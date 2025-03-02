@@ -1,0 +1,145 @@
+import 'package:flutter/material.dart';
+
+class AppLocalizations {
+  final String locale;
+
+  AppLocalizations(this.locale);
+
+  static AppLocalizations of(BuildContext context) {
+    return Localizations.of<AppLocalizations>(context, AppLocalizations)!;
+  }
+
+  static Map<String, Map<String, String>> _localizedValues = {
+    'uk': {
+      'tests': 'Тести',
+      'theory': 'Теорія',
+      'routes': 'Маршрути',
+      'premium': 'Premium',
+      'profile': 'Профіль',
+      'testing': 'Тестування',
+      'take_exam': 'Складай іспит',
+      'exam_desc': 'як в СЦ МВС: 20 запитань, 20 хвилин',
+      'learn_by_topics': 'Вчи по темах',
+      'topics_desc': 'Запитання згруповані по темах',
+      'practice_tickets': 'Тренуйся по білетах',
+      'practice_desc': '20 випадкових запитань, без обмежень',
+      'mistake_work': 'Робота над помилками',
+      'my_mistakes': 'Мої помилки',
+      'mistakes_desc': 'Запитання, де були допущені помилки',
+      'common_mistakes': 'Часті помилки',
+      'common_mistakes_desc': '100 найбільш складних запитань в іспиті',
+      'saved': 'Збережені',
+      'saved_desc': 'Збережені питання з різних розділів',
+      'video': 'Відео',
+      'video_lectures': '👉 Лекції з ПДР 👈',
+      'lectures_desc': 'Відеолекції з різних розділів ПДР',
+      'traffic_rules': 'Правила Дорожнього Руху',
+      'theory_course': 'Теоретичний курс майбутнього водія',
+      'rules': 'Правила дорожнього руху',
+      'signs': 'Знаки',
+      'road_markings': 'Дорожня розмітка',
+      'traffic_controller': 'Регулювальник',
+      'traffic_lights': 'Світлофор',
+      'my_profile': 'Мій профіль',
+      'edit_profile': 'Редагувати профіль',
+      'total_progress': 'Загальний прогрес по темах:',
+      'exams_passed': 'Зданих іспитів',
+      'avg_score': 'Середній рахунок іспиту',
+      'questions_completed': 'Запитань пройдено',
+      'wrong_answers': 'Невірних відповідей',
+      'correct_answers': 'Правильних відповідей',
+      'support': 'Підтримка',
+      'support_desc': 'Відповіді на ваші питання',
+      'category': 'Категорія:',
+      'my_group': 'Моя Група:',
+      'join_group': 'приєднатись до групи',
+      'select_language': 'Обрати мову:',
+      'logout': 'Вийти з акаунта',
+      'choose_language': 'Оберіть мову',
+    },
+    'ru': {
+      'tests': 'Тесты',
+      'theory': 'Теория',
+      'routes': 'Маршруты',
+      'premium': 'Premium',
+      'profile': 'Профиль',
+      'testing': 'Тестирование',
+      'take_exam': 'Сдай экзамен',
+      'exam_desc': 'как в СЦ МВД: 20 вопросов, 20 минут',
+      'learn_by_topics': 'Учи по темам',
+      'topics_desc': 'Вопросы сгруппированные по темам',
+      'practice_tickets': 'Тренируйся по билетам',
+      'practice_desc': '20 случайных вопросов, без ограничений',
+      'mistake_work': 'Работа над ошибками',
+      'my_mistakes': 'Мои ошибки',
+      'mistakes_desc': 'Вопросы, где были допущены ошибки',
+      'common_mistakes': 'Частые ошибки',
+      'common_mistakes_desc': '100 наиболее сложных вопросов в экзамене',
+      'saved': 'Сохраненные',
+      'saved_desc': 'Сохраненные вопросы из разных разделов',
+      'video': 'Видео',
+      'video_lectures': '👉 Лекции по ПДД 👈',
+      'lectures_desc': 'Видеолекции из разных разделов ПДД',
+      'traffic_rules': 'Правила Дорожного Движения',
+      'theory_course': 'Теоретический курс будущего водителя',
+      'rules': 'Правила дорожного движения',
+      'signs': 'Знаки',
+      'road_markings': 'Дорожная разметка',
+      'traffic_controller': 'Регулировщик',
+      'traffic_lights': 'Светофор',
+      'my_profile': 'Мой профиль',
+      'edit_profile': 'Редактировать профиль',
+      'total_progress': 'Общий прогресс по темам:',
+      'exams_passed': 'Сданных экзаменов',
+      'avg_score': 'Средний счет экзамена',
+      'questions_completed': 'Вопросов пройдено',
+      'wrong_answers': 'Неверных ответов',
+      'correct_answers': 'Правильных ответов',
+      'support': 'Поддержка',
+      'support_desc': 'Ответы на ваши вопросы',
+      'category': 'Категория:',
+      'my_group': 'Моя Группа:',
+      'join_group': 'присоединиться к группе',
+      'select_language': 'Выбрать язык:',
+      'logout': 'Выйти из аккаунта',
+      'choose_language': 'Выберите язык',
+    },
+    'pl': {
+      'tests': 'Testy',
+      'theory': 'Teoria',
+      'routes': 'Trasy',
+      'premium': 'Premium',
+      'profile': 'Profil',
+      // Add all Polish translations here
+    },
+    'be': {
+      'tests': 'Тэсты',
+      'theory': 'Тэорыя',
+      'routes': 'Маршруты',
+      'premium': 'Premium',
+      'profile': 'Профіль',
+      // Add all Belarusian translations here
+    },
+  };
+
+  String translate(String key) {
+    return _localizedValues[locale]?[key] ?? _localizedValues['uk']![key] ?? key;
+  }
+}
+
+class AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
+  const AppLocalizationsDelegate();
+
+  @override
+  bool isSupported(Locale locale) {
+    return ['uk', 'ru', 'pl', 'be'].contains(locale.languageCode);
+  }
+
+  @override
+  Future<AppLocalizations> load(Locale locale) async {
+    return AppLocalizations(locale.languageCode);
+  }
+
+  @override
+  bool shouldReload(AppLocalizationsDelegate old) => false;
+}
