@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/license_data.dart';
+import 'traffic_rules_topics_screen.dart';
 
 class TheoryScreen extends StatelessWidget {
   @override
@@ -37,6 +38,12 @@ class TheoryScreen extends StatelessWidget {
                 '',
                 () {
                   // Navigate to traffic rules
+                  Navigator.push(
+                    context,
+                   MaterialPageRoute(
+                     builder: (context) => TrafficRulesTopicsScreen(),
+                   ),
+                 );
                 },
               ),
               _buildTheoryItem(
