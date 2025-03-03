@@ -54,40 +54,11 @@ class TestScreen extends StatelessWidget {
               _buildSectionHeader('Робота над помилками'),
               _buildTestItem(
                 context,
-                'assets/images/mistakes.png',
-                'Мої помилки',
-                'Запитання, де були допущені помилки',
-                () {
-                  // Navigate to mistakes section
-                },
-              ),
-              _buildTestItem(
-                context,
-                'assets/images/frequent.png',
-                'Часті помилки',
-                '100 найбільш складних запитань в іспиті',
-                () {
-                  // Navigate to frequent mistakes
-                },
-              ),
-              _buildTestItem(
-                context,
                 'assets/images/saved.png',
                 'Збережені',
                 'Збережені питання з різних розділів',
                 () {
                   // Navigate to saved questions
-                },
-              ),
-              SizedBox(height: 16),
-              _buildSectionHeader('Відео'),
-              _buildTestItem(
-                context,
-                'assets/images/video.png',
-                '👉 Лекції з ПДР 👈',
-                'Відеолекції з різних розділів ПДР',
-                () {
-                  // Navigate to video lectures
                 },
               ),
             ],

@@ -32,15 +32,6 @@ class TheoryScreen extends StatelessWidget {
               SizedBox(height: 24),
               _buildTheoryItem(
                 context,
-                'assets/images/video.png',
-                'Лекції з ПДР',
-                'Відеолекції з різних розділів',
-                () {
-                  // Navigate to video lectures
-                },
-              ),
-              _buildTheoryItem(
-                context,
                 'assets/images/rules.png',
                 'Правила дорожнього руху',
                 '',

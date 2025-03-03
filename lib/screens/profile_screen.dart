@@ -77,61 +77,6 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              SizedBox(height: 24),
-              Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Загальний прогрес по темах:',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      SizedBox(height: 16),
-                      LinearProgressIndicator(
-                        value: 0,
-                        backgroundColor: Colors.red[50],
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
-                      ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                          '0%',
-                          style: TextStyle(
-                            color: Colors.red,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildProgressIndicator('Зданих іспитів', '0', '/'),
-                          _buildProgressIndicator('Середній рахунок іспиту', '0', '/20'),
-                        ],
-                      ),
-                      Divider(height: 32),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildProgressCount('Запитань пройдено', '0', Colors.black),
-                          _buildProgressCount('Невірних відповідей', '0', Colors.red),
-                          _buildProgressCount('Правильних відповідей', '0', Colors.green),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
               SizedBox(height: 16),
               _buildMenuCard(
                 'Підтримка',
