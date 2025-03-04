@@ -31,22 +31,6 @@ final List<TheoryModule> theoryModules = [
     topics: ['Попереджувальні знаки', 'Знаки пріоритету', 'Заборонні знаки'],
   ),
   TheoryModule(
-    id: 'road-markings',
-    licenseId: 'driver',
-    title: 'Дорожня розмітка',
-    description: 'Вивчення дорожньої розмітки та її значення',
-    estimatedTime: 25,
-    topics: ['Горизонтальна розмітка', 'Вертикальна розмітка'],
-  ),
-  TheoryModule(
-    id: 'traffic-controller',
-    licenseId: 'driver',
-    title: 'Регулювальник',
-    description: 'Вивчення сигналів регулювальника',
-    estimatedTime: 20,
-    topics: ['Жести регулювальника', 'Пріоритет регулювальника'],
-  ),
-  TheoryModule(
     id: 'traffic-lights',
     licenseId: 'driver',
     title: 'Світлофор',

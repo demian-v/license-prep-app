@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../data/license_data.dart';
 import 'traffic_rules_topics_screen.dart';
+import 'road_signs_screen.dart';
+import 'road_sign_category_screen.dart';
 
 class TheoryScreen extends StatelessWidget {
   @override
@@ -53,24 +55,12 @@ class TheoryScreen extends StatelessWidget {
                 '',
                 () {
                   // Navigate to road signs
-                },
-              ),
-              _buildTheoryItem(
-                context,
-                'assets/images/markings.png',
-                'Дорожня розмітка',
-                '',
-                () {
-                  // Navigate to road markings
-                },
-              ),
-              _buildTheoryItem(
-                context,
-                'assets/images/controller.png',
-                'Регулювальник',
-                '',
-                () {
-                  // Navigate to traffic controller
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => RoadSignCategoryScreen(),
+                    ),
+                  );
                 },
               ),
               _buildTheoryItem(
@@ -116,8 +106,6 @@ class TheoryScreen extends StatelessWidget {
                 child: Icon(
                   title == 'Лекції з ПДР' ? Icons.play_circle : 
                   title == 'Знаки' ? Icons.warning : 
-                  title == 'Дорожня розмітка' ? Icons.edit_road : 
-                  title == 'Регулювальник' ? Icons.person : 
                   title == 'Світлофор' ? Icons.traffic : 
                   Icons.menu_book,
                   color: Colors.blue,
