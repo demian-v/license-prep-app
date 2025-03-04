@@ -27,6 +27,7 @@ flutter:
     - assets/images/
     - assets/images/signs/
     - assets/images/signs/examples/
+    - assets/images/traffic_lights/
   fonts:
     - family: Roboto
       fonts:

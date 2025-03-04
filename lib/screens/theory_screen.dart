@@ -3,6 +3,7 @@ import '../data/license_data.dart';
 import 'traffic_rules_topics_screen.dart';
 import 'road_signs_screen.dart';
 import 'road_sign_category_screen.dart';
+import 'traffic_light_screen.dart';
 
 class TheoryScreen extends StatelessWidget {
   @override
@@ -70,6 +71,12 @@ class TheoryScreen extends StatelessWidget {
                 '',
                 () {
                   // Navigate to traffic lights
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => TrafficLightScreen(),
+                    ),
+                  );
                 },
               ),
             ],
