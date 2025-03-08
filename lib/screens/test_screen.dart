@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../data/license_data.dart';
 import '../widgets/test_card.dart';
+import 'topic_quiz_screen.dart';
+import 'saved_items_screen.dart';
 
 class TestScreen extends StatelessWidget {
   @override
@@ -39,6 +41,12 @@ class TestScreen extends StatelessWidget {
                 'Запитання згруповані по темах',
                 () {
                   // Navigate to themed questions
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => TopicQuizScreen(),
+                    ),
+                  );
                 },
               ),
               _buildTestItem(
@@ -59,6 +67,12 @@ class TestScreen extends StatelessWidget {
                 'Збережені питання з різних розділів',
                 () {
                   // Navigate to saved questions
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => SavedItemsScreen(),
+                    ),
+                  );
                 },
               ),
             ],
