@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../data/license_data.dart';
 import '../widgets/test_card.dart';
+import '../providers/exam_provider.dart';
 import 'topic_quiz_screen.dart';
 import 'saved_items_screen.dart';
+import 'exam_question_screen.dart';
 
 class TestScreen extends StatelessWidget {
   @override
@@ -29,9 +32,19 @@ class TestScreen extends StatelessWidget {
                 context,
                 'assets/images/exam.png',
                 'Складай іспит',
-                'як в СЦ МВС: 20 запитань, 20 хвилин',
+                'як в СЦ МВС: 40 запитань, 60 хвилин',
                 () {
-                  // Navigate to the exam simulation
+                  // Start a new exam
+                  final examProvider = Provider.of<ExamProvider>(context, listen: false);
+                  examProvider.startNewExam();
+                  
+                  // Navigate to the exam question screen
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ExamQuestionScreen(),
+                    ),
+                  );
                 },
               ),
               _buildTestItem(

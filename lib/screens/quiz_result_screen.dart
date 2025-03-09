@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/quiz_topic.dart';
+import '../providers/progress_provider.dart';
 
 class QuizResultScreen extends StatelessWidget {
   final QuizTopic topic;
@@ -16,6 +18,15 @@ class QuizResultScreen extends StatelessWidget {
     int totalAnswered = answers.length;
     int correctAnswers = answers.values.where((v) => v).length;
     int incorrectAnswers = totalAnswered - correctAnswers;
+    
+    // Calculate progress percentage and update in provider
+    double progressPercentage = correctAnswers / topic.questionCount;
+    
+    // Get the progress provider and update the topic progress
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
+      progressProvider.updateTopicProgress(topic.id, progressPercentage);
+    });
     
     return Scaffold(
       appBar: AppBar(

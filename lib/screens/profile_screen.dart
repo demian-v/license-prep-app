@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
 import '../localization/app_localizations.dart';
 import '../providers/subscription_provider.dart';
+import '../providers/progress_provider.dart';
 
 class ProfileScreen extends StatelessWidget {
   @override
@@ -106,6 +107,17 @@ class ProfileScreen extends StatelessWidget {
                 Colors.amber,
                 () {
                   Navigator.pushNamed(context, '/subscription');
+                },
+              ),
+              SizedBox(height: 16),
+              _buildMenuCard(
+                'Скинути статистику',
+                'Повернути все як було раніше',
+                Icons.restart_alt,
+                Colors.red[50]!,
+                Colors.red,
+                () {
+                  _showResetProgressConfirmation(context);
                 },
               ),
               SizedBox(height: 24),
@@ -219,6 +231,43 @@ Widget _buildLanguageOption(BuildContext context, String language, String code, 
       provider.setLanguage(code);
       Navigator.pop(context);
     },
+  );
+}
+
+void _showResetProgressConfirmation(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('Скинути статистику'),
+      content: Text('Ви впевнені, що хочете скинути всю вашу статистику? Це видалить весь ваш прогрес у тестах та темах. Цю дію неможливо скасувати.'),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.pop(context);
+          },
+          child: Text('Скасувати'),
+        ),
+        TextButton(
+          onPressed: () async {
+            final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
+            await progressProvider.resetProgress();
+            Navigator.pop(context);
+            
+            // Show confirmation
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Статистику скинуто успішно'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          },
+          child: Text('Скинути'),
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.red,
+          ),
+        ),
+      ],
+    ),
   );
 }
 }

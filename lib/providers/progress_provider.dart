@@ -52,4 +52,38 @@ class ProgressProvider extends ChangeNotifier {
     
     notifyListeners();
   }
+  
+  Future<void> resetProgress() async {
+    // Create a new empty progress object, keeping only the selected license
+    final updatedProgress = UserProgress(
+      completedModules: [],
+      testScores: {},
+      selectedLicense: progress.selectedLicense,
+      topicProgress: {}, // Reset topic progress to empty
+    );
+    
+    progress = updatedProgress;
+    
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('progress', jsonEncode(updatedProgress.toJson()));
+    
+    notifyListeners();
+  }
+  
+  // Add a method to update topic progress
+  Future<void> updateTopicProgress(String topicId, double progressValue) async {
+    final updatedTopicProgress = Map<String, double>.from(progress.topicProgress);
+    updatedTopicProgress[topicId] = progressValue;
+    
+    final updatedProgress = progress.copyWith(
+      topicProgress: updatedTopicProgress,
+    );
+    
+    progress = updatedProgress;
+    
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('progress', jsonEncode(updatedProgress.toJson()));
+    
+    notifyListeners();
+  }
 }

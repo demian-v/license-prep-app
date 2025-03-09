@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../data/quiz_data.dart';
 import '../models/quiz_progress.dart';
+import '../providers/progress_provider.dart';
 import '../screens/quiz_question_screen.dart';
 
 class TopicQuizScreen extends StatefulWidget {
@@ -9,24 +11,13 @@ class TopicQuizScreen extends StatefulWidget {
 }
 
 class _TopicQuizScreenState extends State<TopicQuizScreen> {
-  // Mock progress data - in a real app, this would come from a database or provider
-  final Map<String, double> mockTopicProgress = {
-    'general': 0.01,
-    'driver_obligations': 0.0,
-    'special_signals': 0.4,
-    'pedestrian_obligations': 0.0,
-    'passenger_obligations': 0.0,
-    'cyclist_requirements': 0.0,
-  };
-  
-  double get overallProgress {
-    if (mockTopicProgress.isEmpty) return 0.0;
-    double sum = mockTopicProgress.values.fold(0.0, (a, b) => a + b);
-    return sum / mockTopicProgress.length;
-  }
 
   @override
   Widget build(BuildContext context) {
+    final progressProvider = Provider.of<ProgressProvider>(context);
+    final topicProgress = progressProvider.progress.topicProgress;
+    final overallProgress = progressProvider.progress.overallTopicProgress;
+    
     return Scaffold(
       appBar: AppBar(
         title: Text('Вчити по темах'),
@@ -103,7 +94,7 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> {
               itemCount: quizTopics.length,
               itemBuilder: (context, index) {
                 final topic = quizTopics[index];
-                final progress = mockTopicProgress[topic.id] ?? 0.0;
+                final progress = topicProgress[topic.id] ?? 0.0;
                 
                 return Card(
                   margin: EdgeInsets.only(bottom: 16),
