@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../data/quiz_data.dart';
 import '../models/quiz_topic.dart';
 import '../models/quiz_question.dart';
+import '../providers/progress_provider.dart';
 import 'quiz_result_screen.dart';
 
 class QuizQuestionScreen extends StatefulWidget {
@@ -108,10 +110,20 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
               // Show report button functionality
             },
           ),
-          IconButton(
-            icon: Icon(Icons.favorite_border),
-            onPressed: () {
-              // Add to favorites functionality
+          Consumer<ProgressProvider>(
+            builder: (context, progressProvider, child) {
+              final questionId = questions[currentQuestionIndex].id;
+              final isSaved = progressProvider.isQuestionSaved(questionId);
+              
+              return IconButton(
+                icon: Icon(
+                  isSaved ? Icons.favorite : Icons.favorite_border,
+                  color: isSaved ? Colors.red : null,
+                ),
+                onPressed: () {
+                  progressProvider.toggleSavedQuestion(questionId);
+                },
+              );
             },
           ),
         ],

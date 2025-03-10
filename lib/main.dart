@@ -22,6 +22,7 @@ import 'providers/subscription_provider.dart';
 import 'providers/progress_provider.dart';
 import 'providers/language_provider.dart';
 import 'providers/exam_provider.dart';
+import 'providers/practice_provider.dart';
 import 'localization/app_localizations.dart';
 
 void main() async {
@@ -64,6 +65,7 @@ void main() async {
       testScores: {},
       selectedLicense: null,
       topicProgress: {}, // Initialize empty topic progress
+      savedQuestions: [], // Initialize empty saved questions
     );
   }
   
@@ -73,8 +75,9 @@ void main() async {
   final progressProvider = ProgressProvider(progress);
   final languageProvider = LanguageProvider();
 
-  // Create exam provider
+  // Create exam and practice providers
   final examProvider = ExamProvider();
+  final practiceProvider = PracticeProvider();
   
   runApp(
     MultiProvider(
@@ -84,6 +87,7 @@ void main() async {
         ChangeNotifierProvider.value(value: progressProvider),
         ChangeNotifierProvider.value(value: languageProvider),
         ChangeNotifierProvider.value(value: examProvider),
+        ChangeNotifierProvider.value(value: practiceProvider),
       ],
       child: MyApp(
         authProvider: authProvider,

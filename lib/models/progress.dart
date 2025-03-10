@@ -3,12 +3,14 @@ class UserProgress {
   final Map<String, double> testScores;
   final String? selectedLicense;
   final Map<String, double> topicProgress; // Added for quiz progress
+  final List<String> savedQuestions; // For storing saved/favorited questions
 
   UserProgress({
     required this.completedModules,
     required this.testScores,
     this.selectedLicense,
-    required this.topicProgress, // New parameter
+    required this.topicProgress,
+    required this.savedQuestions,
   });
 
   factory UserProgress.fromJson(Map<String, dynamic> json) {
@@ -32,6 +34,7 @@ class UserProgress {
       testScores: scores,
       selectedLicense: json['selectedLicense'],
       topicProgress: topics,
+      savedQuestions: List<String>.from(json['savedQuestions'] ?? []),
     );
   }
 
@@ -41,6 +44,7 @@ class UserProgress {
       'testScores': testScores,
       'selectedLicense': selectedLicense,
       'topicProgress': topicProgress,
+      'savedQuestions': savedQuestions,
     };
   }
 
@@ -49,12 +53,14 @@ class UserProgress {
     Map<String, double>? testScores,
     String? selectedLicense,
     Map<String, double>? topicProgress,
+    List<String>? savedQuestions,
   }) {
     return UserProgress(
       completedModules: completedModules ?? this.completedModules,
       testScores: testScores ?? this.testScores,
       selectedLicense: selectedLicense ?? this.selectedLicense,
       topicProgress: topicProgress ?? this.topicProgress,
+      savedQuestions: savedQuestions ?? this.savedQuestions,
     );
   }
   

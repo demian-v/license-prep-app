@@ -60,6 +60,7 @@ class ProgressProvider extends ChangeNotifier {
       testScores: {},
       selectedLicense: progress.selectedLicense,
       topicProgress: {}, // Reset topic progress to empty
+      savedQuestions: [], // Reset saved questions to empty
     );
     
     progress = updatedProgress;
@@ -68,6 +69,35 @@ class ProgressProvider extends ChangeNotifier {
     await prefs.setString('progress', jsonEncode(updatedProgress.toJson()));
     
     notifyListeners();
+  }
+  
+  // Toggle a question's saved status
+  Future<void> toggleSavedQuestion(String questionId) async {
+    final List<String> updatedSavedQuestions = List<String>.from(progress.savedQuestions);
+    
+    if (updatedSavedQuestions.contains(questionId)) {
+      // Remove if already saved
+      updatedSavedQuestions.remove(questionId);
+    } else {
+      // Add if not saved
+      updatedSavedQuestions.add(questionId);
+    }
+    
+    final updatedProgress = progress.copyWith(
+      savedQuestions: updatedSavedQuestions,
+    );
+    
+    progress = updatedProgress;
+    
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('progress', jsonEncode(updatedProgress.toJson()));
+    
+    notifyListeners();
+  }
+  
+  // Check if a question is saved
+  bool isQuestionSaved(String questionId) {
+    return progress.savedQuestions.contains(questionId);
   }
   
   // Add a method to update topic progress

@@ -6,6 +6,8 @@ import '../providers/exam_provider.dart';
 import 'topic_quiz_screen.dart';
 import 'saved_items_screen.dart';
 import 'exam_question_screen.dart';
+import 'practice_question_screen.dart';
+import '../providers/practice_provider.dart';
 
 class TestScreen extends StatelessWidget {
   @override
@@ -66,9 +68,19 @@ class TestScreen extends StatelessWidget {
                 context,
                 'assets/images/random.png',
                 'Тренуйся по білетах',
-                '20 випадкових запитань, без обмежень',
+                '40 випадкових запитань, без обмежень часу',
                 () {
-                  // Navigate to random questions
+                  // Start a new practice test
+                  final practiceProvider = Provider.of<PracticeProvider>(context, listen: false);
+                  practiceProvider.startNewPractice();
+                  
+                  // Navigate to the practice question screen
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => PracticeQuestionScreen(),
+                    ),
+                  );
                 },
               ),
               SizedBox(height: 16),

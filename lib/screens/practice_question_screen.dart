@@ -1,34 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/exam_provider.dart';
+import '../providers/practice_provider.dart';
 import '../providers/progress_provider.dart';
 import '../models/quiz_question.dart';
-import 'exam_result_screen.dart';
+import 'practice_result_screen.dart';
 
-class ExamQuestionScreen extends StatefulWidget {
+class PracticeQuestionScreen extends StatefulWidget {
   @override
-  _ExamQuestionScreenState createState() => _ExamQuestionScreenState();
+  _PracticeQuestionScreenState createState() => _PracticeQuestionScreenState();
 }
 
-class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
+class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> {
   dynamic selectedAnswer;
   bool isAnswerChecked = false;
   bool? isCorrect;
 
   @override
   Widget build(BuildContext context) {
-    final examProvider = Provider.of<ExamProvider>(context);
-    final exam = examProvider.currentExam;
+    final practiceProvider = Provider.of<PracticeProvider>(context);
+    final practice = practiceProvider.currentPractice;
     
-    if (exam == null) {
+    if (practice == null) {
       return Scaffold(
         body: Center(
-          child: Text("Іспит не активний"),
+          child: Text("Тренування не активне"),
         ),
       );
     }
     
-    final currentQuestion = examProvider.getCurrentQuestion();
+    final currentQuestion = practiceProvider.getCurrentQuestion();
     if (currentQuestion == null) {
       return Scaffold(
         body: Center(
@@ -37,19 +37,13 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
       );
     }
     
-    // Format remaining time
-    final remainingTime = exam.remainingTime;
-    final minutes = remainingTime.inMinutes;
-    final seconds = remainingTime.inSeconds % 60;
-    final timeText = "${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}";
-    
     // Check if we need to show result screen
-    if (exam.isCompleted) {
+    if (practice.isCompleted) {
       // Navigate to results
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => ExamResultScreen(),
+            builder: (context) => PracticeResultScreen(),
           ),
         );
       });
@@ -65,7 +59,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
       onWillPop: _onWillPop,
       child: Scaffold(
         appBar: AppBar(
-          title: Text("Іспит $timeText"),
+          title: Text("Тренування по білетах"),
           centerTitle: true,
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
@@ -85,7 +79,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
             ),
             Consumer<ProgressProvider>(
               builder: (context, progressProvider, child) {
-                final currentQuestion = examProvider.getCurrentQuestion();
+                final currentQuestion = practiceProvider.getCurrentQuestion();
                 if (currentQuestion == null) return SizedBox.shrink();
                 
                 final questionId = currentQuestion.id;
@@ -112,12 +106,12 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 padding: EdgeInsets.symmetric(horizontal: 16),
-                itemCount: exam.questionIds.length,
+                itemCount: practice.questionIds.length,
                 itemBuilder: (context, index) {
-                  bool isActive = index == exam.currentQuestionIndex;
-                  String questionId = exam.questionIds[index];
-                  bool isAnswered = exam.answers.containsKey(questionId);
-                  bool isAnsweredCorrectly = isAnswered ? exam.answers[questionId]! : false;
+                  bool isActive = index == practice.currentQuestionIndex;
+                  String questionId = practice.questionIds[index];
+                  bool isAnswered = practice.answers.containsKey(questionId);
+                  bool isAnsweredCorrectly = isAnswered ? practice.answers[questionId]! : false;
                   
                   Color pillColor = isActive
                       ? Colors.blue
@@ -231,7 +225,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
                   ? ElevatedButton(
                       onPressed: () {
                         // Save answer and move to next question
-                        examProvider.answerQuestion(
+                        practiceProvider.answerQuestion(
                           currentQuestion.id,
                           isCorrect ?? false,
                         );
@@ -242,7 +236,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
                           isCorrect = null;
                         });
                         
-                        examProvider.goToNextQuestion();
+                        practiceProvider.goToNextQuestion();
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
@@ -260,7 +254,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
                           child: ElevatedButton(
                             onPressed: () {
                               // Skip question
-                              examProvider.skipQuestion();
+                              practiceProvider.skipQuestion();
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
@@ -314,16 +308,16 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text("Вийти з іспиту?"),
+        title: Text("Вийти з тренування?"),
         content: Text(
-          "Якщо ви вийдете з іспиту, результат вашого проходження не збережеться",
+          "Якщо ви вийдете з тренування, результат вашого проходження не збережеться",
         ),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.of(context).pop(true); // Yes, exit
-              // Cancel the exam
-              Provider.of<ExamProvider>(context, listen: false).cancelExam();
+              // Cancel the practice
+              Provider.of<PracticeProvider>(context, listen: false).cancelPractice();
               Navigator.of(context).pop(); // Return to previous screen
             },
             child: Text("Вийти"),
