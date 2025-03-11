@@ -88,14 +88,49 @@ class ProfileScreen extends StatelessWidget {
                 () {},
               ),
               SizedBox(height: 16),
-              _buildMenuCard(
-                'Обрати мову:',
-                'Українська',
-                Icons.language,
-                Colors.teal[50]!,
-                Colors.teal,
-                () {
-                  _showLanguageSelector(context);
+              Consumer<LanguageProvider>(
+                builder: (context, languageProvider, _) {
+                  // Map language codes to display names
+                  final Map<String, String> languageNames = {
+                    'en': 'English',
+                    'es': 'Spanish',
+                    'uk': 'Українська',
+                    'pl': 'Polish',
+                    'ru': 'Russian',
+                  };
+                  
+                  // Get current language display name
+                  final String currentLanguage = 
+                      languageNames[languageProvider.language] ?? 'Українська';
+                  
+                  return _buildMenuCard(
+                    'Обрати мову:',
+                    currentLanguage,
+                    Icons.language,
+                    Colors.teal[50]!,
+                    Colors.teal,
+                    () {
+                      _showLanguageSelector(context);
+                    },
+                  );
+                },
+              ),
+              SizedBox(height: 16),
+              Consumer<AuthProvider>(
+                builder: (context, authProvider, _) {
+                  // Get current state
+                  final String currentState = authProvider.user?.state ?? 'Not selected';
+                  
+                  return _buildMenuCard(
+                    'Штат:',
+                    currentState,
+                    Icons.location_on,
+                    Colors.blue[50]!,
+                    Colors.blue,
+                    () {
+                      _showStateSelector(context);
+                    },
+                  );
                 },
               ),
               SizedBox(height: 16),
@@ -205,32 +240,151 @@ class ProfileScreen extends StatelessWidget {
 
 void _showLanguageSelector(BuildContext context) {
   final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+  final authProvider = Provider.of<AuthProvider>(context, listen: false);
+  
+  // Map language codes to display names - using the same languages as language_selection_screen.dart
+  final Map<String, String> languageNames = {
+    'en': 'English',
+    'es': 'Spanish',
+    'uk': 'Українська',
+    'pl': 'Polish',
+    'ru': 'Russian',
+  };
   
   showDialog(
     context: context,
     builder: (context) => AlertDialog(
-      title: Text(AppLocalizations.of(context).translate('choose_language')),
+      title: Text('Select Language'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildLanguageOption(context, 'Українська', 'uk', languageProvider),
-          _buildLanguageOption(context, 'Русский', 'ru', languageProvider),
-          _buildLanguageOption(context, 'Polski', 'pl', languageProvider),
-          _buildLanguageOption(context, 'Беларуская', 'be', languageProvider),
+          _buildLanguageOption(context, 'English', 'en', languageProvider, authProvider),
+          _buildLanguageOption(context, 'Spanish', 'es', languageProvider, authProvider),
+          _buildLanguageOption(context, 'Українська', 'uk', languageProvider, authProvider),
+          _buildLanguageOption(context, 'Polish', 'pl', languageProvider, authProvider),
+          _buildLanguageOption(context, 'Russian', 'ru', languageProvider, authProvider),
         ],
       ),
     ),
   );
 }
 
-Widget _buildLanguageOption(BuildContext context, String language, String code, LanguageProvider provider) {
+Widget _buildLanguageOption(BuildContext context, String language, String code, 
+    LanguageProvider provider, AuthProvider authProvider) {
   return ListTile(
     title: Text(language),
     trailing: provider.language == code ? Icon(Icons.check, color: Colors.green) : null,
-    onTap: () {
-      provider.setLanguage(code);
+    onTap: () async {
+      // Update both providers, just like in the language_selection_screen
+      await provider.setLanguage(code);
+      await authProvider.updateUserLanguage(code);
       Navigator.pop(context);
+      
+      // Visual feedback
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Language changed to $language'),
+          duration: Duration(seconds: 1),
+        ),
+      );
     },
+  );
+}
+
+void _showStateSelector(BuildContext context) {
+  final authProvider = Provider.of<AuthProvider>(context, listen: false);
+  final currentState = authProvider.user?.state;
+  
+  // List of all US states from state_selection_screen.dart
+  final List<String> allStates = [
+    'ALABAMA',
+    'ALASKA',
+    'ARIZONA',
+    'ARKANSAS',
+    'CALIFORNIA',
+    'COLORADO',
+    'CONNECTICUT',
+    'DELAWARE',
+    'DISTRICT OF COLUMBIA',
+    'FLORIDA',
+    'GEORGIA',
+    'HAWAII',
+    'IDAHO',
+    'ILLINOIS',
+    'INDIANA',
+    'IOWA',
+    'KANSAS',
+    'KENTUCKY',
+    'LOUISIANA',
+    'MAINE',
+    'MARYLAND',
+    'MASSACHUSETTS',
+    'MICHIGAN',
+    'MINNESOTA',
+    'MISSISSIPPI',
+    'MISSOURI',
+    'MONTANA',
+    'NEBRASKA',
+    'NEVADA',
+    'NEW HAMPSHIRE',
+    'NEW JERSEY',
+    'NEW MEXICO',
+    'NEW YORK',
+    'NORTH CAROLINA',
+    'NORTH DAKOTA',
+    'OHIO',
+    'OKLAHOMA',
+    'OREGON',
+    'PENNSYLVANIA',
+    'RHODE ISLAND',
+    'SOUTH CAROLINA',
+    'SOUTH DAKOTA',
+    'TENNESSEE',
+    'TEXAS',
+    'UTAH',
+    'VERMONT',
+    'VIRGINIA',
+    'WASHINGTON',
+    'WEST VIRGINIA',
+    'WISCONSIN',
+    'WYOMING',
+  ];
+  
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('Select State'),
+      content: Container(
+        width: double.maxFinite,
+        height: 400, // Fixed height for scrollable content
+        child: ListView.builder(
+          shrinkWrap: true,
+          itemCount: allStates.length,
+          itemBuilder: (context, index) {
+            final state = allStates[index];
+            final isSelected = state == currentState;
+            
+            return ListTile(
+              title: Text(state),
+              trailing: isSelected ? Icon(Icons.check, color: Colors.green) : null,
+              onTap: () async {
+                // Update state in auth provider
+                await authProvider.updateUserState(state);
+                Navigator.pop(context);
+                
+                // Visual feedback
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('State changed to $state'),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+              },
+            );
+          },
+        ),
+      ),
+    ),
   );
 }
 

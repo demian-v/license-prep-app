@@ -97,35 +97,19 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Color(0xFF2196F3),
+        title: Text(
+          'State Selection',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         elevation: 0,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        foregroundColor: Colors.black,
+        centerTitle: true,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text(
-          'State Selection', 
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        actions: [
-          if (_selectedState != null)
-            Container(
-              margin: EdgeInsets.only(right: 16),
-              padding: EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.check_circle_outline,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-        ],
+        // No actions in app bar
       ),
       body: SafeArea(
         child: Column(
@@ -242,20 +226,6 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
             ),
           ),
         ),
-        // Progress indicator
-        Container(
-          padding: EdgeInsets.only(bottom: 24),
-          child: Center(
-            child: Container(
-              width: 100,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.black,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -264,18 +234,15 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
     return Expanded(
       child: Column(
         children: [
+          // Section header
+          _buildSectionHeader('Select your state'),
+          
           // Enhanced search bar
           Container(
             margin: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: Offset(0, 3),
-                ),
-              ],
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey[300]!),
             ),
             child: TextField(
               controller: _searchController,
@@ -349,39 +316,14 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
                   )
                 : ListView.builder(
                     itemCount: _filteredStates.length,
-                    padding: EdgeInsets.symmetric(vertical: 8),
+                    padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                     itemBuilder: (context, index) {
                       final state = _filteredStates[index];
                       final isSelected = state == _selectedState;
                       
-                      return Container(
-                        margin: EdgeInsets.fromLTRB(16, 4, 16, 4),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: isSelected
-                              ? [
-                                  BoxShadow(
-                                    color: Color(0xFF2196F3).withOpacity(0.2),
-                                    blurRadius: 8,
-                                    offset: Offset(0, 2),
-                                  ),
-                                ]
-                              : null,
-                          gradient: isSelected
-                              ? LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    Color(0xFF2196F3),
-                                    Color(0xFF1976D2),
-                                  ],
-                                )
-                              : null,
-                          color: isSelected ? null : Colors.white,
-                          border: isSelected
-                              ? null
-                              : Border.all(color: Colors.grey[200]!),
-                        ),
+                      return Card(
+                        margin: EdgeInsets.only(bottom: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         child: Material(
                           color: Colors.transparent,
                           child: InkWell(
@@ -392,49 +334,52 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
                               });
                             },
                             child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                              padding: EdgeInsets.all(16),
                               child: Row(
                                 children: [
-                                  AnimatedContainer(
-                                    duration: Duration(milliseconds: 200),
-                                    padding: EdgeInsets.all(8),
+                                  Container(
+                                    width: 56,
+                                    height: 56,
                                     decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
                                       color: isSelected
-                                          ? Colors.white.withOpacity(0.2)
-                                          : Color(0xFF2196F3).withOpacity(0.1),
+                                          ? Color(0xFF2196F3).withOpacity(0.1)
+                                          : Colors.blue[50],
+                                      borderRadius: BorderRadius.circular(28),
                                     ),
                                     child: Icon(
                                       Icons.location_on_rounded,
-                                      color: isSelected
-                                          ? Colors.white
-                                          : Color(0xFF2196F3),
-                                      size: 24,
+                                      color: isSelected ? Color(0xFF2196F3) : Colors.blue,
+                                      size: 28,
                                     ),
                                   ),
                                   SizedBox(width: 16),
                                   Expanded(
-                                    child: Text(
-                                      state,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 16,
-                                        color: isSelected ? Colors.white : Colors.black87,
-                                      ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          state,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        SizedBox(height: 4),
+                                        Text(
+                                          isSelected ? "Selected" : "Tap to select",
+                                          style: TextStyle(
+                                            color: Colors.grey[600],
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                   if (isSelected)
-                                    Container(
-                                      padding: EdgeInsets.all(4),
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: Colors.white.withOpacity(0.3),
-                                      ),
-                                      child: Icon(
-                                        Icons.check,
-                                        color: Colors.white,
-                                        size: 18,
-                                      ),
+                                    Icon(
+                                      Icons.check_circle,
+                                      color: Colors.green,
+                                      size: 24,
                                     ),
                                 ],
                               ),
@@ -450,164 +395,111 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
     );
   }
 
-  Widget _buildContinueButton() {
+  Widget _buildSectionHeader(String title) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: Offset(0, -5),
-            spreadRadius: 1,
+      margin: EdgeInsets.symmetric(vertical: 16),
+      child: Row(
+        children: [
+          Expanded(
+            child: Divider(color: Colors.grey[300]),
+          ),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              title,
+              style: TextStyle(
+                color: Colors.grey[500],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Divider(color: Colors.grey[300]),
           ),
         ],
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
+    );
+  }
+
+  Widget _buildContinueButton() {
+    return Container(
+      padding: EdgeInsets.all(16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Selected state card with icon
-          Container(
+          _buildSectionHeader('Selected State'),
+          
+          // Selected state card
+          Card(
             margin: EdgeInsets.only(bottom: 16),
-            padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF2196F3).withOpacity(0.9),
-                  Color(0xFF2196F3).withOpacity(0.7),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Color(0xFF2196F3).withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    shape: BoxShape.circle,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(28),
+                    ),
+                    child: Icon(
+                      Icons.location_on,
+                      color: Colors.blue,
+                      size: 28,
+                    ),
                   ),
-                  child: Icon(
-                    Icons.location_on,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Selected State',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.9),
-                          fontSize: 14,
+                  SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _selectedState!,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
                         ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        _selectedState!,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
+                        SizedBox(height: 4),
+                        Text(
+                          'Selected state',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 14,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                Container(
-                  padding: EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.3),
-                  ),
-                  child: Icon(
+                  Icon(
                     Icons.check_circle,
-                    color: Colors.white,
+                    color: Colors.green,
                     size: 24,
                   ),
-                ),
-              ],
-            ),
-          ),
-          
-          // Beautiful continue button with gradient
-          Container(
-            width: double.infinity,
-            height: 56,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(28),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF4CAF50),
-                  Color(0xFF43A047),
                 ],
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Color(0xFF4CAF50).withOpacity(0.4),
-                  blurRadius: 10,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(28),
-                onTap: () => _continueToApp(context),
-                child: Center(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Continue',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Icon(
-                        Icons.arrow_forward_rounded,
-                        color: Colors.white,
-                        size: 22,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
             ),
           ),
           
-          // Progress indicator
-          Container(
-            padding: EdgeInsets.only(top: 20, bottom: 4),
-            child: Center(
-              child: Container(
-                width: 80,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
+          // Continue button
+          ElevatedButton(
+            onPressed: () => _continueToApp(context),
+            style: ElevatedButton.styleFrom(
+              foregroundColor: Colors.white,
+              backgroundColor: Colors.green,
+              padding: EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              minimumSize: Size(double.infinity, 56),
+            ),
+            child: Text(
+              'Continue',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ),
