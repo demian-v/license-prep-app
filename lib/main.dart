@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
+import 'services/service_locator.dart';
+
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/license_selection_screen.dart';
@@ -27,6 +29,9 @@ import 'localization/app_localizations.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize service locator
+  serviceLocator.initialize();
   
   // Initialize shared preferences
   final prefs = await SharedPreferences.getInstance();
