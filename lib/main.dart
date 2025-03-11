@@ -125,10 +125,11 @@ class MyApp extends StatelessWidget {
       ),
       locale: Locale(languageProvider.language),
       supportedLocales: [
+        Locale('en'), // English
+        Locale('es'), // Spanish
         Locale('uk'), // Ukrainian
         Locale('ru'), // Russian
         Locale('pl'), // Polish
-        Locale('be'), // Belarusian
       ],
       localizationsDelegates: [
         AppLocalizationsDelegate(),

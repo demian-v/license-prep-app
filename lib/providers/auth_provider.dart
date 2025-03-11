@@ -57,6 +57,30 @@ class AuthProvider extends ChangeNotifier {
       return false;
     }
   }
+  
+  Future<void> updateUserLanguage(String language) async {
+    if (user != null) {
+      final updatedUser = user!.copyWith(language: language);
+      user = updatedUser;
+      
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user', jsonEncode(updatedUser.toJson()));
+      
+      notifyListeners();
+    }
+  }
+  
+  Future<void> updateUserState(String state) async {
+    if (user != null) {
+      final updatedUser = user!.copyWith(state: state);
+      user = updatedUser;
+      
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user', jsonEncode(updatedUser.toJson()));
+      
+      notifyListeners();
+    }
+  }
 
   Future<void> updateProfile(String name) async {
     if (user != null) {

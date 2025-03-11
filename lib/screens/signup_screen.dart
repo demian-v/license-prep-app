@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 // import '../providers/subscription_provider.dart';
+import 'language_selection_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   @override
@@ -43,7 +44,16 @@ class _SignupScreenState extends State<SignupScreen> {
       );
       
       if (success) {
-        // No need to do anything else here, the AuthProvider will update the UI
+        // Make sure navigation happens after a delay to ensure the UI updates properly
+        if (mounted) {
+          Future.delayed(Duration.zero, () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => LanguageSelectionScreen(),
+              ),
+            );
+          });
+        }
       } else if (mounted) {
         setState(() {
           _errorMessage = 'Signup failed. Please try again.';
