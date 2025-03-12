@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "987638335534",
+    "project_id": "licenseprepapp",
+    "storage_bucket": "licenseprepapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:987638335534:android:f641ffe1a4f736717937bf",
+        "android_client_info": {
+          "package_name": "com.example.license_prep_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB3NFSey7JrJHEAejCKrzBWSqrpJg6HMoY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
