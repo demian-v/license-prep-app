@@ -159,6 +159,9 @@ final Map<String, QuizQuestion> quizQuestions = {
       'Відповіді, зазначені в пунктах 1 та 2.',
     ],
     correctAnswer: 'Відповіді, зазначені в пунктах 1 та 2.',
+    explanation:
+        'На автомагістралях максимальна дозволена швидкість становить 130 км/год.',
+    ruleReference: 'ПДР 12.6',
     imagePath: 'assets/images/quiz/tram.jpg',
     type: QuestionType.singleChoice,
   ),
