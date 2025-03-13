@@ -1,21 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'dart:convert';
 import '../models/user.dart';
 import '../services/service_locator.dart';
 
 class AuthProvider extends ChangeNotifier {
   User? user;
+  final firebase_auth.FirebaseAuth _firebaseAuth = firebase_auth.FirebaseAuth.instance;
 
   AuthProvider(this.user);
 
   Future<bool> login(String email, String password) async {
     try {
       if (email.isNotEmpty && password.isNotEmpty) {
-        // Use the API service instead of mock data
-        try {
-          // First try to use the API
-          final loggedInUser = await serviceLocator.authApi.login(email, password);
+        // Sign in with Firebase Auth
+        final userCredential = await _firebaseAuth.signInWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+        
+        final firebaseUser = userCredential.user;
+        if (firebaseUser != null) {
+          // Create our app User model from the Firebase user
+          final loggedInUser = User(
+            id: firebaseUser.uid,
+            name: firebaseUser.displayName ?? email.split('@')[0],
+            email: firebaseUser.email ?? email,
+          );
+          
           user = loggedInUser;
           
           final prefs = await SharedPreferences.getInstance();
@@ -23,25 +36,11 @@ class AuthProvider extends ChangeNotifier {
           
           notifyListeners();
           return true;
-        } catch (apiError) {
-          // If API is not available (e.g., during development), fall back to mock data
-          debugPrint('API error, using mock data: $apiError');
-          
-          final mockUser = User(
-            id: '123',
-            name: email.split('@')[0],
-            email: email,
-          );
-          
-          user = mockUser;
-          
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('user', jsonEncode(mockUser.toJson()));
-          
-          notifyListeners();
-          return true;
         }
       }
+      return false;
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      debugPrint('Firebase login error: ${e.code} - ${e.message}');
       return false;
     } catch (e) {
       debugPrint('Login error: $e');
@@ -52,10 +51,24 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> signup(String name, String email, String password) async {
     try {
       if (name.isNotEmpty && email.isNotEmpty && password.isNotEmpty) {
-        // Use the API service instead of mock data
-        try {
-          // First try to use the API
-          final registeredUser = await serviceLocator.authApi.register(name, email, password);
+        // Create user with Firebase Auth
+        final userCredential = await _firebaseAuth.createUserWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+        
+        final firebaseUser = userCredential.user;
+        if (firebaseUser != null) {
+          // Set the display name
+          await firebaseUser.updateDisplayName(name);
+          
+          // Create our app User model
+          final registeredUser = User(
+            id: firebaseUser.uid,
+            name: name,
+            email: email,
+          );
+          
           user = registeredUser;
           
           final prefs = await SharedPreferences.getInstance();
@@ -63,25 +76,11 @@ class AuthProvider extends ChangeNotifier {
           
           notifyListeners();
           return true;
-        } catch (apiError) {
-          // If API is not available (e.g., during development), fall back to mock data
-          debugPrint('API error, using mock data: $apiError');
-          
-          final mockUser = User(
-            id: DateTime.now().millisecondsSinceEpoch.toString(),
-            name: name,
-            email: email,
-          );
-          
-          user = mockUser;
-          
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('user', jsonEncode(mockUser.toJson()));
-          
-          notifyListeners();
-          return true;
         }
       }
+      return false;
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      debugPrint('Firebase signup error: ${e.code} - ${e.message}');
       return false;
     } catch (e) {
       debugPrint('Signup error: $e');
@@ -172,8 +171,9 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> logout() async {
     try {
-      // Try to use the API
-      await serviceLocator.authApi.logout();
+      // Sign out from Firebase
+      await _firebaseAuth.signOut();
+      
       user = null;
       
       final prefs = await SharedPreferences.getInstance();
@@ -181,9 +181,8 @@ class AuthProvider extends ChangeNotifier {
       
       notifyListeners();
     } catch (e) {
-      // Fallback to local logout if API is not available
-      debugPrint('API error, logging out locally: $e');
-      
+      debugPrint('Logout error: $e');
+      // Still clear local data even if Firebase logout fails
       user = null;
       
       final prefs = await SharedPreferences.getInstance();
