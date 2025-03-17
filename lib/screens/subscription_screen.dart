@@ -131,6 +131,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                               'Next Billing: ${formatDate(subscription.nextBillingDate)}',
                               style: TextStyle(color: Colors.grey.shade700),
                             ),
+                          Text(
+                            'Plan Type: ${subscription.planType.toUpperCase()}',
+                            style: TextStyle(color: Colors.grey.shade700),
+                          ),
                         ],
                       ),
                     ),

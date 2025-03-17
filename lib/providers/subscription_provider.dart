@@ -58,10 +58,13 @@ class SubscriptionProvider extends ChangeNotifier {
         debugPrint('API error, using mock subscription: $apiError');
         
         // Mock implementation
-        final nextBillingDate = DateTime.now().add(Duration(days: 30));
+        final now = DateTime.now();
+        final nextBillingDate = now.add(Duration(days: 30));
         final updatedSubscription = subscription.copyWith(
           isActive: true,
           nextBillingDate: nextBillingDate,
+          planType: 'basic_monthly',
+          updatedAt: now,
         );
         
         subscription = updatedSubscription;
@@ -84,7 +87,10 @@ class SubscriptionProvider extends ChangeNotifier {
       final isActive = await serviceLocator.subscriptionApi.isSubscriptionActive(userId);
       if (isActive != subscription.isActive) {
         // Update subscription status if different from current
-        final updatedSubscription = subscription.copyWith(isActive: isActive);
+        final updatedSubscription = subscription.copyWith(
+          isActive: isActive,
+          updatedAt: DateTime.now(),
+        );
         subscription = updatedSubscription;
         
         final prefs = await SharedPreferences.getInstance();
@@ -104,7 +110,10 @@ class SubscriptionProvider extends ChangeNotifier {
         // Try to use the API
         await serviceLocator.subscriptionApi.cancelSubscription(userId, 'current_subscription_id');
         
-        final updatedSubscription = subscription.copyWith(isActive: false);
+        final updatedSubscription = subscription.copyWith(
+          isActive: false,
+          updatedAt: DateTime.now(),
+        );
         subscription = updatedSubscription;
         
         final prefs = await SharedPreferences.getInstance();
@@ -116,7 +125,10 @@ class SubscriptionProvider extends ChangeNotifier {
         // Fall back to local implementation
         debugPrint('API error, using mock cancellation: $apiError');
         
-        final updatedSubscription = subscription.copyWith(isActive: false);
+        final updatedSubscription = subscription.copyWith(
+          isActive: false,
+          updatedAt: DateTime.now(),
+        );
         subscription = updatedSubscription;
         
         final prefs = await SharedPreferences.getInstance();

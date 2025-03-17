@@ -56,10 +56,14 @@ void main() async {
   } else {
     // Default subscription with 3-day trial
     final trialEndDate = DateTime.now().add(Duration(days: 3));
+    final now = DateTime.now();
     subscription = SubscriptionStatus(
       isActive: true,
       trialEndsAt: trialEndDate,
       nextBillingDate: null,
+      planType: 'trial',
+      createdAt: now,
+      updatedAt: now,
     );
     prefs.setString('subscription', jsonEncode(subscription.toJson()));
   }
