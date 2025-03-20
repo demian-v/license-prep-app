@@ -7,6 +7,7 @@ import '../services/api/firebase_content_api.dart';
 import '../services/api/firebase_functions_client.dart';
 import '../services/api/firebase_progress_api.dart';
 import '../services/api/firebase_subscription_api.dart';
+import '../services/api_service_configurator.dart';
 
 /// Example showing how to switch between REST and Firebase APIs
 class ApiSwitcherExample extends StatefulWidget {
@@ -17,7 +18,7 @@ class ApiSwitcherExample extends StatefulWidget {
 }
 
 class _ApiSwitcherExampleState extends State<ApiSwitcherExample> {
-  ApiImplementation _currentImplementation = ApiImplementation.rest;
+  late ApiImplementation _currentImplementation;
   bool _isLoading = false;
   String _result = '';
   
@@ -31,6 +32,9 @@ class _ApiSwitcherExampleState extends State<ApiSwitcherExample> {
   @override
   void initState() {
     super.initState();
+    // Get current implementation from the configurator
+    _currentImplementation = apiServiceConfigurator.currentImplementation;
+    
     _firebaseAuthApi = FirebaseAuthApi(_firebaseFunctionsClient);
     _firebaseContentApi = FirebaseContentApi(_firebaseFunctionsClient);
     _firebaseProgressApi = FirebaseProgressApi(_firebaseFunctionsClient);
@@ -55,11 +59,21 @@ class _ApiSwitcherExampleState extends State<ApiSwitcherExample> {
                 const SizedBox(width: 20),
                 DropdownButton<ApiImplementation>(
                   value: _currentImplementation,
-                  onChanged: (value) {
+                  onChanged: (value) async {
                     if (value != null) {
+                      // Switch the global API implementation
+                      await apiServiceConfigurator.switchImplementation(value);
                       setState(() {
                         _currentImplementation = value;
                       });
+                      
+                      // Show confirmation
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('API implementation switched to ${value == ApiImplementation.firebase ? 'Firebase' : 'REST'}'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
                     }
                   },
                   items: const [

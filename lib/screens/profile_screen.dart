@@ -5,8 +5,17 @@ import '../providers/language_provider.dart';
 import '../localization/app_localizations.dart';
 import '../providers/subscription_provider.dart';
 import '../providers/progress_provider.dart';
+import '../examples/api_switcher_example.dart';
+import '../examples/function_name_mapping_example.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
+  @override
+  _ProfileScreenState createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  // Counter for the hidden developer menu
+  int _versionTapCount = 0;
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
@@ -168,6 +177,26 @@ class ProfileScreen extends StatelessWidget {
                   padding: EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              // Hidden developer menu trigger
+              SizedBox(height: 40),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _versionTapCount++;
+                    if (_versionTapCount >= 5) {
+                      _versionTapCount = 0;
+                      _showDeveloperOptions(context);
+                    }
+                  });
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text(
+                    'Version 1.0.0',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
                   ),
                 ),
               ),
@@ -383,6 +412,65 @@ void _showStateSelector(BuildContext context) {
             );
           },
         ),
+      ),
+    ),
+  );
+}
+
+/**
+ * Show the developer options menu
+ */
+void _showDeveloperOptions(BuildContext context) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    builder: (context) => Container(
+      height: MediaQuery.of(context).size.height * 0.8,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              'Developer Options',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+          ),
+          Divider(),
+          Expanded(
+            child: ListView(
+              children: [
+                ListTile(
+                  leading: Icon(Icons.api),
+                  title: Text('API Implementation Switcher'),
+                  subtitle: Text('Switch between REST and Firebase APIs'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ApiSwitcherExample(),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.functions),
+                  title: Text('Function Name Mapping'),
+                  subtitle: Text('View function name mappings'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => FunctionNameMappingExample(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     ),
   );

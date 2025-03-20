@@ -8,9 +8,10 @@ This document provides guidance on using the Firebase Functions Client in the Li
 3. [Setting Up](#setting-up)
 4. [Switching Implementations](#switching-implementations)
 5. [Using the Firebase Functions Client](#using-the-firebase-functions-client)
-6. [API Examples](#api-examples)
-7. [Best Practices](#best-practices)
-8. [Troubleshooting](#troubleshooting)
+6. [Function Name Mapping](#function-name-mapping)
+7. [API Examples](#api-examples)
+8. [Best Practices](#best-practices)
+9. [Troubleshooting](#troubleshooting)
 
 ## Overview
 
@@ -93,6 +94,43 @@ final userData = await functionsClient.callFunction<Map<String, dynamic>>(
 );
 ```
 
+When calling functions, you don't need to worry about the exact Cloud Function name - the client automatically maps your function name to the correct Cloud Function name using the `FunctionNameMapper` (see next section).
+
+## Function Name Mapping
+
+To solve the mismatch between client-side function names and actual Cloud Function names, we've implemented a function name mapping mechanism. This allows the app code to use consistent function names while correctly mapping to the deployed Cloud Functions.
+
+### How it Works
+
+The `FunctionNameMapper` class in `firebase_functions_client.dart` contains a mapping between client-side function names and Cloud Function names:
+
+```dart
+static const Map<String, String> _nameMap = {
+  // Auth functions
+  'loginUser': 'getUserData',
+  'registerUser': 'createUserRecord',
+  
+  // Content functions
+  'getQuizTopics': 'content-getQuizTopics',
+  // ... more mappings
+};
+```
+
+When you call a function through the `FirebaseFunctionsClient`:
+
+1. The client-side function name (e.g., 'loginUser') is passed to `callFunction()`
+2. The `FunctionNameMapper` translates it to the actual Cloud Function name (e.g., 'getUserData')
+3. The Firebase SDK calls the correct Cloud Function
+
+This mapping is completely transparent to the caller, allowing you to maintain a consistent API in your code regardless of the actual Cloud Function names.
+
+### Benefits
+
+- **Decoupling**: Client code is decoupled from server-side function names
+- **Flexibility**: Server-side function names can change without requiring client code changes
+- **Modularity**: Makes it easier to organize and prefix Cloud Functions by domain (auth, content, etc.)
+- **Migration**: Facilitates gradual migration between different backend implementations
+
 ## API Examples
 
 ### Authentication
@@ -172,7 +210,9 @@ final subscription = await serviceLocator.firebaseSubscriptionApi.subscribeToPla
 
 3. **Error Handling**: All Firebase function calls include proper error handling. Make sure to catch and handle these errors appropriately in your UI.
 
-4. **Testing**: You can use the `ApiServiceConfigurator` to switch between implementations during testing to ensure both work correctly.
+4. **Function Naming**: When adding new functions, follow the established naming convention and update the `FunctionNameMapper` if needed.
+
+5. **Testing**: You can use the `ApiServiceConfigurator` to switch between implementations during testing to ensure both work correctly.
 
 ## Troubleshooting
 
@@ -185,3 +225,5 @@ final subscription = await serviceLocator.firebaseSubscriptionApi.subscribeToPla
 3. **Type Errors**: When using `callFunction<T>()`, ensure the generic type parameter matches the actual return type of the function.
 
 4. **Network Issues**: Firebase functions require an internet connection. Add appropriate offline handling in your app.
+
+5. **Function Name Mismatches**: If you're getting "Function not found" errors, check that the function name is correctly mapped in the `FunctionNameMapper`. The error message will show which function name was actually called.
