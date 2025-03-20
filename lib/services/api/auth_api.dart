@@ -130,6 +130,32 @@ class AuthApi implements AuthApiInterface {
       await _apiClient.clearAuthToken();
     }
   }
+
+  /// Creates or updates a user document in Firestore
+  Future<void> createOrUpdateUserDoc(String userId, {
+    required String name,
+    required String email,
+    String language = "ua",
+    String state = "IL",
+  }) async {
+    try {
+      // Try to use Cloud Function to create/update user directly
+      await _apiClient.post(
+        '/users/createOrUpdate',
+        data: {
+          'userId': userId,
+          'name': name,
+          'email': email,
+          'language': language,
+          'state': state,
+        },
+      );
+    } catch (e) {
+      // Fall back to direct Firestore access if possible
+      // In a real app, you might use Firestore SDK directly here
+      throw 'Failed to create user document: ${e.toString()}';
+    }
+  }
   
   /// Checks if the user is currently authenticated
   Future<bool> isAuthenticated() async {

@@ -13,6 +13,8 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> login(String email, String password) async {
     try {
+      debugPrint('Logging in with email: $email');
+      
       if (email.isNotEmpty && password.isNotEmpty) {
         // Sign in with Firebase Auth
         final userCredential = await _firebaseAuth.signInWithEmailAndPassword(
@@ -22,13 +24,25 @@ class AuthProvider extends ChangeNotifier {
         
         final firebaseUser = userCredential.user;
         if (firebaseUser != null) {
-          // Create our app User model from the Firebase user
+          debugPrint('Firebase Auth login successful: ${firebaseUser.uid}');
+          
+          // Get display name from Firebase if available
+          String userName = firebaseUser.displayName ?? '';
+          if (userName.isEmpty) {
+            userName = email.split('@')[0]; // Use email prefix if no display name
+            debugPrint('No display name found, using email prefix: $userName');
+          } else {
+            debugPrint('Using display name from Firebase: $userName');
+          }
+          
+          // Create our app User model
           final loggedInUser = User(
             id: firebaseUser.uid,
-            name: firebaseUser.displayName ?? email.split('@')[0],
+            name: userName,
             email: firebaseUser.email ?? email,
           );
           
+          debugPrint('Created app user model: ${loggedInUser.name}');
           user = loggedInUser;
           
           final prefs = await SharedPreferences.getInstance();
@@ -50,6 +64,8 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> signup(String name, String email, String password) async {
     try {
+      debugPrint('Creating user with name: $name, email: $email');
+      
       if (name.isNotEmpty && email.isNotEmpty && password.isNotEmpty) {
         // Create user with Firebase Auth
         final userCredential = await _firebaseAuth.createUserWithEmailAndPassword(
@@ -59,18 +75,28 @@ class AuthProvider extends ChangeNotifier {
         
         final firebaseUser = userCredential.user;
         if (firebaseUser != null) {
-          // Set the display name
+          debugPrint('Firebase Auth user created: ${firebaseUser.uid}');
+          
+          // Update the display name immediately
           await firebaseUser.updateDisplayName(name);
+          debugPrint('Updated display name for user: $name');
+          
+          // Get the updated user to confirm display name was set
+          final updatedFirebaseUser = _firebaseAuth.currentUser;
+          debugPrint('Current user display name: ${updatedFirebaseUser?.displayName}');
           
           // Create our app User model
           final registeredUser = User(
             id: firebaseUser.uid,
-            name: name,
+            name: name, // Use the provided name directly
             email: email,
+            language: 'ua', // Default language
+            state: 'IL',   // Default state
           );
           
           user = registeredUser;
           
+          // Save user to local storage
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('user', jsonEncode(registeredUser.toJson()));
           

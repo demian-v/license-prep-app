@@ -8,6 +8,7 @@ class FunctionNameMapper {
     // Auth functions
     'loginUser': 'getUserData',
     'registerUser': 'createUserRecord',
+    'createOrUpdateUserDocument': 'createOrUpdateUserDocument',
     
     // Content functions
     'getQuizTopics': 'content-getQuizTopics',

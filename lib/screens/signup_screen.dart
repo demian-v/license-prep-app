@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import '../providers/auth_provider.dart';
-// import '../providers/subscription_provider.dart';
+import '../services/direct_auth_service.dart';
+import '../models/user.dart' as app_models;
 import 'language_selection_screen.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -25,7 +30,7 @@ class _SignupScreenState extends State<SignupScreen> {
     super.dispose();
   }
 
- Future<void> _signup() async {
+  Future<void> _signup() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -35,31 +40,36 @@ class _SignupScreenState extends State<SignupScreen> {
       _errorMessage = null;
     });
     
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    
+    // Use the directAuthService instead
     try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final success = await authProvider.signup(
-        _nameController.text.trim(),
-        _emailController.text.trim(),
-        _passwordController.text,
-      );
+      debugPrint('SignupScreen: Attempting signup with name=$name, email=$email');
+      final success = await directAuthService.signUp(name, email, password);
       
       if (success) {
-        // Make sure navigation happens after a delay to ensure the UI updates properly
+        debugPrint('SignupScreen: Signup successful');
+        
         if (mounted) {
-          Future.delayed(Duration.zero, () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => LanguageSelectionScreen(),
-              ),
-            );
+          debugPrint('SignupScreen: Navigating to language selection screen');
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => LanguageSelectionScreen(),
+            ),
+          );
+        }
+      } else {
+        debugPrint('SignupScreen: Signup failed');
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'Signup failed. Please try again.';
           });
         }
-      } else if (mounted) {
-        setState(() {
-          _errorMessage = 'Signup failed. Please try again.';
-        });
       }
     } catch (e) {
+      debugPrint('SignupScreen: Error during signup: $e');
       if (mounted) {
         setState(() {
           _errorMessage = 'An error occurred. Please try again.';

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/direct_auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -31,19 +32,27 @@ class _LoginScreenState extends State<LoginScreen> {
       _errorMessage = null;
     });
     
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    
     try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final success = await authProvider.login(
-        _emailController.text.trim(),
-        _passwordController.text,
-      );
+      // Use direct auth service
+      debugPrint('LoginScreen: Logging in with email: $email');
+      final success = await directAuthService.login(email, password);
       
-      if (!success && mounted) {
+      if (success) {
+        debugPrint('LoginScreen: Login successful, navigating to home screen');
+        if (mounted) {
+          // Navigate to home screen on successful login
+          Navigator.of(context).pushReplacementNamed('/home');
+        }
+      } else if (mounted) {
         setState(() {
           _errorMessage = 'Login failed. Please check your credentials.';
         });
       }
     } catch (e) {
+      debugPrint('LoginScreen: Error during login: $e');
       if (mounted) {
         setState(() {
           _errorMessage = 'An error occurred. Please try again.';

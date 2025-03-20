@@ -153,4 +153,28 @@ class FirebaseAuthApi implements AuthApiInterface {
   Future<void> logout() async {
     await _functionsClient.clearAuthToken();
   }
+  
+  /// Creates or updates a user document in Firestore
+  @override
+  Future<void> createOrUpdateUserDoc(String userId, {
+    required String name,
+    required String email,
+    String language = "ua",
+    String state = "IL",
+  }) async {
+    try {
+      await _functionsClient.callFunction<Map<String, dynamic>>(
+        'createOrUpdateUserDocument',
+        data: {
+          'userId': userId,
+          'name': name,
+          'email': email,
+          'language': language,
+          'state': state,
+        },
+      );
+    } catch (e) {
+      throw 'Failed to create user document: $e';
+    }
+  }
 }

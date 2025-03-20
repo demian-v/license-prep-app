@@ -7,6 +7,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
 import 'services/service_locator.dart';
+import 'services/api/api_implementation.dart';
 
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
@@ -35,8 +36,8 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   
-  // Initialize service locator
-  serviceLocator.initialize();
+  // Initialize service locator with Firebase implementation
+  serviceLocator.initializeWithApiImplementation(ApiImplementation.firebase);
   
   // Initialize shared preferences
   final prefs = await SharedPreferences.getInstance();

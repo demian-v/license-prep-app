@@ -23,6 +23,14 @@ abstract class AuthApiInterface {
   /// Logs the user out
   Future<void> logout();
   
+  /// Creates or updates a user document in Firestore
+  Future<void> createOrUpdateUserDoc(String userId, {
+    required String name,
+    required String email,
+    String language,
+    String state,
+  });
+  
   /// Checks if the user is currently authenticated
   Future<bool> isAuthenticated();
   
