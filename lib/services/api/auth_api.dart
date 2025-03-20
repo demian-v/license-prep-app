@@ -1,8 +1,9 @@
 import 'package:dio/dio.dart';
 import '../../models/user.dart';
 import 'api_client.dart';
+import 'base/auth_api_interface.dart';
 
-class AuthApi {
+class AuthApi implements AuthApiInterface {
   final ApiClient _apiClient;
   
   AuthApi(this._apiClient);

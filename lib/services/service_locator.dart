@@ -1,7 +1,17 @@
 import 'package:flutter/material.dart';
 import 'api/api_client.dart';
+import 'api/api_implementation.dart';
 import 'api/auth_api.dart';
+import 'api/base/auth_api_interface.dart';
+import 'api/base/content_api_interface.dart';
+import 'api/base/progress_api_interface.dart';
+import 'api/base/subscription_api_interface.dart';
 import 'api/content_api.dart';
+import 'api/firebase_auth_api.dart';
+import 'api/firebase_content_api.dart';
+import 'api/firebase_functions_client.dart';
+import 'api/firebase_progress_api.dart';
+import 'api/firebase_subscription_api.dart';
 import 'api/progress_api.dart';
 import 'api/subscription_api.dart';
 
@@ -17,53 +27,170 @@ class ServiceLocator {
   // Private constructor
   ServiceLocator._internal();
   
-  // API Services
+  // Core clients
   late ApiClient _apiClient;
-  late AuthApi _authApi;
-  late ContentApi _contentApi;
-  late ProgressApi _progressApi;
-  late SubscriptionApi _subscriptionApi;
+  late FirebaseFunctionsClient _firebaseFunctionsClient;
+  
+  // API service interfaces
+  late AuthApiInterface _authApi;
+  late ContentApiInterface _contentApi;
+  late ProgressApiInterface _progressApi;
+  late SubscriptionApiInterface _subscriptionApi;
+  
+  // API service implementations - REST
+  late AuthApi _restAuthApi;
+  late ContentApi _restContentApi;
+  late ProgressApi _restProgressApi;
+  late SubscriptionApi _restSubscriptionApi;
+  
+  // API service implementations - Firebase
+  late FirebaseAuthApi _firebaseAuthApi;
+  late FirebaseContentApi _firebaseContentApi;
+  late FirebaseProgressApi _firebaseProgressApi;
+  late FirebaseSubscriptionApi _firebaseSubscriptionApi;
+  
+  // Current implementation
+  ApiImplementation _currentImplementation = ApiImplementation.rest;
   
   bool _isInitialized = false;
 
-  /// Initialize all services
+  /// Initialize all services with default implementation (REST)
   void initialize() {
-    if (_isInitialized) return;
-    
-    _apiClient = ApiClient();
-    _authApi = AuthApi(_apiClient);
-    _contentApi = ContentApi(_apiClient);
-    _progressApi = ProgressApi(_apiClient);
-    _subscriptionApi = SubscriptionApi(_apiClient);
-    
-    _isInitialized = true;
-    debugPrint('ServiceLocator initialized');
+    initializeWithApiImplementation(ApiImplementation.rest);
   }
   
-  /// Getters for accessing services
+  /// Initialize services with the specified API implementation
+  void initializeWithApiImplementation(ApiImplementation implementation) {
+    if (_isInitialized) {
+      reset(); // Reset if already initialized
+    }
+    
+    // Store current implementation
+    _currentImplementation = implementation;
+    
+    // Always initialize core clients
+    _apiClient = ApiClient();
+    _firebaseFunctionsClient = FirebaseFunctionsClient();
+    
+    // Initialize REST implementations
+    _restAuthApi = AuthApi(_apiClient);
+    _restContentApi = ContentApi(_apiClient);
+    _restProgressApi = ProgressApi(_apiClient);
+    _restSubscriptionApi = SubscriptionApi(_apiClient);
+    
+    // Initialize Firebase implementations
+    _firebaseAuthApi = FirebaseAuthApi(_firebaseFunctionsClient);
+    _firebaseContentApi = FirebaseContentApi(_firebaseFunctionsClient);
+    _firebaseProgressApi = FirebaseProgressApi(_firebaseFunctionsClient);
+    _firebaseSubscriptionApi = FirebaseSubscriptionApi(_firebaseFunctionsClient);
+    
+    // Set interface references based on selected implementation
+    if (implementation == ApiImplementation.firebase) {
+      debugPrint('Initializing with Firebase implementation');
+      _authApi = _firebaseAuthApi;
+      _contentApi = _firebaseContentApi;
+      _progressApi = _firebaseProgressApi;
+      _subscriptionApi = _firebaseSubscriptionApi;
+    } else {
+      debugPrint('Initializing with REST implementation');
+      _authApi = _restAuthApi;
+      _contentApi = _restContentApi;
+      _progressApi = _restProgressApi;
+      _subscriptionApi = _restSubscriptionApi;
+    }
+    
+    _isInitialized = true;
+    debugPrint('ServiceLocator initialized with ${implementation.toString()}');
+  }
+  
+  /// Get current API implementation
+  ApiImplementation get currentImplementation => _currentImplementation;
+  
+  /// Getters for accessing interface-based services (recommended)
+  AuthApiInterface get auth {
+    _checkInitialization();
+    return _authApi;
+  }
+  
+  ContentApiInterface get content {
+    _checkInitialization();
+    return _contentApi;
+  }
+  
+  ProgressApiInterface get progress {
+    _checkInitialization();
+    return _progressApi;
+  }
+  
+  SubscriptionApiInterface get subscription {
+    _checkInitialization();
+    return _subscriptionApi;
+  }
+  
+  /// Getters for accessing core clients
   ApiClient get apiClient {
     _checkInitialization();
     return _apiClient;
   }
   
+  FirebaseFunctionsClient get firebaseFunctionsClient {
+    _checkInitialization();
+    return _firebaseFunctionsClient;
+  }
+  
+  /// Legacy getters for older code - REST implementations
+  /// Will return current implementation if it's REST, otherwise returns REST implementation directly
   AuthApi get authApi {
     _checkInitialization();
-    return _authApi;
+    if (_currentImplementation == ApiImplementation.rest) {
+      return _authApi as AuthApi;
+    }
+    return _restAuthApi;
   }
   
   ContentApi get contentApi {
     _checkInitialization();
-    return _contentApi;
+    if (_currentImplementation == ApiImplementation.rest) {
+      return _contentApi as ContentApi;
+    }
+    return _restContentApi;
   }
   
   ProgressApi get progressApi {
     _checkInitialization();
-    return _progressApi;
+    if (_currentImplementation == ApiImplementation.rest) {
+      return _progressApi as ProgressApi;
+    }
+    return _restProgressApi;
   }
   
   SubscriptionApi get subscriptionApi {
     _checkInitialization();
-    return _subscriptionApi;
+    if (_currentImplementation == ApiImplementation.rest) {
+      return _subscriptionApi as SubscriptionApi;
+    }
+    return _restSubscriptionApi;
+  }
+  
+  /// Firebase-specific getters
+  FirebaseAuthApi get firebaseAuthApi {
+    _checkInitialization();
+    return _firebaseAuthApi;
+  }
+  
+  FirebaseContentApi get firebaseContentApi {
+    _checkInitialization();
+    return _firebaseContentApi;
+  }
+  
+  FirebaseProgressApi get firebaseProgressApi {
+    _checkInitialization();
+    return _firebaseProgressApi;
+  }
+  
+  FirebaseSubscriptionApi get firebaseSubscriptionApi {
+    _checkInitialization();
+    return _firebaseSubscriptionApi;
   }
   
   void _checkInitialization() {

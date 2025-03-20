@@ -9,8 +9,9 @@ import '../../models/theory_module.dart';
 import '../../models/exam.dart';
 import '../../models/practice_test.dart';
 import 'api_client.dart';
+import 'base/content_api_interface.dart';
 
-class ContentApi {
+class ContentApi implements ContentApiInterface {
   final ApiClient _apiClient;
   
   ContentApi(this._apiClient);

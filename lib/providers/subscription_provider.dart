@@ -41,9 +41,8 @@ class SubscriptionProvider extends ChangeNotifier {
       try {
         // Call the subscription API
         final subscriptionStatus = await serviceLocator.subscriptionApi.subscribeToPlan(
-          userId,
           'basic_monthly', // Default plan ID
-          paymentMethodId ?? 'default_payment_method',
+          paymentMethodId: paymentMethodId ?? 'default_payment_method',
         );
         
         subscription = subscriptionStatus;
@@ -84,7 +83,7 @@ class SubscriptionProvider extends ChangeNotifier {
   // Check if subscription is active via API
   Future<void> checkSubscriptionStatus(String userId) async {
     try {
-      final isActive = await serviceLocator.subscriptionApi.isSubscriptionActive(userId);
+      final isActive = await serviceLocator.subscriptionApi.isSubscriptionActive();
       if (isActive != subscription.isActive) {
         // Update subscription status if different from current
         final updatedSubscription = subscription.copyWith(
@@ -108,7 +107,7 @@ class SubscriptionProvider extends ChangeNotifier {
     try {
       try {
         // Try to use the API
-        await serviceLocator.subscriptionApi.cancelSubscription(userId, 'current_subscription_id');
+        await serviceLocator.subscriptionApi.cancelSubscription();
         
         final updatedSubscription = subscription.copyWith(
           isActive: false,

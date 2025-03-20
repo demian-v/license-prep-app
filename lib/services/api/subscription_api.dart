@@ -1,164 +1,168 @@
 import 'package:dio/dio.dart';
 import '../../models/subscription.dart';
 import 'api_client.dart';
+import 'base/subscription_api_interface.dart';
 
-class SubscriptionApi {
+class SubscriptionApi implements SubscriptionApiInterface {
   final ApiClient _apiClient;
   
   SubscriptionApi(this._apiClient);
   
-  // Get available subscription plans
-  Future<List<Map<String, dynamic>>> getSubscriptionPlans() async {
+  /// Get available subscription plans
+  @override
+  Future<List<dynamic>> getSubscriptionPlans() async {
     try {
       final response = await _apiClient.get('/subscriptions/plans');
-      return List<Map<String, dynamic>>.from(response.data);
-    } catch (e) {
-      throw 'Failed to load subscription plans: ${e.toString()}';
-    }
-  }
-  
-  // Get user's current subscription status
-  Future<SubscriptionStatus?> getUserSubscription(String userId) async {
-    try {
-      final response = await _apiClient.get('/subscriptions/users/$userId');
-      
-      if (response.data == null) {
-        return null;
-      }
-      
-      return SubscriptionStatus.fromJson(response.data);
-    } catch (e) {
-      throw 'Failed to load user subscription: ${e.toString()}';
-    }
-  }
-  
-  // Create or update payment method
-  Future<Map<String, dynamic>> createPaymentMethod(String userId, Map<String, dynamic> paymentDetails) async {
-    try {
-      final response = await _apiClient.post(
-        '/subscriptions/payment-methods',
-        data: {
-          'userId': userId,
-          ...paymentDetails,
-        },
-      );
-      
       return response.data;
     } catch (e) {
-      throw 'Failed to create payment method: ${e.toString()}';
+      if (e is DioException) {
+        throw 'Failed to fetch subscription plans: ${e.message}';
+      } else {
+        throw 'Failed to fetch subscription plans: $e';
+      }
     }
   }
   
-  // Get user's payment methods
-  Future<List<Map<String, dynamic>>> getUserPaymentMethods(String userId) async {
+  /// Get user's current subscription
+  @override
+  Future<SubscriptionStatus> getUserSubscription() async {
     try {
-      final response = await _apiClient.get('/subscriptions/users/$userId/payment-methods');
-      return List<Map<String, dynamic>>.from(response.data);
-    } catch (e) {
-      throw 'Failed to load payment methods: ${e.toString()}';
-    }
-  }
-  
-  // Delete payment method
-  Future<void> deletePaymentMethod(String userId, String paymentMethodId) async {
-    try {
-      await _apiClient.delete('/subscriptions/users/$userId/payment-methods/$paymentMethodId');
-    } catch (e) {
-      throw 'Failed to delete payment method: ${e.toString()}';
-    }
-  }
-  
-  // Subscribe user to plan
-  Future<SubscriptionStatus> subscribeToPlan(String userId, String planId, String paymentMethodId) async {
-    try {
-      final response = await _apiClient.post(
-        '/subscriptions/subscribe',
-        data: {
-          'userId': userId,
-          'planId': planId,
-          'paymentMethodId': paymentMethodId,
-        },
-      );
-      
+      final response = await _apiClient.get('/subscriptions/current');
       return SubscriptionStatus.fromJson(response.data);
     } catch (e) {
-      throw 'Failed to subscribe to plan: ${e.toString()}';
+      if (e is DioException) {
+        if (e.response?.statusCode == 404) {
+          // User has no subscription
+          final now = DateTime.now();
+          return SubscriptionStatus(
+            isActive: false,
+            planType: 'none', 
+            createdAt: now,
+            updatedAt: now,
+          );
+        }
+        throw 'Failed to fetch subscription: ${e.message}';
+      } else {
+        throw 'Failed to fetch subscription: $e';
+      }
     }
   }
   
-  // Cancel subscription
-  Future<void> cancelSubscription(String userId, String subscriptionId) async {
+  /// Check if a user has an active subscription
+  @override
+  Future<bool> isSubscriptionActive() async {
     try {
-      await _apiClient.post(
-        '/subscriptions/$subscriptionId/cancel',
-        data: {
-          'userId': userId,
-        },
+      final response = await _apiClient.get('/subscriptions/status');
+      return response.data['active'] as bool;
+    } catch (e) {
+      if (e is DioException) {
+        return false; // Assume no active subscription on error
+      } else {
+        throw 'Failed to check subscription status: $e';
+      }
+    }
+  }
+  
+  /// Subscribe a user to a plan (create or update subscription)
+  @override
+  Future<SubscriptionStatus> subscribeToPlan(String planId, {String? paymentMethodId}) async {
+    try {
+      final Map<String, dynamic> data = {
+        'planId': planId,
+      };
+      
+      if (paymentMethodId != null) {
+        data['paymentMethodId'] = paymentMethodId;
+      }
+      
+      final response = await _apiClient.post(
+        '/subscriptions/subscribe',
+        data: data,
       );
+      
+      return SubscriptionStatus.fromJson(response.data['subscription']);
     } catch (e) {
-      throw 'Failed to cancel subscription: ${e.toString()}';
+      if (e is DioException) {
+        throw 'Failed to subscribe to plan: ${e.message}';
+      } else {
+        throw 'Failed to subscribe to plan: $e';
+      }
     }
   }
   
-  // Update auto-renewal setting
-  Future<void> updateAutoRenewal(String userId, String subscriptionId, bool autoRenew) async {
+  /// Cancel a user's subscription
+  @override
+  Future<bool> cancelSubscription() async {
     try {
-      await _apiClient.put(
-        '/subscriptions/$subscriptionId/auto-renew',
-        data: {
-          'userId': userId,
-          'autoRenew': autoRenew,
-        },
-      );
+      final response = await _apiClient.post('/subscriptions/cancel');
+      return response.data['success'] as bool;
     } catch (e) {
-      throw 'Failed to update auto-renewal setting: ${e.toString()}';
+      if (e is DioException) {
+        throw 'Failed to cancel subscription: ${e.message}';
+      } else {
+        throw 'Failed to cancel subscription: $e';
+      }
     }
   }
   
-  // Get subscription history
-  Future<List<Map<String, dynamic>>> getSubscriptionHistory(String userId) async {
-    try {
-      final response = await _apiClient.get('/subscriptions/users/$userId/history');
-      return List<Map<String, dynamic>>.from(response.data);
-    } catch (e) {
-      throw 'Failed to load subscription history: ${e.toString()}';
-    }
-  }
-  
-  // Get payment receipts
-  Future<List<Map<String, dynamic>>> getPaymentReceipts(String userId) async {
-    try {
-      final response = await _apiClient.get('/subscriptions/users/$userId/receipts');
-      return List<Map<String, dynamic>>.from(response.data);
-    } catch (e) {
-      throw 'Failed to load payment receipts: ${e.toString()}';
-    }
-  }
-  
-  // Apply promo code
-  Future<Map<String, dynamic>> applyPromoCode(String userId, String promoCode) async {
+  /// Apply a promo code to a subscription
+  @override
+  Future<Map<String, dynamic>> applyPromoCode(String promoCode) async {
     try {
       final response = await _apiClient.post(
-        '/subscriptions/promo-codes/apply',
+        '/subscriptions/promo',
         data: {
-          'userId': userId,
           'promoCode': promoCode,
         },
       );
       
       return response.data;
     } catch (e) {
-      throw 'Failed to apply promo code: ${e.toString()}';
+      if (e is DioException) {
+        if (e.response?.statusCode == 400) {
+          throw 'Invalid promo code';
+        } else if (e.response?.statusCode == 409) {
+          throw 'Promo code already used';
+        } else {
+          throw 'Failed to apply promo code: ${e.message}';
+        }
+      } else {
+        throw 'Failed to apply promo code: $e';
+      }
     }
   }
   
-  // Check subscription status
-  Future<bool> isSubscriptionActive(String userId) async {
+  /// Get subscription history
+  Future<List<Map<String, dynamic>>> getSubscriptionHistory() async {
     try {
-      final subscription = await getUserSubscription(userId);
-      return subscription != null && subscription.isActive;
+      final response = await _apiClient.get('/subscriptions/history');
+      return List<Map<String, dynamic>>.from(response.data);
     } catch (e) {
-      return false;
+      if (e is DioException) {
+        throw 'Failed to fetch subscription history: ${e.message}';
+      } else {
+        throw 'Failed to fetch subscription history: $e';
+      }
+    }
+  }
+  
+  /// Update payment method
+  Future<Map<String, dynamic>> updatePaymentMethod(String paymentMethodId) async {
+    try {
+      final response = await _apiClient.put(
+        '/subscriptions/payment-method',
+        data: {
+          'paymentMethodId': paymentMethodId,
+        },
+      );
+      
+      return response.data;
+    } catch (e) {
+      if (e is DioException) {
+        throw 'Failed to update payment method: ${e.message}';
+      } else {
+        throw 'Failed to update payment method: $e';
+      }
     }
   }
 }

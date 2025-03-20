@@ -33,7 +33,7 @@ class ProgressProvider extends ChangeNotifier {
     if (!progress.completedModules.contains(moduleId)) {
       try {
         // Try to use the API
-        await serviceLocator.progressApi.updateModuleProgress(userId, moduleId, 1.0);
+        await serviceLocator.progressApi.updateModuleProgress(moduleId, 1.0, userId);
         
         final updatedCompletedModules = List<String>.from(progress.completedModules)..add(moduleId);
         final updatedProgress = progress.copyWith(
@@ -74,10 +74,11 @@ class ProgressProvider extends ChangeNotifier {
   Future<void> saveTestScoreWithUserId(String testId, double score, String userId) async {
     try {
       // Try to use the API
-      await serviceLocator.progressApi.updatePracticeTestProgress(
-        userId, 
+      await serviceLocator.progressApi.saveTestScore(
         testId, 
-        {'score': score}
+        score,
+        'practice', // Assuming it's a practice test
+        userId
       );
       
       final updatedScores = Map<String, double>.from(progress.testScores);
@@ -237,7 +238,7 @@ class ProgressProvider extends ChangeNotifier {
   Future<void> updateTopicProgressWithUserId(String topicId, double progressValue, String userId) async {
     try {
       // Try to use the API
-      await serviceLocator.progressApi.updateTopicProgress(userId, topicId, progressValue);
+      await serviceLocator.progressApi.updateTopicProgress(topicId, progressValue, userId);
       
       final updatedTopicProgress = Map<String, double>.from(progress.topicProgress);
       updatedTopicProgress[topicId] = progressValue;
