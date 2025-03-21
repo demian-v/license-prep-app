@@ -8,6 +8,9 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+// Add the line that's directly from the error message
+android.buildFeatures.buildConfig = true
+
 android {
     namespace = "com.example.license_prep_app"
     compileSdk = flutter.compileSdkVersion

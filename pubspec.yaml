@@ -18,16 +18,12 @@ dependencies:
   http: ^1.1.0
   flutter_secure_storage: ^8.0.0
   dio: ^5.3.2
-  firebase_core: ^2.24.2
-  firebase_auth: ^4.16.0
-  cloud_firestore: ^4.14.0
-  cloud_functions: ^4.6.0
-  # Add explicit dependencies to resolve conflicts
-  flutter_secure_storage_web: ^1.2.1
-  firebase_auth_platform_interface: ^7.0.3
-  firebase_auth_web: ^5.8.13
-  firebase_core_platform_interface: ^5.0.0
-  firebase_core_web: ^2.10.0
+  firebase_core: 2.14.0
+  firebase_auth: 4.6.3
+  cloud_firestore: 4.8.0
+  cloud_functions: 4.3.2
+
+# Removing overrides as they may be causing conflicts
 
 dev_dependencies:
   flutter_test:
