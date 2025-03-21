@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import '../services/direct_auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -36,9 +35,11 @@ class _LoginScreenState extends State<LoginScreen> {
     final password = _passwordController.text;
     
     try {
-      // Use direct auth service
+      // Use auth provider instead of direct service
       debugPrint('LoginScreen: Logging in with email: $email');
-      final success = await directAuthService.login(email, password);
+      
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final success = await authProvider.login(email, password);
       
       if (success) {
         debugPrint('LoginScreen: Login successful, navigating to home screen');

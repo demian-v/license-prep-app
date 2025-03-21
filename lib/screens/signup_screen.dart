@@ -1,12 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 import '../providers/auth_provider.dart';
-import '../services/direct_auth_service.dart';
-import '../models/user.dart' as app_models;
 import 'language_selection_screen.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -44,10 +38,12 @@ class _SignupScreenState extends State<SignupScreen> {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
     
-    // Use the directAuthService instead
+    // Use the AuthProvider instead of direct service
     try {
       debugPrint('SignupScreen: Attempting signup with name=$name, email=$email');
-      final success = await directAuthService.signUp(name, email, password);
+      
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final success = await authProvider.signup(name, email, password);
       
       if (success) {
         debugPrint('SignupScreen: Signup successful');
@@ -70,10 +66,45 @@ class _SignupScreenState extends State<SignupScreen> {
       }
     } catch (e) {
       debugPrint('SignupScreen: Error during signup: $e');
-      if (mounted) {
+      
+      // Check if this is a Firebase-specific error that we can handle
+      if (e.toString().contains('email-already-in-use')) {
         setState(() {
-          _errorMessage = 'An error occurred. Please try again.';
+          _errorMessage = 'This email is already in use. Please try a different email or log in.';
         });
+      } else if (e.toString().contains('weak-password')) {
+        setState(() {
+          _errorMessage = 'Password is too weak. Please use a stronger password.';
+        });
+      } else if (e.toString().contains('invalid-email')) {
+        setState(() {
+          _errorMessage = 'Invalid email format. Please check your email address.';
+        });
+      } else if (e.toString().contains('createUserDocument')) {
+        // User was created in Firebase Auth but document creation failed
+        // This is a non-critical error, so we can still proceed
+        debugPrint('SignupScreen: User created but document creation failed: $e');
+        
+        if (mounted) {
+          // Show a toast or snackbar with warning
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Account created but some data could not be saved. Some features may be limited.'))
+          );
+          
+          // Still navigate to next screen
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => LanguageSelectionScreen(),
+            ),
+          );
+        }
+      } else {
+        // For other errors, show generic message
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'An error occurred: ${e.toString().split(':').last}';
+          });
+        }
       }
     } finally {
       if (mounted) {

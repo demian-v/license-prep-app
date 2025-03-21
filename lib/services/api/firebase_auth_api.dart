@@ -1,6 +1,7 @@
 import '../../models/user.dart';
 import 'firebase_functions_client.dart';
 import 'base/auth_api_interface.dart';
+import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth, FirebaseAuthException;
 
 class FirebaseAuthApi implements AuthApiInterface {
   final FirebaseFunctionsClient _functionsClient;
@@ -11,21 +12,43 @@ class FirebaseAuthApi implements AuthApiInterface {
   @override
   Future<User> login(String email, String password) async {
     try {
-      final response = await _functionsClient.callFunction<Map<String, dynamic>>(
-        'loginUser',
-        data: {
-          'email': email,
-          'password': password,
-        },
+      // Use Firebase Auth directly for login
+      final auth = FirebaseAuth.instance;
+      final userCredential = await auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
       );
       
-      // Store token if provided
-      if (response['token'] != null) {
-        await _functionsClient.setAuthToken(response['token']);
-      }
+      // Get user data from Firestore
+      final userId = userCredential.user!.uid;
       
-      return User.fromJson(response['user']);
+      try {
+        // Try to get from Firestore via function
+        final userData = await _functionsClient.callFunction<Map<String, dynamic>>(
+          'getUserData',
+        );
+        
+        return User.fromJson(userData);
+      } catch (firestoreError) {
+        // Fallback if function fails - construct basic user
+        return User(
+          id: userId,
+          name: userCredential.user?.displayName ?? email.split('@')[0],
+          email: email,
+          language: 'ua',
+          state: 'IL',
+        );
+      }
     } catch (e) {
+      if (e is FirebaseAuthException) {
+        if (e.code == 'user-not-found') {
+          throw 'Login failed: No user found with this email.';
+        } else if (e.code == 'wrong-password') {
+          throw 'Login failed: Wrong password.';
+        } else {
+          throw 'Login failed: ${e.message}';
+        }
+      }
       throw 'Login failed: $e';
     }
   }
@@ -34,22 +57,52 @@ class FirebaseAuthApi implements AuthApiInterface {
   @override
   Future<User> register(String name, String email, String password) async {
     try {
-      final response = await _functionsClient.callFunction<Map<String, dynamic>>(
-        'registerUser',
-        data: {
-          'name': name,
-          'email': email,
-          'password': password,
-        },
+      // First use Firebase Auth directly to create the user
+      final auth = FirebaseAuth.instance;
+      final userCredential = await auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
       );
       
-      // Store token if provided
-      if (response['token'] != null) {
-        await _functionsClient.setAuthToken(response['token']);
+      // Update display name
+      await userCredential.user!.updateDisplayName(name);
+      
+      // Create user document in Firestore - using try/catch to continue even if this fails
+      try {
+        await _functionsClient.callFunction<Map<String, dynamic>>(
+          'createOrUpdateUserDocument',
+          data: {
+            'userId': userCredential.user!.uid,
+            'name': name,
+            'email': email,
+            'language': 'ua', // Default language
+            'state': 'IL',    // Default state
+          },
+        );
+      } catch (firestoreError) {
+        // If function call fails, log but continue - don't fail signup
+        print('Warning: Failed to create user document, but auth account created: $firestoreError');
+        // Could create document directly with Firestore SDK here as a fallback
       }
       
-      return User.fromJson(response['user']);
+      // Return user data
+      return User(
+        id: userCredential.user!.uid,
+        name: name,
+        email: email,
+        language: 'ua',
+        state: 'IL',
+      );
     } catch (e) {
+      if (e is FirebaseAuthException) {
+        if (e.code == 'email-already-in-use') {
+          throw 'Registration failed: The email address is already in use.';
+        } else if (e.code == 'weak-password') {
+          throw 'Registration failed: The password is too weak.';
+        } else {
+          throw 'Registration failed: ${e.message}';
+        }
+      }
       throw 'Registration failed: $e';
     }
   }
@@ -151,7 +204,17 @@ class FirebaseAuthApi implements AuthApiInterface {
   /// Logs the user out (clears the token)
   @override
   Future<void> logout() async {
-    await _functionsClient.clearAuthToken();
+    try {
+      // Sign out from Firebase Auth first
+      await FirebaseAuth.instance.signOut();
+      
+      // Then clear any stored tokens
+      await _functionsClient.clearAuthToken();
+    } catch (e) {
+      // Even if Firebase logout fails, try to clear tokens
+      await _functionsClient.clearAuthToken();
+      rethrow;
+    }
   }
   
   /// Creates or updates a user document in Firestore
