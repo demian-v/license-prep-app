@@ -4,6 +4,7 @@ import '../../../models/road_sign_category.dart';
 import '../../../models/road_sign.dart';
 import '../../../models/theory_module.dart';
 import '../../../models/practice_test.dart';
+import '../../../models/traffic_light_info.dart';
 
 /// Base interface for content API
 abstract class ContentApiInterface {
@@ -24,4 +25,7 @@ abstract class ContentApiInterface {
   
   /// Get practice tests based on license type, language, and state
   Future<List<PracticeTest>> getPracticeTests(String licenseType, String language, String state);
+  
+  /// Get traffic light information for a specific language
+  Future<TrafficLightInfo> getTrafficLightInfo(String language);
 }

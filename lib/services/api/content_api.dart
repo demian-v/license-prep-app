@@ -149,7 +149,7 @@ class ContentApi implements ContentApiInterface {
   }
   
   // Traffic Light Information
-  Future<List<TrafficLightInfo>> getTrafficLightInfo(String language) async {
+  Future<TrafficLightInfo> getTrafficLightInfo(String language) async {
     try {
       final response = await _apiClient.get(
         '/content/traffic-lights',
@@ -158,15 +158,36 @@ class ContentApi implements ContentApiInterface {
         },
       );
       
-      final List<dynamic> trafficLightData = response.data;
-      return trafficLightData.map((data) {
+      // If we get a list, take the first item
+      if (response.data is List) {
+        final List<dynamic> trafficLightData = response.data;
+        if (trafficLightData.isEmpty) {
+          // Return default info if list is empty
+          return TrafficLightInfo(
+            id: 'traffic-light',
+            title: 'Сигнали світлофора',
+            content: 'Інформація про сигнали світлофора тимчасово недоступна.',
+            imageUrls: [],
+          );
+        }
+        
+        final data = trafficLightData.first;
         return TrafficLightInfo(
           id: data['id'],
           title: data['title'], 
           content: data['content'],
           imageUrls: data['imageUrls'] != null ? List<String>.from(data['imageUrls']) : [],
         );
-      }).toList();
+      } else {
+        // If we got a single object
+        final data = response.data;
+        return TrafficLightInfo(
+          id: data['id'],
+          title: data['title'], 
+          content: data['content'],
+          imageUrls: data['imageUrls'] != null ? List<String>.from(data['imageUrls']) : [],
+        );
+      }
     } catch (e) {
       throw 'Failed to load traffic light information: ${e.toString()}';
     }

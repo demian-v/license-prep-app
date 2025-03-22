@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../data/quiz_data.dart';
 import '../models/quiz_topic.dart';
 import '../models/quiz_question.dart';
 import '../providers/progress_provider.dart';
+import '../providers/language_provider.dart';
+import '../services/service_locator.dart';
 import 'quiz_result_screen.dart';
 
 class QuizQuestionScreen extends StatefulWidget {
@@ -25,6 +26,8 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
   bool isAnswerChecked = false;
   bool? isCorrect;
   Map<String, bool> answers = {}; // questionId -> isCorrect
+  bool isLoading = true;
+  String? errorMessage;
   
   @override
   void initState() {
@@ -32,11 +35,42 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
     loadQuestions();
   }
   
-  void loadQuestions() {
-    questions = widget.topic.questionIds
-        .map((id) => quizQuestions[id])
-        .whereType<QuizQuestion>()
-        .toList();
+  Future<void> loadQuestions() async {
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
+    
+    try {
+      final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+      final language = languageProvider.language;
+      // Use 'all' or a default value if state filtering isn't implemented
+      final state = 'all';
+      
+      // Fetch questions from Firebase
+      final fetchedQuestions = await serviceLocator.content.getQuizQuestions(
+        widget.topic.id, 
+        language, 
+        state
+      );
+      
+      if (mounted) {
+        setState(() {
+          questions = fetchedQuestions;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading questions: $e');
+      // Fallback to empty list
+      if (mounted) {
+        setState(() {
+          questions = [];
+          errorMessage = 'Failed to load questions. Please try again.';
+          isLoading = false;
+        });
+      }
+    }
   }
   
   void checkAnswer() {
@@ -77,14 +111,56 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
   
   @override
   Widget build(BuildContext context) {
+    // Common AppBar for all states
+    final appBar = AppBar(
+      title: Text('Вчити по темах'),
+      backgroundColor: Colors.white,
+      foregroundColor: Colors.black,
+      elevation: 0,
+      leading: IconButton(
+        icon: Icon(Icons.arrow_back),
+        onPressed: () => Navigator.pop(context),
+      ),
+    );
+    
+    // Show loading state
+    if (isLoading) {
+      return Scaffold(
+        appBar: appBar,
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+    
+    // Show error state
+    if (errorMessage != null) {
+      return Scaffold(
+        appBar: appBar,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                errorMessage!,
+                style: TextStyle(color: Colors.red),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: loadQuestions,
+                child: Text('Повторити спробу'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    // Show empty state
     if (questions.isEmpty) {
       return Scaffold(
-        appBar: AppBar(
-          title: Text('Вчити по темах'),
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black,
-          elevation: 0,
-        ),
+        appBar: appBar,
         body: Center(
           child: Text('Немає запитань для цієї теми'),
         ),
@@ -93,41 +169,44 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
     
     final question = questions[currentQuestionIndex];
     
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Вчити по темах'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.warning_amber_rounded),
-            onPressed: () {
-              // Show report button functionality
-            },
-          ),
-          Consumer<ProgressProvider>(
-            builder: (context, progressProvider, child) {
-              final questionId = questions[currentQuestionIndex].id;
-              final isSaved = progressProvider.isQuestionSaved(questionId);
-              
-              return IconButton(
-                icon: Icon(
-                  isSaved ? Icons.favorite : Icons.favorite_border,
-                  color: isSaved ? Colors.red : null,
-                ),
-                onPressed: () {
-                  progressProvider.toggleSavedQuestion(questionId);
-                },
-              );
-            },
-          ),
-        ],
+    // Create AppBar with actions for the question view
+    final questionAppBar = AppBar(
+      title: Text('Вчити по темах'),
+      backgroundColor: Colors.white,
+      foregroundColor: Colors.black,
+      elevation: 0,
+      leading: IconButton(
+        icon: Icon(Icons.arrow_back),
+        onPressed: () => Navigator.pop(context),
       ),
+      actions: [
+        IconButton(
+          icon: Icon(Icons.warning_amber_rounded),
+          onPressed: () {
+            // Show report button functionality
+          },
+        ),
+        Consumer<ProgressProvider>(
+          builder: (context, progressProvider, child) {
+            final questionId = questions[currentQuestionIndex].id;
+            final isSaved = progressProvider.isQuestionSaved(questionId);
+            
+            return IconButton(
+              icon: Icon(
+                isSaved ? Icons.favorite : Icons.favorite_border,
+                color: isSaved ? Colors.red : null,
+              ),
+              onPressed: () {
+                progressProvider.toggleSavedQuestion(questionId);
+              },
+            );
+          },
+        ),
+      ],
+    );
+    
+    return Scaffold(
+      appBar: questionAppBar,
       body: Column(
         children: [
           // Question number pills
@@ -174,11 +253,11 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
             Container(
               width: double.infinity,
               height: 200,
-              child: Image.asset(
-                question.imagePath!,
+              child: serviceLocator.storage.getImage(
+                storagePath: 'quiz/${question.imagePath!}',
+                assetFallback: 'assets/images/quiz/${question.imagePath!}',
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => 
-                  Center(child: Icon(Icons.broken_image, size: 50)),
+                placeholderIcon: Icons.broken_image,
               ),
             ),
           

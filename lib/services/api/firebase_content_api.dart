@@ -4,6 +4,7 @@ import '../../models/road_sign_category.dart';
 import '../../models/road_sign.dart';
 import '../../models/theory_module.dart';
 import '../../models/practice_test.dart';
+import '../../models/traffic_light_info.dart';
 import 'firebase_functions_client.dart';
 import 'base/content_api_interface.dart';
 
@@ -190,6 +191,33 @@ class FirebaseContentApi implements ContentApiInterface {
       }).toList();
     } catch (e) {
       throw 'Failed to fetch practice tests: $e';
+    }
+  }
+  
+  /// Get traffic light information for a specific language
+  Future<TrafficLightInfo> getTrafficLightInfo(String language) async {
+    try {
+      final response = await _functionsClient.callFunction<Map<String, dynamic>>(
+        'getTrafficLightInfo',
+        data: {
+          'language': language,
+        },
+      );
+      
+      return TrafficLightInfo(
+        id: response['id'] as String,
+        title: response['title'] as String,
+        content: response['content'] as String,
+        imageUrls: List<String>.from(response['imageUrls'] ?? []),
+      );
+    } catch (e) {
+      // If API call fails, return default traffic light info
+      return TrafficLightInfo(
+        id: 'traffic-light',
+        title: 'Сигнали світлофора',
+        content: 'Інформація про сигнали світлофора тимчасово недоступна.',
+        imageUrls: [],
+      );
     }
   }
 }

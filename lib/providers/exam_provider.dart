@@ -1,41 +1,77 @@
 import 'dart:math';
 import 'dart:async';
+import 'dart:math' show min;
 import 'package:flutter/material.dart';
 import '../models/exam.dart';
 import '../models/quiz_question.dart';
-import '../data/quiz_data.dart';
+import '../services/service_locator.dart';
 
 class ExamProvider extends ChangeNotifier {
   Exam? _currentExam;
   Timer? _timer;
+  Map<String, QuizQuestion> _loadedQuestions = {};
+  bool _isLoading = false;
+  String? _errorMessage;
   
   Exam? get currentExam => _currentExam;
   bool get isExamInProgress => _currentExam != null && !_currentExam!.isCompleted;
+  bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
   
   // Start a new exam with 40 random questions
-  void startNewExam() {
-    // Collect all question IDs from quiz topics
-    final allQuestionIds = <String>[];
-    for (final topic in quizTopics) {
-      allQuestionIds.addAll(topic.questionIds);
+  Future<void> startNewExam({
+    required String language,
+    required String state,
+    required String licenseType,
+  }) async {
+    try {
+      _isLoading = true;
+      _errorMessage = null;
+      notifyListeners();
+      
+      // Fetch random questions from Firebase
+      final examQuestions = await _fetchRandomQuestions(
+        language: language,
+        state: state,
+        licenseType: licenseType,
+        count: 40 // Number of questions for the exam
+      );
+      
+      if (examQuestions.isEmpty) {
+        _errorMessage = 'Failed to load exam questions';
+        _isLoading = false;
+        notifyListeners();
+        return;
+      }
+      
+      // Store questions locally
+      _loadedQuestions = {};
+      final questionIds = <String>[];
+      
+      for (final question in examQuestions) {
+        _loadedQuestions[question.id] = question;
+        questionIds.add(question.id);
+      }
+      
+      // Create the exam
+      _currentExam = Exam(
+        questionIds: questionIds,
+        startTime: DateTime.now(),
+        timeLimit: 60, // 60 minutes
+      );
+      
+      _isLoading = false;
+      notifyListeners();
+      
+      // Start timer for UI updates
+      _startTimer();
+    } catch (e) {
+      print('Error starting exam: $e');
+      _errorMessage = 'Failed to start exam: $e';
+      _isLoading = false;
+      _currentExam = null;
+      notifyListeners();
     }
-    
-    // Shuffle and take 40 random question IDs
-    final Random random = Random();
-    allQuestionIds.shuffle(random);
-    final selectedQuestionIds = allQuestionIds.take(40).toList();
-    
-    // Create a new exam
-    _currentExam = Exam(
-      questionIds: selectedQuestionIds,
-      startTime: DateTime.now(),
-      timeLimit: 60, // 60 minutes
-    );
-    
-    // Start timer for UI updates
-    _startTimer();
-    
-    notifyListeners();
   }
   
   // Answer the current question and move to the next
@@ -101,7 +137,50 @@ class ExamProvider extends ChangeNotifier {
     if (_currentExam == null) return null;
     
     final questionId = _currentExam!.questionIds[_currentExam!.currentQuestionIndex];
-    return quizQuestions[questionId];
+    return _loadedQuestions[questionId];
+  }
+  
+  // Helper method to fetch random questions
+  Future<List<QuizQuestion>> _fetchRandomQuestions({
+    required String language,
+    required String state,
+    required String licenseType,
+    required int count,
+  }) async {
+    try {
+      // Get topics for the license type
+      final topics = await serviceLocator.content.getQuizTopics(
+        licenseType,
+        language,
+        state
+      );
+      
+      // Collect questions from all topics
+      List<QuizQuestion> allQuestions = [];
+      
+      for (final topic in topics) {
+        final topicQuestions = await serviceLocator.content.getQuizQuestions(
+          topic.id,
+          language,
+          state
+        );
+        allQuestions.addAll(topicQuestions);
+      }
+      
+      // Shuffle and select random questions
+      if (allQuestions.isEmpty) {
+        return [];
+      }
+      
+      final Random random = Random();
+      allQuestions.shuffle(random);
+      
+      // Take the requested number of questions or all if less available
+      return allQuestions.take(min(count, allQuestions.length)).toList();
+    } catch (e) {
+      print('Error fetching random questions: $e');
+      return [];
+    }
   }
   
   // Check if time limit is exceeded and complete exam if needed

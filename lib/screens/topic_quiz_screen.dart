@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../data/quiz_data.dart';
+import '../models/quiz_topic.dart';
 import '../models/quiz_progress.dart';
 import '../providers/progress_provider.dart';
+import '../providers/language_provider.dart';
+import '../services/service_locator.dart';
 import '../screens/quiz_question_screen.dart';
 
 class TopicQuizScreen extends StatefulWidget {
@@ -11,6 +13,55 @@ class TopicQuizScreen extends StatefulWidget {
 }
 
 class _TopicQuizScreenState extends State<TopicQuizScreen> {
+  List<QuizTopic> topics = [];
+  bool isLoading = true;
+  String? errorMessage;
+  
+  @override
+  void initState() {
+    super.initState();
+    loadTopics();
+  }
+  
+  Future<void> loadTopics() async {
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
+    
+    try {
+      final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+      final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
+      
+      final language = languageProvider.language;
+      final state = 'all'; // Or get from user preferences
+      
+      // Get license type 
+      final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
+      
+      // Fetch topics from Firebase
+      final fetchedTopics = await serviceLocator.content.getQuizTopics(
+        licenseType,
+        language,
+        state
+      );
+      
+      if (mounted) {
+        setState(() {
+          topics = fetchedTopics;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading quiz topics: $e');
+      if (mounted) {
+        setState(() {
+          errorMessage = 'Failed to load topics. Please try again.';
+          isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,17 +69,57 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> {
     final topicProgress = progressProvider.progress.topicProgress;
     final overallProgress = progressProvider.progress.overallTopicProgress;
     
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Вчити по темах'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
+    // Create app bar
+    final appBar = AppBar(
+      title: Text('Вчити по темах'),
+      backgroundColor: Colors.white,
+      foregroundColor: Colors.black,
+      elevation: 0,
+      leading: IconButton(
+        icon: Icon(Icons.arrow_back),
+        onPressed: () => Navigator.pop(context),
       ),
+    );
+    
+    // Show loading state
+    if (isLoading) {
+      return Scaffold(
+        appBar: appBar,
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+    
+    // Show error state
+    if (errorMessage != null) {
+      return Scaffold(
+        appBar: appBar,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 32),
+                child: Text(
+                  errorMessage!,
+                  style: TextStyle(color: Colors.red),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: loadTopics,
+                child: Text('Повторити спробу'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    return Scaffold(
+      appBar: appBar,
       body: Column(
         children: [
           Padding(
@@ -89,12 +180,14 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> {
           ),
           // Topic list
           Expanded(
-            child: ListView.builder(
-              padding: EdgeInsets.all(16),
-              itemCount: quizTopics.length,
-              itemBuilder: (context, index) {
-                final topic = quizTopics[index];
-                final progress = topicProgress[topic.id] ?? 0.0;
+            child: topics.isEmpty 
+            ? Center(child: Text('Немає доступних тем')) 
+            : ListView.builder(
+                padding: EdgeInsets.all(16),
+                itemCount: topics.length,
+                itemBuilder: (context, index) {
+                  final topic = topics[index];
+                  final progress = topicProgress[topic.id] ?? 0.0;
                 
                 return Card(
                   margin: EdgeInsets.only(bottom: 16),

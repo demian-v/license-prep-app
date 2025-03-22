@@ -1,32 +1,130 @@
 import 'package:flutter/material.dart';
-import '../data/road_signs_data.dart';
+import 'package:provider/provider.dart';
+import '../models/road_sign_category.dart';
+import '../providers/language_provider.dart';
+import '../services/service_locator.dart';
 import 'road_sign_category_screen.dart';
 
-class RoadSignsScreen extends StatelessWidget {
+class RoadSignsScreen extends StatefulWidget {
+  @override
+  _RoadSignsScreenState createState() => _RoadSignsScreenState();
+}
+
+class _RoadSignsScreenState extends State<RoadSignsScreen> {
+  List<RoadSignCategory> categories = [];
+  bool isLoading = true;
+  String? errorMessage;
+  String roadSignsIntro = "Дорожні знаки є важливою частиною правил дорожнього руху. Вони надають важливу інформацію для безпечного руху на дорогах.";
+  
+  @override
+  void initState() {
+    super.initState();
+    loadCategories();
+  }
+  
+  Future<void> loadCategories() async {
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
+    
+    try {
+      final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+      final language = languageProvider.language;
+      
+      // Fetch road sign categories from Firebase
+      final fetchedCategories = await serviceLocator.content.getRoadSignCategories(language);
+      
+      if (mounted) {
+        setState(() {
+          categories = fetchedCategories;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading road sign categories: $e');
+      if (mounted) {
+        setState(() {
+          errorMessage = 'Failed to load road sign categories. Please try again.';
+          isLoading = false;
+        });
+      }
+    }
+  }
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Дорожні знаки',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        elevation: 0,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: Colors.black,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.search),
-            onPressed: () {
-              // Search functionality
-            },
-          ),
-        ],
+    // Create common app bar
+    final appBar = AppBar(
+      title: Text(
+        'Дорожні знаки',
+        style: TextStyle(fontWeight: FontWeight.bold),
       ),
+      elevation: 0,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      foregroundColor: Colors.black,
+      leading: IconButton(
+        icon: Icon(Icons.arrow_back),
+        onPressed: () => Navigator.pop(context),
+      ),
+      actions: [
+        IconButton(
+          icon: Icon(Icons.search),
+          onPressed: () {
+            // Search functionality
+          },
+        ),
+      ],
+    );
+    
+    // Show loading state
+    if (isLoading) {
+      return Scaffold(
+        appBar: appBar,
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+    
+    // Show error state
+    if (errorMessage != null) {
+      return Scaffold(
+        appBar: appBar,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 32),
+                child: Text(
+                  errorMessage!,
+                  style: TextStyle(color: Colors.red),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: loadCategories,
+                child: Text('Повторити спробу'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    // Show empty state
+    if (categories.isEmpty) {
+      return Scaffold(
+        appBar: appBar,
+        body: Center(
+          child: Text('Немає доступних категорій дорожніх знаків'),
+        ),
+      );
+    }
+    
+    return Scaffold(
+      appBar: appBar,
       body: SingleChildScrollView(
         child: Padding(
           padding: EdgeInsets.all(16.0),
@@ -41,9 +139,9 @@ class RoadSignsScreen extends StatelessWidget {
               ListView.builder(
                 shrinkWrap: true,
                 physics: NeverScrollableScrollPhysics(),
-                itemCount: roadSignCategories.length,
+                itemCount: categories.length,
                 itemBuilder: (context, index) {
-                  final category = roadSignCategories[index];
+                  final category = categories[index];
                   return Card(
                     margin: EdgeInsets.only(bottom: 16),
                     shape: RoundedRectangleBorder(
@@ -55,7 +153,7 @@ class RoadSignsScreen extends StatelessWidget {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => RoadSignCategoryScreen(),
+                            builder: (context) => RoadSignCategoryScreen(category: category),
                           ),
                         );
                       },

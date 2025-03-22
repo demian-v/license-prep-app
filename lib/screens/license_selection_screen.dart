@@ -1,11 +1,61 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/license_type.dart';
 import '../providers/progress_provider.dart';
 import '../providers/subscription_provider.dart';
+import '../providers/language_provider.dart';
+import '../services/service_locator.dart';
 import '../widgets/license_card.dart';
-import '../data/license_data.dart';
+import '../data/license_data.dart' as license_data;
 
-class LicenseSelectionScreen extends StatelessWidget {
+class LicenseSelectionScreen extends StatefulWidget {
+  @override
+  _LicenseSelectionScreenState createState() => _LicenseSelectionScreenState();
+}
+
+class _LicenseSelectionScreenState extends State<LicenseSelectionScreen> {
+  List<LicenseType> licenseTypes = [];
+  bool isLoading = true;
+  String? errorMessage;
+  
+  @override
+  void initState() {
+    super.initState();
+    loadLicenseTypes();
+  }
+  
+  // Since we don't have a direct getLicenseTypes method in ContentApiInterface,
+  // we'll use the hard-coded license types for now
+  Future<void> loadLicenseTypes() async {
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
+    
+    try {
+      // We could potentially enhance this by fetching module counts, etc. from Firebase
+      final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+      final language = languageProvider.language;
+      
+      // For now, use the hard-coded license types
+      // In a real implementation, you'd want to add the ContentApiInterface.getLicenseTypes method
+      // and fetch this data from Firebase
+      if (mounted) {
+        setState(() {
+          licenseTypes = license_data.licenseTypes;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading license types: $e');
+      if (mounted) {
+        setState(() {
+          errorMessage = 'Failed to load license types. Please try again.';
+          isLoading = false;
+        });
+      }
+    }
+  }
   @override
   Widget build(BuildContext context) {
     final progressProvider = Provider.of<ProgressProvider>(context);

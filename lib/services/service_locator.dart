@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'firebase_storage_service.dart';
 import 'api/api_client.dart';
 import 'api/api_implementation.dart';
 import 'api/auth_api.dart';
@@ -52,6 +53,9 @@ class ServiceLocator {
   // Current implementation
   ApiImplementation _currentImplementation = ApiImplementation.rest;
   
+  // Firebase Storage Service
+  late FirebaseStorageService _firebaseStorageService;
+  
   bool _isInitialized = false;
 
   /// Initialize all services with default implementation (REST)
@@ -71,6 +75,7 @@ class ServiceLocator {
     // Always initialize core clients
     _apiClient = ApiClient();
     _firebaseFunctionsClient = FirebaseFunctionsClient();
+    _firebaseStorageService = FirebaseStorageService();
     
     // Initialize REST implementations
     _restAuthApi = AuthApi(_apiClient);
@@ -105,6 +110,12 @@ class ServiceLocator {
   
   /// Get current API implementation
   ApiImplementation get currentImplementation => _currentImplementation;
+  
+  /// Getter for Firebase Storage Service
+  FirebaseStorageService get storage {
+    _checkInitialization();
+    return _firebaseStorageService;
+  }
   
   /// Getters for accessing interface-based services (recommended)
   AuthApiInterface get auth {

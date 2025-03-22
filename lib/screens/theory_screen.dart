@@ -59,7 +59,7 @@ class TheoryScreen extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => RoadSignCategoryScreen(),
+                      builder: (context) => RoadSignsScreen(),
                     ),
                   );
                 },

@@ -3,11 +3,13 @@ import 'package:provider/provider.dart';
 import '../data/license_data.dart';
 import '../widgets/test_card.dart';
 import '../providers/exam_provider.dart';
+import '../providers/language_provider.dart';
+import '../providers/progress_provider.dart';
+import '../providers/practice_provider.dart';
 import 'topic_quiz_screen.dart';
 import 'saved_items_screen.dart';
 import 'exam_question_screen.dart';
 import 'practice_question_screen.dart';
-import '../providers/practice_provider.dart';
 
 class TestScreen extends StatelessWidget {
   @override
@@ -38,7 +40,21 @@ class TestScreen extends StatelessWidget {
                 () {
                   // Start a new exam
                   final examProvider = Provider.of<ExamProvider>(context, listen: false);
-                  examProvider.startNewExam();
+                  
+                  // Get language from provider
+                  final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+                  final language = languageProvider.language;
+                  
+                  // Get license type from provider, default to 'driver'
+                  final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
+                  final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
+                  
+                  // Start new exam with required parameters
+                  examProvider.startNewExam(
+                    language: language,
+                    state: 'all', // Default state
+                    licenseType: licenseType,
+                  );
                   
                   // Navigate to the exam question screen
                   Navigator.push(
