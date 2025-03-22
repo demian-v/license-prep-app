@@ -7,7 +7,7 @@ final List<LicenseType> licenseTypes = [
     id: 'driver',
     name: 'Правила Дорожнього Руху',
     description: 'Теоретичний курс майбутнього водія',
-    icon: '🚗',
+    icon: 'Car',
     modules: 5,
     tests: 3,
   ),

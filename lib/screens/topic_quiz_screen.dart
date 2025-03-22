@@ -34,7 +34,7 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> {
       final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
       
       final language = languageProvider.language;
-      final state = 'all'; // Or get from user preferences
+      final state = 'ALL'; // Match the case in Firebase ('ALL' instead of 'all')
       
       // Get license type 
       final licenseType = progressProvider.progress.selectedLicense ?? 'driver';

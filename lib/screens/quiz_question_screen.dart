@@ -44,8 +44,8 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
     try {
       final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
       final language = languageProvider.language;
-      // Use 'all' or a default value if state filtering isn't implemented
-      final state = 'all';
+      // Use 'IL' to match the state of questions in Firebase
+      final state = 'IL';
       
       // Fetch questions from Firebase
       final fetchedQuestions = await serviceLocator.content.getQuizQuestions(
@@ -78,7 +78,11 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
     
     setState(() {
       isAnswerChecked = true;
-      isCorrect = selectedAnswer == questions[currentQuestionIndex].correctAnswer;
+      // Add more logging to help debug the answer checking
+      final correctAnswer = questions[currentQuestionIndex].correctAnswer;
+      print('Selected answer: "$selectedAnswer"');
+      print('Correct answer: "$correctAnswer"');
+      isCorrect = selectedAnswer == correctAnswer;
       answers[questions[currentQuestionIndex].id] = isCorrect!;
     });
   }
@@ -253,11 +257,16 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
             Container(
               width: double.infinity,
               height: 200,
-              child: serviceLocator.storage.getImage(
-                storagePath: 'quiz/${question.imagePath!}',
-                assetFallback: 'assets/images/quiz/${question.imagePath!}',
-                fit: BoxFit.cover,
-                placeholderIcon: Icons.broken_image,
+              child: Image.asset(
+                // Use asset directly instead of Firebase Storage
+                'assets/images/quiz/default.png',
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  print('Error loading image: $error');
+                  return Center(
+                    child: Icon(Icons.broken_image, size: 50, color: Colors.grey),
+                  );
+                },
               ),
             ),
           

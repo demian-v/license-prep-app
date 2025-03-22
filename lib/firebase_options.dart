@@ -46,7 +46,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '987638335534',
     projectId: 'licenseprepapp',
     authDomain: 'licenseprepapp.firebaseapp.com',
-    storageBucket: 'licenseprepapp.firebasestorage.app',
+    storageBucket: 'licenseprepapp.appspot.com',
     measurementId: 'G-8TTZX72V8P',
   );
 

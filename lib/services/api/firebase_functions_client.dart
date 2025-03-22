@@ -1,6 +1,7 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 
 /// Maps client-side function names to Cloud Functions names
 class FunctionNameMapper {
@@ -72,15 +73,35 @@ class FirebaseFunctionsClient {
     final cloudFunctionName = FunctionNameMapper.getCloudFunctionName(functionName);
     
     try {
+      // Make sure Firebase Auth user is present
+      final auth = firebase_auth.FirebaseAuth.instance;
+      if (auth.currentUser == null) {
+        // Try to sign in anonymously if no user is authenticated
+        print('No Firebase user detected, attempting anonymous sign-in...');
+        await auth.signInAnonymously();
+        print('Anonymous sign-in successful');
+      } else {
+        // Refresh token to ensure it's valid
+        print('Refreshing Firebase token...');
+        await auth.currentUser!.getIdToken(true);
+      }
+      
       final callable = _functions.httpsCallable(cloudFunctionName);
+      print('Calling function $cloudFunctionName with data: $data');
       final result = await callable.call(data ?? {});
+      print('Function call successful, result type: ${result.data.runtimeType}');
+      
       return result.data as T;
     } on FirebaseFunctionsException catch (e) {
       // Handle specific Firebase Functions errors
-      throw '${e.code}: ${e.message}${e.details != null ? " (Details: ${e.details})" : ""}';
+      final errorMsg = '${e.code}: ${e.message}${e.details != null ? " (Details: ${e.details})" : ""}';
+      print('Firebase Function Error: $errorMsg');
+      throw errorMsg;
     } catch (e) {
       // Handle other errors
-      throw 'Error calling function $functionName: $e';
+      final errorMsg = 'Error calling function $functionName: $e';
+      print(errorMsg);
+      throw errorMsg;
     }
   }
 }

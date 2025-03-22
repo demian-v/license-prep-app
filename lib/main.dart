@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'firebase_options.dart';
 
 import 'services/service_locator.dart';
@@ -35,6 +36,20 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  
+  // Sign in anonymously to Firebase - this will help with storage permissions
+  try {
+    final auth = firebase_auth.FirebaseAuth.instance;
+    if (auth.currentUser == null) {
+      print('No user logged in, signing in anonymously...');
+      await auth.signInAnonymously();
+      print('Anonymous sign-in successful');
+    } else {
+      print('User already signed in: ${auth.currentUser?.uid}');
+    }
+  } catch (e) {
+    print('Error signing in anonymously: $e');
+  }
   
   // Initialize service locator with Firebase implementation
   serviceLocator.initializeWithApiImplementation(ApiImplementation.firebase);
