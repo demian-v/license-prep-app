@@ -52,7 +52,7 @@ class TestScreen extends StatelessWidget {
                   // Start new exam with required parameters
                   examProvider.startNewExam(
                     language: language,
-                    state: 'all', // Default state
+                    state: 'IL', // Use 'IL' to match Firebase data structure
                     licenseType: licenseType,
                   );
                   
@@ -88,15 +88,26 @@ class TestScreen extends StatelessWidget {
                 () {
                   // Start a new practice test
                   final practiceProvider = Provider.of<PracticeProvider>(context, listen: false);
-                  practiceProvider.startNewPractice();
+                  final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+                  final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
                   
-                  // Navigate to the practice question screen
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => PracticeQuestionScreen(),
-                    ),
-                  );
+                  final language = languageProvider.language;
+                  final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
+                  
+                  // Start new practice with required parameters
+                  practiceProvider.startNewPractice(
+                    language: language,
+                    state: 'IL', // Use 'IL' to match Firebase data structure
+                    licenseType: licenseType,
+                  ).then((_) {
+                    // Navigate to the practice question screen after loading
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PracticeQuestionScreen(),
+                      ),
+                    );
+                  });
                 },
               ),
               SizedBox(height: 16),

@@ -148,24 +148,34 @@ class ExamProvider extends ChangeNotifier {
     required int count,
   }) async {
     try {
-      // Get topics for the license type
+      print('Fetching random questions for exam with: language=$language, licenseType=$licenseType');
+      
+      // Get topics for the license type - Use 'IL' for state matching Firebase data
       final topics = await serviceLocator.content.getQuizTopics(
         licenseType,
         language,
-        state
+        'IL' // Use 'IL' instead of lowercase 'all' to match Firebase data
       );
+      
+      print('Fetched ${topics.length} topics for exam');
       
       // Collect questions from all topics
       List<QuizQuestion> allQuestions = [];
       
       for (final topic in topics) {
+        print('Fetching questions for topic: ${topic.id}');
+        
         final topicQuestions = await serviceLocator.content.getQuizQuestions(
           topic.id,
           language,
-          state
+          'IL' // Use 'IL' instead of lowercase 'all' to match Firebase data
         );
+        
+        print('Fetched ${topicQuestions.length} questions for topic ${topic.id}');
         allQuestions.addAll(topicQuestions);
       }
+      
+      print('Total questions collected for exam: ${allQuestions.length}');
       
       // Shuffle and select random questions
       if (allQuestions.isEmpty) {

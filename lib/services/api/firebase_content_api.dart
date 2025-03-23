@@ -49,21 +49,9 @@ class FirebaseContentApi implements ContentApiInterface {
       print('Received response: $response');
       
       if (response == null || response.isEmpty) {
-        print('Response was empty, returning fallback data');
-        // Return hardcoded sample data for testing
-        return [
-          QuizTopic(
-            id: 'q_topic_il_ua_01',
-            title: 'ЗАГАЛЬНІ ПОЛОЖЕННЯ',
-            questionCount: 15,
-            progress: 0.0,
-            questionIds: [
-              'q_il_ua_general_01',
-              'q_il_ua_general_02',
-              'q_il_ua_general_03',
-            ],
-          ),
-        ];
+        print('Response was empty, returning empty list');
+        // Return empty list instead of fallback data to ensure we only use Firebase data
+        return [];
       }
       
       return response.map((item) {
@@ -113,22 +101,10 @@ class FirebaseContentApi implements ContentApiInterface {
       .toList();
     } catch (e) {
       print('Error fetching quiz topics: $e');
-      print('Returning fallback data');
+      print('Returning empty list');
       
-      // Return hardcoded sample data if Firebase call fails
-      return [
-        QuizTopic(
-          id: 'q_topic_il_ua_01',
-          title: 'ЗАГАЛЬНІ ПОЛОЖЕННЯ',
-          questionCount: 15,
-          progress: 0.0,
-          questionIds: [
-            'q_il_ua_general_01',
-            'q_il_ua_general_02',
-            'q_il_ua_general_03',
-          ],
-        ),
-      ];
+      // Return empty list instead of fallback data
+      return [];
     }
   }
   
@@ -156,31 +132,9 @@ class FirebaseContentApi implements ContentApiInterface {
       print('Received questions response: $response');
       
       if (response == null || response.isEmpty) {
-        print('Questions response was empty, returning fallback data');
-        // Return hardcoded sample data for testing
-        return [
-          QuizQuestion(
-            id: 'q_il_ua_general_01',
-            topicId: topicId,
-            questionText: 'Чи належить до проїзної частини велосипедна смуга?',
-            options: ['Так, належить.', 'Ні, не належить.'],
-            correctAnswer: 'Смуга руху',
-            explanation: 'Смуга руху — це поздовжня смуга на проїзній частині завширшки щонайменше 2,75 м, що позначена або не позначена дорожньою розміткою і призначена для руху нерейкових транспортних засобів.',
-            ruleReference: 'Загальні положення - Визначення',
-            imagePath: 'assets/images/section1/lane_marking.png',
-            type: QuestionType.singleChoice,
-          ),
-          QuizQuestion(
-            id: 'q_il_ua_general_02',
-            topicId: topicId,
-            questionText: 'Що таке "розділювальна смуга"?',
-            options: ['Розділює зустрічні потоки транспорту', 'Відокремлює пішохідну частину', 'Визначає межі стоянки'],
-            correctAnswer: 'Розділює зустрічні потоки транспорту',
-            explanation: 'Розділювальна смуга — відокремлює проїзні частини дороги на самостійні проїзди і (або) відокремлює проїзну частину дороги від трамвайної колії.',
-            ruleReference: 'Загальні положення - Визначення',
-            type: QuestionType.singleChoice,
-          ),
-        ];
+        print('Questions response was empty, returning empty list');
+        // Return empty list instead of fallback data
+        return [];
       }
       
       return response.map((item) {
@@ -241,32 +195,10 @@ class FirebaseContentApi implements ContentApiInterface {
       .toList();
     } catch (e) {
       print('Error fetching quiz questions: $e');
-      print('Returning fallback question data');
+      print('Returning empty list');
       
-      // Return hardcoded sample data if Firebase call fails
-      return [
-        QuizQuestion(
-          id: 'q_il_ua_general_01',
-          topicId: topicId,
-          questionText: 'Чи належить до проїзної частини велосипедна смуга?',
-          options: ['Так, належить.', 'Ні, не належить.'],
-          correctAnswer: 'Смуга руху',
-          explanation: 'Смуга руху — це поздовжня смуга на проїзній частині завширшки щонайменше 2,75 м, що позначена або не позначена дорожньою розміткою і призначена для руху нерейкових транспортних засобів.',
-          ruleReference: 'Загальні положення - Визначення',
-          imagePath: 'assets/images/section1/lane_marking.png',
-          type: QuestionType.singleChoice,
-        ),
-        QuizQuestion(
-          id: 'q_il_ua_general_02',
-          topicId: topicId,
-          questionText: 'Що таке "розділювальна смуга"?',
-          options: ['Розділює зустрічні потоки транспорту', 'Відокремлює пішохідну частину', 'Визначає межі стоянки'],
-          correctAnswer: 'Розділює зустрічні потоки транспорту',
-          explanation: 'Розділювальна смуга — відокремлює проїзні частини дороги на самостійні проїзди і (або) відокремлює проїзну частину дороги від трамвайної колії.',
-          ruleReference: 'Загальні положення - Визначення',
-          type: QuestionType.singleChoice,
-        ),
-      ];
+      // Return empty list instead of fallback data
+      return [];
     }
   }
   
