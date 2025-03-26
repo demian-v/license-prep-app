@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 import '../providers/exam_provider.dart';
 import '../providers/progress_provider.dart';
 import '../models/quiz_question.dart';
@@ -97,7 +98,10 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
                     color: isSaved ? Colors.red : null,
                   ),
                   onPressed: () {
-                    progressProvider.toggleSavedQuestion(questionId);
+                    // Get auth provider to check if user is logged in
+                    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                    final userId = authProvider.user?.id ?? '';
+                    progressProvider.toggleSavedQuestionWithUserId(questionId, userId);
                   },
                 );
               },

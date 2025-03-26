@@ -160,12 +160,25 @@ class FirebaseContentApi implements ContentApiInterface {
           }
           
           // Extract the correct answer value - checking multiple possible field names
-          // This handles the case where correct answer is stored in correctAnswerString
-          var correctAnswer = "";
-          if (data.containsKey('correctAnswer') && data['correctAnswer'] != null) {
+          // Handle different formats (array or string)
+          dynamic correctAnswer;
+          if (data.containsKey('correctAnswers') && data['correctAnswers'] != null) {
+            // If it's stored as an array in Firestore
+            if (data['correctAnswers'] is List) {
+              correctAnswer = (data['correctAnswers'] as List)
+                  .map((item) => item.toString())
+                  .toList();
+            }
+          } else if (data.containsKey('correctAnswer') && data['correctAnswer'] != null) {
             correctAnswer = data['correctAnswer'].toString();
           } else if (data.containsKey('correctAnswerString') && data['correctAnswerString'] != null) {
-            correctAnswer = data['correctAnswerString'].toString();
+            // For backward compatibility, split comma-separated values
+            String answerStr = data['correctAnswerString'].toString();
+            if (data['type']?.toString()?.toLowerCase() == 'multiplechoice') {
+              correctAnswer = answerStr.split(', ').map((s) => s.trim()).toList();
+            } else {
+              correctAnswer = answerStr;
+            }
           }
           
           print('Question ID: ${data['id']}, Correct Answer: $correctAnswer');

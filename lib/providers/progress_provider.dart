@@ -33,7 +33,7 @@ class ProgressProvider extends ChangeNotifier {
     if (!progress.completedModules.contains(moduleId)) {
       try {
         // Try to use the API
-        await serviceLocator.progressApi.updateModuleProgress(moduleId, 1.0, userId);
+        await serviceLocator.progress.updateModuleProgress(moduleId, 1.0, userId);
         
         final updatedCompletedModules = List<String>.from(progress.completedModules)..add(moduleId);
         final updatedProgress = progress.copyWith(
@@ -74,7 +74,7 @@ class ProgressProvider extends ChangeNotifier {
   Future<void> saveTestScoreWithUserId(String testId, double score, String userId) async {
     try {
       // Try to use the API
-      await serviceLocator.progressApi.saveTestScore(
+      await serviceLocator.progress.saveTestScore(
         testId, 
         score,
         'practice', // Assuming it's a practice test
@@ -122,17 +122,6 @@ class ProgressProvider extends ChangeNotifier {
   // New method with userId parameter
   Future<void> resetProgressWithUserId(String userId) async {
     try {
-      // Sync with API first - send empty progress
-      await serviceLocator.progressApi.syncOfflineProgress(
-        userId, 
-        {
-          'completedModules': [],
-          'testScores': {},
-          'topicProgress': {},
-          'savedQuestions': [],
-        }
-      );
-      
       // Create a new empty progress object, keeping only the selected license
       final updatedProgress = UserProgress(
         completedModules: [],
@@ -147,10 +136,27 @@ class ProgressProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('progress', jsonEncode(updatedProgress.toJson()));
       
+      // Try to sync with API after updating local state
+      try {
+        // Use the concrete implementation for this specialized method
+        await serviceLocator.progressApi.syncOfflineProgress(
+          userId, 
+          {
+            'completedModules': [],
+            'testScores': {},
+            'topicProgress': {},
+            'savedQuestions': [],
+          }
+        );
+      } catch (e) {
+        debugPrint('Error syncing reset progress to server: $e');
+        // Continue anyway since local state is already updated
+      }
+      
       notifyListeners();
     } catch (e) {
-      // Fallback to local implementation if API is not available
-      debugPrint('API error, resetting locally: $e');
+      // Fallback to local implementation if something fails
+      debugPrint('Error in resetProgressWithUserId: $e');
       
       final updatedProgress = UserProgress(
         completedModules: [],
@@ -176,57 +182,157 @@ class ProgressProvider extends ChangeNotifier {
 
   // New method with userId parameter
   Future<void> toggleSavedQuestionWithUserId(String questionId, String userId) async {
-    final List<String> updatedSavedQuestions = List<String>.from(progress.savedQuestions);
+    // Check if savedItems is already initialized
+    Map<String, List<String>> updatedSavedItems = 
+      Map<String, List<String>>.from(progress.savedItems);
     
+    // Initialize 'question' list if it doesn't exist
+    if (!updatedSavedItems.containsKey('question')) {
+      updatedSavedItems['question'] = [];
+    }
+    
+    List<String> questionsList = List<String>.from(updatedSavedItems['question'] ?? []);
+    bool isCurrentlySaved = questionsList.contains(questionId);
+    
+    // Also check old savedQuestions for backward compatibility
+    if (!isCurrentlySaved) {
+      isCurrentlySaved = progress.savedQuestions.contains(questionId);
+    }
+    
+    // Get the current order mapping
+    Map<String, Map<String, int>> updatedSavedItemsOrder = 
+      Map<String, Map<String, int>>.from(progress.savedItemsOrder);
+    
+    // Initialize 'question' order map if it doesn't exist
+    if (!updatedSavedItemsOrder.containsKey('question')) {
+      updatedSavedItemsOrder['question'] = {};
+    }
+    
+    Map<String, int> questionOrderMap = Map<String, int>.from(updatedSavedItemsOrder['question'] ?? {});
+    
+    if (isCurrentlySaved) {
+      // Remove if already saved
+      questionsList.remove(questionId);
+      questionOrderMap.remove(questionId);
+    } else {
+      // Add if not saved and set the order to be the current timestamp
+      // This way newer questions will have higher order numbers
+      questionsList.add(questionId);
+      questionOrderMap[questionId] = DateTime.now().millisecondsSinceEpoch;
+    }
+    
+    updatedSavedItems['question'] = questionsList;
+    updatedSavedItemsOrder['question'] = questionOrderMap;
+    
+    // Update local state immediately - use both for compatibility
+    final List<String> updatedSavedQuestions = List<String>.from(progress.savedQuestions);
+    if (isCurrentlySaved) {
+      updatedSavedQuestions.remove(questionId);
+    } else if (!updatedSavedQuestions.contains(questionId)) {
+      updatedSavedQuestions.add(questionId);
+    }
+    
+    final updatedProgress = progress.copyWith(
+      savedItems: updatedSavedItems,
+      savedQuestions: updatedSavedQuestions,
+      savedItemsOrder: updatedSavedItemsOrder,
+    );
+    
+    progress = updatedProgress;
+    
+    // Save to SharedPreferences for offline persistence
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('progress', jsonEncode(updatedProgress.toJson()));
+    
+    // Notify listeners to update UI
+    notifyListeners();
+    
+    // Then try to sync with the server
     try {
-      if (updatedSavedQuestions.contains(questionId)) {
+      // IMPORTANT: Use the correct API interface
+      // The service locator returns the appropriate implementation (REST or Firebase)
+      // based on how it was initialized in main.dart
+      if (isCurrentlySaved) {
         // Remove if already saved
-        await serviceLocator.progressApi.removeSavedItem(userId, questionId);
-        updatedSavedQuestions.remove(questionId);
+        await serviceLocator.progress.removeSavedItem(questionId, 'question', userId);
       } else {
         // Add if not saved
-        await serviceLocator.progressApi.addSavedItem(userId, questionId, 'question');
-        updatedSavedQuestions.add(questionId);
+        await serviceLocator.progress.saveItem(questionId, 'question', userId);
       }
       
-      final updatedProgress = progress.copyWith(
-        savedQuestions: updatedSavedQuestions,
-      );
-      
-      progress = updatedProgress;
-      
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('progress', jsonEncode(updatedProgress.toJson()));
-      
-      notifyListeners();
+      // No need to update local state again as we've already done it
     } catch (e) {
-      // Fallback to local implementation if API is not available
-      debugPrint('API error, updating locally: $e');
+      // Log the error but don't revert the UI change
+      // This allows the app to work offline while providing detailed error info
+      debugPrint('API error while syncing saved question: $e');
       
-      if (updatedSavedQuestions.contains(questionId)) {
-        // Remove if already saved
-        updatedSavedQuestions.remove(questionId);
-      } else {
-        // Add if not saved
-        updatedSavedQuestions.add(questionId);
-      }
-      
-      final updatedProgress = progress.copyWith(
-        savedQuestions: updatedSavedQuestions,
-      );
-      
-      progress = updatedProgress;
-      
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('progress', jsonEncode(updatedProgress.toJson()));
-      
-      notifyListeners();
+      // We could show a toast message here to inform the user of sync issues
+      // but the local state will remain correct
     }
   }
   
-  // Check if a question is saved
+  // Check if a question is saved - check both places for backward compatibility
   bool isQuestionSaved(String questionId) {
-    return progress.savedQuestions.contains(questionId);
+    final savedQuestionsInNewStructure = progress.savedItems['question'] ?? [];
+    return progress.savedQuestions.contains(questionId) || 
+           savedQuestionsInNewStructure.contains(questionId);
+  }
+  
+  // Get the saved order for a question
+  int getQuestionSaveOrder(String questionId) {
+    final orderMap = progress.savedItemsOrder['question'] ?? {};
+    return orderMap[questionId] ?? 0;
+  }
+  
+  // Migrate saved questions from old to new structure if needed
+  Future<void> migrateSavedQuestionsIfNeeded(String userId) async {
+    if (progress.savedQuestions.isNotEmpty && 
+        (!progress.savedItems.containsKey('question') || progress.savedItems['question']!.isEmpty)) {
+      
+      debugPrint('Migrating saved questions from old to new structure');
+      
+      // Update local model
+      Map<String, List<String>> updatedSavedItems = 
+        Map<String, List<String>>.from(progress.savedItems);
+      updatedSavedItems['question'] = List<String>.from(progress.savedQuestions);
+      
+      // Create order timestamps for each question, using incrementing values
+      // so the original order is preserved
+      Map<String, Map<String, int>> updatedSavedItemsOrder = 
+        Map<String, Map<String, int>>.from(progress.savedItemsOrder);
+      
+      Map<String, int> questionOrderMap = {};
+      final baseTime = DateTime.now().millisecondsSinceEpoch;
+      
+      for (int i = 0; i < progress.savedQuestions.length; i++) {
+        questionOrderMap[progress.savedQuestions[i]] = baseTime + i;
+      }
+      
+      updatedSavedItemsOrder['question'] = questionOrderMap;
+      
+      final updatedProgress = progress.copyWith(
+        savedItems: updatedSavedItems,
+        savedItemsOrder: updatedSavedItemsOrder,
+      );
+      
+      progress = updatedProgress;
+      
+      // Save to SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('progress', jsonEncode(updatedProgress.toJson()));
+      
+      // Sync with server
+      try {
+        for (String questionId in progress.savedQuestions) {
+          await serviceLocator.progress.saveItem(questionId, 'question', userId);
+        }
+        debugPrint('Migration complete');
+      } catch (e) {
+        debugPrint('API error during migration: $e');
+      }
+      
+      notifyListeners();
+    }
   }
   
   // For backwards compatibility with existing code
@@ -238,7 +344,7 @@ class ProgressProvider extends ChangeNotifier {
   Future<void> updateTopicProgressWithUserId(String topicId, double progressValue, String userId) async {
     try {
       // Try to use the API
-      await serviceLocator.progressApi.updateTopicProgress(topicId, progressValue, userId);
+      await serviceLocator.progress.updateTopicProgress(topicId, progressValue, userId);
       
       final updatedTopicProgress = Map<String, double>.from(progress.topicProgress);
       updatedTopicProgress[topicId] = progressValue;
@@ -276,7 +382,7 @@ class ProgressProvider extends ChangeNotifier {
   // Sync local progress with server
   Future<void> syncProgress(String userId) async {
     try {
-      // Try to use the API to sync progress
+      // Try to use the API to sync progress - using concrete implementation
       await serviceLocator.progressApi.syncOfflineProgress(
         userId, 
         {

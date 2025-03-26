@@ -26,6 +26,8 @@ class FunctionNameMapper {
     'updateQuestionProgress': 'progress-updateQuestionProgress',
     'saveTestScore': 'progress-saveTestScore',
     'getSavedItems': 'progress-getSavedItems',
+    'addSavedItem': 'progress-addSavedItem',
+    'removeSavedItem': 'progress-removeSavedItem',
     
     // Subscription functions
     'getSubscriptionPlans': 'subscription-getSubscriptionPlans',

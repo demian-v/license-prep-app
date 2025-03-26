@@ -109,6 +109,14 @@ void main() async {
   final examProvider = ExamProvider();
   final practiceProvider = PracticeProvider();
   
+  // Check if we need to migrate saved questions
+  if (user != null) {
+    final userId = user.id; // User.id is non-nullable based on the model
+    Future.microtask(() async {
+      await progressProvider.migrateSavedQuestionsIfNeeded(userId);
+    });
+  }
+  
   runApp(
     MultiProvider(
       providers: [

@@ -146,7 +146,7 @@ class FirebaseProgressApi implements ProgressApiInterface {
         'itemType': itemType,
       };
       
-      if (userId != null) {
+      if (userId != null && userId.isNotEmpty) {
         data['userId'] = userId;
       }
       
@@ -157,6 +157,7 @@ class FirebaseProgressApi implements ProgressApiInterface {
       
       return response;
     } catch (e) {
+      print('Error in saveItem: $e');
       throw 'Failed to save item: $e';
     }
   }
@@ -170,7 +171,7 @@ class FirebaseProgressApi implements ProgressApiInterface {
         'itemType': itemType,
       };
       
-      if (userId != null) {
+      if (userId != null && userId.isNotEmpty) {
         data['userId'] = userId;
       }
       
@@ -181,6 +182,7 @@ class FirebaseProgressApi implements ProgressApiInterface {
       
       return response;
     } catch (e) {
+      print('Error in removeSavedItem: $e');
       throw 'Failed to remove saved item: $e';
     }
   }
