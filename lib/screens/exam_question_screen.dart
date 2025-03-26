@@ -15,6 +15,43 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
   dynamic selectedAnswer;
   bool isAnswerChecked = false;
   bool? isCorrect;
+  ScrollController _pillsScrollController = ScrollController();
+  
+  @override
+  void initState() {
+    super.initState();
+    // Scroll to current pill when screen initializes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToCurrentPill();
+    });
+  }
+  
+  @override
+  void dispose() {
+    _pillsScrollController.dispose();
+    super.dispose();
+  }
+  
+  void _scrollToCurrentPill() {
+    if (!_pillsScrollController.hasClients) return;
+    
+    final examProvider = Provider.of<ExamProvider>(context, listen: false);
+    final exam = examProvider.currentExam;
+    if (exam == null) return;
+    
+    final pillWidth = 48.0; // Width of pill including margins
+    final screenWidth = MediaQuery.of(context).size.width;
+    final targetPosition = pillWidth * exam.currentQuestionIndex;
+    final screenCenter = screenWidth / 2;
+    
+    final scrollOffset = targetPosition - screenCenter + (pillWidth / 2);
+    
+    _pillsScrollController.animateTo(
+      scrollOffset.clamp(0.0, _pillsScrollController.position.maxScrollExtent),
+      duration: Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -114,6 +151,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
             Container(
               height: 50,
               child: ListView.builder(
+                controller: _pillsScrollController,
                 scrollDirection: Axis.horizontal,
                 padding: EdgeInsets.symmetric(horizontal: 16),
                 itemCount: exam.questionIds.length,
@@ -166,12 +204,29 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
             // Question text
             Padding(
               padding: EdgeInsets.all(16),
-              child: Text(
-                currentQuestion.questionText,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    currentQuestion.questionText,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  if (currentQuestion.type == QuestionType.multipleChoice)
+                    Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Text(
+                        "Оберіть всі правильні відповіді",
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.blue,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
             
@@ -184,7 +239,14 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
                   final option = currentQuestion.options[index];
                   bool isSelected = selectedAnswer == option;
                   bool showResult = isAnswerChecked;
-                  bool isCorrectOption = option == currentQuestion.correctAnswer;
+                  bool isCorrectOption = false;
+                  
+                  // Check if this option is a correct answer
+                  if (currentQuestion.correctAnswer is List<String>) {
+                    isCorrectOption = (currentQuestion.correctAnswer as List<String>).contains(option);
+                  } else {
+                    isCorrectOption = option == currentQuestion.correctAnswer.toString();
+                  }
                   
                   Color backgroundColor = Colors.white;
                   if (showResult) {
@@ -196,8 +258,28 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
                       backgroundColor = Colors.green;
                     }
                   } else if (isSelected) {
-                    backgroundColor = Colors.blue;
+                    backgroundColor = Colors.blue.shade100;
                   }
+                  
+                  // Use circular indicators
+                  Widget selectionIndicator = Container(
+                    width: 24,
+                    height: 24,
+                    margin: EdgeInsets.only(right: 12),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.grey),
+                    ),
+                    child: isSelected
+                        ? Container(
+                            margin: EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.blue,
+                            ),
+                          )
+                        : null,
+                  );
                   
                   return GestureDetector(
                     onTap: isAnswerChecked 
@@ -214,13 +296,20 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
                         color: backgroundColor,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(
-                        option,
-                        style: TextStyle(
-                          color: isSelected || (showResult && isCorrectOption) 
-                              ? Colors.white 
-                              : Colors.black,
-                        ),
+                      child: Row(
+                        children: [
+                          selectionIndicator,
+                          Expanded(
+                            child: Text(
+                              option,
+                              style: TextStyle(
+                                color: showResult && (isSelected || isCorrectOption)
+                                    ? Colors.white
+                                    : Colors.black,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   );
@@ -247,6 +336,11 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
                         });
                         
                         examProvider.goToNextQuestion();
+                        
+                        // Scroll to the current pill after navigation
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _scrollToCurrentPill();
+                        });
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
@@ -265,6 +359,11 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
                             onPressed: () {
                               // Skip question
                               examProvider.skipQuestion();
+                              
+                              // Scroll to the current pill after navigation
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                _scrollToCurrentPill();
+                              });
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
@@ -286,7 +385,13 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
                                     // Check answer
                                     setState(() {
                                       isAnswerChecked = true;
-                                      isCorrect = selectedAnswer == currentQuestion.correctAnswer;
+                                      
+                                      if (currentQuestion.correctAnswer is List<String>) {
+                                        isCorrect = (currentQuestion.correctAnswer as List<String>)
+                                            .contains(selectedAnswer);
+                                      } else {
+                                        isCorrect = selectedAnswer == currentQuestion.correctAnswer;
+                                      }
                                     });
                                   },
                             style: ElevatedButton.styleFrom(

@@ -29,11 +29,18 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
   Map<String, bool> answers = {}; // questionId -> isCorrect
   bool isLoading = true;
   String? errorMessage;
+  ScrollController _pillsScrollController = ScrollController();
   
   @override
   void initState() {
     super.initState();
     loadQuestions();
+  }
+  
+  @override
+  void dispose() {
+    _pillsScrollController.dispose();
+    super.dispose();
   }
   
   Future<void> loadQuestions() async {
@@ -124,6 +131,11 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
         isAnswerChecked = false;
         isCorrect = null;
       });
+      
+      // Scroll to the current question pill
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToCurrentPill();
+      });
     } else {
       // Navigate to results screen
       Navigator.push(
@@ -134,6 +146,24 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
             answers: answers,
           ),
         ),
+      );
+    }
+  }
+  
+  void _scrollToCurrentPill() {
+    if (_pillsScrollController.hasClients) {
+      final pillWidth = 48.0; // Width of pill including margins
+      final screenWidth = MediaQuery.of(context).size.width;
+      final visiblePills = screenWidth / pillWidth;
+      final targetPosition = pillWidth * currentQuestionIndex;
+      final screenCenter = screenWidth / 2;
+      
+      final scrollOffset = targetPosition - screenCenter + (pillWidth / 2);
+      
+      _pillsScrollController.animateTo(
+        scrollOffset.clamp(0.0, _pillsScrollController.position.maxScrollExtent),
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeOut,
       );
     }
   }
@@ -245,6 +275,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
           Container(
             height: 50,
             child: ListView.builder(
+              controller: _pillsScrollController,
               scrollDirection: Axis.horizontal,
               padding: EdgeInsets.symmetric(horizontal: 16),
               itemCount: questions.length,

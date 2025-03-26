@@ -15,6 +15,43 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> {
   dynamic selectedAnswer;
   bool isAnswerChecked = false;
   bool? isCorrect;
+  ScrollController _pillsScrollController = ScrollController();
+  
+  @override
+  void initState() {
+    super.initState();
+    // Scroll to current pill when screen initializes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToCurrentPill();
+    });
+  }
+  
+  @override
+  void dispose() {
+    _pillsScrollController.dispose();
+    super.dispose();
+  }
+  
+  void _scrollToCurrentPill() {
+    if (!_pillsScrollController.hasClients) return;
+    
+    final practiceProvider = Provider.of<PracticeProvider>(context, listen: false);
+    final practice = practiceProvider.currentPractice;
+    if (practice == null) return;
+    
+    final pillWidth = 48.0; // Width of pill including margins
+    final screenWidth = MediaQuery.of(context).size.width;
+    final targetPosition = pillWidth * practice.currentQuestionIndex;
+    final screenCenter = screenWidth / 2;
+    
+    final scrollOffset = targetPosition - screenCenter + (pillWidth / 2);
+    
+    _pillsScrollController.animateTo(
+      scrollOffset.clamp(0.0, _pillsScrollController.position.maxScrollExtent),
+      duration: Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -108,6 +145,7 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> {
             Container(
               height: 50,
               child: ListView.builder(
+                controller: _pillsScrollController,
                 scrollDirection: Axis.horizontal,
                 padding: EdgeInsets.symmetric(horizontal: 16),
                 itemCount: practice.questionIds.length,
@@ -190,8 +228,28 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> {
                       backgroundColor = Colors.green;
                     }
                   } else if (isSelected) {
-                    backgroundColor = Colors.blue;
+                    backgroundColor = Colors.blue.shade100;
                   }
+                  
+                  // Use circular indicators for both single and multiple choice questions
+                  Widget selectionIndicator = Container(
+                    width: 24,
+                    height: 24,
+                    margin: EdgeInsets.only(right: 12),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.grey),
+                    ),
+                    child: isSelected
+                        ? Container(
+                            margin: EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.blue,
+                            ),
+                          )
+                        : null,
+                  );
                   
                   return GestureDetector(
                     onTap: isAnswerChecked 
@@ -208,13 +266,20 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> {
                         color: backgroundColor,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(
-                        option,
-                        style: TextStyle(
-                          color: isSelected || (showResult && isCorrectOption) 
-                              ? Colors.white 
-                              : Colors.black,
-                        ),
+                      child: Row(
+                        children: [
+                          selectionIndicator,
+                          Expanded(
+                            child: Text(
+                              option,
+                              style: TextStyle(
+                                color: showResult && (isSelected || isCorrectOption)
+                                    ? Colors.white
+                                    : Colors.black,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   );
@@ -241,6 +306,11 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> {
                         });
                         
                         practiceProvider.goToNextQuestion();
+                        
+                        // Scroll to the current pill after navigation
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _scrollToCurrentPill();
+                        });
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
@@ -259,6 +329,11 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> {
                             onPressed: () {
                               // Skip question
                               practiceProvider.skipQuestion();
+                              
+                              // Scroll to the current pill after navigation
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                _scrollToCurrentPill();
+                              });
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
