@@ -15,7 +15,7 @@ class SavedItemsScreen extends StatefulWidget {
 
 class _SavedItemsScreenState extends State<SavedItemsScreen> {
   int? _expandedIndex;
-  Map<String, dynamic> _selectedAnswers = {};
+  Map<String, Set<String>> _selectedAnswers = {}; // Changed to Set<String> for multiple selections
   Map<String, bool> _checkedAnswers = {};
   List<QuizQuestion> _savedQuestions = [];
   bool _isLoading = true;
@@ -251,7 +251,7 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> {
                                 ),
                               ),
                               
-                              // Expanded content with answer options
+                                // Expanded content with answer options
                               if (isExpanded) ...[
                                 // Question image (if available)
                                 if (question.imagePath != null)
@@ -265,15 +265,41 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> {
                                         Center(child: Icon(Icons.broken_image, size: 50)),
                                     ),
                                   ),
+                                
+                                // Multiple choice indicator if applicable
+                                if (question.type == QuestionType.multipleChoice)
+                                  Padding(
+                                    padding: EdgeInsets.only(top: 8, left: 16, right: 16, bottom: 8),
+                                    child: Text(
+                                      "Оберіть всі правильні відповіді",
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.blue,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  ),
                                   
                                 // Answer options
                                 Padding(
                                   padding: EdgeInsets.symmetric(horizontal: 16),
                                   child: Column(
                                     children: question.options.map((option) {
-                                      bool isSelected = selectedAnswer == option;
+                                      // Initialize the set if it doesn't exist yet
+                                      if (!_selectedAnswers.containsKey(question.id)) {
+                                        _selectedAnswers[question.id] = <String>{};
+                                      }
+                                      
+                                      bool isSelected = _selectedAnswers[question.id]?.contains(option) ?? false;
                                       bool showResult = isAnswerChecked;
-                                      bool isCorrectOption = option == question.correctAnswer;
+                                      bool isCorrectOption = false;
+                                      
+                                      // Check if this option is a correct answer
+                                      if (question.correctAnswer is List<String>) {
+                                        isCorrectOption = (question.correctAnswer as List<String>).contains(option);
+                                      } else {
+                                        isCorrectOption = option == question.correctAnswer.toString();
+                                      }
                                       
                                       Color backgroundColor = Colors.white;
                                       if (showResult) {
@@ -288,12 +314,42 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> {
                                         backgroundColor = Colors.blue.shade100;
                                       }
                                       
+                                      // Use circular indicators for both single and multiple choice
+                                      Widget selectionIndicator = Container(
+                                        width: 24,
+                                        height: 24,
+                                        margin: EdgeInsets.only(right: 12),
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: Colors.grey),
+                                        ),
+                                        child: isSelected
+                                            ? Container(
+                                                margin: EdgeInsets.all(4),
+                                                decoration: BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                  color: Colors.blue,
+                                                ),
+                                              )
+                                            : null,
+                                      );
+                                      
                                       return GestureDetector(
                                         onTap: isAnswerChecked 
                                             ? null 
                                             : () {
                                                 setState(() {
-                                                  _selectedAnswers[question.id] = option;
+                                                  if (question.type == QuestionType.multipleChoice) {
+                                                    // Toggle selection for multiple choice
+                                                    if (isSelected) {
+                                                      _selectedAnswers[question.id]?.remove(option);
+                                                    } else {
+                                                      _selectedAnswers[question.id]?.add(option);
+                                                    }
+                                                  } else {
+                                                    // Single selection for other types
+                                                    _selectedAnswers[question.id] = {option};
+                                                  }
                                                 });
                                               },
                                         child: Container(
@@ -308,13 +364,20 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> {
                                               width: isSelected ? 2 : 1,
                                             ),
                                           ),
-                                          child: Text(
-                                            option,
-                                            style: TextStyle(
-                                              color: showResult && (isSelected || isCorrectOption) 
-                                                  ? Colors.white 
-                                                  : Colors.black,
-                                            ),
+                                          child: Row(
+                                            children: [
+                                              selectionIndicator,
+                                              Expanded(
+                                                child: Text(
+                                                  option,
+                                                  style: TextStyle(
+                                                    color: showResult && (isSelected || isCorrectOption) 
+                                                        ? Colors.white 
+                                                        : Colors.black,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       );
@@ -369,12 +432,36 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> {
                                         child: Text('Спробувати ще раз'),
                                       )
                                     : ElevatedButton(
-                                        onPressed: selectedAnswer == null
+                                        onPressed: (_selectedAnswers[question.id]?.isEmpty ?? true)
                                             ? null
                                             : () {
                                                 setState(() {
-                                                  _checkedAnswers[question.id] = 
-                                                    selectedAnswer == question.correctAnswer;
+                                                  // Check answers based on question type
+                                                  if (question.type == QuestionType.multipleChoice) {
+                                                    final selectedSet = _selectedAnswers[question.id] ?? <String>{};
+                                                    
+                                                    if (question.correctAnswer is List<String>) {
+                                                      final correctList = question.correctAnswer as List<String>;
+                                                      _checkedAnswers[question.id] = 
+                                                        selectedSet.length == correctList.length &&
+                                                        correctList.every((answer) => selectedSet.contains(answer));
+                                                    } else {
+                                                      _checkedAnswers[question.id] = 
+                                                        selectedSet.contains(question.correctAnswer.toString());
+                                                    }
+                                                  } else {
+                                                    // Single choice question
+                                                    final selectedOption = _selectedAnswers[question.id]?.first;
+                                                    
+                                                    if (question.correctAnswer is List<String> && 
+                                                        (question.correctAnswer as List<String>).isNotEmpty) {
+                                                      _checkedAnswers[question.id] = 
+                                                        selectedOption == (question.correctAnswer as List<String>)[0];
+                                                    } else {
+                                                      _checkedAnswers[question.id] = 
+                                                        selectedOption == question.correctAnswer.toString();
+                                                    }
+                                                  }
                                                 });
                                               },
                                         style: ElevatedButton.styleFrom(
