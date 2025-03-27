@@ -258,11 +258,12 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> {
                                   Container(
                                     width: double.infinity,
                                     height: 150,
-                                    child: Image.asset(
-                                      question.imagePath!,
+                                    child: serviceLocator.storage.getImage(
+                                      storagePath: 'quiz_images/${question.imagePath}',
+                                      assetFallback: question.imagePath,
                                       fit: BoxFit.contain,
-                                      errorBuilder: (context, error, stackTrace) => 
-                                        Center(child: Icon(Icons.broken_image, size: 50)),
+                                      placeholderIcon: Icons.broken_image,
+                                      placeholderColor: Colors.grey[200],
                                     ),
                                   ),
                                 

@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import '../providers/exam_provider.dart';
 import '../providers/progress_provider.dart';
 import '../models/quiz_question.dart';
+import '../services/service_locator.dart';
 import 'exam_result_screen.dart';
 
 class ExamQuestionScreen extends StatefulWidget {
@@ -193,11 +194,12 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
               Container(
                 width: double.infinity,
                 height: 200,
-                child: Image.asset(
-                  currentQuestion.imagePath!,
+                child: serviceLocator.storage.getImage(
+                  storagePath: 'quiz_images/${currentQuestion.imagePath}',
+                  assetFallback: currentQuestion.imagePath,
                   fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) => 
-                    Center(child: Icon(Icons.broken_image, size: 50)),
+                  placeholderIcon: Icons.broken_image,
+                  placeholderColor: Colors.grey[200],
                 ),
               ),
             

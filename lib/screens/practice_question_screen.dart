@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import '../providers/practice_provider.dart';
 import '../providers/progress_provider.dart';
 import '../models/quiz_question.dart';
+import '../services/service_locator.dart';
 import 'practice_result_screen.dart';
 
 class PracticeQuestionScreen extends StatefulWidget {
@@ -187,11 +188,12 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> {
               Container(
                 width: double.infinity,
                 height: 200,
-                child: Image.asset(
-                  currentQuestion.imagePath!,
+                child: serviceLocator.storage.getImage(
+                  storagePath: 'quiz_images/${currentQuestion.imagePath}',
+                  assetFallback: currentQuestion.imagePath,
                   fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) => 
-                    Center(child: Icon(Icons.broken_image, size: 50)),
+                  placeholderIcon: Icons.broken_image,
+                  placeholderColor: Colors.grey[200],
                 ),
               ),
             

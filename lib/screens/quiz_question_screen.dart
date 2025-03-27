@@ -316,16 +316,12 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
             Container(
               width: double.infinity,
               height: 200,
-              child: Image.asset(
-                // Use asset directly instead of Firebase Storage
-                'assets/images/quiz/default.png',
+              child: serviceLocator.storage.getImage(
+                storagePath: 'quiz_images/${question.imagePath}',
+                assetFallback: 'assets/images/quiz/default.png',
                 fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  print('Error loading image: $error');
-                  return Center(
-                    child: Icon(Icons.broken_image, size: 50, color: Colors.grey),
-                  );
-                },
+                placeholderIcon: Icons.broken_image,
+                placeholderColor: Colors.grey[200],
               ),
             ),
           
