@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../screens/test_screen.dart';
-import '../screens/theory_screen.dart';
+import '../screens/traffic_rules_topics_screen.dart';
 import '../screens/profile_screen.dart';
 import '../widgets/bottom_navigation.dart';
 
@@ -14,7 +14,7 @@ class _HomeScreenState extends State<HomeScreen> {
   
   final List<Widget> _screens = [
     TestScreen(),
-    TheoryScreen(),
+    TrafficRulesTopicsScreen(),
     ProfileScreen(),
   ];
 

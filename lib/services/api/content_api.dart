@@ -1,9 +1,6 @@
 import 'package:dio/dio.dart';
 import '../../models/quiz_question.dart';
 import '../../models/quiz_topic.dart';
-import '../../models/road_sign.dart';
-import '../../models/road_sign_category.dart';
-import '../../models/traffic_light_info.dart';
 import '../../models/traffic_rule_topic.dart';
 import '../../models/theory_module.dart';
 import '../../models/exam.dart';
@@ -95,103 +92,6 @@ class ContentApi implements ContentApiInterface {
     }
   }
   
-  // Road Sign Categories
-  Future<List<RoadSignCategory>> getRoadSignCategories(String language) async {
-    try {
-      final response = await _apiClient.get(
-        '/content/road-sign-categories',
-        queryParameters: {
-          'language': language,
-        },
-      );
-      
-      final List<dynamic> categoriesData = response.data;
-      return categoriesData.map((data) {
-        return RoadSignCategory(
-          id: data['id'],
-          title: data['title'],
-          iconUrl: data['iconUrl'],
-          description: data['description'],
-          signs: [],  // Signs will be loaded separately via getRoadSigns method
-        );
-      }).toList();
-    } catch (e) {
-      throw 'Failed to load road sign categories: ${e.toString()}';
-    }
-  }
-  
-  // Road Signs by Category
-  Future<List<RoadSign>> getRoadSigns(String categoryId, String language) async {
-    try {
-      final response = await _apiClient.get(
-        '/content/road-signs',
-        queryParameters: {
-          'categoryId': categoryId,
-          'language': language,
-        },
-      );
-      
-      final List<dynamic> signsData = response.data;
-      return signsData.map((data) {
-        return RoadSign(
-          id: data['id'],
-          name: data['name'], 
-          signCode: data['signCode'],
-          imageUrl: data['imageUrl'],
-          description: data['description'],
-          installationGuidelines: data['installationGuidelines'],
-          exampleImageUrl: data['exampleImageUrl'],
-        );
-      }).toList();
-    } catch (e) {
-      throw 'Failed to load road signs: ${e.toString()}';
-    }
-  }
-  
-  // Traffic Light Information
-  Future<TrafficLightInfo> getTrafficLightInfo(String language) async {
-    try {
-      final response = await _apiClient.get(
-        '/content/traffic-lights',
-        queryParameters: {
-          'language': language,
-        },
-      );
-      
-      // If we get a list, take the first item
-      if (response.data is List) {
-        final List<dynamic> trafficLightData = response.data;
-        if (trafficLightData.isEmpty) {
-          // Return default info if list is empty
-          return TrafficLightInfo(
-            id: 'traffic-light',
-            title: 'Сигнали світлофора',
-            content: 'Інформація про сигнали світлофора тимчасово недоступна.',
-            imageUrls: [],
-          );
-        }
-        
-        final data = trafficLightData.first;
-        return TrafficLightInfo(
-          id: data['id'],
-          title: data['title'], 
-          content: data['content'],
-          imageUrls: data['imageUrls'] != null ? List<String>.from(data['imageUrls']) : [],
-        );
-      } else {
-        // If we got a single object
-        final data = response.data;
-        return TrafficLightInfo(
-          id: data['id'],
-          title: data['title'], 
-          content: data['content'],
-          imageUrls: data['imageUrls'] != null ? List<String>.from(data['imageUrls']) : [],
-        );
-      }
-    } catch (e) {
-      throw 'Failed to load traffic light information: ${e.toString()}';
-    }
-  }
   
   // Traffic Rule Topics
   Future<List<TrafficRuleTopic>> getTrafficRuleTopics(String language, String state) async {

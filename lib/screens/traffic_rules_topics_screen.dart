@@ -284,7 +284,11 @@ class TrafficRulesTopicsScreen extends StatelessWidget {
         foregroundColor: Colors.black,
         leading: IconButton(
           icon: Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            // Instead of popping, navigate to the home screen
+            // This ensures we have a proper screen to go back to
+            Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+          },
         ),
         actions: [
           IconButton(

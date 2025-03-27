@@ -18,7 +18,7 @@ import 'screens/practice_test_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/subscription_screen.dart';
 import 'screens/home_screen.dart';
-import 'screens/theory_screen.dart';
+import 'screens/traffic_rules_topics_screen.dart';
 import 'screens/test_screen.dart';
 import 'models/user.dart';
 import 'models/subscription.dart';
@@ -180,7 +180,7 @@ class MyApp extends StatelessWidget {
         '/login': (context) => LoginScreen(),
         '/signup': (context) => SignupScreen(),
         '/home': (context) => HomeScreen(),
-        '/theory': (context) => TheoryScreen(),
+        '/theory': (context) => TrafficRulesTopicsScreen(),
         '/tests': (context) => TestScreen(),
         '/profile': (context) => ProfileScreen(),
         '/subscription': (context) => SubscriptionScreen(),
