@@ -61,7 +61,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
     if (exam == null) {
       return Scaffold(
         body: Center(
-          child: Text("Іспит не активний"),
+          child: CircularProgressIndicator(),
         ),
       );
     }
