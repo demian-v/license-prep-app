@@ -29,6 +29,7 @@ import 'providers/progress_provider.dart';
 import 'providers/language_provider.dart';
 import 'providers/exam_provider.dart';
 import 'providers/practice_provider.dart';
+import 'providers/content_provider.dart';
 import 'localization/app_localizations.dart';
 
 void main() async {
@@ -109,6 +110,15 @@ void main() async {
   final examProvider = ExamProvider();
   final practiceProvider = PracticeProvider();
   
+  // Create content provider
+  final contentProvider = ContentProvider();
+  // Load content based on language and state
+  contentProvider.setPreferences(
+    language: languageProvider.language,
+    state: 'IL', // Default to Illinois for now
+    licenseId: 'driver', // Default to driver license
+  );
+  
   // Check if we need to migrate saved questions
   if (user != null) {
     final userId = user.id; // User.id is non-nullable based on the model
@@ -126,6 +136,7 @@ void main() async {
         ChangeNotifierProvider.value(value: languageProvider),
         ChangeNotifierProvider.value(value: examProvider),
         ChangeNotifierProvider.value(value: practiceProvider),
+        ChangeNotifierProvider.value(value: contentProvider),
       ],
       child: MyApp(
         authProvider: authProvider,

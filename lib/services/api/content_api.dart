@@ -94,13 +94,15 @@ class ContentApi implements ContentApiInterface {
   
   
   // Traffic Rule Topics
-  Future<List<TrafficRuleTopic>> getTrafficRuleTopics(String language, String state) async {
+  @override
+  Future<List<TrafficRuleTopic>> getTrafficRuleTopics(String language, String state, String licenseId) async {
     try {
       final response = await _apiClient.get(
         '/content/traffic-rule-topics',
         queryParameters: {
           'language': language,
           'state': state,
+          'licenseId': licenseId,
         },
       );
       
@@ -114,6 +116,26 @@ class ContentApi implements ContentApiInterface {
       }).toList();
     } catch (e) {
       throw 'Failed to load traffic rule topics: ${e.toString()}';
+    }
+  }
+  
+  // Get a specific traffic rule topic by ID
+  @override
+  Future<TrafficRuleTopic?> getTrafficRuleTopic(String topicId) async {
+    try {
+      final response = await _apiClient.get(
+        '/content/traffic-rule-topics/$topicId',
+      );
+      
+      final data = response.data;
+      return TrafficRuleTopic(
+        id: data['id'],
+        title: data['title'],
+        content: data['content'],
+      );
+    } catch (e) {
+      print('Failed to load traffic rule topic: ${e.toString()}');
+      return null;
     }
   }
   

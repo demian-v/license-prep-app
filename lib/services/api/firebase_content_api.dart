@@ -1,7 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/quiz_topic.dart';
 import '../../models/quiz_question.dart';
 import '../../models/theory_module.dart';
 import '../../models/practice_test.dart';
+import '../../models/traffic_rule_topic.dart';
 import 'firebase_functions_client.dart';
 import 'base/content_api_interface.dart';
 
@@ -19,6 +21,7 @@ QuestionType _parseQuestionType(String type) {
 
 class FirebaseContentApi implements ContentApiInterface {
   final FirebaseFunctionsClient _functionsClient;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   
   FirebaseContentApi(this._functionsClient);
   
@@ -213,7 +216,63 @@ class FirebaseContentApi implements ContentApiInterface {
   }
   
   
+  /// Get traffic rule topics from Firestore
+  /// This is used for the direct Firestore approach
+  @override
+  Future<List<TrafficRuleTopic>> getTrafficRuleTopics(String language, String state, String licenseId) async {
+    try {
+      print('Fetching traffic rule topics from Firestore with: language=$language, state=$state, licenseId=$licenseId');
+      
+      // Query Firestore collection
+      QuerySnapshot querySnapshot = await _firestore
+          .collection('trafficRuleTopics')
+          .where('language', isEqualTo: language)
+          .where('state', whereIn: [state, 'ALL'])
+          .where('licenseId', isEqualTo: licenseId)
+          .orderBy('order')
+          .get();
+      
+      print('Got ${querySnapshot.docs.length} traffic rule topics from Firestore');
+      
+      // Process results
+      List<TrafficRuleTopic> topics = querySnapshot.docs.map((doc) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        return TrafficRuleTopic.fromFirestore(data, doc.id);
+      }).toList();
+      
+      return topics;
+    } catch (e) {
+      print('Error fetching traffic rule topics from Firestore: $e');
+      return [];
+    }
+  }
+  
+  /// Get a specific traffic rule topic by ID from Firestore
+  @override
+  Future<TrafficRuleTopic?> getTrafficRuleTopic(String topicId) async {
+    try {
+      print('Fetching traffic rule topic from Firestore with ID: $topicId');
+      
+      DocumentSnapshot docSnapshot = await _firestore
+          .collection('trafficRuleTopics')
+          .doc(topicId)
+          .get();
+      
+      if (docSnapshot.exists) {
+        Map<String, dynamic> data = docSnapshot.data() as Map<String, dynamic>;
+        return TrafficRuleTopic.fromFirestore(data, docSnapshot.id);
+      }
+      
+      print('No topic found with ID: $topicId');
+      return null;
+    } catch (e) {
+      print('Error fetching traffic rule topic from Firestore: $e');
+      return null;
+    }
+  }
+
   /// Get theory modules based on license type, language, and state
+  @override
   Future<List<TheoryModule>> getTheoryModules(String licenseType, String language, String state) async {
     try {
       // Ensure language code is correct (use 'uk' for Ukrainian)
@@ -222,7 +281,34 @@ class FirebaseContentApi implements ContentApiInterface {
         print('Corrected language code from ua to uk');
       }
       
-      final response = await _functionsClient.callFunction<List<dynamic>>(
+      // Try to get from Firestore first
+      try {
+        print('Attempting to fetch theory modules from Firestore');
+        // Query Firestore collection
+        QuerySnapshot querySnapshot = await _firestore
+            .collection('theoryModules')
+            .where('language', isEqualTo: language)
+            .where('state', whereIn: [state, 'ALL'])
+            .where('licenseId', isEqualTo: licenseType)
+            .orderBy('order')
+            .get();
+        
+        print('Got ${querySnapshot.docs.length} theory modules from Firestore');
+        
+        if (querySnapshot.docs.isNotEmpty) {
+          // Process results
+          return querySnapshot.docs.map((doc) {
+            Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+            return TheoryModule.fromFirestore(data, doc.id);
+          }).toList();
+        }
+      } catch (e) {
+        print('Error fetching theory modules from Firestore: $e');
+        print('Falling back to Firebase Functions');
+      }
+      
+      // Fallback to Firebase Functions
+      final functionsResponse = await _functionsClient.callFunction<List<dynamic>>(
         'getTheoryModules',
         data: {
           'licenseType': licenseType,
@@ -231,7 +317,7 @@ class FirebaseContentApi implements ContentApiInterface {
         },
       );
       
-      return response.map((item) {
+      return functionsResponse.map((item) {
         final Map<String, dynamic> data = item as Map<String, dynamic>;
         return TheoryModule(
           id: data['id'] as String,
@@ -240,6 +326,11 @@ class FirebaseContentApi implements ContentApiInterface {
           description: data['description'] as String,
           estimatedTime: data['estimatedTime'] as int? ?? 30, // Default to 30 minutes if not provided
           topics: List<String>.from(data['topics'] ?? []),
+          language: data['language'] as String? ?? language,
+          state: data['state'] as String? ?? state,
+          icon: data['icon'] as String? ?? 'menu_book',
+          type: data['type'] as String? ?? 'module',
+          order: data['order'] as int? ?? 0,
         );
       }).toList();
     } catch (e) {

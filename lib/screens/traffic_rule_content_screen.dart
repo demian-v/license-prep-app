@@ -50,13 +50,37 @@ class TrafficRuleContentScreen extends StatelessWidget {
                 ),
               ),
             ),
-            Padding(
-              padding: EdgeInsets.all(16),
-              child: Text(
-                topic.content,
-                style: TextStyle(fontSize: 16),
+            // Check if we have sections to display
+            if (topic.sections.isNotEmpty)
+              ...topic.sections.map((section) => Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      section.title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      section.content,
+                      style: TextStyle(fontSize: 16),
+                    ),
+                  ],
+                ),
+              )).toList()
+            else
+              // If no sections, display the full content
+              Padding(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  topic.fullContent,
+                  style: TextStyle(fontSize: 16),
+                ),
               ),
-            ),
           ],
         ),
       ),
