@@ -1,6 +1,8 @@
 import 'dart:io';
+import 'dart:collection';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class FirebaseStorageService {
   final FirebaseStorage _storage = FirebaseStorage.instance;
@@ -8,10 +10,32 @@ class FirebaseStorageService {
   /// Cache downloaded URLs to avoid unnecessary downloads
   final Map<String, String> _urlCache = {};
   
+  /// Track usage order for LRU cache management
+  final Queue<String> _cacheOrder = Queue<String>();
+  
+  /// Maximum number of cached entries
+  final int _maxCacheEntries = 200;
+  
+  /// Add to cache with size management (LRU strategy)
+  void _addToCache(String key, String value) {
+    // Remove oldest entry if cache is full
+    if (_cacheOrder.length >= _maxCacheEntries) {
+      final oldestKey = _cacheOrder.removeFirst();
+      _urlCache.remove(oldestKey);
+    }
+    
+    // Add new entry
+    _urlCache[key] = value;
+    _cacheOrder.add(key);
+  }
+  
   /// Get download URL for a file in Firebase Storage
   Future<String?> getDownloadURL(String path) async {
     // Return cached URL if available
     if (_urlCache.containsKey(path)) {
+      // Move to end of queue (mark as recently used)
+      _cacheOrder.remove(path);
+      _cacheOrder.add(path);
       return _urlCache[path];
     }
     
@@ -19,8 +43,8 @@ class FirebaseStorageService {
       final ref = _storage.ref().child(path);
       final url = await ref.getDownloadURL();
       
-      // Cache the URL
-      _urlCache[path] = url;
+      // Cache the URL with LRU management
+      _addToCache(path, url);
       
       return url;
     } catch (e) {
@@ -32,6 +56,7 @@ class FirebaseStorageService {
   /// Clear the URL cache
   void clearCache() {
     _urlCache.clear();
+    _cacheOrder.clear();
   }
   
   /// Create an image widget that loads from Firebase Storage with fallback to local asset
@@ -49,33 +74,17 @@ class FirebaseStorageService {
       future: getDownloadURL(storagePath),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return SizedBox(
-            width: width,
-            height: height,
-            child: Center(
-              child: CircularProgressIndicator(),
-            ),
-          );
+          return _buildLoadingIndicator(width, height);
         }
         
         if (snapshot.hasData && snapshot.data != null) {
-          return Image.network(
-            snapshot.data!,
+          return CachedNetworkImage(
+            imageUrl: snapshot.data!,
             width: width,
             height: height,
             fit: fit,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return Center(
-                child: CircularProgressIndicator(
-                  value: loadingProgress.expectedTotalBytes != null
-                      ? loadingProgress.cumulativeBytesLoaded / 
-                          (loadingProgress.expectedTotalBytes ?? 1)
-                      : null,
-                ),
-              );
-            },
-            errorBuilder: (context, error, stackTrace) {
+            placeholder: (context, url) => _buildLoadingIndicator(width, height),
+            errorWidget: (context, url, error) {
               // If network image fails, try asset fallback
               if (assetFallback != null) {
                 return Image.asset(
@@ -107,6 +116,17 @@ class FirebaseStorageService {
         // If all else fails, show placeholder
         return _buildPlaceholder(width, height, placeholderColor, placeholderIcon);
       },
+    );
+  }
+  
+  /// Build a loading indicator
+  Widget _buildLoadingIndicator(double? width, double? height) {
+    return SizedBox(
+      width: width,
+      height: height,
+      child: Center(
+        child: CircularProgressIndicator(),
+      ),
     );
   }
   
