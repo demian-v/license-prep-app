@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
+import '../localization/app_localizations.dart';
 import 'state_selection_screen.dart';
 
 class LanguageSelectionScreen extends StatelessWidget {
@@ -10,7 +11,7 @@ class LanguageSelectionScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Language Selection',
+          'Language Selection', // This remains hardcoded in English as specified
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         elevation: 0,
@@ -28,12 +29,18 @@ class LanguageSelectionScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildSectionHeader('Select your language'),
-              _buildLanguageButton(context, 'English', 'en'),
-              _buildLanguageButton(context, 'Spanish', 'es'),
-              _buildLanguageButton(context, 'Ukrainian', 'uk'),
-              _buildLanguageButton(context, 'Polish', 'pl'),
-              _buildLanguageButton(context, 'Russian', 'ru'),
+              _buildSectionHeader('Select your language'), // This remains hardcoded in English as specified
+              Consumer<LanguageProvider>(
+                builder: (context, languageProvider, _) => Column(
+                  children: [
+                    _buildLanguageButton(context, 'English', 'en'),
+                    _buildLanguageButton(context, 'Spanish', 'es'),
+                    _buildLanguageButton(context, 'Ukrainian', 'uk'),
+                    _buildLanguageButton(context, 'Polish', 'pl'),
+                    _buildLanguageButton(context, 'Russian', 'ru'),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -96,8 +103,8 @@ class LanguageSelectionScreen extends StatelessWidget {
           ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Setting language to $language...'),
-              duration: Duration(seconds: 1),
+              content: Text('Setting UI language to $language...\nContent will remain in Ukrainian (IL)'), // This is feedback in English as specified
+              duration: Duration(seconds: 2),
               backgroundColor: languageColors[code],
             ),
           );
@@ -112,18 +119,25 @@ class LanguageSelectionScreen extends StatelessWidget {
             final authProvider = Provider.of<AuthProvider>(context, listen: false);
             await authProvider.updateUserLanguage(code);
             
-            // Use push instead of pushReplacement to maintain navigation history
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => StateSelectionScreen(),
-              ),
-            );
+            // Wait for a short time to ensure the language is loaded properly
+            await Future.delayed(Duration(milliseconds: 300));
+            
+            // Force a rebuild of MaterialApp with the new locale
+            if (context.mounted) {
+              // Use pushAndRemoveUntil to rebuild the navigation stack with the new locale
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (_) => StateSelectionScreen(),
+                ),
+                (route) => route.isFirst, // Keep only the first route
+              );
+            }
           } catch (e) {
             print('Error updating language: $e');
             // Show error snackbar
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Error selecting language: $e'),
+                content: Text('Error selecting language: $e'), // Error message in English as specified
                 backgroundColor: Colors.red,
               ),
             );

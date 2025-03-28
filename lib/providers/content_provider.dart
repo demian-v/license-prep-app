@@ -24,6 +24,11 @@ class ContentProvider extends ChangeNotifier {
   final Duration _cacheValidityDuration = Duration(hours: 2);
   final Map<String, DateTime> _lastFetchTimes = {};
   
+  // In-memory content caches
+  final Map<String, Map<String, List<TrafficRuleTopic>>> _topicCache = {}; // state -> language -> topics
+  final Map<String, Map<String, List<TheoryModule>>> _moduleCache = {}; // state -> language -> modules
+  final Map<String, TrafficRuleTopic> _topicDetailCache = {}; // topicId -> topic
+  
   // Getters
   bool get isLoading => _isLoading;
   List<TrafficRuleTopic> get topics => _topics;
@@ -70,14 +75,19 @@ class ContentProvider extends ChangeNotifier {
   void setPreferences({String? language, String? state, String? licenseId}) {
     bool shouldRefresh = false;
     
+    // Store the UI language for reference but always use 'uk' for content
     if (language != null && language != _currentLanguage) {
-      _currentLanguage = language;
-      shouldRefresh = true;
+      // We track the UI language change but don't use it for content
+      print('UI language changed to $language, but content will remain in Ukrainian (uk)');
+      // Don't update _currentLanguage as we'll keep it fixed to 'uk'
+      shouldRefresh = false; // No need to refresh content when UI language changes
     }
     
-    if (state != null && state != _currentState) {
-      _currentState = state;
-      shouldRefresh = true;
+    // Always use 'IL' state for content, but track other values
+    if (state != null && state != _currentState && state != 'IL') {
+      print('State requested: $state, but content will remain for IL (Illinois)');
+      // Don't update _currentState as we'll keep it fixed to 'IL'
+      shouldRefresh = false; // No need to refresh as we're keeping the same state
     }
     
     if (licenseId != null && licenseId != _currentLicenseId) {
@@ -90,11 +100,58 @@ class ContentProvider extends ChangeNotifier {
     }
   }
   
+  // Get content for specific language and state (used only for special cases)
+  Future<void> fetchContentForLanguageAndState(String language, String state, {bool forceRefresh = false}) async {
+    String originalLanguage = _currentLanguage;
+    String originalState = _currentState;
+    
+    // Temporarily set the language and state
+    _currentLanguage = language;
+    _currentState = state;
+    
+    // Fetch the content
+    await fetchContent(forceRefresh: forceRefresh);
+    
+    // Restore original values
+    _currentLanguage = originalLanguage;
+    _currentState = originalState;
+  }
+  
+  // Clear caches when language or state changes
+  void _clearRelevantCaches() {
+    // We don't clear the entire cache, just the timestamp
+    // so we force a refresh for the new language/state
+    _lastFetchTime = null;
+    _lastFetchTimes.remove('topics');
+    _lastFetchTimes.remove('modules');
+    
+    // We keep the caches for other language/state combinations
+    // in case user switches back
+  }
+  
   // Fetch all content
   Future<void> fetchContent({bool forceRefresh = false}) async {
-    // If cache is valid and we're not forcing a refresh, skip the fetch
-    if (isCacheValid && !forceRefresh && _topics.isNotEmpty) {
-      return;
+    // Check if we have cached content for this specific language and state
+    final String cacheKey = '$_currentState:$_currentLanguage';
+    
+    // If cache is valid and we're not forcing a refresh, use cached content if available
+    if (isCacheValid && !forceRefresh) {
+      // Check if we have topics in cache
+      if (_topicCache.containsKey(_currentState) && 
+          _topicCache[_currentState]!.containsKey(_currentLanguage) &&
+          _topicCache[_currentState]![_currentLanguage]!.isNotEmpty) {
+        
+        _topics = _topicCache[_currentState]![_currentLanguage]!;
+        
+        // Check if we have modules in cache
+        if (_moduleCache.containsKey(_currentState) && 
+            _moduleCache[_currentState]!.containsKey(_currentLanguage) &&
+            _moduleCache[_currentState]![_currentLanguage]!.isNotEmpty) {
+          
+          _modules = _moduleCache[_currentState]![_currentLanguage]!;
+          return; // Use cached content and skip Firestore fetch
+        }
+      }
     }
     
     _isLoading = true;
@@ -133,6 +190,31 @@ class ContentProvider extends ChangeNotifier {
         return TheoryModule.fromFirestore(data, doc.id);
       }).toList();
       
+      // If no modules found and language isn't English, try English as fallback
+      if (_modules.isEmpty && _currentLanguage != 'en') {
+        print('No modules found in $_currentLanguage, trying English fallback');
+        QuerySnapshot englishModuleSnapshot = await firestore
+            .collection('theoryModules')
+            .where('language', isEqualTo: 'en')
+            .where('state', whereIn: [_currentState, 'ALL'])
+            .where('licenseId', isEqualTo: _currentLicenseId)
+            .orderBy('order')
+            .get();
+            
+        if (englishModuleSnapshot.docs.isNotEmpty) {
+          _modules = englishModuleSnapshot.docs.map((doc) {
+            Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+            return TheoryModule.fromFirestore(data, doc.id);
+          }).toList();
+        }
+      }
+      
+      // Cache the modules
+      if (!_moduleCache.containsKey(_currentState)) {
+        _moduleCache[_currentState] = {};
+      }
+      _moduleCache[_currentState]![_currentLanguage] = _modules;
+      
       // Update modules cache timestamp
       _lastFetchTimes['modules'] = DateTime.now();
       
@@ -157,6 +239,31 @@ class ContentProvider extends ChangeNotifier {
           Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
           return TrafficRuleTopic.fromFirestore(data, doc.id);
         }).toList();
+        
+        // If no topics found and language isn't English, try English as fallback
+        if (_topics.isEmpty && _currentLanguage != 'en') {
+          print('No topics found in $_currentLanguage, trying English fallback');
+          QuerySnapshot englishTopicSnapshot = await firestore
+              .collection('trafficRuleTopics')
+              .where('language', isEqualTo: 'en')
+              .where('state', whereIn: [_currentState, 'ALL'])
+              .where('licenseId', isEqualTo: _currentLicenseId)
+              .orderBy('order')
+              .get();
+              
+          if (englishTopicSnapshot.docs.isNotEmpty) {
+            _topics = englishTopicSnapshot.docs.map((doc) {
+              Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+              return TrafficRuleTopic.fromFirestore(data, doc.id);
+            }).toList();
+          }
+        }
+        
+        // Cache the topics
+        if (!_topicCache.containsKey(_currentState)) {
+          _topicCache[_currentState] = {};
+        }
+        _topicCache[_currentState]![_currentLanguage] = _topics;
         
         // Update topics cache timestamp
         _lastFetchTimes['topics'] = DateTime.now();
@@ -212,13 +319,19 @@ class ContentProvider extends ChangeNotifier {
   
   // Get a specific topic by ID
   Future<TrafficRuleTopic?> getTopicById(String topicId) async {
-    // First check if we already have it in memory
+    // First check if we have it in cache
+    if (_topicDetailCache.containsKey(topicId)) {
+      return _topicDetailCache[topicId];
+    }
+    
+    // Then check if we already have it in memory
     TrafficRuleTopic? topic = _topics.where(
       (t) => t.id == topicId || t.id == topicId.replaceAll('topic_', '')
     ).firstOrNull;
     
-    // If found in memory, return it
+    // If found in memory, cache and return it
     if (topic != null) {
+      _topicDetailCache[topicId] = topic;
       return topic;
     }
     
@@ -241,6 +354,9 @@ class ContentProvider extends ChangeNotifier {
         Map<String, dynamic> data = docSnapshot.data() as Map<String, dynamic>;
         final fetchedTopic = TrafficRuleTopic.fromFirestore(data, docSnapshot.id);
         
+        // Cache the topic
+        _topicDetailCache[topicId] = fetchedTopic;
+        
         // If this is a new topic not in our list, add it
         if (!_topics.any((t) => t.id == fetchedTopic.id)) {
           _topics.add(fetchedTopic);
@@ -248,6 +364,37 @@ class ContentProvider extends ChangeNotifier {
         }
         
         return fetchedTopic;
+      } else if (_currentLanguage != 'en') {
+        // Try to fetch English version as fallback if not already trying English
+        print('Topic $topicId not found in $_currentLanguage, trying English fallback');
+        
+        // Look for English version - modify the ID if it contains language code
+        String englishTopicId = topicId;
+        if (topicId.contains('_${_currentLanguage}_')) {
+          englishTopicId = topicId.replaceAll('_${_currentLanguage}_', '_en_');
+        }
+        
+        DocumentSnapshot englishDocSnapshot = await firestore
+            .collection('trafficRuleTopics')
+            .doc(englishTopicId)
+            .get();
+            
+        if (englishDocSnapshot.exists) {
+          Map<String, dynamic> data = englishDocSnapshot.data() as Map<String, dynamic>;
+          final fetchedTopic = TrafficRuleTopic.fromFirestore(data, englishDocSnapshot.id);
+          
+          // Cache the topic under both IDs
+          _topicDetailCache[topicId] = fetchedTopic;
+          _topicDetailCache[englishTopicId] = fetchedTopic;
+          
+          // If this is a new topic not in our list, add it
+          if (!_topics.any((t) => t.id == fetchedTopic.id)) {
+            _topics.add(fetchedTopic);
+            notifyListeners();
+          }
+          
+          return fetchedTopic;
+        }
       }
       
       return null;
@@ -262,5 +409,14 @@ class ContentProvider extends ChangeNotifier {
   void loadHardcodedTopics() {
     // We'll use the content from TrafficRulesTopicsScreen
     // This is just a fallback and should be implemented as needed
+  }
+  
+  // Clear all caches - use this for logout or when you want to force a complete refresh
+  void clearAllCaches() {
+    _lastFetchTime = null;
+    _lastFetchTimes.clear();
+    _topicCache.clear();
+    _moduleCache.clear();
+    _topicDetailCache.clear();
   }
 }

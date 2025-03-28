@@ -35,7 +35,7 @@ class FirebaseAuthApi implements AuthApiInterface {
           id: userId,
           name: userCredential.user?.displayName ?? email.split('@')[0],
           email: email,
-          language: 'ua',
+          language: 'uk', // ISO code for Ukrainian
           state: 'IL',
         );
       }
@@ -75,7 +75,7 @@ class FirebaseAuthApi implements AuthApiInterface {
             'userId': userCredential.user!.uid,
             'name': name,
             'email': email,
-            'language': 'ua', // Default language
+            'language': 'uk', // Default language (ISO code for Ukrainian)
             'state': 'IL',    // Default state
           },
         );
@@ -90,7 +90,7 @@ class FirebaseAuthApi implements AuthApiInterface {
         id: userCredential.user!.uid,
         name: name,
         email: email,
-        language: 'ua',
+        language: 'uk', // ISO code for Ukrainian (not 'ua')
         state: 'IL',
       );
     } catch (e) {
@@ -222,7 +222,7 @@ class FirebaseAuthApi implements AuthApiInterface {
   Future<void> createOrUpdateUserDoc(String userId, {
     required String name,
     required String email,
-    String language = "ua",
+    String language = "uk", // ISO code for Ukrainian
     String state = "IL",
   }) async {
     try {

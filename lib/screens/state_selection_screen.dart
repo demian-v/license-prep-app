@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/language_provider.dart';
 import '../screens/home_screen.dart';
+import '../screens/language_selection_screen.dart';
+import '../localization/app_localizations.dart';
 
 class StateSelectionScreen extends StatefulWidget {
   @override
@@ -95,30 +98,48 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'State Selection',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        elevation: 0,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: Colors.black,
-        centerTitle: true,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        // No actions in app bar
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildStateListView(),
-            if (_selectedState != null) _buildContinueButton(),
-          ],
-        ),
-      ),
+    return Consumer<LanguageProvider>(
+      builder: (context, languageProvider, _) {
+        // Get the current language
+        final currentLanguage = languageProvider.language;
+        
+        return Scaffold(
+          // Force rebuild of the entire screen when language changes
+          key: ValueKey('state_selection_screen_${languageProvider.language}'),
+          appBar: AppBar(
+            title: Text(
+              AppLocalizations.of(context).translate('state_selection'),
+              // Force rebuild by adding a key that changes with language
+              key: ValueKey('state_selection_title_${languageProvider.language}'),
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            elevation: 0,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            foregroundColor: Colors.black,
+            centerTitle: true,
+            leading: IconButton(
+              icon: Icon(Icons.arrow_back),
+              onPressed: () {
+                // Navigate back to language selection screen instead of popping
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) => LanguageSelectionScreen(),
+                  ),
+                );
+              },
+            ),
+            // No actions in app bar
+          ),
+          body: SafeArea(
+            child: Column(
+              children: [
+                _buildStateListView(),
+                if (_selectedState != null) _buildContinueButton(),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -160,7 +181,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
                       ),
                     ),
                     child: Text(
-                      'Select your state',
+                      AppLocalizations.of(context).translate('select_state'),
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w500,
@@ -179,7 +200,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
-                      'Selected: $_selectedState',
+                      AppLocalizations.of(context).translate('selected_state') + ': $_selectedState',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w500,
@@ -212,7 +233,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
                         ),
                       ),
                       child: Text(
-                        'Continue',
+                        AppLocalizations.of(context).translate('continue'),
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w500,
@@ -235,7 +256,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
       child: Column(
         children: [
           // Section header
-          _buildSectionHeader('Select your state'),
+          _buildSectionHeader(AppLocalizations.of(context).translate('select_state')),
           
           // Enhanced search bar
           Container(
@@ -247,7 +268,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Search state...',
+                hintText: AppLocalizations.of(context).translate('search_state'),
                 hintStyle: TextStyle(color: Colors.grey[400]),
                 contentPadding: EdgeInsets.symmetric(vertical: 16),
                 border: OutlineInputBorder(
@@ -305,7 +326,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
                         ),
                         SizedBox(height: 16),
                         Text(
-                          'No states found',
+                          AppLocalizations.of(context).translate('no_states_found'),
                           style: TextStyle(
                             color: Colors.grey[500],
                             fontSize: 18,
@@ -366,7 +387,9 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
                                         ),
                                         SizedBox(height: 4),
                                         Text(
-                                          isSelected ? "Selected" : "Tap to select",
+                                          isSelected 
+                                              ? AppLocalizations.of(context).translate('selected') 
+                                              : AppLocalizations.of(context).translate('tap_to_select'),
                                           style: TextStyle(
                                             color: Colors.grey[600],
                                             fontSize: 14,
@@ -427,7 +450,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildSectionHeader('Selected State'),
+          _buildSectionHeader(AppLocalizations.of(context).translate('selected_state')),
           
           // Selected state card
           Card(
@@ -464,7 +487,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
                         ),
                         SizedBox(height: 4),
                         Text(
-                          'Selected state',
+                          AppLocalizations.of(context).translate('selected_state'),
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 14,
@@ -496,7 +519,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
               minimumSize: Size(double.infinity, 56),
             ),
             child: Text(
-              'Continue',
+              AppLocalizations.of(context).translate('continue'),
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -511,10 +534,27 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
   void _continueToApp(BuildContext context) {
     // Save the selected state to the user profile
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    // Only save the state for UI display purposes - not for content loading
     authProvider.updateUserState(_selectedState!);
     
-    // Navigate to the home screen but allow back navigation
-    Future.delayed(Duration.zero, () {
+    // Get language provider to get current language name
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    
+    // Display a message indicating that content will remain in Ukrainian/IL
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'UI will use ${languageProvider.languageName}, but content will remain in Ukrainian (IL)',
+          style: TextStyle(fontSize: 14),
+        ),
+        duration: Duration(seconds: 3),
+        backgroundColor: Colors.blue,
+      ),
+    );
+    
+    // Wait a moment for the snackbar to be visible before navigating
+    Future.delayed(Duration(milliseconds: 1500), () {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => HomeScreen()),
       );

@@ -6,6 +6,7 @@ import '../providers/auth_provider.dart';
 import '../providers/progress_provider.dart';
 import '../providers/language_provider.dart';
 import '../services/service_locator.dart';
+import '../localization/app_localizations.dart';
 import 'quiz_result_screen.dart';
 
 class QuizQuestionScreen extends StatefulWidget {
@@ -74,7 +75,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
       if (mounted) {
         setState(() {
           questions = [];
-          errorMessage = 'Failed to load questions. Please try again.';
+          errorMessage = 'Failed to load questions. Please try again.'; // Error in English as specified
           isLoading = false;
         });
       }
@@ -172,7 +173,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
   Widget build(BuildContext context) {
     // Common AppBar for all states
     final appBar = AppBar(
-      title: Text('Вчити по темах'),
+      title: Text(widget.topic.title),
       backgroundColor: Colors.white,
       foregroundColor: Colors.black,
       elevation: 0,
@@ -208,7 +209,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
               SizedBox(height: 16),
               ElevatedButton(
                 onPressed: loadQuestions,
-                child: Text('Повторити спробу'),
+                child: Text(AppLocalizations.of(context).translate('try_again')),
               ),
             ],
           ),
@@ -221,7 +222,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
       return Scaffold(
         appBar: appBar,
         body: Center(
-          child: Text('Немає запитань для цієї теми'),
+          child: Text(AppLocalizations.of(context).translate('no_questions')),
         ),
       );
     }
@@ -230,7 +231,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
     
     // Create AppBar with actions for the question view
     final questionAppBar = AppBar(
-      title: Text('Вчити по темах'),
+      title: Text(widget.topic.title),
       backgroundColor: Colors.white,
       foregroundColor: Colors.black,
       elevation: 0,
@@ -342,7 +343,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
                   Padding(
                     padding: EdgeInsets.only(top: 8),
                     child: Text(
-                      "Оберіть всі правильні відповіді",
+                      AppLocalizations.of(context).translate('select_all_correct'),
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.blue,
@@ -489,7 +490,9 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
                       ),
                       padding: EdgeInsets.symmetric(vertical: 12),
                     ),
-                    child: Text(isAnswerChecked ? 'Наступне' : 'Пропустити'),
+                    child: Text(isAnswerChecked 
+                      ? AppLocalizations.of(context).translate('next') 
+                      : AppLocalizations.of(context).translate('skip')),
                   ),
                 ),
                 SizedBox(width: 16),
@@ -506,7 +509,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
                       ),
                       padding: EdgeInsets.symmetric(vertical: 12),
                     ),
-                    child: Text('Обрати'),
+                    child: Text(AppLocalizations.of(context).translate('check')),
                   ),
                 ),
               ],
@@ -519,7 +522,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
               Navigator.pop(context);
             },
             child: Text(
-              'Завершити тему',
+              AppLocalizations.of(context).translate('finish_topic'),
               style: TextStyle(
                 color: Colors.grey,
               ),

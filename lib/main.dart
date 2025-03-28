@@ -112,12 +112,16 @@ void main() async {
   
   // Create content provider
   final contentProvider = ContentProvider();
-  // Load content based on language and state
-  contentProvider.setPreferences(
-    language: languageProvider.language,
-    state: 'IL', // Default to Illinois for now
-    licenseId: 'driver', // Default to driver license
-  );
+  // Load content with fixed 'uk' language and 'IL' state
+  // This initialization will always use Ukrainian for content, regardless of UI language
+  await contentProvider.fetchContentForLanguageAndState('uk', 'IL', forceRefresh: true);
+  
+  // Observe language changes for UI only
+  languageProvider.addListener(() {
+    // We don't update content language when UI language changes
+    print('UI language changed to: ${languageProvider.language}, content remains in Ukrainian');
+    // No need to call contentProvider.setPreferences since we're keeping content in 'uk'
+  });
   
   // Check if we need to migrate saved questions
   if (user != null) {
@@ -172,7 +176,9 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
+      // Set locale and force rebuilding when language changes
       locale: Locale(languageProvider.language),
+      key: ValueKey(languageProvider.language), // Force rebuild on language change
       supportedLocales: [
         Locale('en'), // English
         Locale('es'), // Spanish
@@ -181,7 +187,7 @@ class MyApp extends StatelessWidget {
         Locale('pl'), // Polish
       ],
       localizationsDelegates: [
-        AppLocalizationsDelegate(),
+        AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,

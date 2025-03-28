@@ -1,228 +1,84 @@
+import 'dart:convert';
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class AppLocalizations {
-  final String locale;
+  final Locale locale;
+  late Map<String, String> _localizedStrings;
 
   AppLocalizations(this.locale);
 
+  // Helper method to keep the code in the widgets concise
   static AppLocalizations of(BuildContext context) {
     return Localizations.of<AppLocalizations>(context, AppLocalizations)!;
   }
 
-  static Map<String, Map<String, String>> _localizedValues = {
-    'en': {
-      'tests': 'Tests',
-      'theory': 'Theory',
-      'routes': 'Routes',
-      'premium': 'Premium',
-      'profile': 'Profile',
-      'testing': 'Testing',
-      'take_exam': 'Take Exam',
-      'exam_desc': 'Like at DMV: 40 questions, 60 minutes',
-      'learn_by_topics': 'Learn by Topics',
-      'topics_desc': 'Questions grouped by topics',
-      'practice_tickets': 'Practice with Tests',
-      'practice_desc': '40 random questions, no time limit',
-      'mistake_work': 'Review Mistakes',
-      'my_mistakes': 'My Mistakes',
-      'mistakes_desc': 'Questions where mistakes were made',
-      'common_mistakes': 'Common Mistakes',
-      'common_mistakes_desc': '100 most difficult exam questions',
-      'saved': 'Saved',
-      'saved_desc': 'Saved questions from different sections',
-      'video': 'Video',
-      'video_lectures': '👉 Traffic Rules Lectures 👈',
-      'lectures_desc': 'Video lectures on various traffic rules',
-      'traffic_rules': 'Traffic Rules',
-      'theory_course': 'Theoretical course for future drivers',
-      'rules': 'Traffic rules',
-      'signs': 'Signs',
-      'road_markings': 'Road markings',
-      'traffic_controller': 'Traffic officer',
-      'traffic_lights': 'Traffic lights',
-      'my_profile': 'My Profile',
-      'edit_profile': 'Edit Profile',
-      'total_progress': 'Total topic progress:',
-      'exams_passed': 'Exams passed',
-      'avg_score': 'Average exam score',
-      'questions_completed': 'Questions completed',
-      'wrong_answers': 'Wrong answers',
-      'correct_answers': 'Correct answers',
-      'support': 'Support',
-      'support_desc': 'Answers to your questions',
-      'category': 'Category:',
-      'my_group': 'My Group:',
-      'join_group': 'join group',
-      'select_language': 'Select language:',
-      'logout': 'Log out',
-      'choose_language': 'Choose language',
-    },
-    'es': {
-      'tests': 'Pruebas',
-      'theory': 'Teoría',
-      'routes': 'Rutas',
-      'premium': 'Premium',
-      'profile': 'Perfil',
-      'testing': 'Exámenes',
-      'take_exam': 'Tomar Examen',
-      'exam_desc': 'Como en el DMV: 40 preguntas, 60 minutos',
-      'learn_by_topics': 'Aprender por Temas',
-      'topics_desc': 'Preguntas agrupadas por temas',
-      'practice_tickets': 'Practicar con Pruebas',
-      'practice_desc': '40 preguntas aleatorias, sin límite de tiempo',
-      'mistake_work': 'Revisar Errores',
-      'my_mistakes': 'Mis Errores',
-      'mistakes_desc': 'Preguntas donde se cometieron errores',
-      'common_mistakes': 'Errores Comunes',
-      'common_mistakes_desc': '100 preguntas más difíciles del examen',
-      'saved': 'Guardadas',
-      'saved_desc': 'Preguntas guardadas de diferentes secciones',
-      'video': 'Video',
-      'video_lectures': '👉 Lecciones de Tráfico 👈',
-      'lectures_desc': 'Lecciones en video sobre varias reglas de tráfico',
-      'traffic_rules': 'Reglas de Tráfico',
-      'theory_course': 'Curso teórico para futuros conductores',
-      'rules': 'Reglas de tráfico',
-      'signs': 'Señales',
-      'road_markings': 'Marcas viales',
-      'traffic_controller': 'Oficial de tránsito',
-      'traffic_lights': 'Semáforos',
-      'my_profile': 'Mi Perfil',
-      'edit_profile': 'Editar Perfil',
-      'total_progress': 'Progreso total por tema:',
-      'exams_passed': 'Exámenes aprobados',
-      'avg_score': 'Puntuación media de examen',
-      'questions_completed': 'Preguntas completadas',
-      'wrong_answers': 'Respuestas incorrectas',
-      'correct_answers': 'Respuestas correctas',
-      'support': 'Soporte',
-      'support_desc': 'Respuestas a tus preguntas',
-      'category': 'Categoría:',
-      'my_group': 'Mi Grupo:',
-      'join_group': 'unirse al grupo',
-      'select_language': 'Seleccionar idioma:',
-      'logout': 'Cerrar sesión',
-      'choose_language': 'Elegir idioma',
-    },
-    'uk': {
-      'tests': 'Тести',
-      'theory': 'Теорія',
-      'routes': 'Маршрути',
-      'premium': 'Premium',
-      'profile': 'Профіль',
-      'testing': 'Тестування',
-      'take_exam': 'Складай іспит',
-      'exam_desc': 'як в СЦ МВС: 20 запитань, 20 хвилин',
-      'learn_by_topics': 'Вчи по темах',
-      'topics_desc': 'Запитання згруповані по темах',
-      'practice_tickets': 'Тренуйся по білетах',
-      'practice_desc': '20 випадкових запитань, без обмежень',
-      'mistake_work': 'Робота над помилками',
-      'my_mistakes': 'Мої помилки',
-      'mistakes_desc': 'Запитання, де були допущені помилки',
-      'common_mistakes': 'Часті помилки',
-      'common_mistakes_desc': '100 найбільш складних запитань в іспиті',
-      'saved': 'Збережені',
-      'saved_desc': 'Збережені питання з різних розділів',
-      'video': 'Відео',
-      'video_lectures': '👉 Лекції з ПДР 👈',
-      'lectures_desc': 'Відеолекції з різних розділів ПДР',
-      'traffic_rules': 'Правила Дорожнього Руху',
-      'theory_course': 'Теоретичний курс майбутнього водія',
-      'rules': 'Правила дорожнього руху',
-      'signs': 'Знаки',
-      'road_markings': 'Дорожня розмітка',
-      'traffic_controller': 'Регулювальник',
-      'traffic_lights': 'Світлофор',
-      'my_profile': 'Мій профіль',
-      'edit_profile': 'Редагувати профіль',
-      'total_progress': 'Загальний прогрес по темах:',
-      'exams_passed': 'Зданих іспитів',
-      'avg_score': 'Середній рахунок іспиту',
-      'questions_completed': 'Запитань пройдено',
-      'wrong_answers': 'Невірних відповідей',
-      'correct_answers': 'Правильних відповідей',
-      'support': 'Підтримка',
-      'support_desc': 'Відповіді на ваші питання',
-      'category': 'Категорія:',
-      'my_group': 'Моя Група:',
-      'join_group': 'приєднатись до групи',
-      'select_language': 'Обрати мову:',
-      'logout': 'Вийти з акаунта',
-      'choose_language': 'Оберіть мову',
-    },
-    'ru': {
-      'tests': 'Тесты',
-      'theory': 'Теория',
-      'routes': 'Маршруты',
-      'premium': 'Premium',
-      'profile': 'Профиль',
-      'testing': 'Тестирование',
-      'take_exam': 'Сдай экзамен',
-      'exam_desc': 'как в СЦ МВД: 20 вопросов, 20 минут',
-      'learn_by_topics': 'Учи по темам',
-      'topics_desc': 'Вопросы сгруппированные по темам',
-      'practice_tickets': 'Тренируйся по билетам',
-      'practice_desc': '20 случайных вопросов, без ограничений',
-      'mistake_work': 'Работа над ошибками',
-      'my_mistakes': 'Мои ошибки',
-      'mistakes_desc': 'Вопросы, где были допущены ошибки',
-      'common_mistakes': 'Частые ошибки',
-      'common_mistakes_desc': '100 наиболее сложных вопросов в экзамене',
-      'saved': 'Сохраненные',
-      'saved_desc': 'Сохраненные вопросы из разных разделов',
-      'video': 'Видео',
-      'video_lectures': '👉 Лекции по ПДД 👈',
-      'lectures_desc': 'Видеолекции из разных разделов ПДД',
-      'traffic_rules': 'Правила Дорожного Движения',
-      'theory_course': 'Теоретический курс будущего водителя',
-      'rules': 'Правила дорожного движения',
-      'signs': 'Знаки',
-      'road_markings': 'Дорожная разметка',
-      'traffic_controller': 'Регулировщик',
-      'traffic_lights': 'Светофор',
-      'my_profile': 'Мой профиль',
-      'edit_profile': 'Редактировать профиль',
-      'total_progress': 'Общий прогресс по темам:',
-      'exams_passed': 'Сданных экзаменов',
-      'avg_score': 'Средний счет экзамена',
-      'questions_completed': 'Вопросов пройдено',
-      'wrong_answers': 'Неверных ответов',
-      'correct_answers': 'Правильных ответов',
-      'support': 'Поддержка',
-      'support_desc': 'Ответы на ваши вопросы',
-      'category': 'Категория:',
-      'my_group': 'Моя Группа:',
-      'join_group': 'присоединиться к группе',
-      'select_language': 'Выбрать язык:',
-      'logout': 'Выйти из аккаунта',
-      'choose_language': 'Выберите язык',
-    },
-    'pl': {
-      'tests': 'Testy',
-      'theory': 'Teoria',
-      'routes': 'Trasy',
-      'premium': 'Premium',
-      'profile': 'Profil',
-      // Add all Polish translations here
-    },
-    'be': {
-      'tests': 'Тэсты',
-      'theory': 'Тэорыя',
-      'routes': 'Маршруты',
-      'premium': 'Premium',
-      'profile': 'Профіль',
-      // Add all Belarusian translations here
-    },
-  };
+  // Static member to have a simple access to the delegate from the MaterialApp
+  static const LocalizationsDelegate<AppLocalizations> delegate =
+      _AppLocalizationsDelegate();
 
+  Future<bool> load() async {
+    try {
+      // Load the language JSON file from the "l10n" folder (with 'lib/' prefix removed)
+      String jsonString = await rootBundle.loadString('lib/localization/l10n/${locale.languageCode}.json');
+      Map<String, dynamic> jsonMap = json.decode(jsonString);
+
+      _localizedStrings = jsonMap.map((key, value) {
+        return MapEntry(key, value.toString());
+      });
+
+      return true;
+    } catch (e) {
+      print('Error loading language file: $e');
+      // Fallback to English if there's an error loading the requested language
+      if (locale.languageCode != 'en') {
+        try {
+          String fallbackString = await rootBundle.loadString('lib/localization/l10n/en.json');
+          Map<String, dynamic> fallbackMap = json.decode(fallbackString);
+          
+          _localizedStrings = fallbackMap.map((key, value) {
+            return MapEntry(key, value.toString());
+          });
+          
+          print('Falling back to English language');
+          return true;
+        } catch (fallbackError) {
+          print('Error loading fallback language: $fallbackError');
+          _localizedStrings = {};
+          return false;
+        }
+      }
+      _localizedStrings = {};
+      return false;
+    }
+  }
+
+  // This method will be called from every widget which needs a localized text
   String translate(String key) {
-    return _localizedValues[locale]?[key] ?? _localizedValues['uk']![key] ?? key;
+    if (_localizedStrings.containsKey(key)) {
+      return _localizedStrings[key]!;
+    }
+    // If we don't have a translation for the key, return the key itself as fallback
+    return key;
+  }
+
+  // Get all supported locales for the app
+  static List<Locale> supportedLocales() {
+    return const [
+      Locale('en', ''), // English
+      Locale('es', ''), // Spanish
+      Locale('uk', ''), // Ukrainian
+      Locale('ru', ''), // Russian
+      Locale('pl', ''), // Polish
+    ];
   }
 }
 
-class AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
-  const AppLocalizationsDelegate();
+// LocalizationsDelegate is a factory for a set of localized resources
+class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
+  const _AppLocalizationsDelegate();
 
   @override
   bool isSupported(Locale locale) {
@@ -231,9 +87,12 @@ class AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
 
   @override
   Future<AppLocalizations> load(Locale locale) async {
-    return AppLocalizations(locale.languageCode);
+    // AppLocalizations class is where the JSON loading actually runs
+    AppLocalizations localizations = AppLocalizations(locale);
+    await localizations.load();
+    return localizations;
   }
 
   @override
-  bool shouldReload(AppLocalizationsDelegate old) => false;
+  bool shouldReload(_AppLocalizationsDelegate old) => false;
 }

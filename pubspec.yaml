@@ -41,6 +41,7 @@ flutter:
     - assets/images/signs/examples/
     - assets/images/traffic_lights/
     - assets/images/quiz/
+    - lib/localization/l10n/
   fonts:
     - family: Roboto
       fonts:

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/traffic_rule_topic.dart';
+import '../localization/app_localizations.dart';
+import '../providers/language_provider.dart';
+import 'package:provider/provider.dart';
 
 class TrafficRuleContentScreen extends StatelessWidget {
   final TrafficRuleTopic topic;
@@ -14,7 +17,7 @@ class TrafficRuleContentScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Правила дорожнього руху',
+          topic.title,
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         elevation: 0,

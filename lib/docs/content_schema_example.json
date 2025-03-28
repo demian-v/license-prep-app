@@ -1,0 +1,109 @@
+{
+  "theory_content": {
+    "speed_limits": {
+      "contentByStateAndLanguage": {
+        "ILLINOIS": {
+          "en": {
+            "id": "speed_limits_il_en",
+            "type": "theory",
+            "titles": {
+              "en": "Illinois Speed Limits"
+            },
+            "descriptions": {
+              "en": "In residential areas, the speed limit is generally 30 mph. On highways, the limit is typically 65 mph, but can be up to 70 mph in rural areas. School zones have a 20 mph limit when children are present."
+            },
+            "metadata": {
+              "imageUrls": ["speed_limit_signs.jpg"]
+            }
+          },
+          "uk": {
+            "id": "speed_limits_il_uk",
+            "type": "theory",
+            "titles": {
+              "uk": "Обмеження швидкості в Іллінойсі"
+            },
+            "descriptions": {
+              "uk": "У житлових районах обмеження швидкості зазвичай становить 30 миль на годину. На автомагістралях обмеження зазвичай становить 65 миль на годину, але може бути до 70 миль на годину в сільській місцевості. У шкільних зонах обмеження 20 миль на годину, коли присутні діти."
+            },
+            "metadata": {
+              "imageUrls": ["speed_limit_signs.jpg"]
+            }
+          }
+        },
+        "ALASKA": {
+          "en": {
+            "id": "speed_limits_ak_en",
+            "type": "theory",
+            "titles": {
+              "en": "Alaska Speed Limits"
+            },
+            "descriptions": {
+              "en": "In residential areas of Alaska, the speed limit is typically 25 mph. On highways, the limit is usually 55 mph, but can be up to 65 mph on certain highways. School zones have a 20 mph limit when children are present."
+            },
+            "metadata": {
+              "imageUrls": ["alaska_speed_signs.jpg"]
+            }
+          }
+        }
+      }
+    }
+  },
+  "quiz_questions": {
+    "speed_limit_question_1": {
+      "id": "q001",
+      "state": "ILLINOIS",
+      "question": {
+        "en": "What is the typical speed limit in residential areas of Illinois?",
+        "uk": "Яке типове обмеження швидкості в житлових районах Іллінойсу?"
+      },
+      "options": {
+        "en": [
+          "25 mph",
+          "30 mph",
+          "35 mph",
+          "40 mph"
+        ],
+        "uk": [
+          "25 миль/год",
+          "30 миль/год",
+          "35 миль/год",
+          "40 миль/год"
+        ]
+      },
+      "correctOptionIndex": 1,
+      "explanation": {
+        "en": "In residential areas of Illinois, the typical speed limit is 30 mph unless otherwise posted.",
+        "uk": "У житлових районах Іллінойсу типове обмеження швидкості становить 30 миль на годину, якщо не вказано інше."
+      },
+      "tags": ["speed limits", "residential"]
+    },
+    "school_zone_question": {
+      "id": "q002",
+      "state": "ILLINOIS",
+      "question": {
+        "en": "What is the speed limit in school zones in Illinois when children are present?",
+        "uk": "Яке обмеження швидкості в шкільних зонах Іллінойсу, коли присутні діти?"
+      },
+      "options": {
+        "en": [
+          "15 mph",
+          "20 mph",
+          "25 mph",
+          "30 mph"
+        ],
+        "uk": [
+          "15 миль/год",
+          "20 миль/год",
+          "25 миль/год",
+          "30 миль/год"
+        ]
+      },
+      "correctOptionIndex": 1,
+      "explanation": {
+        "en": "In school zones in Illinois, the speed limit is 20 mph when children are present.",
+        "uk": "У шкільних зонах Іллінойсу обмеження швидкості становить 20 миль на годину, коли присутні діти."
+      },
+      "tags": ["speed limits", "school zone", "safety"]
+    }
+  }
+}
