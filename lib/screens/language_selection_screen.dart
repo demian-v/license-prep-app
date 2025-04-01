@@ -8,6 +8,7 @@ import 'state_selection_screen.dart';
 class LanguageSelectionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    print('🏳️‍🌈 [LANGUAGE SCREEN] Building language selection screen');
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -103,41 +104,56 @@ class LanguageSelectionScreen extends StatelessWidget {
           ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Setting UI language to $language...\nContent will remain in Ukrainian (IL)'), // This is feedback in English as specified
+              content: Text('Setting UI language to $language...'), // Updated message
               duration: Duration(seconds: 2),
               backgroundColor: languageColors[code],
             ),
           );
           
-          // Update the language in both providers - using a try-catch to handle any errors
           try {
             // Update language provider
             final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+            print('🔄 [LANGUAGE SCREEN] Setting language to: $code');
             await languageProvider.setLanguage(code);
+            
+            // Verify language was set correctly
+            print('✅ [LANGUAGE SCREEN] Language set to: ${languageProvider.language}');
             
             // Update auth provider
             final authProvider = Provider.of<AuthProvider>(context, listen: false);
             await authProvider.updateUserLanguage(code);
+            print('✅ [LANGUAGE SCREEN] User language updated in auth provider');
             
-            // Wait for a short time to ensure the language is loaded properly
-            await Future.delayed(Duration(milliseconds: 300));
+            // Wait longer to ensure the language is properly loaded
+            print('⏳ [LANGUAGE SCREEN] Waiting for language to propagate...');
+            await Future.delayed(Duration(milliseconds: 800));
             
-            // Force a rebuild of MaterialApp with the new locale
             if (context.mounted) {
-              // Use pushAndRemoveUntil to rebuild the navigation stack with the new locale
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(
-                  builder: (_) => StateSelectionScreen(),
+              // Pop all routes except first one
+              Navigator.of(context).popUntil((route) => route.isFirst);
+              
+              print('🔍 [LANGUAGE SCREEN] Current language before navigation: ${languageProvider.language}');
+              
+              // Use pushReplacement with unique key to force rebuild
+              Navigator.of(context).pushReplacement(
+                PageRouteBuilder(
+                  settings: RouteSettings(
+                    name: 'state_selection_${code}_${DateTime.now().millisecondsSinceEpoch}'
+                  ),
+                  pageBuilder: (context, animation1, animation2) => StateSelectionScreen(
+                    key: UniqueKey(), // Force complete rebuild
+                  ),
+                  transitionDuration: Duration.zero,
                 ),
-                (route) => route.isFirst, // Keep only the first route
               );
+              print('🔄 [LANGUAGE SCREEN] Navigated to state selection screen');
             }
           } catch (e) {
-            print('Error updating language: $e');
+            print('🚨 [LANGUAGE SCREEN] Error updating language: $e');
             // Show error snackbar
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Error selecting language: $e'), // Error message in English as specified
+                content: Text('Error selecting language: $e'), // Error message in English
                 backgroundColor: Colors.red,
               ),
             );

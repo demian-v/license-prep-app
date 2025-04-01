@@ -467,6 +467,15 @@ void _showDeveloperOptions(BuildContext context) {
                     );
                   },
                 ),
+                ListTile(
+                  leading: Icon(Icons.settings_applications),
+                  title: Text('App Settings Reset'),
+                  subtitle: Text('Reset all app settings and preferences'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.pushNamed(context, '/settings/reset');
+                  },
+                ),
               ],
             ),
           ),

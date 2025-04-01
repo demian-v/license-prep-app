@@ -67,18 +67,35 @@ class AuthProvider extends ChangeNotifier {
   Future<void> updateUserLanguage(String language) async {
     if (user != null) {
       try {
+        debugPrint('🔤 AuthProvider: Updating user language to: $language');
+        
         // Try to use the API
         await serviceLocator.auth.updateUserLanguage(user!.id, language);
-        final updatedUser = user!.copyWith(language: language);
-        user = updatedUser;
+        
+        // Get the updated user from the API
+        try {
+          final updatedUserFromApi = await serviceLocator.auth.getCurrentUser();
+          if (updatedUserFromApi != null) {
+            debugPrint('✅ AuthProvider: Successfully updated user language to $language via API');
+            user = updatedUserFromApi;
+          } else {
+            debugPrint('⚠️ AuthProvider: API returned null user, using local update');
+            user = user!.copyWith(language: language);
+          }
+        } catch (getUserError) {
+          debugPrint('⚠️ AuthProvider: Error getting updated user: $getUserError');
+          // Use local update as fallback
+          user = user!.copyWith(language: language);
+        }
         
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('user', jsonEncode(updatedUser.toJson()));
+        await prefs.setString('user', jsonEncode(user!.toJson()));
         
         notifyListeners();
+        debugPrint('🔤 AuthProvider: Language set to: ${user!.language}');
       } catch (e) {
         // Fallback to local update if API is not available
-        debugPrint('API error, updating locally: $e');
+        debugPrint('⚠️ AuthProvider: API error, updating locally: $e');
         
         final updatedUser = user!.copyWith(language: language);
         user = updatedUser;
@@ -87,25 +104,45 @@ class AuthProvider extends ChangeNotifier {
         await prefs.setString('user', jsonEncode(updatedUser.toJson()));
         
         notifyListeners();
+        debugPrint('🔤 AuthProvider: Language set locally to: ${user!.language}');
       }
+    } else {
+      debugPrint('⚠️ AuthProvider: Cannot update language - user is null');
     }
   }
   
   Future<void> updateUserState(String state) async {
     if (user != null) {
       try {
+        debugPrint('🗺️ AuthProvider: Updating user state to: $state');
+        
         // Try to use the API
         await serviceLocator.auth.updateUserState(user!.id, state);
-        final updatedUser = user!.copyWith(state: state);
-        user = updatedUser;
+        
+        // Get the updated user from the API
+        try {
+          final updatedUserFromApi = await serviceLocator.auth.getCurrentUser();
+          if (updatedUserFromApi != null) {
+            debugPrint('✅ AuthProvider: Successfully updated user state to $state via API');
+            user = updatedUserFromApi;
+          } else {
+            debugPrint('⚠️ AuthProvider: API returned null user, using local update');
+            user = user!.copyWith(state: state);
+          }
+        } catch (getUserError) {
+          debugPrint('⚠️ AuthProvider: Error getting updated user: $getUserError');
+          // Use local update as fallback
+          user = user!.copyWith(state: state);
+        }
         
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('user', jsonEncode(updatedUser.toJson()));
+        await prefs.setString('user', jsonEncode(user!.toJson()));
         
         notifyListeners();
+        debugPrint('🗺️ AuthProvider: State set to: ${user!.state}');
       } catch (e) {
         // Fallback to local update if API is not available
-        debugPrint('API error, updating locally: $e');
+        debugPrint('⚠️ AuthProvider: API error, updating locally: $e');
         
         final updatedUser = user!.copyWith(state: state);
         user = updatedUser;
@@ -114,25 +151,44 @@ class AuthProvider extends ChangeNotifier {
         await prefs.setString('user', jsonEncode(updatedUser.toJson()));
         
         notifyListeners();
+        debugPrint('🗺️ AuthProvider: State set locally to: ${user!.state}');
       }
+    } else {
+      debugPrint('⚠️ AuthProvider: Cannot update state - user is null');
     }
   }
 
   Future<void> updateProfile(String name) async {
     if (user != null) {
       try {
+        debugPrint('👤 AuthProvider: Updating user profile name to: $name');
+        
         // Try to use the API
         await serviceLocator.auth.updateProfile(user!.id, name: name);
-        final updatedUser = user!.copyWith(name: name);
-        user = updatedUser;
+        
+        // Get the updated user from the API
+        try {
+          final updatedUserFromApi = await serviceLocator.auth.getCurrentUser();
+          if (updatedUserFromApi != null) {
+            debugPrint('✅ AuthProvider: Successfully updated user name to $name via API');
+            user = updatedUserFromApi;
+          } else {
+            debugPrint('⚠️ AuthProvider: API returned null user, using local update');
+            user = user!.copyWith(name: name);
+          }
+        } catch (getUserError) {
+          debugPrint('⚠️ AuthProvider: Error getting updated user: $getUserError');
+          // Use local update as fallback
+          user = user!.copyWith(name: name);
+        }
         
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('user', jsonEncode(updatedUser.toJson()));
+        await prefs.setString('user', jsonEncode(user!.toJson()));
         
         notifyListeners();
       } catch (e) {
         // Fallback to local update if API is not available
-        debugPrint('API error, updating locally: $e');
+        debugPrint('⚠️ AuthProvider: API error, updating name locally: $e');
         
         final updatedUser = user!.copyWith(name: name);
         user = updatedUser;
@@ -142,11 +198,15 @@ class AuthProvider extends ChangeNotifier {
         
         notifyListeners();
       }
+    } else {
+      debugPrint('⚠️ AuthProvider: Cannot update profile - user is null');
     }
   }
 
   Future<void> logout() async {
     try {
+      debugPrint('🚪 AuthProvider: Logging out user');
+      
       // Sign out using the API
       await serviceLocator.auth.logout();
       
@@ -158,8 +218,9 @@ class AuthProvider extends ChangeNotifier {
       await prefs.remove('user');
       
       notifyListeners();
+      debugPrint('✅ AuthProvider: User logged out successfully');
     } catch (e) {
-      debugPrint('AuthProvider: Logout error: $e');
+      debugPrint('⚠️ AuthProvider: Logout error: $e');
       // Still clear local data even if API logout fails
       user = null;
       
@@ -167,6 +228,7 @@ class AuthProvider extends ChangeNotifier {
       await prefs.remove('user');
       
       notifyListeners();
+      debugPrint('🚪 AuthProvider: User logged out locally due to API error');
     }
   }
 }

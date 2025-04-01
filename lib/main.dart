@@ -8,7 +8,9 @@ import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'firebase_options.dart';
 
 import 'services/service_locator.dart';
+import 'services/service_locator_extensions.dart';
 import 'services/api/api_implementation.dart';
+import 'services/content_loading_manager.dart';
 
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
@@ -20,6 +22,7 @@ import 'screens/subscription_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/traffic_rules_topics_screen.dart';
 import 'screens/test_screen.dart';
+import 'screens/reset_app_settings_screen.dart';
 import 'models/user.dart';
 import 'models/subscription.dart';
 import 'models/progress.dart';
@@ -30,6 +33,7 @@ import 'providers/language_provider.dart';
 import 'providers/exam_provider.dart';
 import 'providers/practice_provider.dart';
 import 'providers/content_provider.dart';
+import 'providers/state_provider.dart';
 import 'localization/app_localizations.dart';
 
 void main() async {
@@ -104,7 +108,25 @@ void main() async {
   final authProvider = AuthProvider(user);
   final subscriptionProvider = SubscriptionProvider(subscription);
   final progressProvider = ProgressProvider(progress);
-  final languageProvider = LanguageProvider();
+  
+  // Create language provider with option to force English if needed
+  // Set forceEnglish to true to reset language to English regardless of saved preferences
+  final languageProvider = LanguageProvider(forceEnglish: true);  // Force reset to English by default
+  // Wait for language to load properly from SharedPreferences
+  await languageProvider.waitForLoad();
+  print('Language provider loaded with language: ${languageProvider.language}');
+  
+  // Make sure English is the default. If something was wrong with preferences,
+  // explicitly set language to English.
+  if (languageProvider.language != 'en') {
+    print('Detected non-English default language: ${languageProvider.language}, resetting to English');
+    await languageProvider.resetToEnglish();
+  }
+  
+  final stateProvider = StateProvider();
+  
+  // Initialize state provider
+  await stateProvider.initialize();
 
   // Create exam and practice providers
   final examProvider = ExamProvider();
@@ -112,15 +134,21 @@ void main() async {
   
   // Create content provider
   final contentProvider = ContentProvider();
-  // Load content with fixed 'uk' language and 'IL' state
-  // This initialization will always use Ukrainian for content, regardless of UI language
-  await contentProvider.fetchContentForLanguageAndState('uk', 'IL', forceRefresh: true);
   
-  // Observe language changes for UI only
+  // Update content provider to use the correct language (not hardcoded to Ukrainian)
+  contentProvider.setPreferences(language: languageProvider.language);
+  
+  // Register providers with service locator for our extensions
+  serviceLocator.registerLanguageProvider(languageProvider);
+  serviceLocator.registerContentProvider(contentProvider);
+  
+  // Initialize service locator extensions
+  ServiceLocatorExtensions.initialize();
+  
+  // Listen for language changes and update content language
   languageProvider.addListener(() {
-    // We don't update content language when UI language changes
-    print('UI language changed to: ${languageProvider.language}, content remains in Ukrainian');
-    // No need to call contentProvider.setPreferences since we're keeping content in 'uk'
+    contentProvider.setPreferences(language: languageProvider.language);
+    print('Language updated in ContentProvider to: ${languageProvider.language}');
   });
   
   // Check if we need to migrate saved questions
@@ -141,6 +169,7 @@ void main() async {
         ChangeNotifierProvider.value(value: examProvider),
         ChangeNotifierProvider.value(value: practiceProvider),
         ChangeNotifierProvider.value(value: contentProvider),
+        ChangeNotifierProvider.value(value: stateProvider),
       ],
       child: MyApp(
         authProvider: authProvider,
@@ -162,6 +191,10 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final currentLang = languageProvider.language;
+    print('MyApp.build: Setting app locale to language: $currentLang');
+    
+    // Important: Force app rebuild with unique key when language changes
     return MaterialApp(
       title: 'USA License Prep',
       theme: ThemeData(
@@ -177,21 +210,36 @@ class MyApp extends StatelessWidget {
         ),
       ),
       // Set locale and force rebuilding when language changes
-      locale: Locale(languageProvider.language),
-      key: ValueKey(languageProvider.language), // Force rebuild on language change
-      supportedLocales: [
-        Locale('en'), // English
-        Locale('es'), // Spanish
-        Locale('uk'), // Ukrainian
-        Locale('ru'), // Russian
-        Locale('pl'), // Polish
-      ],
+      locale: Locale(currentLang),
+      key: ValueKey('app_${currentLang}_${DateTime.now().millisecondsSinceEpoch}'), // Force rebuild on language change
+      supportedLocales: AppLocalizations.supportedLocales(),
       localizationsDelegates: [
+        // Set app localizations first to take priority
         AppLocalizations.delegate,
+        // These framework delegates need to come after our custom delegate
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
+      
+      // Crucial: Set this to ensure correct localization context
+      localeResolutionCallback: (locale, supportedLocales) {
+        print('🔍 localeResolutionCallback called with locale: ${locale?.languageCode}');
+        print('🔍 Supported locales: ${supportedLocales.map((l) => l.languageCode).join(', ')}');
+        
+        // Use the passed locale if it's supported
+        for (var supportedLocale in supportedLocales) {
+          if (supportedLocale.languageCode == locale?.languageCode) {
+            print('✅ Using matched locale: ${supportedLocale.languageCode}');
+            return supportedLocale;
+          }
+        }
+        
+        // Fall back to the first locale if not supported
+        print('⚠️ Language not supported, falling back to: ${supportedLocales.first.languageCode}');
+        return supportedLocales.first;
+      },
+      
       home: authProvider.user != null ? HomeScreen() : LoginScreen(),
       routes: {
         '/login': (context) => LoginScreen(),
@@ -201,6 +249,7 @@ class MyApp extends StatelessWidget {
         '/tests': (context) => TestScreen(),
         '/profile': (context) => ProfileScreen(),
         '/subscription': (context) => SubscriptionScreen(),
+        '/settings/reset': (context) => ResetAppSettingsScreen(),
       },
       onGenerateRoute: (settings) {
         if (settings.name!.startsWith('/theory/')) {

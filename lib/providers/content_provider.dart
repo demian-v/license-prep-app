@@ -9,7 +9,7 @@ class ContentProvider extends ChangeNotifier {
   bool _isLoading = false;
   List<TrafficRuleTopic> _topics = [];
   List<TheoryModule> _modules = [];
-  String _currentLanguage = 'uk';
+  String _currentLanguage = 'en'; // Default to English
   String _currentState = 'IL';
   String _currentLicenseId = 'driver';
   String? _lastError;
@@ -71,23 +71,29 @@ class ContentProvider extends ChangeNotifier {
     return !_isOffline;
   }
   
+  // Track if content loading has been explicitly requested
+  bool _contentRequestedExplicitly = false;
+  
+  // Get whether content has been explicitly requested
+  bool get contentRequestedExplicitly => _contentRequestedExplicitly;
+  
   // Set user preferences
   void setPreferences({String? language, String? state, String? licenseId}) {
     bool shouldRefresh = false;
     
-    // Store the UI language for reference but always use 'uk' for content
+    // Store the UI language and use it for both UI and content
     if (language != null && language != _currentLanguage) {
-      // We track the UI language change but don't use it for content
-      print('UI language changed to $language, but content will remain in Ukrainian (uk)');
-      // Don't update _currentLanguage as we'll keep it fixed to 'uk'
-      shouldRefresh = false; // No need to refresh content when UI language changes
+      // Update the language for content
+      _currentLanguage = language;
+      print('ContentProvider: Language changed to $language for both UI and content');
+      shouldRefresh = true; // Refresh content when language changes
     }
     
-    // Always use 'IL' state for content, but track other values
-    if (state != null && state != _currentState && state != 'IL') {
-      print('State requested: $state, but content will remain for IL (Illinois)');
-      // Don't update _currentState as we'll keep it fixed to 'IL'
-      shouldRefresh = false; // No need to refresh as we're keeping the same state
+    // Store the selected state
+    if (state != null && state != _currentState) {
+      _currentState = state;
+      print('ContentProvider: State changed to $state');
+      shouldRefresh = true; // Refresh content when state changes
     }
     
     if (licenseId != null && licenseId != _currentLicenseId) {
@@ -95,9 +101,23 @@ class ContentProvider extends ChangeNotifier {
       shouldRefresh = true;
     }
     
-    if (shouldRefresh) {
+    // IMPORTANT: Only fetch content if user is past the state selection screen
+    // This prevents database calls during the language and state selection process
+    if (shouldRefresh && _contentRequestedExplicitly) {
+      print('ContentProvider: Fetching content due to preference change');
       fetchContent();
+    } else {
+      print('ContentProvider: Skipping content fetch (explicit request = $_contentRequestedExplicitly)');
     }
+  }
+  
+  // Fetch content explicitly after language and state selection
+  Future<void> fetchContentAfterSelection({bool forceRefresh = false}) async {
+    // Mark content as explicitly requested
+    _contentRequestedExplicitly = true;
+    
+    // Now fetch the content
+    return fetchContent(forceRefresh: forceRefresh);
   }
   
   // Get content for specific language and state (used only for special cases)

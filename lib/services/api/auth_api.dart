@@ -135,8 +135,8 @@ class AuthApi implements AuthApiInterface {
   Future<void> createOrUpdateUserDoc(String userId, {
     required String name,
     required String email,
-    String language = "ua",
-    String state = "IL",
+    String language = "en",
+    String? state = null,
   }) async {
     try {
       // Try to use Cloud Function to create/update user directly

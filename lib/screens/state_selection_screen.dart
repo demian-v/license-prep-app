@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import '../providers/language_provider.dart';
+import '../providers/state_provider.dart';
+import '../models/state_info.dart';
+import '../localization/app_localizations.dart';
 import '../screens/home_screen.dart';
+import '../providers/language_provider.dart';
 import '../screens/language_selection_screen.dart';
 import '../localization/app_localizations.dart';
+import '../data/state_data.dart';
+import '../services/service_locator_extensions.dart';
 
 class StateSelectionScreen extends StatefulWidget {
+  // Add constructor with key parameter
+  const StateSelectionScreen({Key? key}) : super(key: key);
+
   @override
   _StateSelectionScreenState createState() => _StateSelectionScreenState();
 }
@@ -16,66 +24,32 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
   String? _selectedState;
   bool _showStateList = true; // Show state list by default
   List<String> _filteredStates = [];
+  AppLocalizations? _localizations;
 
-  // List of all US states
-  final List<String> _allStates = [
-    'ALABAMA',
-    'ALASKA',
-    'ARIZONA',
-    'ARKANSAS',
-    'CALIFORNIA',
-    'COLORADO',
-    'CONNECTICUT',
-    'DELAWARE',
-    'DISTRICT OF COLUMBIA',
-    'FLORIDA',
-    'GEORGIA',
-    'HAWAII',
-    'IDAHO',
-    'ILLINOIS',
-    'INDIANA',
-    'IOWA',
-    'KANSAS',
-    'KENTUCKY',
-    'LOUISIANA',
-    'MAINE',
-    'MARYLAND',
-    'MASSACHUSETTS',
-    'MICHIGAN',
-    'MINNESOTA',
-    'MISSISSIPPI',
-    'MISSOURI',
-    'MONTANA',
-    'NEBRASKA',
-    'NEVADA',
-    'NEW HAMPSHIRE',
-    'NEW JERSEY',
-    'NEW MEXICO',
-    'NEW YORK',
-    'NORTH CAROLINA',
-    'NORTH DAKOTA',
-    'OHIO',
-    'OKLAHOMA',
-    'OREGON',
-    'PENNSYLVANIA',
-    'RHODE ISLAND',
-    'SOUTH CAROLINA',
-    'SOUTH DAKOTA',
-    'TENNESSEE',
-    'TEXAS',
-    'UTAH',
-    'VERMONT',
-    'VIRGINIA',
-    'WASHINGTON',
-    'WEST VIRGINIA',
-    'WISCONSIN',
-    'WYOMING',
-  ];
+  // Get states from hardcoded data in StateData class
+  final List<String> _allStates = StateData.getAllStateNames();
 
   @override
   void initState() {
     super.initState();
-    _filteredStates = List.from(_allStates);
+    print('🔧 [STATE SCREEN] initState - filteredStates initialized with ${_filteredStates.length} states');
+    
+    // Ensure app default language is English
+    Future.microtask(() {
+      final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+      if (languageProvider.language != 'en') {
+        print('⚠️ [STATE SCREEN] Detected non-English language: ${languageProvider.language}, forcing to English');
+        languageProvider.resetToEnglish();
+      }
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Get localizations after context is available
+    _localizations = AppLocalizations.of(context);
+    print('🔄 [STATE SCREEN] didChangeDependencies - localizations loaded: ${_localizations?.locale}');
   }
 
   @override
@@ -100,17 +74,30 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
   Widget build(BuildContext context) {
     return Consumer<LanguageProvider>(
       builder: (context, languageProvider, _) {
-        // Get the current language
-        final currentLanguage = languageProvider.language;
+        print('🔄 [STATE SCREEN] Rebuilding with language: ${languageProvider.language}');
+        
+        // Debugging: Check if we have a proper BuildContext with Localizations
+        bool hasLocalizations = Localizations.of<AppLocalizations>(context, AppLocalizations) != null;
+        print('🔍 [STATE SCREEN] Has Localizations? $hasLocalizations');
+
+        // Create a new instance of AppLocalizations to force it to load the correct language
+        final localizations = AppLocalizations.of(context);
+        print('🌐 [STATE SCREEN] Got AppLocalizations with locale: ${localizations.locale.languageCode}');
+        
+        // Debug print the translations for key fields to verify loading is correct
+        print('📝 [STATE SCREEN] Translation check for state_selection: "${localizations.translate('state_selection')}"');
+        print('📝 [STATE SCREEN] Translation check for select_state: "${localizations.translate('select_state')}"');
+        print('📝 [STATE SCREEN] Translation check for search_state: "${localizations.translate('search_state')}"');
+        
+        final title = localizations.translate('state_selection');
+        print('🏷️ [STATE SCREEN] Title translated to: "$title" (language: ${languageProvider.language})');
         
         return Scaffold(
-          // Force rebuild of the entire screen when language changes
-          key: ValueKey('state_selection_screen_${languageProvider.language}'),
+          key: ValueKey('state_selection_screen_${languageProvider.language}_${DateTime.now().millisecondsSinceEpoch}'),
           appBar: AppBar(
             title: Text(
-              AppLocalizations.of(context).translate('state_selection'),
-              // Force rebuild by adding a key that changes with language
-              key: ValueKey('state_selection_title_${languageProvider.language}'),
+              title,
+              key: ValueKey('state_selection_title_${languageProvider.language}_${DateTime.now().millisecondsSinceEpoch}'),
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             elevation: 0,
@@ -120,7 +107,6 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
             leading: IconButton(
               icon: Icon(Icons.arrow_back),
               onPressed: () {
-                // Navigate back to language selection screen instead of popping
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
                     builder: (context) => LanguageSelectionScreen(),
@@ -128,7 +114,6 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
                 );
               },
             ),
-            // No actions in app bar
           ),
           body: SafeArea(
             child: Column(
@@ -140,114 +125,6 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
           ),
         );
       },
-    );
-  }
-
-  Widget _buildStateSelectionView() {
-    return Column(
-      children: [
-        // State selection button
-        Expanded(
-          flex: 3,
-          child: Container(
-            padding: EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // State button with shadow
-                Container(
-                  decoration: BoxDecoration(
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 8,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        _showStateList = true;
-                      });
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 16, horizontal: 32),
-                      elevation: 0, // Using custom shadow instead
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(32.0),
-                      ),
-                    ),
-                    child: Text(
-                      AppLocalizations.of(context).translate('select_state'),
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                ),
-                if (_selectedState != null) ...[
-                  SizedBox(height: 24),
-                  // Selected state display
-                  Container(
-                    padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text(
-                      AppLocalizations.of(context).translate('selected_state') + ': $_selectedState',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.blue,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  SizedBox(height: 32),
-                  // Continue button with shadow
-                  Container(
-                    decoration: BoxDecoration(
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: ElevatedButton(
-                      onPressed: () => _continueToApp(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(vertical: 16, horizontal: 40),
-                        elevation: 0, // Using custom shadow instead
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(32.0),
-                        ),
-                      ),
-                      child: Text(
-                        AppLocalizations.of(context).translate('continue'),
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ],
     );
   }
 
@@ -379,7 +256,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          state,
+                                          state, // Keep English name for consistency
                                           style: TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 16,
@@ -532,32 +409,17 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
   }
 
   void _continueToApp(BuildContext context) {
-    // Save the selected state to the user profile
+    // Get the providers
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final stateProvider = Provider.of<StateProvider>(context, listen: false);
     
-    // Only save the state for UI display purposes - not for content loading
+    // Update both providers - StateProvider for new system, AuthProvider for backward compatibility
+    stateProvider.setSelectedStateByName(_selectedState!);
     authProvider.updateUserState(_selectedState!);
     
-    // Get language provider to get current language name
-    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
-    
-    // Display a message indicating that content will remain in Ukrainian/IL
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'UI will use ${languageProvider.languageName}, but content will remain in Ukrainian (IL)',
-          style: TextStyle(fontSize: 14),
-        ),
-        duration: Duration(seconds: 3),
-        backgroundColor: Colors.blue,
-      ),
+    // Navigate to home screen
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (context) => HomeScreen()),
     );
-    
-    // Wait a moment for the snackbar to be visible before navigating
-    Future.delayed(Duration(milliseconds: 1500), () {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => HomeScreen()),
-      );
-    });
   }
 }

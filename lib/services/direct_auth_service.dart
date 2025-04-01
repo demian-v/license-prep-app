@@ -64,8 +64,8 @@ class DirectAuthService {
         'email': email,
         'createdAt': FieldValue.serverTimestamp(),
         'lastLoginAt': FieldValue.serverTimestamp(),
-        'language': 'ua',
-        'state': 'IL',
+        'language': 'en',
+        'state': null,
       });
       debugPrint('DirectAuthService: Created Firestore user document');
       

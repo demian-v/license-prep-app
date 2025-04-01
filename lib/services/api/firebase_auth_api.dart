@@ -35,8 +35,8 @@ class FirebaseAuthApi implements AuthApiInterface {
           id: userId,
           name: userCredential.user?.displayName ?? email.split('@')[0],
           email: email,
-          language: 'uk', // ISO code for Ukrainian
-          state: 'IL',
+          language: 'en', // Updated to English
+          state: null,    // No default state
         );
       }
     } catch (e) {
@@ -75,8 +75,8 @@ class FirebaseAuthApi implements AuthApiInterface {
             'userId': userCredential.user!.uid,
             'name': name,
             'email': email,
-            'language': 'uk', // Default language (ISO code for Ukrainian)
-            'state': 'IL',    // Default state
+            'language': 'en', // Default language (English)
+            'state': null,    // No default state - user will select explicitly
           },
         );
       } catch (firestoreError) {
@@ -90,8 +90,8 @@ class FirebaseAuthApi implements AuthApiInterface {
         id: userCredential.user!.uid,
         name: name,
         email: email,
-        language: 'uk', // ISO code for Ukrainian (not 'ua')
-        state: 'IL',
+        language: 'en', // Default language (English)
+        state: null,    // No default state
       );
     } catch (e) {
       if (e is FirebaseAuthException) {
@@ -115,8 +115,30 @@ class FirebaseAuthApi implements AuthApiInterface {
         'getUserData',
       );
       
+      // Add safeguards against null or invalid data
+      if (response == null) {
+        print('Warning: getUserData returned null response');
+        return null;
+      }
+      
+      // Ensure all required fields exist
+      if (!response.containsKey('id') && response.containsKey('uid')) {
+        // Fix common issue where Firebase returns uid instead of id
+        response['id'] = response['uid'];
+      }
+      
+      // Check if any required fields are null or missing
+      if (response['id'] == null || 
+          response['name'] == null || 
+          response['email'] == null) {
+        print('Warning: User data is missing required fields: $response');
+        return null;
+      }
+      
+      // Safe to create the user now
       return User.fromJson(response);
     } catch (e) {
+      print('Error in getCurrentUser: $e');
       throw 'Failed to get user data: $e';
     }
   }
@@ -145,18 +167,64 @@ class FirebaseAuthApi implements AuthApiInterface {
   @override
   Future<User> updateUserLanguage(String userId, String language) async {
     try {
-      await _functionsClient.callFunction<Map<String, dynamic>>(
+      print('🔤 [API] Updating user language to $language via Firebase function');
+      final result = await _functionsClient.callFunction<Map<String, dynamic>>(
         'updateUserLanguage',
         data: {'language': language},
       );
       
-      // Fetch and return the updated user
+      // Check if we got a proper success response
+      if (result != null && result['success'] == true) {
+        // Create a locally updated user with the new language
+        // This prevents issues with the getUserData function
+        final currentAuth = FirebaseAuth.instance.currentUser;
+        if (currentAuth != null) {
+          print('✅ [API] Language updated successfully, creating local user object');
+          return User(
+            id: userId,
+            name: currentAuth.displayName ?? "User",
+            email: currentAuth.email ?? "",
+            language: language,
+            state: null, // We don't know the state, leave it null
+          );
+        }
+      }
+      
+      // Try to fetch the updated user as a fallback
+      print('🔍 [API] Getting updated user data after language change');
       final User? user = await getCurrentUser();
       if (user == null) {
+        print('❌ [API] Failed to get updated user after language change');
+        // Fallback to returning a basic user with the updated language
+        final currentAuth = FirebaseAuth.instance.currentUser;
+        if (currentAuth != null) {
+          return User(
+            id: userId,
+            name: currentAuth.displayName ?? "User",
+            email: currentAuth.email ?? "",
+            language: language,
+            state: null, // We don't know the state, leave it null
+          );
+        }
         throw 'Failed to retrieve updated user profile';
       }
+      
+      print('✅ [API] Successfully updated language, user language is now: ${user.language}');
       return user;
     } catch (e) {
+      print('❌ [API] Error updating language: $e');
+      // Fallback to returning a user with the requested language
+      final currentAuth = FirebaseAuth.instance.currentUser;
+      if (currentAuth != null) {
+        print('⚠️ Using fallback user creation with updated language');
+        return User(
+          id: userId,
+          name: currentAuth.displayName ?? "User",
+          email: currentAuth.email ?? "",
+          language: language,
+          state: null, // We don't know the state, leave it null
+        );
+      }
       throw 'Failed to update language: $e';
     }
   }
@@ -165,18 +233,77 @@ class FirebaseAuthApi implements AuthApiInterface {
   @override
   Future<User> updateUserState(String userId, String state) async {
     try {
-      await _functionsClient.callFunction<Map<String, dynamic>>(
+      print('🗺️ [API] Updating user state to $state via Firebase function');
+      final result = await _functionsClient.callFunction<Map<String, dynamic>>(
         'updateUserState',
         data: {'state': state},
       );
       
-      // Fetch and return the updated user
+      // Check if we got a proper success response
+      if (result != null && result['success'] == true) {
+        // Try to get the current language
+        final currentAuth = FirebaseAuth.instance.currentUser;
+        String? currentLanguage = 'en'; // Default to English
+        
+        try {
+          // Try to get current language from stored user data
+          final currentUser = await getCurrentUser();
+          if (currentUser != null && currentUser.language != null) {
+            currentLanguage = currentUser.language;
+          }
+        } catch (e) {
+          // Ignore error, we'll use the default
+          print('⚠️ Could not get current language, using default');
+        }
+        
+        // Create a locally updated user with the new state
+        if (currentAuth != null) {
+          print('✅ [API] State updated successfully, creating local user object');
+          return User(
+            id: userId,
+            name: currentAuth.displayName ?? "User",
+            email: currentAuth.email ?? "",
+            language: currentLanguage,
+            state: state,
+          );
+        }
+      }
+      
+      // Try to fetch the updated user as a fallback
+      print('🔍 [API] Getting updated user data after state change');
       final User? user = await getCurrentUser();
       if (user == null) {
+        print('❌ [API] Failed to get updated user after state change');
+        // Fallback to returning a basic user with the updated state
+        final currentAuth = FirebaseAuth.instance.currentUser;
+        if (currentAuth != null) {
+          return User(
+            id: userId,
+            name: currentAuth.displayName ?? "User",
+            email: currentAuth.email ?? "",
+            language: 'en', // Default to English
+            state: state,
+          );
+        }
         throw 'Failed to retrieve updated user profile';
       }
+      
+      print('✅ [API] Successfully updated state, user state is now: ${user.state}');
       return user;
     } catch (e) {
+      print('❌ [API] Error updating state: $e');
+      // Fallback to returning a user with the requested state
+      final currentAuth = FirebaseAuth.instance.currentUser;
+      if (currentAuth != null) {
+        print('⚠️ Using fallback user creation with updated state');
+        return User(
+          id: userId,
+          name: currentAuth.displayName ?? "User",
+          email: currentAuth.email ?? "",
+          language: 'en', // Default to English
+          state: state,
+        );
+      }
       throw 'Failed to update state: $e';
     }
   }
@@ -222,8 +349,8 @@ class FirebaseAuthApi implements AuthApiInterface {
   Future<void> createOrUpdateUserDoc(String userId, {
     required String name,
     required String email,
-    String language = "uk", // ISO code for Ukrainian
-    String state = "IL",
+    String language = "en",   // Changed to English default
+    String? state = null,    // Changed to null for no default state
   }) async {
     try {
       await _functionsClient.callFunction<Map<String, dynamic>>(

@@ -10,6 +10,7 @@ import 'topic_quiz_screen.dart';
 import 'saved_items_screen.dart';
 import 'exam_question_screen.dart';
 import 'practice_question_screen.dart';
+import '../localization/app_localizations.dart';
 
 class TestScreen extends StatelessWidget {
   @override
@@ -17,7 +18,7 @@ class TestScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Тести',
+          AppLocalizations.of(context).translate('tests'),
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         elevation: 0,
@@ -68,8 +69,8 @@ class TestScreen extends StatelessWidget {
               _buildTestItem(
                 context,
                 'assets/images/themes.png',
-                'Вчи по темах',
-                'Запитання згруповані по темах',
+                AppLocalizations.of(context).translate('learn_by_topics'),
+                AppLocalizations.of(context).translate('questions_by_topics'),
                 () {
                   // Navigate to themed questions
                   Navigator.push(
@@ -83,8 +84,8 @@ class TestScreen extends StatelessWidget {
               _buildTestItem(
                 context,
                 'assets/images/random.png',
-                'Тренуйся по білетах',
-                '40 випадкових запитань, без обмежень часу',
+                AppLocalizations.of(context).translate('practice_tickets'),
+                AppLocalizations.of(context).translate('random_questions_no_limit'),
                 () {
                   // Start a new practice test
                   final practiceProvider = Provider.of<PracticeProvider>(context, listen: false);
