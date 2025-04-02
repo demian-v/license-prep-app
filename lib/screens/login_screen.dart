@@ -42,10 +42,10 @@ class _LoginScreenState extends State<LoginScreen> {
       final success = await authProvider.login(email, password);
       
       if (success) {
-        debugPrint('LoginScreen: Login successful, navigating to home screen');
+        debugPrint('LoginScreen: Login successful, navigating to language selection screen');
         if (mounted) {
-          // Navigate to home screen on successful login
-          Navigator.of(context).pushReplacementNamed('/home');
+          // Navigate to language selection screen first 
+          Navigator.of(context).pushReplacementNamed('/language');
         }
       } else if (mounted) {
         setState(() {

@@ -231,9 +231,9 @@ class FirebaseAuthApi implements AuthApiInterface {
   
   /// Updates user state/region preference
   @override
-  Future<User> updateUserState(String userId, String state) async {
+  Future<User> updateUserState(String userId, String? state) async {
     try {
-      print('🗺️ [API] Updating user state to $state via Firebase function');
+      print('🗺️ [API] Updating user state to ${state ?? "null"} via Firebase function');
       final result = await _functionsClient.callFunction<Map<String, dynamic>>(
         'updateUserState',
         data: {'state': state},

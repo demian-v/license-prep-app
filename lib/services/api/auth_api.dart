@@ -99,7 +99,8 @@ class AuthApi implements AuthApiInterface {
   }
   
   /// Updates user state/region preference
-  Future<User> updateUserState(String userId, String state) async {
+  @override
+  Future<User> updateUserState(String userId, String? state) async {
     return updateProfile(userId, state: state);
   }
   

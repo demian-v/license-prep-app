@@ -10,7 +10,7 @@ class ContentProvider extends ChangeNotifier {
   List<TrafficRuleTopic> _topics = [];
   List<TheoryModule> _modules = [];
   String _currentLanguage = 'en'; // Default to English
-  String _currentState = 'IL';
+  String? _currentState = null; // Default to null - no state selected
   String _currentLicenseId = 'driver';
   String? _lastError;
   bool _isOffline = false;
@@ -25,8 +25,8 @@ class ContentProvider extends ChangeNotifier {
   final Map<String, DateTime> _lastFetchTimes = {};
   
   // In-memory content caches
-  final Map<String, Map<String, List<TrafficRuleTopic>>> _topicCache = {}; // state -> language -> topics
-  final Map<String, Map<String, List<TheoryModule>>> _moduleCache = {}; // state -> language -> modules
+  final Map<String?, Map<String, List<TrafficRuleTopic>>> _topicCache = {}; // state -> language -> topics
+  final Map<String?, Map<String, List<TheoryModule>>> _moduleCache = {}; // state -> language -> modules
   final Map<String, TrafficRuleTopic> _topicDetailCache = {}; // topicId -> topic
   
   // Getters
@@ -34,7 +34,7 @@ class ContentProvider extends ChangeNotifier {
   List<TrafficRuleTopic> get topics => _topics;
   List<TheoryModule> get modules => _modules;
   String get currentLanguage => _currentLanguage;
-  String get currentState => _currentState;
+  String? get currentState => _currentState;
   String get currentLicenseId => _currentLicenseId;
   String? get lastError => _lastError;
   bool get isOffline => _isOffline;
@@ -90,9 +90,9 @@ class ContentProvider extends ChangeNotifier {
     }
     
     // Store the selected state
-    if (state != null && state != _currentState) {
+    if (state != _currentState) {
       _currentState = state;
-      print('ContentProvider: State changed to $state');
+      print('ContentProvider: State changed to ${state ?? 'null'}');
       shouldRefresh = true; // Refresh content when state changes
     }
     
@@ -123,7 +123,7 @@ class ContentProvider extends ChangeNotifier {
   // Get content for specific language and state (used only for special cases)
   Future<void> fetchContentForLanguageAndState(String language, String state, {bool forceRefresh = false}) async {
     String originalLanguage = _currentLanguage;
-    String originalState = _currentState;
+    String? originalState = _currentState;
     
     // Temporarily set the language and state
     _currentLanguage = language;
@@ -152,7 +152,7 @@ class ContentProvider extends ChangeNotifier {
   // Fetch all content
   Future<void> fetchContent({bool forceRefresh = false}) async {
     // Check if we have cached content for this specific language and state
-    final String cacheKey = '$_currentState:$_currentLanguage';
+    final String cacheKey = '${_currentState ?? "null"}:$_currentLanguage';
     
     // If cache is valid and we're not forcing a refresh, use cached content if available
     if (isCacheValid && !forceRefresh) {
@@ -192,41 +192,29 @@ class ContentProvider extends ChangeNotifier {
     }
     
     try {
-      // Fetch theory modules from Firestore
-      final FirebaseFirestore firestore = FirebaseFirestore.instance;
+      // Get a reference to the service locator to use our interface with nullable state
+      final contentService = serviceLocator.content;
       
-      // Query for theory modules that match current language, state, and licenseId
-      QuerySnapshot moduleSnapshot = await firestore
-          .collection('theoryModules')
-          .where('language', isEqualTo: _currentLanguage)
-          .where('state', whereIn: [_currentState, 'ALL'])
-          .where('licenseId', isEqualTo: _currentLicenseId)
-          .orderBy('order')
-          .get();
+      // Fetch theory modules using the updated API
+      // Use 'ALL' as default if state is null
+      final stateValue = _currentState ?? 'ALL';
       
-      // Process results
-      _modules = moduleSnapshot.docs.map((doc) {
-        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-        return TheoryModule.fromFirestore(data, doc.id);
-      }).toList();
+      _modules = await contentService.getTheoryModules(
+        _currentLanguage, 
+        stateValue, 
+        _currentLicenseId
+      );
       
       // If no modules found and language isn't English, try English as fallback
       if (_modules.isEmpty && _currentLanguage != 'en') {
         print('No modules found in $_currentLanguage, trying English fallback');
-        QuerySnapshot englishModuleSnapshot = await firestore
-            .collection('theoryModules')
-            .where('language', isEqualTo: 'en')
-            .where('state', whereIn: [_currentState, 'ALL'])
-            .where('licenseId', isEqualTo: _currentLicenseId)
-            .orderBy('order')
-            .get();
-            
-        if (englishModuleSnapshot.docs.isNotEmpty) {
-          _modules = englishModuleSnapshot.docs.map((doc) {
-            Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-            return TheoryModule.fromFirestore(data, doc.id);
-          }).toList();
-        }
+        final stateValue = _currentState ?? 'ALL';
+        
+        _modules = await contentService.getTheoryModules(
+          'en', 
+          stateValue, 
+          _currentLicenseId
+        );
       }
       
       // Cache the modules
@@ -245,38 +233,26 @@ class ContentProvider extends ChangeNotifier {
       
       // If we found the traffic rules module, fetch its topics
       if (trafficRulesModule != null) {
-        // Query for topics that match current language, state, and licenseId
-        QuerySnapshot topicSnapshot = await firestore
-            .collection('trafficRuleTopics')
-            .where('language', isEqualTo: _currentLanguage)
-            .where('state', whereIn: [_currentState, 'ALL'])
-            .where('licenseId', isEqualTo: _currentLicenseId)
-            .orderBy('order')
-            .get();
+        // Fetch topics using the API
+        // Use 'ALL' as default if state is null
+        final stateValue = _currentState ?? 'ALL';
         
-        // Process results
-        _topics = topicSnapshot.docs.map((doc) {
-          Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-          return TrafficRuleTopic.fromFirestore(data, doc.id);
-        }).toList();
+        _topics = await contentService.getTrafficRuleTopics(
+          _currentLanguage, 
+          stateValue, 
+          _currentLicenseId
+        );
         
         // If no topics found and language isn't English, try English as fallback
         if (_topics.isEmpty && _currentLanguage != 'en') {
           print('No topics found in $_currentLanguage, trying English fallback');
-          QuerySnapshot englishTopicSnapshot = await firestore
-              .collection('trafficRuleTopics')
-              .where('language', isEqualTo: 'en')
-              .where('state', whereIn: [_currentState, 'ALL'])
-              .where('licenseId', isEqualTo: _currentLicenseId)
-              .orderBy('order')
-              .get();
-              
-          if (englishTopicSnapshot.docs.isNotEmpty) {
-            _topics = englishTopicSnapshot.docs.map((doc) {
-              Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-              return TrafficRuleTopic.fromFirestore(data, doc.id);
-            }).toList();
-          }
+          final stateValue = _currentState ?? 'ALL';
+          
+          _topics = await contentService.getTrafficRuleTopics(
+            'en', 
+            stateValue, 
+            _currentLicenseId
+          );
         }
         
         // Cache the topics
@@ -362,58 +338,45 @@ class ContentProvider extends ChangeNotifier {
       return null;
     }
     
-    // Otherwise fetch from Firestore
+    // Otherwise fetch from API
     try {
-      final FirebaseFirestore firestore = FirebaseFirestore.instance;
-      DocumentSnapshot docSnapshot = await firestore
-          .collection('trafficRuleTopics')
-          .doc(topicId)
-          .get();
+      final topic = await serviceLocator.content.getTrafficRuleTopic(topicId);
       
-      if (docSnapshot.exists) {
-        Map<String, dynamic> data = docSnapshot.data() as Map<String, dynamic>;
-        final fetchedTopic = TrafficRuleTopic.fromFirestore(data, docSnapshot.id);
-        
+      if (topic != null) {
         // Cache the topic
-        _topicDetailCache[topicId] = fetchedTopic;
+        _topicDetailCache[topicId] = topic;
         
         // If this is a new topic not in our list, add it
-        if (!_topics.any((t) => t.id == fetchedTopic.id)) {
-          _topics.add(fetchedTopic);
+        if (!_topics.any((t) => t.id == topic.id)) {
+          _topics.add(topic);
           notifyListeners();
         }
         
-        return fetchedTopic;
-      } else if (_currentLanguage != 'en') {
-        // Try to fetch English version as fallback if not already trying English
-        print('Topic $topicId not found in $_currentLanguage, trying English fallback');
-        
+        return topic;
+      }
+      
+      // Try fetching English version if needed
+      if (_currentLanguage != 'en') {
         // Look for English version - modify the ID if it contains language code
         String englishTopicId = topicId;
         if (topicId.contains('_${_currentLanguage}_')) {
           englishTopicId = topicId.replaceAll('_${_currentLanguage}_', '_en_');
         }
         
-        DocumentSnapshot englishDocSnapshot = await firestore
-            .collection('trafficRuleTopics')
-            .doc(englishTopicId)
-            .get();
-            
-        if (englishDocSnapshot.exists) {
-          Map<String, dynamic> data = englishDocSnapshot.data() as Map<String, dynamic>;
-          final fetchedTopic = TrafficRuleTopic.fromFirestore(data, englishDocSnapshot.id);
-          
+        final englishTopic = await serviceLocator.content.getTrafficRuleTopic(englishTopicId);
+        
+        if (englishTopic != null) {
           // Cache the topic under both IDs
-          _topicDetailCache[topicId] = fetchedTopic;
-          _topicDetailCache[englishTopicId] = fetchedTopic;
+          _topicDetailCache[topicId] = englishTopic;
+          _topicDetailCache[englishTopicId] = englishTopic;
           
           // If this is a new topic not in our list, add it
-          if (!_topics.any((t) => t.id == fetchedTopic.id)) {
-            _topics.add(fetchedTopic);
+          if (!_topics.any((t) => t.id == englishTopic.id)) {
+            _topics.add(englishTopic);
             notifyListeners();
           }
           
-          return fetchedTopic;
+          return englishTopic;
         }
       }
       
@@ -427,8 +390,12 @@ class ContentProvider extends ChangeNotifier {
   
   // Fallback to load hardcoded topics if Firestore fetch fails
   void loadHardcodedTopics() {
-    // We'll use the content from TrafficRulesTopicsScreen
-    // This is just a fallback and should be implemented as needed
+    // This is a fallback method that would load static content
+    // when network fetch fails
+    print('Loading hardcoded topics as fallback');
+    
+    // For now, just keeping an empty array
+    _topics = [];
   }
   
   // Clear all caches - use this for logout or when you want to force a complete refresh

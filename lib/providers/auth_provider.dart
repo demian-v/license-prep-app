@@ -111,35 +111,41 @@ class AuthProvider extends ChangeNotifier {
     }
   }
   
-  Future<void> updateUserState(String state) async {
+  Future<void> updateUserState(String? state) async {
     if (user != null) {
       try {
-        debugPrint('🗺️ AuthProvider: Updating user state to: $state');
+        debugPrint('🗺️ AuthProvider: Updating user state to: ${state ?? "null"}');
         
-        // Try to use the API
-        await serviceLocator.auth.updateUserState(user!.id, state);
-        
-        // Get the updated user from the API
-        try {
-          final updatedUserFromApi = await serviceLocator.auth.getCurrentUser();
-          if (updatedUserFromApi != null) {
-            debugPrint('✅ AuthProvider: Successfully updated user state to $state via API');
-            user = updatedUserFromApi;
-          } else {
-            debugPrint('⚠️ AuthProvider: API returned null user, using local update');
+        if (state != null) {
+          // Try to use the API only if state is not null
+          await serviceLocator.auth.updateUserState(user!.id, state);
+          
+          // Get the updated user from the API
+          try {
+            final updatedUserFromApi = await serviceLocator.auth.getCurrentUser();
+            if (updatedUserFromApi != null) {
+              debugPrint('✅ AuthProvider: Successfully updated user state to $state via API');
+              user = updatedUserFromApi;
+            } else {
+              debugPrint('⚠️ AuthProvider: API returned null user, using local update');
+              user = user!.copyWith(state: state);
+            }
+          } catch (getUserError) {
+            debugPrint('⚠️ AuthProvider: Error getting updated user: $getUserError');
+            // Use local update as fallback
             user = user!.copyWith(state: state);
           }
-        } catch (getUserError) {
-          debugPrint('⚠️ AuthProvider: Error getting updated user: $getUserError');
-          // Use local update as fallback
-          user = user!.copyWith(state: state);
+        } else {
+          // Just update the local user with null state
+          user = user!.copyWith(clearState: true);
+          debugPrint('✅ AuthProvider: Updated user state to null locally');
         }
         
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('user', jsonEncode(user!.toJson()));
         
         notifyListeners();
-        debugPrint('🗺️ AuthProvider: State set to: ${user!.state}');
+        debugPrint('🗺️ AuthProvider: State set to: ${user!.state ?? "null"}');
       } catch (e) {
         // Fallback to local update if API is not available
         debugPrint('⚠️ AuthProvider: API error, updating locally: $e');
@@ -151,7 +157,7 @@ class AuthProvider extends ChangeNotifier {
         await prefs.setString('user', jsonEncode(updatedUser.toJson()));
         
         notifyListeners();
-        debugPrint('🗺️ AuthProvider: State set locally to: ${user!.state}');
+        debugPrint('🗺️ AuthProvider: State set locally to: ${user!.state ?? "null"}');
       }
     } else {
       debugPrint('⚠️ AuthProvider: Cannot update state - user is null');

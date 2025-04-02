@@ -37,13 +37,14 @@ class User {
     String? name,
     String? language,
     String? state,
+    bool clearState = false,
   }) {
     return User(
       id: this.id,
       name: name ?? this.name,
       email: this.email,
       language: language ?? this.language,
-      state: state ?? this.state,
+      state: clearState ? null : (state ?? this.state),
     );
   }
 }

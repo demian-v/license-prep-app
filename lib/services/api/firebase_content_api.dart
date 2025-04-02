@@ -26,6 +26,7 @@ class FirebaseContentApi implements ContentApiInterface {
   FirebaseContentApi(this._functionsClient);
   
   /// Get quiz topics based on license type, language, and state
+  @override
   Future<List<QuizTopic>> getQuizTopics(String licenseType, String language, String state) async {
     try {
       // Ensure language code is correct (use 'uk' for Ukrainian)
@@ -34,14 +35,17 @@ class FirebaseContentApi implements ContentApiInterface {
         print('Corrected language code from ua to uk');
       }
       
-      print('Fetching quiz topics with: licenseType=$licenseType, language=$language, state=$state');
+      // Use 'ALL' as default if state is empty
+      final stateValue = state.isEmpty ? 'ALL' : state;
+      
+      print('Fetching quiz topics with: licenseType=$licenseType, language=$language, state=$stateValue');
       
       final response = await _functionsClient.callFunction<List<dynamic>>(
         'getQuizTopics',
         data: {
           'licenseType': licenseType,
           'language': language,
-          'state': state,
+          'state': stateValue,
         },
       );
       
@@ -109,6 +113,7 @@ class FirebaseContentApi implements ContentApiInterface {
   }
   
   /// Get quiz questions based on topic ID, language, and state
+  @override
   Future<List<QuizQuestion>> getQuizQuestions(String topicId, String language, String state) async {
     try {
       // Ensure language code is correct (use 'uk' for Ukrainian)
@@ -117,14 +122,17 @@ class FirebaseContentApi implements ContentApiInterface {
         print('Corrected language code from ua to uk');
       }
       
-      print('Fetching quiz questions with: topicId=$topicId, language=$language, state=$state');
+      // Use 'ALL' as default if state is empty
+      final stateValue = state.isEmpty ? 'ALL' : state;
+      
+      print('Fetching quiz questions with: topicId=$topicId, language=$language, state=$stateValue');
       
       final response = await _functionsClient.callFunction<List<dynamic>>(
         'getQuizQuestions',
         data: {
           'topicId': topicId,
           'language': language,
-          'state': state,
+          'state': stateValue,
         },
       );
       
@@ -221,13 +229,18 @@ class FirebaseContentApi implements ContentApiInterface {
   @override
   Future<List<TrafficRuleTopic>> getTrafficRuleTopics(String language, String state, String licenseId) async {
     try {
-      print('Fetching traffic rule topics from Firestore with: language=$language, state=$state, licenseId=$licenseId');
+      // Use 'ALL' as default if state is empty
+      final stateValue = state.isEmpty ? 'ALL' : state;
+      
+      print('Fetching traffic rule topics from Firestore with: language=$language, state=$stateValue, licenseId=$licenseId');
       
       // Query Firestore collection
-      QuerySnapshot querySnapshot = await _firestore
+      QuerySnapshot querySnapshot;
+      
+      querySnapshot = await _firestore
           .collection('trafficRuleTopics')
           .where('language', isEqualTo: language)
-          .where('state', whereIn: [state, 'ALL'])
+          .where('state', whereIn: [stateValue, 'ALL'])
           .where('licenseId', isEqualTo: licenseId)
           .orderBy('order')
           .get();
@@ -281,14 +294,19 @@ class FirebaseContentApi implements ContentApiInterface {
         print('Corrected language code from ua to uk');
       }
       
+      // Use 'ALL' as default if state is empty
+      final stateValue = state.isEmpty ? 'ALL' : state;
+      
       // Try to get from Firestore first
       try {
         print('Attempting to fetch theory modules from Firestore');
         // Query Firestore collection
-        QuerySnapshot querySnapshot = await _firestore
+        QuerySnapshot querySnapshot;
+        
+        querySnapshot = await _firestore
             .collection('theoryModules')
             .where('language', isEqualTo: language)
-            .where('state', whereIn: [state, 'ALL'])
+            .where('state', whereIn: [stateValue, 'ALL'])
             .where('licenseId', isEqualTo: licenseType)
             .orderBy('order')
             .get();
@@ -313,7 +331,7 @@ class FirebaseContentApi implements ContentApiInterface {
         data: {
           'licenseType': licenseType,
           'language': language,
-          'state': state,
+          'state': stateValue,
         },
       );
       
@@ -327,7 +345,7 @@ class FirebaseContentApi implements ContentApiInterface {
           estimatedTime: data['estimatedTime'] as int? ?? 30, // Default to 30 minutes if not provided
           topics: List<String>.from(data['topics'] ?? []),
           language: data['language'] as String? ?? language,
-          state: data['state'] as String? ?? state,
+          state: data['state'] as String? ?? stateValue,
           icon: data['icon'] as String? ?? 'menu_book',
           type: data['type'] as String? ?? 'module',
           order: data['order'] as int? ?? 0,
@@ -339,6 +357,7 @@ class FirebaseContentApi implements ContentApiInterface {
   }
   
   /// Get practice tests based on license type, language, and state
+  @override
   Future<List<PracticeTest>> getPracticeTests(String licenseType, String language, String state) async {
     try {
       // Ensure language code is correct (use 'uk' for Ukrainian)
@@ -347,12 +366,15 @@ class FirebaseContentApi implements ContentApiInterface {
         print('Corrected language code from ua to uk');
       }
       
+      // Use 'ALL' as default if state is empty
+      final stateValue = state.isEmpty ? 'ALL' : state;
+      
       final response = await _functionsClient.callFunction<List<dynamic>>(
         'getPracticeTests',
         data: {
           'licenseType': licenseType,
           'language': language,
-          'state': state,
+          'state': stateValue,
         },
       );
       
@@ -371,5 +393,4 @@ class FirebaseContentApi implements ContentApiInterface {
       throw 'Failed to fetch practice tests: $e';
     }
   }
-  
 }

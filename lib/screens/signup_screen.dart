@@ -50,7 +50,7 @@ class _SignupScreenState extends State<SignupScreen> {
         
         if (mounted) {
           debugPrint('SignupScreen: Navigating to language selection screen');
-          Navigator.of(context).push(
+          Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (context) => LanguageSelectionScreen(),
             ),
@@ -92,7 +92,7 @@ class _SignupScreenState extends State<SignupScreen> {
           );
           
           // Still navigate to next screen
-          Navigator.of(context).push(
+          Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (context) => LanguageSelectionScreen(),
             ),

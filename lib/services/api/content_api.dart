@@ -38,14 +38,18 @@ class ContentApi implements ContentApiInterface {
   }
   
   // Quiz Topics
+  @override
   Future<List<QuizTopic>> getQuizTopics(String licenseType, String language, String state) async {
     try {
+      // Use 'ALL' as default if state is empty
+      final stateValue = state.isEmpty ? 'ALL' : state;
+      
       final response = await _apiClient.get(
         '/content/quiz-topics',
         queryParameters: {
           'licenseType': licenseType,
           'language': language,
-          'state': state,
+          'state': stateValue,
         },
       );
       
@@ -62,14 +66,18 @@ class ContentApi implements ContentApiInterface {
   }
   
   // Quiz Questions
+  @override
   Future<List<QuizQuestion>> getQuizQuestions(String topicId, String language, String state) async {
     try {
+      // Use 'ALL' as default if state is empty
+      final stateValue = state.isEmpty ? 'ALL' : state;
+      
       final response = await _apiClient.get(
         '/content/quiz-questions',
         queryParameters: {
           'topicId': topicId,
           'language': language,
-          'state': state,
+          'state': stateValue,
         },
       );
       
@@ -97,11 +105,14 @@ class ContentApi implements ContentApiInterface {
   @override
   Future<List<TrafficRuleTopic>> getTrafficRuleTopics(String language, String state, String licenseId) async {
     try {
+      // Use 'ALL' as default if state is empty
+      final stateValue = state.isEmpty ? 'ALL' : state;
+      
       final response = await _apiClient.get(
         '/content/traffic-rule-topics',
         queryParameters: {
           'language': language,
-          'state': state,
+          'state': stateValue,
           'licenseId': licenseId,
         },
       );
@@ -140,14 +151,18 @@ class ContentApi implements ContentApiInterface {
   }
   
   // Theory Modules
+  @override
   Future<List<TheoryModule>> getTheoryModules(String licenseType, String language, String state) async {
     try {
+      // Use 'ALL' as default if state is empty
+      final stateValue = state.isEmpty ? 'ALL' : state;
+      
       final response = await _apiClient.get(
         '/content/theory-modules',
         queryParameters: {
           'licenseType': licenseType,
           'language': language,
-          'state': state,
+          'state': stateValue,
         },
       );
       
@@ -170,12 +185,15 @@ class ContentApi implements ContentApiInterface {
   // Exams
   Future<List<Exam>> getExams(String licenseType, String language, String state) async {
     try {
+      // Use 'ALL' as default if state is empty
+      final stateValue = state.isEmpty ? 'ALL' : state;
+      
       final response = await _apiClient.get(
         '/content/exams',
         queryParameters: {
           'licenseType': licenseType,
           'language': language,
-          'state': state,
+          'state': stateValue,
         },
       );
       
@@ -198,14 +216,18 @@ class ContentApi implements ContentApiInterface {
   }
   
   // Practice Tests
+  @override
   Future<List<PracticeTest>> getPracticeTests(String licenseType, String language, String state) async {
     try {
+      // Use 'ALL' as default if state is empty
+      final stateValue = state.isEmpty ? 'ALL' : state;
+      
       final response = await _apiClient.get(
         '/content/practice-tests',
         queryParameters: {
           'licenseType': licenseType,
           'language': language,
-          'state': state,
+          'state': stateValue,
         },
       );
       
@@ -228,11 +250,14 @@ class ContentApi implements ContentApiInterface {
   // Get specific exam questions
   Future<Exam> getExamWithQuestions(String examId, String language, String state) async {
     try {
+      // Use 'ALL' as default if state is empty
+      final stateValue = state.isEmpty ? 'ALL' : state;
+      
       final response = await _apiClient.get(
         '/content/exams/$examId/questions',
         queryParameters: {
           'language': language,
-          'state': state,
+          'state': stateValue,
         },
       );
       
@@ -255,11 +280,14 @@ class ContentApi implements ContentApiInterface {
   // Get specific practice test questions
   Future<PracticeTest> getPracticeTestWithQuestions(String testId, String language, String state) async {
     try {
+      // Use 'ALL' as default if state is empty
+      final stateValue = state.isEmpty ? 'ALL' : state;
+      
       final response = await _apiClient.get(
         '/content/practice-tests/$testId/questions',
         queryParameters: {
           'language': language,
-          'state': state,
+          'state': stateValue,
         },
       );
       

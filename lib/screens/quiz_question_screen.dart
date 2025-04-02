@@ -5,6 +5,7 @@ import '../models/quiz_question.dart';
 import '../providers/auth_provider.dart';
 import '../providers/progress_provider.dart';
 import '../providers/language_provider.dart';
+import '../providers/state_provider.dart';
 import '../services/service_locator.dart';
 import '../localization/app_localizations.dart';
 import 'quiz_result_screen.dart';
@@ -53,8 +54,9 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
     try {
       final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
       final language = languageProvider.language;
-      // Use 'IL' to match the state of questions in Firebase
-      final state = 'IL';
+      // Get the current state from provider
+      final stateProvider = Provider.of<StateProvider>(context, listen: false);
+      final state = stateProvider.selectedStateId ?? 'ALL'; // Default to ALL if null
       
       // Fetch questions from Firebase
       final fetchedQuestions = await serviceLocator.content.getQuizQuestions(

@@ -32,6 +32,8 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
   @override
   void initState() {
     super.initState();
+    // Initialize filtered states with all states
+    _filteredStates = List.from(_allStates);
     print('🔧 [STATE SCREEN] initState - filteredStates initialized with ${_filteredStates.length} states');
     
     // Ensure app default language is English
@@ -114,6 +116,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
                 );
               },
             ),
+            // No skip button - state selection is mandatory
           ),
           body: SafeArea(
             child: Column(
@@ -416,6 +419,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
     // Update both providers - StateProvider for new system, AuthProvider for backward compatibility
     stateProvider.setSelectedStateByName(_selectedState!);
     authProvider.updateUserState(_selectedState!);
+    print('🌎 [STATE SCREEN] User selected state: $_selectedState');
     
     // Navigate to home screen
     Navigator.of(context).pushReplacement(

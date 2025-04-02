@@ -15,7 +15,7 @@ abstract class AuthApiInterface {
   Future<User> updateUserLanguage(String userId, String language);
   
   /// Updates user state/region preference
-  Future<User> updateUserState(String userId, String state);
+  Future<User> updateUserState(String userId, String? state);
   
   /// Request password reset
   Future<void> requestPasswordReset(String email);
@@ -28,7 +28,7 @@ abstract class AuthApiInterface {
     required String name,
     required String email,
     String language,
-    String state,
+    String? state,
   });
   
   /// Checks if the user is currently authenticated

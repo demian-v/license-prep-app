@@ -51,14 +51,14 @@ class ContentLoadingManager {
       return;
     }
     
-    // Only proceed if both language and state are selected
-    if (languageProvider.language.isNotEmpty && stateProvider.selectedStateId != null) {
-      print('ContentLoadingManager: Initializing content with language=${languageProvider.language}, state=${stateProvider.selectedStateId}');
+    // Now we allow null states
+    if (languageProvider.language.isNotEmpty) {
+      print('ContentLoadingManager: Initializing content with language=${languageProvider.language}, state=${stateProvider.selectedStateId ?? "null"}');
       
       // Set content provider preferences - use the selected language
       contentProvider.setPreferences(
         language: languageProvider.language,
-        state: stateProvider.selectedStateId!,
+        state: stateProvider.selectedStateId, // Can be null
       );
       
       // Now explicitly load content after both selections are made
@@ -68,23 +68,21 @@ class ContentLoadingManager {
       _hasInitializedContent = true;
       print('ContentLoadingManager: Content initialization complete');
     } else {
-      print('ContentLoadingManager: Cannot initialize content: language or state is not selected');
+      print('ContentLoadingManager: Cannot initialize content: language is not selected');
     }
   }
   
   /// Reload content if needed (e.g., after changing language or state)
   Future<void> reloadContentIfNeeded({bool force = false}) async {
     if (force || 
-        (languageProvider.language.isNotEmpty && 
-         stateProvider.selectedStateId != null &&
-         _hasInitializedContent)) {
+        (languageProvider.language.isNotEmpty && _hasInitializedContent)) {
       
-      print('ContentLoadingManager: Reloading content - language=${languageProvider.language}, state=${stateProvider.selectedStateId}');
+      print('ContentLoadingManager: Reloading content - language=${languageProvider.language}, state=${stateProvider.selectedStateId ?? "null"}');
       
       // Update preferences and reload - use selected language
       contentProvider.setPreferences(
         language: languageProvider.language,
-        state: stateProvider.selectedStateId!,
+        state: stateProvider.selectedStateId, // Can be null
       );
       
       await _loadContent();
@@ -96,7 +94,7 @@ class ContentLoadingManager {
   /// Private method to load content
   Future<void> _loadContent() async {
     try {
-      print('ContentLoadingManager: Loading content with language: ${languageProvider.language}, state: ${stateProvider.selectedStateId}');
+      print('ContentLoadingManager: Loading content with language: ${languageProvider.language}, state: ${stateProvider.selectedStateId ?? "null"}');
       // Explicitly request content loading with user's selected language
       await contentProvider.fetchContentAfterSelection();
     } catch (e) {
