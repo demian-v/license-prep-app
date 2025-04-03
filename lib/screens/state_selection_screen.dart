@@ -36,14 +36,8 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
     _filteredStates = List.from(_allStates);
     print('🔧 [STATE SCREEN] initState - filteredStates initialized with ${_filteredStates.length} states');
     
-    // Ensure app default language is English
-    Future.microtask(() {
-      final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
-      if (languageProvider.language != 'en') {
-        print('⚠️ [STATE SCREEN] Detected non-English language: ${languageProvider.language}, forcing to English');
-        languageProvider.resetToEnglish();
-      }
-    });
+    // No longer forcing language to English
+    // This allows the selected language from the Language Selection screen to be used
   }
 
   @override
@@ -72,26 +66,84 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
     });
   }
 
+  // Helper method to get correct translations
+  String _translate(String key, LanguageProvider languageProvider) {
+    // Create a direct translation based on the selected language
+    try {
+      // Get the appropriate language JSON file
+      switch (languageProvider.language) {
+        case 'es':
+          return {
+            'state_selection': 'Selección de Estado',
+            'select_state': 'Seleccione su estado',
+            'search_state': 'Buscar estado...',
+            'no_states_found': 'No se encontraron estados',
+            'selected': 'Seleccionado',
+            'tap_to_select': 'Toque para seleccionar',
+            'selected_state': 'Estado seleccionado',
+            'continue': 'Continuar',
+          }[key] ?? key;
+        case 'uk':
+          return {
+            'state_selection': 'Вибір Штату',
+            'select_state': 'Виберіть свій штат',
+            'search_state': 'Пошук штату...',
+            'no_states_found': 'Штатів не знайдено',
+            'selected': 'Вибрано',
+            'tap_to_select': 'Натисніть, щоб вибрати',
+            'selected_state': 'Вибраний штат',
+            'continue': 'Продовжити',
+          }[key] ?? key;
+        case 'ru':
+          return {
+            'state_selection': 'Выбор Штата',
+            'select_state': 'Выберите свой штат',
+            'search_state': 'Найти штат...',
+            'no_states_found': 'Штаты не найдены',
+            'selected': 'Выбрано',
+            'tap_to_select': 'Нажмите для выбора',
+            'selected_state': 'Выбранный штат',
+            'continue': 'Продолжить',
+          }[key] ?? key;
+        case 'pl':
+          return {
+            'state_selection': 'Wybór Stanu',
+            'select_state': 'Wybierz swój stan',
+            'search_state': 'Szukaj stanu...',
+            'no_states_found': 'Nie znaleziono stanów',
+            'selected': 'Wybrany',
+            'tap_to_select': 'Dotknij, aby wybrać',
+            'selected_state': 'Wybrany stan',
+            'continue': 'Kontynuuj',
+          }[key] ?? key;
+        case 'en':
+        default:
+          return {
+            'state_selection': 'State Selection',
+            'select_state': 'Select your state',
+            'search_state': 'Search state...',
+            'no_states_found': 'No states found',
+            'selected': 'Selected',
+            'tap_to_select': 'Tap to select',
+            'selected_state': 'Selected state',
+            'continue': 'Continue',
+          }[key] ?? key;
+      }
+    } catch (e) {
+      print('🚨 [STATE SCREEN] Error getting translation: $e');
+      // Default fallback
+      return key;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<LanguageProvider>(
       builder: (context, languageProvider, _) {
         print('🔄 [STATE SCREEN] Rebuilding with language: ${languageProvider.language}');
         
-        // Debugging: Check if we have a proper BuildContext with Localizations
-        bool hasLocalizations = Localizations.of<AppLocalizations>(context, AppLocalizations) != null;
-        print('🔍 [STATE SCREEN] Has Localizations? $hasLocalizations');
-
-        // Create a new instance of AppLocalizations to force it to load the correct language
-        final localizations = AppLocalizations.of(context);
-        print('🌐 [STATE SCREEN] Got AppLocalizations with locale: ${localizations.locale.languageCode}');
-        
-        // Debug print the translations for key fields to verify loading is correct
-        print('📝 [STATE SCREEN] Translation check for state_selection: "${localizations.translate('state_selection')}"');
-        print('📝 [STATE SCREEN] Translation check for select_state: "${localizations.translate('select_state')}"');
-        print('📝 [STATE SCREEN] Translation check for search_state: "${localizations.translate('search_state')}"');
-        
-        final title = localizations.translate('state_selection');
+        // Get translated text for our screen using our direct translation helper
+        final title = _translate('state_selection', languageProvider);
         print('🏷️ [STATE SCREEN] Title translated to: "$title" (language: ${languageProvider.language})');
         
         return Scaffold(
@@ -136,7 +188,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
       child: Column(
         children: [
           // Section header
-          _buildSectionHeader(AppLocalizations.of(context).translate('select_state')),
+          _buildSectionHeader(_translate('select_state', Provider.of<LanguageProvider>(context, listen: false))),
           
           // Enhanced search bar
           Container(
@@ -148,7 +200,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: AppLocalizations.of(context).translate('search_state'),
+                hintText: _translate('search_state', Provider.of<LanguageProvider>(context, listen: false)),
                 hintStyle: TextStyle(color: Colors.grey[400]),
                 contentPadding: EdgeInsets.symmetric(vertical: 16),
                 border: OutlineInputBorder(
@@ -206,7 +258,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
                         ),
                         SizedBox(height: 16),
                         Text(
-                          AppLocalizations.of(context).translate('no_states_found'),
+                          _translate('no_states_found', Provider.of<LanguageProvider>(context, listen: false)),
                           style: TextStyle(
                             color: Colors.grey[500],
                             fontSize: 18,
@@ -268,8 +320,8 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
                                         SizedBox(height: 4),
                                         Text(
                                           isSelected 
-                                              ? AppLocalizations.of(context).translate('selected') 
-                                              : AppLocalizations.of(context).translate('tap_to_select'),
+                                              ? _translate('selected', Provider.of<LanguageProvider>(context, listen: false)) 
+                                              : _translate('tap_to_select', Provider.of<LanguageProvider>(context, listen: false)),
                                           style: TextStyle(
                                             color: Colors.grey[600],
                                             fontSize: 14,
@@ -330,7 +382,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildSectionHeader(AppLocalizations.of(context).translate('selected_state')),
+          _buildSectionHeader(_translate('selected_state', Provider.of<LanguageProvider>(context, listen: false))),
           
           // Selected state card
           Card(
@@ -367,7 +419,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
                         ),
                         SizedBox(height: 4),
                         Text(
-                          AppLocalizations.of(context).translate('selected_state'),
+                          _translate('selected_state', Provider.of<LanguageProvider>(context, listen: false)),
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 14,
@@ -399,7 +451,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
               minimumSize: Size(double.infinity, 56),
             ),
             child: Text(
-              AppLocalizations.of(context).translate('continue'),
+              _translate('continue', Provider.of<LanguageProvider>(context, listen: false)),
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,

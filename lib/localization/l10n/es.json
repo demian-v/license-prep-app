@@ -34,6 +34,18 @@
   "practice": "Práctica",
   "quiz": "Cuestionario",
   "exam": "Examen",
+  "tests": "Pruebas",
+  
+  "testing": "Pruebas",
+  "take_exam": "Realizar examen",
+  "dmv_exam_desc": "como en el DMV: 40 preguntas, 60 minutos",
+  "working_on_mistakes": "Trabajando en errores",
+  "saved": "Guardado",
+  "saved_questions_desc": "Preguntas guardadas de diferentes secciones",
+  "learn_by_topics": "Aprender por Temas",
+  "questions_by_topics": "Preguntas por Temas",
+  "practice_tickets": "Boletos de Práctica",
+  "random_questions_no_limit": "Preguntas aleatorias, sin límite",
   
   "try_again": "Intentar de nuevo",
   "no_questions": "No hay preguntas disponibles para este tema",

@@ -34,6 +34,18 @@
   "practice": "Practice",
   "quiz": "Quiz",
   "exam": "Exam",
+  "tests": "Tests",
+  
+  "testing": "Testing",
+  "take_exam": "Take Exam",
+  "dmv_exam_desc": "like in DMV: 40 questions, 60 minutes",
+  "working_on_mistakes": "Working on Mistakes",
+  "saved": "Saved",
+  "saved_questions_desc": "Saved questions from different sections",
+  "learn_by_topics": "Learn by Topics",
+  "questions_by_topics": "Questions by Topics",
+  "practice_tickets": "Practice Tickets",
+  "random_questions_no_limit": "Random questions, no limit",
   
   "try_again": "Try Again",
   "no_questions": "No questions available for this topic",

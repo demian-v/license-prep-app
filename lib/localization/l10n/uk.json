@@ -34,6 +34,18 @@
   "practice": "Практика",
   "quiz": "Вікторина",
   "exam": "Іспит",
+  "tests": "Тести",
+  
+  "testing": "Тестування",
+  "take_exam": "Складай іспит",
+  "dmv_exam_desc": "як в СЦ МВС: 40 запитань, 60 хвилин",
+  "working_on_mistakes": "Робота над помилками",
+  "saved": "Збережені",
+  "saved_questions_desc": "Збережені питання з різних розділів",
+  "learn_by_topics": "Навчання за темами",
+  "questions_by_topics": "Питання за темами",
+  "practice_tickets": "Практичні білети",
+  "random_questions_no_limit": "Випадкові питання, без обмежень",
   
   "try_again": "Спробувати ще раз",
   "no_questions": "Немає запитань для цієї теми",
