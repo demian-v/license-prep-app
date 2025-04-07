@@ -17,6 +17,12 @@ abstract class AuthApiInterface {
   /// Updates user state/region preference
   Future<User> updateUserState(String userId, String? state);
   
+  /// Updates user email address
+  Future<void> updateUserEmail(String userId, String email);
+  
+  /// Deletes user account
+  Future<void> deleteAccount(String userId);
+  
   /// Request password reset
   Future<void> requestPasswordReset(String email);
   

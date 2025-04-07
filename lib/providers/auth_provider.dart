@@ -209,6 +209,103 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> updateUserEmail(String email) async {
+    if (user != null) {
+      try {
+        debugPrint('📧 AuthProvider: Updating user email to: $email');
+        
+        // Try to use the API
+        await serviceLocator.auth.updateUserEmail(user!.id, email);
+        
+        // Get the updated user from the API
+        try {
+          final updatedUserFromApi = await serviceLocator.auth.getCurrentUser();
+          if (updatedUserFromApi != null) {
+            debugPrint('✅ AuthProvider: Successfully updated user email to $email via API');
+            user = updatedUserFromApi;
+          } else {
+            debugPrint('⚠️ AuthProvider: API returned null user, using local update');
+            // Create a new user object with updated email
+            // We can't use copyWith here because it doesn't allow email changes
+            user = User(
+              id: user!.id,
+              name: user!.name,
+              email: email, // Update the email
+              language: user!.language,
+              state: user!.state,
+            );
+          }
+        } catch (getUserError) {
+          debugPrint('⚠️ AuthProvider: Error getting updated user: $getUserError');
+          // Use local update as fallback
+          user = User(
+            id: user!.id,
+            name: user!.name,
+            email: email, // Update the email
+            language: user!.language,
+            state: user!.state,
+          );
+        }
+        
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('user', jsonEncode(user!.toJson()));
+        
+        notifyListeners();
+      } catch (e) {
+        // Fallback to local update if API is not available
+        debugPrint('⚠️ AuthProvider: API error, updating email locally: $e');
+        
+        // Create a new user object with updated email
+        final updatedUser = User(
+          id: user!.id,
+          name: user!.name,
+          email: email, // Update the email
+          language: user!.language,
+          state: user!.state,
+        );
+        user = updatedUser;
+        
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('user', jsonEncode(updatedUser.toJson()));
+        
+        notifyListeners();
+      }
+    } else {
+      debugPrint('⚠️ AuthProvider: Cannot update email - user is null');
+    }
+  }
+
+  Future<void> deleteAccount() async {
+    if (user != null) {
+      try {
+        debugPrint('🗑️ AuthProvider: Deleting user account for ID: ${user!.id}');
+        
+        // Try to use the API to delete the account
+        await serviceLocator.auth.deleteAccount(user!.id);
+        
+        // Clear local data after successful API deletion
+        user = null;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('user');
+        
+        notifyListeners();
+        debugPrint('✅ AuthProvider: User account deleted successfully');
+      } catch (e) {
+        debugPrint('⚠️ AuthProvider: Account deletion error: $e');
+        // Still clear local data even if API deletion fails
+        user = null;
+        
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('user');
+        
+        notifyListeners();
+        debugPrint('🗑️ AuthProvider: User account deleted locally due to API error');
+      }
+    } else {
+      debugPrint('⚠️ AuthProvider: Cannot delete account - user is null');
+    }
+  }
+
   Future<void> logout() async {
     try {
       debugPrint('🚪 AuthProvider: Logging out user');

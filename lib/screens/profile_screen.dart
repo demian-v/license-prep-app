@@ -7,6 +7,7 @@ import '../providers/subscription_provider.dart';
 import '../providers/progress_provider.dart';
 import '../examples/api_switcher_example.dart';
 import '../examples/function_name_mapping_example.dart';
+import 'personal_info_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   @override
@@ -259,6 +260,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           GestureDetector(
                             onTap: () {
                               // Navigate to edit profile screen
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => PersonalInfoScreen(),
+                                ),
+                              );
                             },
                             child: Text(
                               _translate('edit_profile', languageProvider),

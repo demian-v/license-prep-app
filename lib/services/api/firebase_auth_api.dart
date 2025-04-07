@@ -367,4 +367,70 @@ class FirebaseAuthApi implements AuthApiInterface {
       throw 'Failed to create user document: $e';
     }
   }
+  
+  /// Updates user email address
+  @override
+  Future<void> updateUserEmail(String userId, String email) async {
+    try {
+      print('📧 [API] Updating user email to $email via Firebase function');
+      
+      // Update email in Firebase Auth first
+      final currentAuth = FirebaseAuth.instance.currentUser;
+      if (currentAuth == null) {
+        throw 'No authenticated user found';
+      }
+      
+      // Update email in Firebase Auth
+      await currentAuth.updateEmail(email);
+      
+      // Then update in Firestore via function
+      final result = await _functionsClient.callFunction<Map<String, dynamic>>(
+        'updateUserEmail',
+        data: {'email': email},
+      );
+      
+      if (result == null || result['success'] != true) {
+        throw 'Failed to update email in database';
+      }
+      
+      print('✅ [API] Email updated successfully');
+    } catch (e) {
+      print('❌ [API] Error updating email: $e');
+      throw 'Failed to update email: $e';
+    }
+  }
+  
+  /// Deletes user account
+  @override
+  Future<void> deleteAccount(String userId) async {
+    try {
+      print('🗑️ [API] Deleting user account via Firebase function');
+      
+      // Delete account in Firestore first via function
+      final result = await _functionsClient.callFunction<Map<String, dynamic>>(
+        'deleteUserAccount',
+        data: {'userId': userId},
+      );
+      
+      // Then delete the Firebase Auth user
+      final currentAuth = FirebaseAuth.instance.currentUser;
+      if (currentAuth == null) {
+        throw 'No authenticated user found';
+      }
+      
+      await currentAuth.delete();
+      
+      // Clear any stored tokens
+      await _functionsClient.clearAuthToken();
+      
+      print('✅ [API] Account deleted successfully');
+    } catch (e) {
+      print('❌ [API] Error deleting account: $e');
+      
+      // Try to clear tokens even if account deletion failed
+      await _functionsClient.clearAuthToken();
+      
+      throw 'Failed to delete account: $e';
+    }
+  }
 }

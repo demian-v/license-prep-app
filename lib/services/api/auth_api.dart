@@ -131,6 +131,51 @@ class AuthApi implements AuthApiInterface {
       await _apiClient.clearAuthToken();
     }
   }
+  
+  /// Updates user email address
+  @override
+  Future<void> updateUserEmail(String userId, String email) async {
+    try {
+      await _apiClient.put(
+        '/users/$userId/email',
+        data: {
+          'email': email,
+        },
+      );
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        throw 'Authentication required';
+      } else if (e.response?.statusCode == 403) {
+        throw 'Not authorized to update this email';
+      } else if (e.response?.statusCode == 409) {
+        throw 'Email already in use';
+      } else {
+        throw 'Email update failed: ${e.message}';
+      }
+    } catch (e) {
+      throw 'An unexpected error occurred during email update';
+    }
+  }
+  
+  /// Deletes user account
+  @override
+  Future<void> deleteAccount(String userId) async {
+    try {
+      await _apiClient.delete('/users/$userId');
+      // Also clear auth token since account is deleted
+      await _apiClient.clearAuthToken();
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        throw 'Authentication required';
+      } else if (e.response?.statusCode == 403) {
+        throw 'Not authorized to delete this account';
+      } else {
+        throw 'Account deletion failed: ${e.message}';
+      }
+    } catch (e) {
+      throw 'An unexpected error occurred during account deletion';
+    }
+  }
 
   /// Creates or updates a user document in Firestore
   Future<void> createOrUpdateUserDoc(String userId, {
