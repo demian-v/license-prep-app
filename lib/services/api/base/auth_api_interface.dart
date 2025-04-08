@@ -2,6 +2,9 @@ import '../../../models/user.dart';
 
 /// Base interface for authentication API
 abstract class AuthApiInterface {
+  /// Reauthenticates the user with their password before sensitive operations
+  Future<bool> reauthenticateUser(String password);
+  
   /// Logs in a user with email and password
   Future<User> login(String email, String password);
   
@@ -19,6 +22,9 @@ abstract class AuthApiInterface {
   
   /// Updates user email address
   Future<void> updateUserEmail(String userId, String email);
+  
+  /// Updates user email address with reauthentication
+  Future<void> updateUserEmailSecure(String userId, String newEmail, String password);
   
   /// Deletes user account
   Future<void> deleteAccount(String userId);

@@ -1,7 +1,8 @@
 import '../../models/user.dart';
 import 'firebase_functions_client.dart';
 import 'base/auth_api_interface.dart';
-import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth, FirebaseAuthException;
+import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth, FirebaseAuthException, EmailAuthProvider;
+import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseFirestore, FieldValue, SetOptions;
 
 class FirebaseAuthApi implements AuthApiInterface {
   final FirebaseFunctionsClient _functionsClient;
@@ -67,7 +68,7 @@ class FirebaseAuthApi implements AuthApiInterface {
       // Update display name
       await userCredential.user!.updateDisplayName(name);
       
-      // Create user document in Firestore - using try/catch to continue even if this fails
+      // Create user document in Firestore and ensure it's created successfully
       try {
         await _functionsClient.callFunction<Map<String, dynamic>>(
           'createOrUpdateUserDocument',
@@ -79,10 +80,26 @@ class FirebaseAuthApi implements AuthApiInterface {
             'state': null,    // No default state - user will select explicitly
           },
         );
+        print('✅ User document created successfully with name: $name');
       } catch (firestoreError) {
-        // If function call fails, log but continue - don't fail signup
-        print('Warning: Failed to create user document, but auth account created: $firestoreError');
-        // Could create document directly with Firestore SDK here as a fallback
+        print('⚠️ Warning: Failed to create user document: $firestoreError');
+        
+        // Implement fallback using Firestore SDK directly
+        try {
+          final firestore = FirebaseFirestore.instance;
+          await firestore.collection('users').doc(userCredential.user!.uid).set({
+            'name': name,
+            'email': email,
+            'createdAt': FieldValue.serverTimestamp(),
+            'lastLoginAt': FieldValue.serverTimestamp(),
+            'language': 'en',
+            'state': null,
+          });
+          print('✅ User document created with fallback method');
+        } catch (directFirestoreError) {
+          print('❌ Failed to create user document with fallback: $directFirestoreError');
+          // Continue with signup but warn about potential issues
+        }
       }
       
       // Return user data
@@ -368,6 +385,32 @@ class FirebaseAuthApi implements AuthApiInterface {
     }
   }
   
+  /// Reauthenticates the user with their password before sensitive operations
+  @override
+  Future<bool> reauthenticateUser(String password) async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null || currentUser.email == null) {
+        print('❌ [API] Reauthentication failed: No user is logged in or email is null');
+        return false;
+      }
+      
+      // Create a credential with the current email and provided password
+      final credential = EmailAuthProvider.credential(
+        email: currentUser.email!,
+        password: password,
+      );
+      
+      // Reauthenticate
+      await currentUser.reauthenticateWithCredential(credential);
+      print('✅ [API] User reauthenticated successfully');
+      return true;
+    } catch (e) {
+      print('❌ [API] Reauthentication failed: $e');
+      return false;
+    }
+  }
+  
   /// Updates user email address
   @override
   Future<void> updateUserEmail(String userId, String email) async {
@@ -394,6 +437,48 @@ class FirebaseAuthApi implements AuthApiInterface {
       }
       
       print('✅ [API] Email updated successfully');
+    } catch (e) {
+      print('❌ [API] Error updating email: $e');
+      throw 'Failed to update email: $e';
+    }
+  }
+  
+  /// Updates user email address with reauthentication
+  @override
+  Future<void> updateUserEmailSecure(String userId, String newEmail, String password) async {
+    try {
+      print('📧 [API] Updating user email with reauthentication');
+      
+      // First reauthenticate
+      final reauthSuccess = await reauthenticateUser(password);
+      if (!reauthSuccess) {
+        throw 'Authentication failed. Please check your password and try again.';
+      }
+      
+      // Get current user
+      final currentAuth = FirebaseAuth.instance.currentUser;
+      if (currentAuth == null) {
+        throw 'No authenticated user found';
+      }
+      
+      try {
+        // Instead of directly updating email, send a verification email to the new address
+        await currentAuth.verifyBeforeUpdateEmail(newEmail);
+        
+        print('✅ [API] Verification email sent to $newEmail. User must verify before email is updated');
+        
+        // We don't update Firestore here because the email hasn't actually changed yet
+        // Firebase will update the email after the user clicks the verification link
+        
+        // Show a different success message
+        return;
+      } catch (e) {
+        if (e.toString().contains('auth/requires-recent-login')) {
+          throw 'Authentication required. Please log out and log back in before changing your email.';
+        } else {
+          throw 'Failed to send verification email: $e';
+        }
+      }
     } catch (e) {
       print('❌ [API] Error updating email: $e');
       throw 'Failed to update email: $e';

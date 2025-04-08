@@ -209,13 +209,20 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> updateUserEmail(String email) async {
+  Future<void> updateUserEmail(String email, {String? password}) async {
     if (user != null) {
       try {
         debugPrint('📧 AuthProvider: Updating user email to: $email');
         
-        // Try to use the API
-        await serviceLocator.auth.updateUserEmail(user!.id, email);
+        // Use secure method if password is provided
+        if (password != null) {
+          debugPrint('🔐 AuthProvider: Using secure email update with authentication');
+          await serviceLocator.auth.updateUserEmailSecure(user!.id, email, password);
+        } else {
+          // Try legacy method (this will likely fail on Firebase)
+          debugPrint('⚠️ AuthProvider: Using non-secure email update (may fail)');
+          await serviceLocator.auth.updateUserEmail(user!.id, email);
+        }
         
         // Get the updated user from the API
         try {

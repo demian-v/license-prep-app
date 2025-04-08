@@ -2,10 +2,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../models/user.dart' as app_models;
+import '../services/api/base/auth_api_interface.dart';
 
 /// A service class that directly interacts with Firebase Auth and Firestore
 /// without any abstractions or complex mappings
-class DirectAuthService {
+class DirectAuthService implements AuthApiInterface {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -38,11 +39,9 @@ class DirectAuthService {
         // Continue even if this fails
       }
       
-      // Step 3: Create Firestore user documents after a short delay
-      // This helps avoid race conditions and timing issues
-      Future.delayed(Duration(milliseconds: 500), () {
-        createUserDocuments(userId, name, email);
-      });
+      // Step 3: Create Firestore user documents immediately and await it
+      // to ensure the document is created before proceeding
+      await createUserDocuments(userId, name, email);
       
       // Successfully created Authentication user
       return true;
@@ -134,6 +133,32 @@ class DirectAuthService {
     await _auth.signOut();
   }
   
+  /// Reauthenticate user before sensitive operations
+  Future<bool> reauthenticateUser(String password) async {
+    try {
+      // Get the current Firebase user
+      final User? currentUser = _auth.currentUser;
+      if (currentUser == null || currentUser.email == null) {
+        debugPrint('DirectAuthService: Reauthentication failed: No user is logged in or email is null');
+        return false;
+      }
+      
+      // Create credentials
+      final credential = EmailAuthProvider.credential(
+        email: currentUser.email!,
+        password: password,
+      );
+      
+      // Reauthenticate
+      await currentUser.reauthenticateWithCredential(credential);
+      debugPrint('DirectAuthService: User reauthenticated successfully');
+      return true;
+    } catch (e) {
+      debugPrint('DirectAuthService: Reauthentication failed: $e');
+      return false;
+    }
+  }
+
   /// Update user email
   Future<void> updateUserEmail(String userId, String email) async {
     try {
@@ -162,8 +187,46 @@ class DirectAuthService {
     }
   }
   
+  /// Update user email with reauthentication
+  Future<void> updateUserEmailSecure(String userId, String email, String password) async {
+    try {
+      debugPrint('DirectAuthService: Securely updating email for user: $userId to: $email');
+      
+      // Reauthenticate first
+      final reauthSuccess = await reauthenticateUser(password);
+      if (!reauthSuccess) {
+        throw Exception('Authentication failed. Please check your password and try again.');
+      }
+      
+      // Get the current Firebase user
+      final User? currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        throw Exception('No authenticated user found');
+      }
+      
+      try {
+        // Instead of directly updating email, send a verification email first
+        await currentUser.verifyBeforeUpdateEmail(email);
+        debugPrint('DirectAuthService: Verification email sent to $email. User must verify before email is updated');
+        
+        // We don't update Firestore here because the email hasn't actually changed yet
+        // Firebase will update the email after the user clicks the verification link
+      } catch (e) {
+        if (e.toString().contains('requires-recent-login')) {
+          throw Exception('Authentication required. Please log out and log back in before changing your email.');
+        } else {
+          throw Exception('Failed to send verification email: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('DirectAuthService: Error updating email: $e');
+      throw e;
+    }
+  }
+
   /// Update user profile 
-  Future<void> updateProfile(String userId, {required String name}) async {
+  @override
+  Future<app_models.User> updateProfile(String userId, {String? name, String? language, String? state}) async {
     try {
       debugPrint('DirectAuthService: Updating profile for user: $userId');
       
@@ -173,17 +236,27 @@ class DirectAuthService {
         throw Exception('No authenticated user found');
       }
       
-      // Update name in Firebase Auth
-      await currentUser.updateDisplayName(name);
-      debugPrint('DirectAuthService: Firebase Auth display name updated successfully');
+      // Update fields in Firebase Auth
+      if (name != null) {
+        await currentUser.updateDisplayName(name);
+        debugPrint('DirectAuthService: Firebase Auth display name updated successfully');
+      }
       
-      // Update name in Firestore
-      await _firestore.collection('users').doc(userId).update({
-        'name': name,
+      // Build update data for Firestore
+      Map<String, dynamic> updateData = {
         'lastUpdated': FieldValue.serverTimestamp(),
-      });
+      };
+      if (name != null) updateData['name'] = name;
+      if (language != null) updateData['language'] = language;
+      if (state != null) updateData['state'] = state;
       
-      debugPrint('DirectAuthService: Firestore name updated successfully');
+      // Update in Firestore
+      await _firestore.collection('users').doc(userId).update(updateData);
+      
+      debugPrint('DirectAuthService: Firestore profile updated successfully');
+      
+      // Return the updated user
+      return getCurrentUser().then((user) => user!);
     } catch (e) {
       debugPrint('DirectAuthService: Error updating profile: $e');
       throw e;
@@ -191,7 +264,8 @@ class DirectAuthService {
   }
   
   /// Update user language
-  Future<void> updateUserLanguage(String userId, String language) async {
+  @override
+  Future<app_models.User> updateUserLanguage(String userId, String language) async {
     try {
       debugPrint('DirectAuthService: Updating language for user: $userId to: $language');
       
@@ -202,6 +276,9 @@ class DirectAuthService {
       });
       
       debugPrint('DirectAuthService: Language updated successfully');
+      
+      // Return the updated user
+      return getCurrentUser().then((user) => user!);
     } catch (e) {
       debugPrint('DirectAuthService: Error updating language: $e');
       throw e;
@@ -209,7 +286,8 @@ class DirectAuthService {
   }
   
   /// Update user state
-  Future<void> updateUserState(String userId, String state) async {
+  @override
+  Future<app_models.User> updateUserState(String userId, String? state) async {
     try {
       debugPrint('DirectAuthService: Updating state for user: $userId to: $state');
       
@@ -220,6 +298,9 @@ class DirectAuthService {
       });
       
       debugPrint('DirectAuthService: State updated successfully');
+      
+      // Return the updated user
+      return getCurrentUser().then((user) => user!);
     } catch (e) {
       debugPrint('DirectAuthService: Error updating state: $e');
       throw e;
@@ -336,6 +417,49 @@ class DirectAuthService {
   /// Logout user
   Future<void> logout() async {
     await signOut();
+  }
+  
+  /// Checks if the user is currently authenticated
+  @override
+  Future<bool> isAuthenticated() async {
+    return _auth.currentUser != null;
+  }
+  
+  /// Creates or updates a user document in Firestore
+  @override
+  Future<void> createOrUpdateUserDoc(String userId, {
+    required String name,
+    required String email,
+    String language = "en",
+    String? state = null,
+  }) async {
+    try {
+      // Create or update the user document
+      await _firestore.collection('users').doc(userId).set({
+        'name': name,
+        'email': email,
+        'language': language,
+        'state': state,
+        'lastUpdated': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      
+      debugPrint('DirectAuthService: User document created or updated successfully');
+    } catch (e) {
+      debugPrint('DirectAuthService: Error creating/updating user document: $e');
+      throw e;
+    }
+  }
+  
+  /// Request password reset
+  @override
+  Future<void> requestPasswordReset(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+      debugPrint('DirectAuthService: Password reset email sent to $email');
+    } catch (e) {
+      // For security reasons, we don't reveal if the email exists or not
+      debugPrint('DirectAuthService: Password reset request handled');
+    }
   }
 }
 

@@ -13,7 +13,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _emailController;
+  late TextEditingController _passwordController;
   bool _isLoading = false;
+  bool _showPasswordField = false;
 
   // Helper method to get correct translations
   String _translate(String key, LanguageProvider languageProvider) {
@@ -100,6 +102,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             'change_personal_data': 'Change personal data',
             'name': 'Name',
             'email': 'Email',
+            'password': 'Password',
+            'password_required': 'Password is required',
+            'password_needed_for_email': 'Your password is required to change your email address',
             'delete_account': 'Delete account',
             'delete_account_desc': 'Deletion will be permanent, without the possibility to restore the account',
             'save': 'Save',
@@ -127,12 +132,14 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     final user = Provider.of<AuthProvider>(context, listen: false).user;
     _nameController = TextEditingController(text: user?.name ?? '');
     _emailController = TextEditingController(text: user?.email ?? '');
+    _passwordController = TextEditingController();
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -159,14 +166,38 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         
         // Update email if it changed
         if (authProvider.user!.email != _emailController.text) {
-          await authProvider.updateUserEmail(_emailController.text);
+          // Check if we need to show password field
+          if (!_showPasswordField) {
+            setState(() {
+              _showPasswordField = true;
+              _isLoading = false;
+            });
+            return; // Exit method to let user enter password
+          }
+          
+          // Now we have the password, update email securely
+          await authProvider.updateUserEmail(
+            _emailController.text,
+            password: _passwordController.text
+          );
+          
+          // Reset password field
+          _passwordController.clear();
+          _showPasswordField = false;
         }
         
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_translate('changes_saved', languageProvider)),
+            content: Text(
+              _emailController.text != authProvider.user!.email 
+                ? 'Verification email sent. Please check your inbox to confirm the new email address.'
+                : _translate('changes_saved', languageProvider)
+            ),
             backgroundColor: Colors.green,
+            duration: _emailController.text != authProvider.user!.email 
+                ? Duration(seconds: 5)  // Show longer for verification message
+                : Duration(seconds: 2),
           ),
         );
         
@@ -344,6 +375,40 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                             },
                           ),
                           
+                          // Password field (only shown when changing email)
+                          if (_showPasswordField)
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                SizedBox(height: 16),
+                                _buildFormField(
+                                  context,
+                                  _translate('password', languageProvider),
+                                  Icons.lock_outline,
+                                  Colors.purple,
+                                  _passwordController,
+                                  (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return _translate('password_required', languageProvider);
+                                    }
+                                    return null;
+                                  },
+                                  isPassword: true,
+                                ),
+                                SizedBox(height: 8),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                                  child: Text(
+                                    _translate('password_needed_for_email', languageProvider),
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          
                           SizedBox(height: 48),
                           
                           // Delete account button
@@ -389,6 +454,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     Color iconColor,
     TextEditingController controller,
     String? Function(String?) validator,
+    {bool isPassword = false}
   ) {
     return Container(
       decoration: BoxDecoration(
@@ -428,6 +494,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                   labelText: label,
                   border: InputBorder.none,
                 ),
+                obscureText: isPassword,
                 validator: validator,
               ),
             ),

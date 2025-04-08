@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import '../../models/user.dart';
 import 'api_client.dart';
 import 'base/auth_api_interface.dart';
+import 'package:flutter/material.dart';
 
 class AuthApi implements AuthApiInterface {
   final ApiClient _apiClient;
@@ -129,6 +130,51 @@ class AuthApi implements AuthApiInterface {
     } finally {
       // Clear token from secure storage
       await _apiClient.clearAuthToken();
+    }
+  }
+  
+  /// Reauthenticates the user with their password before sensitive operations
+  @override
+  Future<bool> reauthenticateUser(String password) async {
+    try {
+      // Call a reauthentication endpoint
+      final response = await _apiClient.post(
+        '/auth/reauthenticate',
+        data: {
+          'password': password,
+        },
+      );
+      
+      // Return true if authentication was successful
+      return response.statusCode == 200;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        debugPrint('Reauthentication failed: Invalid password');
+        return false;
+      } else {
+        debugPrint('Reauthentication failed: ${e.message}');
+        return false;
+      }
+    } catch (e) {
+      debugPrint('Unexpected error during reauthentication: $e');
+      return false;
+    }
+  }
+  
+  /// Updates user email address with reauthentication
+  @override
+  Future<void> updateUserEmailSecure(String userId, String newEmail, String password) async {
+    try {
+      // First reauthenticate
+      final reauthSuccess = await reauthenticateUser(password);
+      if (!reauthSuccess) {
+        throw 'Authentication failed. Please check your password and try again.';
+      }
+      
+      // Then update email
+      await updateUserEmail(userId, newEmail);
+    } catch (e) {
+      throw 'Secure email update failed: $e';
     }
   }
   
