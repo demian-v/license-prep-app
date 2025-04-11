@@ -249,7 +249,7 @@ class EmailSyncService {
             // Update local state
             await _refreshLocalUserData();
             
-            // Store state and language data in shared preferences for restoration after login
+            // Store state, language, and name data in shared preferences for restoration after login
             final prefs = await SharedPreferences.getInstance();
             final userId = user.uid; // Get userId from user object
             final userDoc = await _firestore.collection('users').doc(userId).get();
@@ -257,6 +257,25 @@ class EmailSyncService {
               final userData = userDoc.data() as Map<String, dynamic>;
               final state = userData['state']; 
               final language = userData['language'];
+              final name = userData['name']; // Get the user's original name
+              
+              // Save user's name to SharedPreferences
+              if (name != null) {
+                await prefs.setString('last_user_name', name.toString());
+                // Verify it was saved
+                final savedName = prefs.getString('last_user_name');
+                debugPrint('✅ EmailSyncService: Saved name "$name" to preferences, verified: $savedName');
+                
+                if (savedName != name.toString()) {
+                  debugPrint('⚠️ EmailSyncService: Name may not have been saved correctly! Expected: $name, Actual: $savedName');
+                  // Try one more time with explicit toString
+                  await prefs.setString('last_user_name', '$name');
+                  final retryName = prefs.getString('last_user_name');
+                  debugPrint('✅ EmailSyncService: Retry saving name: $retryName');
+                }
+              } else {
+                debugPrint('⚠️ EmailSyncService: User name is null, nothing to save for restoration');
+              }
               
               if (state != null) {
                 await prefs.setString('last_user_state', state.toString());

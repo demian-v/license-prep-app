@@ -29,6 +29,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
     
     // Ensure state data is properly loaded
     _ensureStateDataLoaded();
+    
+    // Ensure user name is properly loaded from Firestore
+    _ensureUserNameLoaded();
+  }
+  
+  // Method to ensure user name is loaded correctly from Firestore
+  Future<void> _ensureUserNameLoaded() async {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final user = authProvider.user;
+      
+      if (user != null) {
+        // If we have a user, check Firestore directly for the actual name
+        try {
+          final userId = user.id;
+          final userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+          
+          if (userDoc.exists) {
+            final firestoreName = userDoc.data()?['name'];
+            
+            // If the name in Firestore differs from local user name, update it
+            if (firestoreName != null && firestoreName.toString().isNotEmpty && 
+                firestoreName != user.name) {
+                
+              // Update local user object with name from Firestore
+              final updatedUser = User(
+                id: user.id,
+                name: firestoreName.toString(),
+                email: user.email,
+                language: user.language,
+                state: user.state,
+              );
+              
+              // Update AuthProvider
+              authProvider.user = updatedUser;
+              authProvider.notifyListeners();
+              
+              debugPrint('✅ ProfileScreen: Updated user name from Firestore: $firestoreName');
+              
+              // Force a rebuild to show updated name
+              if (mounted) {
+                setState(() {});
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('❌ ProfileScreen: Error fetching name from Firestore: $e');
+        }
+      }
+    });
   }
   
   // Method to ensure state data is loaded correctly from both local and remote sources
@@ -37,29 +87,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final user = authProvider.user;
       
-      if (user != null && (user.state == null || user.state == '')) {
-        // If state is missing in the local user object, check Firestore directly
+      if (user != null) {
+        // Always check Firestore for the most up-to-date state
         try {
           final userId = user.id;
           final userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
           
           if (userDoc.exists) {
             final firestoreState = userDoc.data()?['state'];
+            debugPrint('🗺️ ProfileScreen: Retrieved state from Firestore: $firestoreState');
+            
             if (firestoreState != null && firestoreState.toString().isNotEmpty) {
-              // Update local user object with state from Firestore
-              final updatedUser = User(
-                id: user.id,
-                name: user.name,
-                email: user.email,
-                language: user.language,
-                state: firestoreState.toString(),
-              );
-              
-              // Update AuthProvider
-              authProvider.user = updatedUser;
-              authProvider.notifyListeners();
-              
-              debugPrint('✅ ProfileScreen: Updated user state from Firestore: $firestoreState');
+              // Only update if Firestore has a state and it differs from local state
+              if (user.state != firestoreState.toString()) {
+                // Update local user object with state from Firestore
+                final updatedUser = User(
+                  id: user.id,
+                  name: user.name,
+                  email: user.email,
+                  language: user.language,
+                  state: firestoreState.toString(),
+                );
+                
+                // Update AuthProvider
+                authProvider.user = updatedUser;
+                authProvider.notifyListeners();
+                
+                debugPrint('✅ ProfileScreen: Updated user state from Firestore: $firestoreState');
+                
+                // Force a rebuild to show updated state
+                if (mounted) {
+                  setState(() {});
+                }
+              } else {
+                debugPrint('✓ ProfileScreen: Local state already matches Firestore: ${user.state}');
+              }
             }
           }
         } catch (e) {
@@ -67,6 +129,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       }
     });
+  }
+  
+  // Helper method to get state display name without translation
+  String _getStateDisplayName(String? state) {
+    if (state == null || state.isEmpty) {
+      return 'Not selected';
+    }
+    return state;
   }
 
   // This method forces a sync of the email in Firestore when the profile screen loads
@@ -380,13 +450,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _buildMenuCard(
                     _translate('state', languageProvider),
                     (authProvider.user?.state?.isNotEmpty == true) 
-                      ? authProvider.user!.state! 
+                      ? authProvider.user!.state! // Display raw state value without translation
                       : _translate('Not selected', languageProvider),
                     Icons.location_on,
                     Colors.blue[50]!,
                     Colors.blue,
                     () {
-                      _showStateSelector(context, languageProvider);
+                      // Check Firestore for latest state before showing selector
+                      _ensureStateDataLoaded().then((_) {
+                        _showStateSelector(context, languageProvider);
+                      });
                     },
                     languageProvider,
                   ),

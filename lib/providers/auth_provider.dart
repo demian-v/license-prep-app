@@ -22,19 +22,20 @@ class AuthProvider extends ChangeNotifier {
         // Use API to log in
         final loggedInUser = await serviceLocator.auth.login(email, password);
         
-        // Check if we have saved state/language preferences (from email change)
+        // Check if we have saved state/language/name preferences (from email change)
         final prefs = await SharedPreferences.getInstance();
         String? savedState = prefs.getString('last_user_state');
         String? savedLanguage = prefs.getString('last_user_language');
+        String? savedName = prefs.getString('last_user_name');
         
         // If we have saved preferences, use them to create updated user
-        if (savedState != null || savedLanguage != null) {
-          debugPrint('🔄 AuthProvider: Found saved preferences - state: $savedState, language: $savedLanguage');
+        if (savedState != null || savedLanguage != null || savedName != null) {
+          debugPrint('🔄 AuthProvider: Found saved preferences - state: $savedState, language: $savedLanguage, name: $savedName');
           
           // Create user with preserved preferences
           final updatedUser = User(
             id: loggedInUser.id,
-            name: loggedInUser.name,
+            name: savedName ?? loggedInUser.name, // Use saved name if available
             email: loggedInUser.email,
             language: savedLanguage ?? loggedInUser.language,
             state: savedState ?? loggedInUser.state,
@@ -46,12 +47,19 @@ class AuthProvider extends ChangeNotifier {
           
           // IMPORTANT: Also update Firestore with the restored values to ensure consistency
           try {
-            await _firestore.collection('users').doc(updatedUser.id).update({
-              'state': savedState,
-              'language': savedLanguage,
-              'lastUpdated': FieldValue.serverTimestamp(),
-            });
-            debugPrint('✅ AuthProvider: Updated Firestore with restored state and language');
+            Map<String, dynamic> updateData = {};
+            
+            // Only include fields that have saved values
+            if (savedName != null) updateData['name'] = savedName;
+            if (savedState != null) updateData['state'] = savedState;
+            if (savedLanguage != null) updateData['language'] = savedLanguage;
+            
+            // Add timestamp
+            updateData['lastUpdated'] = FieldValue.serverTimestamp();
+            
+            // Update Firestore
+            await _firestore.collection('users').doc(updatedUser.id).update(updateData);
+            debugPrint('✅ AuthProvider: Updated Firestore with restored preferences: ${updateData.keys.join(", ")}');
           } catch (e) {
             debugPrint('⚠️ AuthProvider: Error updating Firestore with restored values: $e');
           }
@@ -59,6 +67,7 @@ class AuthProvider extends ChangeNotifier {
           // Clean up saved preferences
           await prefs.remove('last_user_state');
           await prefs.remove('last_user_language');
+          await prefs.remove('last_user_name');
         } else {
           // Use the user as-is if no saved preferences
           user = loggedInUser;
