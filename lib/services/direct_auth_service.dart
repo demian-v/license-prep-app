@@ -188,6 +188,13 @@ class DirectAuthService implements AuthApiInterface {
   }
   
   /// Update user email with reauthentication
+  /// 
+  /// This method sends a verification email to the new address.
+  /// The email in Firebase Auth will only be updated after the user clicks the verification link.
+  /// The Firestore database email will be updated automatically by EmailSyncService when:
+  /// 1. The app detects the auth state change (if app is running)
+  /// 2. Next time the app starts up (if app was closed during verification)
+  /// 3. Next time the user logs in (as an additional safety measure)
   Future<void> updateUserEmailSecure(String userId, String email, String password) async {
     try {
       debugPrint('DirectAuthService: Securely updating email for user: $userId to: $email');
@@ -211,6 +218,7 @@ class DirectAuthService implements AuthApiInterface {
         
         // We don't update Firestore here because the email hasn't actually changed yet
         // Firebase will update the email after the user clicks the verification link
+        // EmailSyncService will handle synchronizing the email to Firestore after verification
       } catch (e) {
         if (e.toString().contains('requires-recent-login')) {
           throw Exception('Authentication required. Please log out and log back in before changing your email.');

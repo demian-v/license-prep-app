@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
 import '../localization/app_localizations.dart';
@@ -7,6 +8,8 @@ import '../providers/subscription_provider.dart';
 import '../providers/progress_provider.dart';
 import '../examples/api_switcher_example.dart';
 import '../examples/function_name_mapping_example.dart';
+import '../services/email_sync_service.dart';
+import '../models/user.dart';
 import 'personal_info_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -17,6 +20,74 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   // Counter for the hidden developer menu
   int _versionTapCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Force sync the email in Firestore when the profile screen loads
+    _syncEmailOnScreenLoad();
+    
+    // Ensure state data is properly loaded
+    _ensureStateDataLoaded();
+  }
+  
+  // Method to ensure state data is loaded correctly from both local and remote sources
+  Future<void> _ensureStateDataLoaded() async {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final user = authProvider.user;
+      
+      if (user != null && (user.state == null || user.state == '')) {
+        // If state is missing in the local user object, check Firestore directly
+        try {
+          final userId = user.id;
+          final userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+          
+          if (userDoc.exists) {
+            final firestoreState = userDoc.data()?['state'];
+            if (firestoreState != null && firestoreState.toString().isNotEmpty) {
+              // Update local user object with state from Firestore
+              final updatedUser = User(
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                language: user.language,
+                state: firestoreState.toString(),
+              );
+              
+              // Update AuthProvider
+              authProvider.user = updatedUser;
+              authProvider.notifyListeners();
+              
+              debugPrint('✅ ProfileScreen: Updated user state from Firestore: $firestoreState');
+            }
+          }
+        } catch (e) {
+          debugPrint('❌ ProfileScreen: Error fetching state from Firestore: $e');
+        }
+      }
+    });
+  }
+
+  // This method forces a sync of the email in Firestore when the profile screen loads
+  void _syncEmailOnScreenLoad() {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Force sync the email in Firebase with Firestore
+      await emailSyncService.syncEmailWithFirestore();
+      
+      // Check for and handle email verification with context for dialog display
+      bool emailChanged = await emailSyncService.handlePostEmailVerification(context);
+      
+      // If email wasn't changed (no verification happened), just update the UI
+      if (!emailChanged && mounted) {
+        // Update Firestore with the current auth email
+        await emailSyncService.updateFirestoreEmail();
+
+        // Also update the AuthProvider's user object with correct email
+        await emailSyncService.updateAuthProviderEmail(context);
+      }
+    });
+  }
 
   // Helper method to get correct translations
   String _translate(String key, LanguageProvider languageProvider) {
@@ -56,6 +127,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             'function_mapping_desc': 'Ver mapeos de nombres de funciones',
             'app_settings_reset': 'Restablecer configuración de la app',
             'app_settings_reset_desc': 'Restablecer todas las configuraciones y preferencias',
+            'Not selected': 'No seleccionado',
           }[key] ?? key;
         case 'uk':
           return {
@@ -89,6 +161,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             'function_mapping_desc': 'Перегляд відображень імен функцій',
             'app_settings_reset': 'Скидання налаштувань додатку',
             'app_settings_reset_desc': 'Скинути всі налаштування та налаштування',
+            'Not selected': 'Не вибрано',
           }[key] ?? key;
         case 'ru':
           return {
@@ -122,6 +195,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             'function_mapping_desc': 'Просмотр отображений имен функций',
             'app_settings_reset': 'Сброс настроек приложения',
             'app_settings_reset_desc': 'Сбросить все настройки и предпочтения',
+            'Not selected': 'Не выбрано',
           }[key] ?? key;
         case 'pl':
           return {
@@ -155,6 +229,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             'function_mapping_desc': 'Zobacz mapowania nazw funkcji',
             'app_settings_reset': 'Reset ustawień aplikacji',
             'app_settings_reset_desc': 'Zresetuj wszystkie ustawienia i preferencje',
+            'Not selected': 'Nie wybrano',
           }[key] ?? key;
         case 'en':
         default:
@@ -304,7 +379,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   SizedBox(height: 16),
                   _buildMenuCard(
                     _translate('state', languageProvider),
-                    authProvider.user?.state ?? 'Not selected',
+                    (authProvider.user?.state?.isNotEmpty == true) 
+                      ? authProvider.user!.state! 
+                      : _translate('Not selected', languageProvider),
                     Icons.location_on,
                     Colors.blue[50]!,
                     Colors.blue,

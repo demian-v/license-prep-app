@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../localization/app_localizations.dart';
 import '../providers/language_provider.dart';
+import '../services/email_sync_service.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 
 class PersonalInfoScreen extends StatefulWidget {
   @override
@@ -133,6 +135,55 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     _nameController = TextEditingController(text: user?.name ?? '');
     _emailController = TextEditingController(text: user?.email ?? '');
     _passwordController = TextEditingController();
+    
+    // Handle post-email verification when screen initializes
+    _handlePossibleEmailVerification();
+  }
+  
+  // Special method to check if email was verified and sync it
+  Future<void> _handlePossibleEmailVerification() async {
+    // Add a slight delay to let the screen initialize
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        // Force reload the user to get the latest email
+        final currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          await currentUser.reload();
+          final authEmail = currentUser.email;
+          
+          // Get the latest email from Auth
+          if (authEmail != null) {
+            // Check if email changed
+            final authProvider = Provider.of<AuthProvider>(context, listen: false);
+            if (authEmail != authProvider.user?.email) {
+              print('📧 PersonalInfoScreen: Detected email change: ${authProvider.user?.email} -> $authEmail');
+              
+              // Use our new method to update the app state with verified email
+              await authProvider.applyVerifiedEmail();
+              
+              // Update the text field with the new email
+              setState(() {
+                _emailController.text = authEmail;
+              });
+              
+              // Show success message
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Email successfully changed to $authEmail'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
+            } else {
+              print('ℹ️ PersonalInfoScreen: Email already up to date: $authEmail');
+            }
+          }
+        }
+      } catch (e) {
+        print('❌ Error handling email verification in PersonalInfoScreen: $e');
+      }
+    });
   }
 
   @override
@@ -141,6 +192,14 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+  
+  // Override didChangeDependencies to catch when screen is shown again
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // This will be called when the screen comes back into view
+    _handlePossibleEmailVerification();
   }
 
   // Validate email format
@@ -166,24 +225,39 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         
         // Update email if it changed
         if (authProvider.user!.email != _emailController.text) {
-          // Check if we need to show password field
-          if (!_showPasswordField) {
+          try {
+            // Check if we need to show password field
+            if (!_showPasswordField) {
+              setState(() {
+                _showPasswordField = true;
+                _isLoading = false;
+              });
+              return; // Exit method to let user enter password
+            }
+            
+            // Now we have the password, update email securely
+            await authProvider.updateUserEmail(
+              _emailController.text,
+              password: _passwordController.text
+            );
+            
+            // Reset password field
+            _passwordController.clear();
+            _showPasswordField = false;
+          } catch (e) {
+            print('❌ Error updating email: $e');
+            // Show error message to user
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error updating email: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
             setState(() {
-              _showPasswordField = true;
               _isLoading = false;
             });
-            return; // Exit method to let user enter password
+            return;
           }
-          
-          // Now we have the password, update email securely
-          await authProvider.updateUserEmail(
-            _emailController.text,
-            password: _passwordController.text
-          );
-          
-          // Reset password field
-          _passwordController.clear();
-          _showPasswordField = false;
         }
         
         // Show success message

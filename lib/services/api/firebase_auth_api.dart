@@ -444,6 +444,13 @@ class FirebaseAuthApi implements AuthApiInterface {
   }
   
   /// Updates user email address with reauthentication
+  /// 
+  /// This method sends a verification email to the new address.
+  /// The email in Firebase Auth will only be updated after the user clicks the verification link.
+  /// The Firestore database email will be updated automatically by EmailSyncService when:
+  /// 1. The app detects the auth state change (if app is running)
+  /// 2. Next time the app starts up (if app was closed during verification)
+  /// 3. Next time the user logs in (as an additional safety measure)
   @override
   Future<void> updateUserEmailSecure(String userId, String newEmail, String password) async {
     try {
@@ -469,8 +476,8 @@ class FirebaseAuthApi implements AuthApiInterface {
         
         // We don't update Firestore here because the email hasn't actually changed yet
         // Firebase will update the email after the user clicks the verification link
+        // EmailSyncService will handle synchronizing the email to Firestore after verification
         
-        // Show a different success message
         return;
       } catch (e) {
         if (e.toString().contains('auth/requires-recent-login')) {

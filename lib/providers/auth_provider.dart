@@ -4,10 +4,13 @@ import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'dart:convert';
 import '../models/user.dart';
 import '../services/service_locator.dart';
+import '../services/email_sync_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AuthProvider extends ChangeNotifier {
   User? user;
   final firebase_auth.FirebaseAuth _firebaseAuth = firebase_auth.FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   AuthProvider(this.user);
 
@@ -19,13 +22,54 @@ class AuthProvider extends ChangeNotifier {
         // Use API to log in
         final loggedInUser = await serviceLocator.auth.login(email, password);
         
-        // Store the user
-        user = loggedInUser;
-        debugPrint('AuthProvider: Login successful for user: ${loggedInUser.name}');
+        // Check if we have saved state/language preferences (from email change)
+        final prefs = await SharedPreferences.getInstance();
+        String? savedState = prefs.getString('last_user_state');
+        String? savedLanguage = prefs.getString('last_user_language');
+        
+        // If we have saved preferences, use them to create updated user
+        if (savedState != null || savedLanguage != null) {
+          debugPrint('🔄 AuthProvider: Found saved preferences - state: $savedState, language: $savedLanguage');
+          
+          // Create user with preserved preferences
+          final updatedUser = User(
+            id: loggedInUser.id,
+            name: loggedInUser.name,
+            email: loggedInUser.email,
+            language: savedLanguage ?? loggedInUser.language,
+            state: savedState ?? loggedInUser.state,
+          );
+          
+          // Store the updated user
+          user = updatedUser;
+          debugPrint('✅ AuthProvider: Login successful with restored preferences for user: ${updatedUser.name}');
+          
+          // IMPORTANT: Also update Firestore with the restored values to ensure consistency
+          try {
+            await _firestore.collection('users').doc(updatedUser.id).update({
+              'state': savedState,
+              'language': savedLanguage,
+              'lastUpdated': FieldValue.serverTimestamp(),
+            });
+            debugPrint('✅ AuthProvider: Updated Firestore with restored state and language');
+          } catch (e) {
+            debugPrint('⚠️ AuthProvider: Error updating Firestore with restored values: $e');
+          }
+          
+          // Clean up saved preferences
+          await prefs.remove('last_user_state');
+          await prefs.remove('last_user_language');
+        } else {
+          // Use the user as-is if no saved preferences
+          user = loggedInUser;
+          debugPrint('AuthProvider: Login successful for user: ${loggedInUser.name}');
+        }
+        
+        // Sync emails between Auth and Firestore
+        await emailSyncService.syncEmailWithFirestore();
         
         // Persist to shared preferences
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('user', jsonEncode(loggedInUser.toJson()));
+        await prefs.setString('user', jsonEncode(user!.toJson()));
         
         notifyListeners();
         return true;
@@ -49,6 +93,9 @@ class AuthProvider extends ChangeNotifier {
         // Store the user
         user = registeredUser;
         debugPrint('AuthProvider: User created successfully: ${registeredUser.name}');
+        
+        // Sync emails between Auth and Firestore to ensure consistency
+        await emailSyncService.syncEmailWithFirestore();
         
         // Save user to local storage
         final prefs = await SharedPreferences.getInstance();
@@ -209,6 +256,76 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // This method handles updating the local app state with the verified email
+  // It works even when Firestore permissions prevent direct database updates
+  Future<void> applyVerifiedEmail() async {
+    try {
+      if (user == null) {
+        debugPrint('⚠️ AuthProvider: Cannot apply verified email - user is null');
+        return;
+      }
+      
+      // Reload the Firebase Auth user to get the latest email
+      final firebaseUser = _firebaseAuth.currentUser;
+      if (firebaseUser == null) {
+        debugPrint('⚠️ AuthProvider: No Firebase Auth user found');
+        return;
+      }
+      
+      // Force reload to get latest data from Firebase Auth
+      await firebaseUser.reload();
+      final verifiedEmail = firebaseUser.email;
+      
+      if (verifiedEmail == null) {
+        debugPrint('⚠️ AuthProvider: Firebase Auth user has no email');
+        return;
+      }
+      
+      debugPrint('📧 AuthProvider: Found verified email in Firebase Auth: $verifiedEmail');
+      
+      if (verifiedEmail != user!.email) {
+        debugPrint('🔄 AuthProvider: Updating app state with verified email: ${user!.email} → $verifiedEmail');
+        
+        // Create a new user object with updated email
+        final updatedUser = User(
+          id: user!.id,
+          name: user!.name,
+          email: verifiedEmail, // Use the verified email from Firebase Auth
+          language: user!.language,
+          state: user!.state,
+        );
+        
+        // Update the provider's user object
+        user = updatedUser;
+        
+        // Save to SharedPreferences so it persists even if app is restarted
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('user', jsonEncode(updatedUser.toJson()));
+        
+        // Try one more time to update Firestore, but don't worry if it fails
+        // This is just an attempt since we've seen permission issues
+        try {
+          await _firestore.collection('users').doc(user!.id).update({
+            'email': verifiedEmail,
+            'lastUpdated': FieldValue.serverTimestamp(),
+          });
+          debugPrint('✅ AuthProvider: Successfully updated Firestore with verified email');
+        } catch (e) {
+          // This is expected to fail due to permission issues
+          debugPrint('⚠️ AuthProvider: Could not update Firestore (expected): $e');
+        }
+        
+        // Notify listeners to update the UI
+        notifyListeners();
+        debugPrint('✅ AuthProvider: Successfully applied verified email in app state');
+      } else {
+        debugPrint('ℹ️ AuthProvider: Email already matches verified email, no update needed');
+      }
+    } catch (e) {
+      debugPrint('❌ AuthProvider: Error applying verified email: $e');
+    }
+  }
+  
   Future<void> updateUserEmail(String email, {String? password}) async {
     if (user != null) {
       try {

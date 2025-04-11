@@ -42,10 +42,10 @@ class _LoginScreenState extends State<LoginScreen> {
       final success = await authProvider.login(email, password);
       
       if (success) {
-        debugPrint('LoginScreen: Login successful, navigating to language selection screen');
+        debugPrint('LoginScreen: Login successful');
         if (mounted) {
-          // Navigate to language selection screen first 
-          Navigator.of(context).pushReplacementNamed('/language');
+          // Navigate to home screen
+          Navigator.of(context).pushReplacementNamed('/home');
         }
       } else if (mounted) {
         setState(() {
@@ -54,9 +54,33 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       debugPrint('LoginScreen: Error during login: $e');
+      String errorMessage = 'An error occurred. Please try again.';
+      
+      // Check for specific Firebase auth errors to provide better guidance
+      String errorString = e.toString().toLowerCase();
+      
+      if (errorString.contains('user-not-found') || 
+          errorString.contains('no user record corresponding') ||
+          errorString.contains('invalid-email')) {
+        
+        errorMessage = 'Email not found. If you recently verified a new email address, please use that email to log in.';
+      } else if (errorString.contains('wrong-password') || 
+                errorString.contains('invalid-credential')) {
+        
+        errorMessage = 'Invalid password. Please try again.';
+      } else if (errorString.contains('user-disabled')) {
+        errorMessage = 'This account has been disabled. Please contact support.';
+      } else if (errorString.contains('too-many-requests')) {
+        errorMessage = 'Too many failed login attempts. Please try again later.';
+      } else if (errorString.contains('session-expired') || 
+                errorString.contains('user-token-expired')) {
+        
+        errorMessage = 'Your session has expired. If you recently changed your email, please use your new email address to log in.';
+      }
+      
       if (mounted) {
         setState(() {
-          _errorMessage = 'An error occurred. Please try again.';
+          _errorMessage = errorMessage;
         });
       }
     } finally {
