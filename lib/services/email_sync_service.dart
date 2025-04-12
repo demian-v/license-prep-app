@@ -259,7 +259,7 @@ class EmailSyncService {
               final language = userData['language'];
               final name = userData['name']; // Get the user's original name
               
-              // Save user's name to SharedPreferences
+              // Save user's name - this is critical for preserving name during email changes
               if (name != null) {
                 await prefs.setString('last_user_name', name.toString());
                 // Verify it was saved
@@ -274,7 +274,11 @@ class EmailSyncService {
                   debugPrint('✅ EmailSyncService: Retry saving name: $retryName');
                 }
               } else {
-                debugPrint('⚠️ EmailSyncService: User name is null, nothing to save for restoration');
+                // If name is null in Firestore, try to save a default name to prevent email-derived names
+                debugPrint('⚠️ EmailSyncService: User name is null in Firestore, attempting to use a default name');
+                await prefs.setString('last_user_name', 'User');
+                final savedName = prefs.getString('last_user_name');
+                debugPrint('✅ EmailSyncService: Saved default name "User" to preferences, verified: $savedName');
               }
               
               if (state != null) {

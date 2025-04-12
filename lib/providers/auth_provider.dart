@@ -30,12 +30,24 @@ class AuthProvider extends ChangeNotifier {
         
         // If we have saved preferences, use them to create updated user
         if (savedState != null || savedLanguage != null || savedName != null) {
-          debugPrint('🔄 AuthProvider: Found saved preferences - state: $savedState, language: $savedLanguage, name: $savedName');
+          debugPrint('🔄 AuthProvider: Found saved preferences - name: $savedName, state: $savedState, language: $savedLanguage');
           
-          // Create user with preserved preferences
+          // Check if current name appears to be from email
+          bool nameIsFromEmail = false;
+          if (loggedInUser.name.isNotEmpty) {
+            final emailPrefix = email.split('@').first.toLowerCase();
+            if (emailPrefix.isNotEmpty && loggedInUser.name.toLowerCase().contains(emailPrefix)) {
+              debugPrint('⚠️ AuthProvider: Current user name appears to be derived from email: ${loggedInUser.name}');
+              nameIsFromEmail = true;
+            }
+          }
+          
+          // Create user with preserved preferences, prioritizing saved name especially if current name is email-derived
           final updatedUser = User(
             id: loggedInUser.id,
-            name: savedName ?? loggedInUser.name, // Use saved name if available
+            name: (savedName != null && savedName.isNotEmpty && (loggedInUser.name.isEmpty || nameIsFromEmail)) 
+                ? savedName 
+                : loggedInUser.name,
             email: loggedInUser.email,
             language: savedLanguage ?? loggedInUser.language,
             state: savedState ?? loggedInUser.state,

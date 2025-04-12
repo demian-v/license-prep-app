@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
 import '../localization/app_localizations.dart';
@@ -17,9 +18,15 @@ class ProfileScreen extends StatefulWidget {
   _ProfileScreenState createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserver {
   // Counter for the hidden developer menu
   int _versionTapCount = 0;
+  
+  // State tracking variables
+  bool _isLoadingState = true;
+  bool _isLoadingName = true;
+  String? _cachedFirestoreState;
+  String? _cachedFirestoreName;
 
   @override
   void initState() {
@@ -32,50 +39,199 @@ class _ProfileScreenState extends State<ProfileScreen> {
     
     // Ensure user name is properly loaded from Firestore
     _ensureUserNameLoaded();
+    
+    // Listen for app lifecycle changes to refresh data when app resumes
+    WidgetsBinding.instance.addObserver(this as WidgetsBindingObserver);
+  }
+  
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this as WidgetsBindingObserver);
+    super.dispose();
+  }
+  
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Refresh state data when app is resumed
+      _ensureStateDataLoaded();
+    }
+  }
+  
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh state data when dependencies change (like when coming back to this screen)
+    _ensureStateDataLoaded();
+  }
+  
+  @override
+  void setState(VoidCallback fn) {
+    // Make sure widget is still mounted before calling setState
+    if (mounted) {
+      super.setState(fn);
+    }
+  }
+  
+  // Helper method to get name from Firestore (cached for performance)
+  Future<String?> _getNameFromFirestore(String userId) async {
+    if (_cachedFirestoreName != null) {
+      return _cachedFirestoreName;
+    }
+    
+    try {
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+      if (userDoc.exists) {
+        _cachedFirestoreName = userDoc.data()?['name'] as String?;
+        return _cachedFirestoreName;
+      }
+    } catch (e) {
+      debugPrint('❌ ProfileScreen: Error retrieving name from Firestore: $e');
+    }
+    return null;
   }
   
   // Method to ensure user name is loaded correctly from Firestore
   Future<void> _ensureUserNameLoaded() async {
+    // Set loading state to inform UI
+    if (mounted) {
+      setState(() {
+        _isLoadingName = true;
+      });
+    }
+    
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final user = authProvider.user;
       
       if (user != null) {
-        // If we have a user, check Firestore directly for the actual name
         try {
           final userId = user.id;
-          final userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
           
-          if (userDoc.exists) {
-            final firestoreName = userDoc.data()?['name'];
-            
-            // If the name in Firestore differs from local user name, update it
-            if (firestoreName != null && firestoreName.toString().isNotEmpty && 
-                firestoreName != user.name) {
+          // First check if current name appears to be derived from email
+          bool nameIsFromEmail = false;
+          if (user.name.isNotEmpty) {
+            final emailPrefix = user.email.split('@').first.toLowerCase();
+            if (emailPrefix.isNotEmpty && user.name.toLowerCase().contains(emailPrefix)) {
+              debugPrint('⚠️ ProfileScreen: Current user name appears to be derived from email: ${user.name}');
+              nameIsFromEmail = true;
+              
+              // Check SharedPreferences for a previously saved name
+              final prefs = await SharedPreferences.getInstance();
+              final savedName = prefs.getString('last_user_name');
+              
+              if (savedName != null && savedName.isNotEmpty) {
+                debugPrint('✅ ProfileScreen: Found saved name in preferences: $savedName');
                 
-              // Update local user object with name from Firestore
-              final updatedUser = User(
-                id: user.id,
-                name: firestoreName.toString(),
-                email: user.email,
-                language: user.language,
-                state: user.state,
-              );
+                // Update user with the saved name from preferences
+                final updatedUser = User(
+                  id: user.id,
+                  name: savedName,
+                  email: user.email,
+                  language: user.language,
+                  state: user.state,
+                );
+                
+                // Update AuthProvider
+                authProvider.user = updatedUser;
+                authProvider.notifyListeners();
+                
+                // Also update Firestore with this name for consistency
+                try {
+                  await FirebaseFirestore.instance.collection('users').doc(userId).update({
+                    'name': savedName,
+                    'lastUpdated': FieldValue.serverTimestamp(),
+                  });
+                  debugPrint('✅ ProfileScreen: Updated Firestore with name from preferences: $savedName');
+                } catch (e) {
+                  debugPrint('⚠️ ProfileScreen: Error updating Firestore with saved name: $e');
+                }
+                
+                // We've found and used a saved name, so we can exit early
+                if (mounted) {
+                  setState(() {
+                    _isLoadingName = false;
+                  });
+                }
+                return;
+              }
+            }
+          }
+          
+          // Add retry mechanism for more reliable name fetching
+          int retryCount = 0;
+          const maxRetries = 3;
+          String? firestoreName;
+          
+          while (retryCount < maxRetries && (firestoreName == null || firestoreName.isEmpty)) {
+            final userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+            
+            if (userDoc.exists) {
+              firestoreName = userDoc.data()?['name'] as String?;
               
-              // Update AuthProvider
-              authProvider.user = updatedUser;
-              authProvider.notifyListeners();
+              // Cache the name for later use
+              _cachedFirestoreName = firestoreName;
               
-              debugPrint('✅ ProfileScreen: Updated user name from Firestore: $firestoreName');
-              
-              // Force a rebuild to show updated name
-              if (mounted) {
-                setState(() {});
+              // If the name in Firestore differs from local user name, update it
+              if (firestoreName != null && firestoreName.toString().isNotEmpty && 
+                  (firestoreName != user.name || nameIsFromEmail)) {
+                  
+                debugPrint('🔄 ProfileScreen: User name mismatch - Firebase: $firestoreName, Local: ${user.name}');
+                
+                // Update local user object with name from Firestore
+                final updatedUser = User(
+                  id: user.id,
+                  name: firestoreName.toString(),
+                  email: user.email,
+                  language: user.language,
+                  state: user.state,
+                );
+                
+                // Update AuthProvider
+                authProvider.user = updatedUser;
+                authProvider.notifyListeners();
+                
+                debugPrint('✅ ProfileScreen: Updated user name from Firestore: $firestoreName');
+                
+                // Force a rebuild to show updated name
+                if (mounted) {
+                  setState(() {});
+                }
+                
+                // Name found and updated, break the retry loop
+                break;
+              } else if (firestoreName != null && firestoreName.toString().isNotEmpty) {
+                // Name in Firestore matches local name, no need to update
+                debugPrint('✓ ProfileScreen: User name already matches Firestore: ${user.name}');
+                break;
+              }
+            }
+            
+            // If we need to retry, wait with increasing delay
+            if (firestoreName == null || firestoreName.isEmpty) {
+              retryCount++;
+              if (retryCount < maxRetries) {
+                debugPrint('⏱️ ProfileScreen: Retry $retryCount getting user name from Firestore');
+                await Future.delayed(Duration(milliseconds: 500 * retryCount));
               }
             }
           }
         } catch (e) {
           debugPrint('❌ ProfileScreen: Error fetching name from Firestore: $e');
+        } finally {
+          // Always update UI when done, whether successful or not
+          if (mounted) {
+            setState(() {
+              _isLoadingName = false;
+            });
+          }
+        }
+      } else {
+        // No user, just update loading state
+        if (mounted) {
+          setState(() {
+            _isLoadingName = false;
+          });
         }
       }
     });
@@ -83,49 +239,86 @@ class _ProfileScreenState extends State<ProfileScreen> {
   
   // Method to ensure state data is loaded correctly from both local and remote sources
   Future<void> _ensureStateDataLoaded() async {
+    // Set loading state to inform UI
+    if (mounted) {
+      setState(() {
+        _isLoadingState = true;
+      });
+    }
+    
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final user = authProvider.user;
       
       if (user != null) {
-        // Always check Firestore for the most up-to-date state
         try {
           final userId = user.id;
-          final userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
           
-          if (userDoc.exists) {
-            final firestoreState = userDoc.data()?['state'];
-            debugPrint('🗺️ ProfileScreen: Retrieved state from Firestore: $firestoreState');
+          // Add retry mechanism for more reliable state fetching
+          int retryCount = 0;
+          const maxRetries = 3;
+          String? firestoreState;
+          
+          while (retryCount < maxRetries) {
+            final userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
             
-            if (firestoreState != null && firestoreState.toString().isNotEmpty) {
-              // Only update if Firestore has a state and it differs from local state
-              if (user.state != firestoreState.toString()) {
-                // Update local user object with state from Firestore
-                final updatedUser = User(
-                  id: user.id,
-                  name: user.name,
-                  email: user.email,
-                  language: user.language,
-                  state: firestoreState.toString(),
-                );
-                
-                // Update AuthProvider
-                authProvider.user = updatedUser;
-                authProvider.notifyListeners();
-                
-                debugPrint('✅ ProfileScreen: Updated user state from Firestore: $firestoreState');
-                
-                // Force a rebuild to show updated state
-                if (mounted) {
-                  setState(() {});
+            if (userDoc.exists) {
+              firestoreState = userDoc.data()?['state'] as String?;
+              _cachedFirestoreState = firestoreState; // Cache the state for later use
+              
+              debugPrint('🗺️ ProfileScreen: Retrieved state from Firestore: $firestoreState');
+              
+              if (firestoreState != null && firestoreState.toString().isNotEmpty) {
+                // Only update if Firestore has a state and it differs from local state
+                if (user.state != firestoreState.toString()) {
+                  debugPrint('🔄 ProfileScreen: State mismatch - Firebase: $firestoreState, Local: ${user.state}');
+                  
+                  // Update local user object with state from Firestore
+                  final updatedUser = User(
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    language: user.language,
+                    state: firestoreState.toString(),
+                  );
+                  
+                  // Update AuthProvider
+                  authProvider.user = updatedUser;
+                  authProvider.notifyListeners();
+                  
+                  debugPrint('✅ ProfileScreen: Updated user state from Firestore: $firestoreState');
+                } else {
+                  debugPrint('✓ ProfileScreen: Local state already matches Firestore: ${user.state}');
                 }
-              } else {
-                debugPrint('✓ ProfileScreen: Local state already matches Firestore: ${user.state}');
+                
+                // State found, no need to retry
+                break;
               }
+            }
+            
+            // If we need to retry, wait with increasing delay
+            retryCount++;
+            if (retryCount < maxRetries) {
+              debugPrint('⏱️ ProfileScreen: Retry $retryCount getting user state from Firestore');
+              await Future.delayed(Duration(milliseconds: 500 * retryCount));
             }
           }
         } catch (e) {
           debugPrint('❌ ProfileScreen: Error fetching state from Firestore: $e');
+        } finally {
+          // Always update UI when done, whether successful or not
+          if (mounted) {
+            setState(() {
+              _isLoadingState = false;
+            });
+          }
+        }
+      } else {
+        // No user, just update loading state
+        if (mounted) {
+          setState(() {
+            _isLoadingState = false;
+          });
         }
       }
     });
@@ -449,14 +642,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   SizedBox(height: 16),
                   _buildMenuCard(
                     _translate('state', languageProvider),
-                    (authProvider.user?.state?.isNotEmpty == true) 
-                      ? authProvider.user!.state! // Display raw state value without translation
-                      : _translate('Not selected', languageProvider),
+                    _isLoadingState 
+                      ? "Loading..." // Show loading indicator while fetching state
+                      : ((authProvider.user?.state?.isNotEmpty == true) 
+                          ? authProvider.user!.state! 
+                          : _translate('Not selected', languageProvider)),
                     Icons.location_on,
                     Colors.blue[50]!,
                     Colors.blue,
                     () {
-                      // Check Firestore for latest state before showing selector
+                      // Force Firestore refresh and wait for it to complete before showing selector
+                      setState(() { _isLoadingState = true; });
                       _ensureStateDataLoaded().then((_) {
                         _showStateSelector(context, languageProvider);
                       });
@@ -726,6 +922,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onTap: () async {
                   // Update state in auth provider
                   await authProvider.updateUserState(state);
+                  
+                  // Force immediate UI update
+                  if (mounted) {
+                    setState(() {
+                      // This will trigger an immediate UI rebuild
+                      _isLoadingState = false;
+                    });
+                  }
+                  
                   Navigator.pop(context);
                   
                   // Visual feedback
