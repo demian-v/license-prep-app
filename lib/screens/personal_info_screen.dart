@@ -18,6 +18,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   late TextEditingController _passwordController;
   bool _isLoading = false;
   bool _showPasswordField = false;
+  String? _initialName;
+  String? _initialEmail;
 
   // Helper method to get correct translations
   String _translate(String key, LanguageProvider languageProvider) {
@@ -29,8 +31,12 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           return {
             'personal_info': 'Información personal',
             'change_personal_data': 'Cambiar datos personales',
+            'delete_account_section': 'Eliminación de cuenta',
             'name': 'Nombre',
             'email': 'Correo electrónico',
+            'password': 'Contraseña',
+            'password_required': 'La contraseña es obligatoria',
+            'password_needed_for_email': 'Se requiere su contraseña para cambiar su dirección de correo electrónico',
             'delete_account': 'Eliminar cuenta',
             'delete_account_desc': 'La eliminación será permanente, sin posibilidad de recuperar la cuenta',
             'save': 'Guardar',
@@ -47,8 +53,12 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           return {
             'personal_info': 'Персональна інформація',
             'change_personal_data': 'Змінити особисті дані',
+            'delete_account_section': 'Видалення аккаунту',
             'name': 'Ім\'я',
             'email': 'E-mail',
+            'password': 'Пароль',
+            'password_required': 'Пароль обов\'язковий',
+            'password_needed_for_email': 'Для зміни електронної адреси потрібен ваш пароль',
             'delete_account': 'Видалити аккаунт',
             'delete_account_desc': 'Видалення буде остаточним, без можливості відновити аккаунт',
             'save': 'Зберегти',
@@ -65,8 +75,12 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           return {
             'personal_info': 'Персональная информация',
             'change_personal_data': 'Изменить личные данные',
+            'delete_account_section': 'Удаление аккаунта',
             'name': 'Имя',
             'email': 'Электронная почта',
+            'password': 'Пароль',
+            'password_required': 'Пароль обязателен',
+            'password_needed_for_email': 'Для изменения адреса электронной почты требуется ваш пароль',
             'delete_account': 'Удалить аккаунт',
             'delete_account_desc': 'Удаление будет окончательным, без возможности восстановить аккаунт',
             'save': 'Сохранить',
@@ -83,8 +97,12 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           return {
             'personal_info': 'Informacje osobiste',
             'change_personal_data': 'Zmień dane osobowe',
+            'delete_account_section': 'Usuwanie konta',
             'name': 'Imię i nazwisko',
             'email': 'E-mail',
+            'password': 'Hasło',
+            'password_required': 'Hasło jest wymagane',
+            'password_needed_for_email': 'Twoje hasło jest wymagane do zmiany adresu e-mail',
             'delete_account': 'Usuń konto',
             'delete_account_desc': 'Usunięcie będzie trwałe, bez możliwości odzyskania konta',
             'save': 'Zapisz',
@@ -102,6 +120,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           return {
             'personal_info': 'Personal Information',
             'change_personal_data': 'Change personal data',
+            'delete_account_section': 'Account Deletion',
             'name': 'Name',
             'email': 'Email',
             'password': 'Password',
@@ -132,9 +151,19 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     super.initState();
     // Initialize with current user data
     final user = Provider.of<AuthProvider>(context, listen: false).user;
-    _nameController = TextEditingController(text: user?.name ?? '');
-    _emailController = TextEditingController(text: user?.email ?? '');
+    _initialName = user?.name ?? '';
+    _initialEmail = user?.email ?? '';
+    _nameController = TextEditingController(text: _initialName);
+    _emailController = TextEditingController(text: _initialEmail);
     _passwordController = TextEditingController();
+    
+    // Add listeners to controllers
+    _nameController.addListener(() {
+      setState(() {}); // Trigger rebuild to update save button state
+    });
+    _emailController.addListener(() {
+      setState(() {}); // Trigger rebuild to update save button state
+    });
     
     // Handle post-email verification when screen initializes
     _handlePossibleEmailVerification();
@@ -188,6 +217,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
 
   @override
   void dispose() {
+    _nameController.removeListener(() { setState(() {}); });
+    _emailController.removeListener(() { setState(() {}); });
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -349,10 +380,23 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     );
   }
 
+  // Add method to check if form was modified
+  bool _isFormModified() {
+    return _nameController.text != _initialName || 
+           _emailController.text != _initialEmail;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<LanguageProvider>(
       builder: (context, languageProvider, _) {
+        // Define common title style
+        final titleStyle = TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+          color: Colors.black87,
+        );
+
         return Scaffold(
           appBar: AppBar(
             title: Text(
@@ -381,141 +425,165 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                       ),
                     ),
                   ),
-                )
-              else
-                TextButton(
-                  onPressed: () => _saveChanges(context, languageProvider),
-                  child: Text(
-                    _translate('save', languageProvider),
-                    style: TextStyle(
-                      color: Colors.blue,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
                 ),
             ],
           ),
-          body: _isLoading
+          body: SafeArea(
+            child: _isLoading
               ? Center(child: CircularProgressIndicator())
-              : SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _translate('change_personal_data', languageProvider),
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey[700],
-                            ),
-                          ),
-                          SizedBox(height: 24),
-                          
-                          // Name field
-                          _buildFormField(
-                            context,
-                            _translate('name', languageProvider),
-                            Icons.person_outline,
-                            Colors.green,
-                            _nameController,
-                            (value) {
-                              if (value == null || value.isEmpty) {
-                                return _translate('name_required', languageProvider);
-                              }
-                              return null;
-                            },
-                          ),
-                          SizedBox(height: 16),
-                          
-                          // Email field
-                          _buildFormField(
-                            context,
-                            _translate('email', languageProvider),
-                            Icons.email_outlined,
-                            Colors.blue,
-                            _emailController,
-                            (value) {
-                              if (value == null || value.isEmpty) {
-                                return _translate('email_required', languageProvider);
-                              }
-                              if (!_isValidEmail(value)) {
-                                return _translate('invalid_email', languageProvider);
-                              }
-                              return null;
-                            },
-                          ),
-                          
-                          // Password field (only shown when changing email)
-                          if (_showPasswordField)
-                            Column(
+              : Column(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                SizedBox(height: 16),
+                                Text(
+                                  _translate('change_personal_data', languageProvider),
+                                  style: titleStyle,
+                                ),
+                                SizedBox(height: 24),
+                                
+                                // Name field
                                 _buildFormField(
                                   context,
-                                  _translate('password', languageProvider),
-                                  Icons.lock_outline,
-                                  Colors.purple,
-                                  _passwordController,
+                                  _translate('name', languageProvider),
+                                  Icons.person_outline,
+                                  Colors.green,
+                                  _nameController,
                                   (value) {
                                     if (value == null || value.isEmpty) {
-                                      return _translate('password_required', languageProvider);
+                                      return _translate('name_required', languageProvider);
                                     }
                                     return null;
                                   },
-                                  isPassword: true,
                                 ),
-                                SizedBox(height: 8),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                                  child: Text(
-                                    _translate('password_needed_for_email', languageProvider),
-                                    style: TextStyle(
-                                      color: Colors.grey[600],
-                                      fontSize: 12,
-                                    ),
+                                SizedBox(height: 16),
+                                
+                                // Email field
+                                _buildFormField(
+                                  context,
+                                  _translate('email', languageProvider),
+                                  Icons.email_outlined,
+                                  Colors.blue,
+                                  _emailController,
+                                  (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return _translate('email_required', languageProvider);
+                                    }
+                                    if (!_isValidEmail(value)) {
+                                      return _translate('invalid_email', languageProvider);
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                
+                                // Password field (only shown when changing email)
+                                if (_showPasswordField)
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      SizedBox(height: 16),
+                                      _buildFormField(
+                                        context,
+                                        _translate('password', languageProvider),
+                                        Icons.lock_outline,
+                                        Colors.purple,
+                                        _passwordController,
+                                        (value) {
+                                          if (value == null || value.isEmpty) {
+                                            return _translate('password_required', languageProvider);
+                                          }
+                                          return null;
+                                        },
+                                        isPassword: true,
+                                      ),
+                                      SizedBox(height: 8),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                                        child: Text(
+                                          _translate('password_needed_for_email', languageProvider),
+                                          style: TextStyle(
+                                            color: Colors.grey[600],
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
+                                
+                                SizedBox(height: 32),
+                                
+                                // Delete account section title
+                                Text(
+                                  _translate('delete_account_section', languageProvider),
+                                  style: titleStyle,
+                                ),
+                                SizedBox(height: 16),
+                                
+                                // Delete account button
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _translate('delete_account_desc', languageProvider),
+                                      style: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    SizedBox(height: 8),
+                                    ElevatedButton(
+                                      onPressed: () => _showDeleteConfirmation(context, languageProvider),
+                                      child: Text(_translate('delete_account', languageProvider)),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.red,
+                                        foregroundColor: Colors.white,
+                                        minimumSize: Size(double.infinity, 48),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                          
-                          SizedBox(height: 48),
-                          
-                          // Delete account button
-                          Column(
-                            children: [
-                              ElevatedButton(
-                                onPressed: () => _showDeleteConfirmation(context, languageProvider),
-                                child: Text(_translate('delete_account', languageProvider)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red,
-                                  foregroundColor: Colors.white,
-                                  minimumSize: Size(double.infinity, 48),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        children: [
+                          ElevatedButton(
+                            onPressed: _isFormModified() 
+                              ? () => _saveChanges(context, languageProvider)
+                              : null,
+                            child: Text(_translate('save', languageProvider)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              foregroundColor: Colors.white,
+                              minimumSize: Size(double.infinity, 48),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                              SizedBox(height: 8),
-                              Text(
-                                _translate('delete_account_desc', languageProvider),
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
+                              // Add disabled color
+                              disabledBackgroundColor: Colors.blue.withOpacity(0.3),
+                              disabledForegroundColor: Colors.white,
+                            ),
                           ),
                         ],
                       ),
                     ),
-                  ),
+                  ],
                 ),
+          ),
         );
       },
     );

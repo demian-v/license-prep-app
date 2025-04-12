@@ -686,18 +686,21 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                     languageProvider,
                   ),
                   SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: () async {
-                      await authProvider.logout();
-                      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-                    },
-                    child: Text(_translate('logout', languageProvider)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                  Container(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        await authProvider.logout();
+                        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                      },
+                      child: Text(_translate('logout', languageProvider)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
                   ),
