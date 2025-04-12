@@ -20,6 +20,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   bool _showPasswordField = false;
   String? _initialName;
   String? _initialEmail;
+  String? _passwordError; // Added variable to track password error
 
   // Helper method to get correct translations
   String _translate(String key, LanguageProvider languageProvider) {
@@ -146,6 +147,17 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     }
   }
 
+  // Clear password error when text changes
+  void _setupPasswordListener() {
+    _passwordController.addListener(() {
+      if (_passwordError != null) {
+        setState(() {
+          _passwordError = null;
+        });
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -164,6 +176,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     _emailController.addListener(() {
       setState(() {}); // Trigger rebuild to update save button state
     });
+    
+    // Setup password error clearing
+    _setupPasswordListener();
     
     // Handle post-email verification when screen initializes
     _handlePossibleEmailVerification();
@@ -244,6 +259,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
+        _passwordError = null; // Clear any previous password errors
       });
 
       try {
@@ -277,37 +293,76 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             _showPasswordField = false;
           } catch (e) {
             print('❌ Error updating email: $e');
-            // Show error message to user
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Error updating email: $e'),
-                backgroundColor: Colors.red,
-              ),
-            );
-            setState(() {
-              _isLoading = false;
-            });
+            
+            // Check for authentication errors and set password error
+            String errorMessage = e.toString();
+            print('📋 Personal info error caught: $errorMessage');
+            if (errorMessage.contains('INVALID_LOGIN_CREDENTIALS') || 
+                errorMessage.contains('wrong-password') ||
+                errorMessage.contains('Authentication failed') ||
+                errorMessage.contains('auth/invalid-credential') ||
+                errorMessage.contains('Reauthentication failed')) {
+              
+              // Use a more specific error message for incorrect password
+              String errorText = 'Невірний пароль. Перевірте пароль та спробуйте ще раз.';
+              if (languageProvider.language != 'uk') {
+                // Get translation if available, or use a generic authentication error message
+                errorText = _translate('password_required', languageProvider);
+              }
+              
+              setState(() {
+                _passwordError = errorText;
+                _isLoading = false;
+              });
+              
+              // Ensure the error is visible by forcing a UI refresh
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) setState(() {});
+              });
+            } else {
+              // For other errors, show in SnackBar
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error updating email: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+              setState(() {
+                _isLoading = false;
+              });
+            }
             return;
           }
         }
         
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              _emailController.text != authProvider.user!.email 
-                ? 'Verification email sent. Please check your inbox to confirm the new email address.'
-                : _translate('changes_saved', languageProvider)
+        // Check if email was actually changed before showing success message
+        if (_emailController.text != _initialEmail) {
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Verification email sent. Please check your inbox to confirm the new email address.'
+              ),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 5),  // Show longer for verification message
             ),
-            backgroundColor: Colors.green,
-            duration: _emailController.text != authProvider.user!.email 
-                ? Duration(seconds: 5)  // Show longer for verification message
-                : Duration(seconds: 2),
-          ),
-        );
-        
-        // Go back to profile screen
-        Navigator.pop(context);
+          );
+          
+          // Go back to profile screen
+          Navigator.pop(context);
+        } else {
+          // Only name was changed
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(_translate('changes_saved', languageProvider)),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+          
+          // Go back to profile screen
+          Navigator.pop(context);
+        }
         
       } catch (e) {
         // Show error message
@@ -482,12 +537,24 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                                   },
                                 ),
                                 
-                                // Password field (only shown when changing email)
+                                    // Password field (only shown when changing email)
                                 if (_showPasswordField)
                                   Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       SizedBox(height: 16),
+                                      // Password description is now above the password field
+                                      Padding(
+                                        padding: const EdgeInsets.only(left: 16.0, bottom: 8.0, right: 16.0),
+                                        child: Text(
+                                          _translate('password_needed_for_email', languageProvider),
+                                          style: TextStyle(
+                                            color: Colors.grey[600],
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                      // Password field
                                       _buildFormField(
                                         context,
                                         _translate('password', languageProvider),
@@ -501,17 +568,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                                           return null;
                                         },
                                         isPassword: true,
-                                      ),
-                                      SizedBox(height: 8),
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                                        child: Text(
-                                          _translate('password_needed_for_email', languageProvider),
-                                          style: TextStyle(
-                                            color: Colors.grey[600],
-                                            fontSize: 12,
-                                          ),
-                                        ),
+                                        errorText: _passwordError,
                                       ),
                                     ],
                                   ),
@@ -596,53 +653,70 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     Color iconColor,
     TextEditingController controller,
     String? Function(String?) validator,
-    {bool isPassword = false}
+    {bool isPassword = false, String? errorText}
   ) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 2,
-            offset: Offset(0, 1),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                spreadRadius: 1,
+                blurRadius: 2,
+                offset: Offset(0, 1),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                color: iconColor,
-                size: 20,
-              ),
-            ),
-            SizedBox(width: 16),
-            Expanded(
-              child: TextFormField(
-                controller: controller,
-                decoration: InputDecoration(
-                  labelText: label,
-                  border: InputBorder.none,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: iconColor.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    icon,
+                    color: iconColor,
+                    size: 20,
+                  ),
                 ),
-                obscureText: isPassword,
-                validator: validator,
+                SizedBox(width: 16),
+                Expanded(
+                  child: TextFormField(
+                    controller: controller,
+                    decoration: InputDecoration(
+                      labelText: label,
+                      border: InputBorder.none,
+                    ),
+                    obscureText: isPassword,
+                    validator: validator,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Error text display
+        if (errorText != null)
+          Padding(
+            padding: const EdgeInsets.only(left: 16.0, top: 8.0, right: 16.0),
+            child: Text(
+              errorText,
+              style: TextStyle(
+                color: Colors.red,
+                fontSize: 12,
               ),
             ),
-          ],
-        ),
-      ),
+          ),
+      ],
     );
   }
 }

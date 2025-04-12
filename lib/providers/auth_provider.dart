@@ -397,23 +397,36 @@ class AuthProvider extends ChangeNotifier {
         
         notifyListeners();
       } catch (e) {
-        // Fallback to local update if API is not available
-        debugPrint('⚠️ AuthProvider: API error, updating email locally: $e');
-        
-        // Create a new user object with updated email
-        final updatedUser = User(
-          id: user!.id,
-          name: user!.name,
-          email: email, // Update the email
-          language: user!.language,
-          state: user!.state,
-        );
-        user = updatedUser;
-        
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('user', jsonEncode(updatedUser.toJson()));
-        
-        notifyListeners();
+        // Check if this is an authentication error
+        String errorMessage = e.toString();
+        if (errorMessage.contains('INVALID_LOGIN_CREDENTIALS') || 
+            errorMessage.contains('wrong-password') ||
+            errorMessage.contains('Authentication failed') ||
+            errorMessage.contains('auth/invalid-credential') ||
+            errorMessage.contains('Reauthentication failed')) {
+          // This is an authentication error - do NOT update locally
+          debugPrint('❌ AuthProvider: Authentication error, NOT updating email: $e');
+          // Re-throw the error so it can be handled by the UI
+          throw e;
+        } else {
+          // Only for network errors or API unavailability, fall back to local update
+          debugPrint('⚠️ AuthProvider: Non-auth API error, updating email locally: $e');
+          
+          // Create a new user object with updated email
+          final updatedUser = User(
+            id: user!.id,
+            name: user!.name,
+            email: email, // Update the email
+            language: user!.language,
+            state: user!.state,
+          );
+          user = updatedUser;
+          
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('user', jsonEncode(updatedUser.toJson()));
+          
+          notifyListeners();
+        }
       }
     } else {
       debugPrint('⚠️ AuthProvider: Cannot update email - user is null');
