@@ -23,6 +23,10 @@ import 'screens/home_screen.dart';
 import 'screens/traffic_rules_topics_screen.dart';
 import 'screens/test_screen.dart';
 import 'screens/reset_app_settings_screen.dart';
+import 'screens/forgot_password_screen.dart';
+import 'screens/reset_email_sent_screen.dart';
+import 'screens/reset_password_screen.dart';
+import 'screens/password_reset_success_screen.dart';
 import 'models/user.dart';
 import 'models/subscription.dart';
 import 'models/progress.dart';
@@ -348,6 +352,14 @@ class MyApp extends StatelessWidget {
         '/profile': (context) => ProfileScreen(),
         '/subscription': (context) => SubscriptionScreen(),
         '/settings/reset': (context) => ResetAppSettingsScreen(),
+        // Password reset routes
+        '/forgot-password': (context) => ForgotPasswordScreen(),
+        '/reset-email-sent': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          final email = args?['email'] as String? ?? '';
+          return ResetEmailSentScreen();
+        },
+        '/reset-success': (context) => PasswordResetSuccessScreen(),
       },
       onGenerateRoute: (settings) {
         if (settings.name!.startsWith('/theory/')) {
@@ -360,6 +372,15 @@ class MyApp extends StatelessWidget {
           return MaterialPageRoute(
             builder: (context) => PracticeTestScreen(licenseId: licenseId),
           );
+        } else if (settings.name!.startsWith('/reset-password')) {
+          // Handle password reset deep links
+          final uri = Uri.parse(settings.name!);
+          final code = uri.queryParameters['oobCode'];
+          if (code != null) {
+            return MaterialPageRoute(
+              builder: (context) => ResetPasswordScreen(code: code),
+            );
+          }
         }
         return null;
       },

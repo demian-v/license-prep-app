@@ -31,7 +31,28 @@ class FirebaseAuthApi implements AuthApiInterface {
         
         return User.fromJson(userData);
       } catch (firestoreError) {
-        // Fallback if function fails - construct basic user
+        print('Warning: Failed to get user data from function: $firestoreError');
+        
+        // Attempt to get data directly from Firestore
+        try {
+          final firestore = FirebaseFirestore.instance;
+          final docSnapshot = await firestore.collection('users').doc(userId).get();
+          
+          if (docSnapshot.exists && docSnapshot.data()?['name'] != null) {
+            print('Retrieved user data directly from Firestore');
+            return User(
+              id: userId,
+              name: docSnapshot.data()?['name'],
+              email: email,
+              language: docSnapshot.data()?['language'] ?? 'en',
+              state: docSnapshot.data()?['state'],
+            );
+          }
+        } catch (directFirestoreError) {
+          print('Warning: Failed to get user data directly from Firestore: $directFirestoreError');
+        }
+        
+        // Final fallback if all methods fail - construct basic user
         return User(
           id: userId,
           name: userCredential.user?.displayName ?? email.split('@')[0],
@@ -67,6 +88,9 @@ class FirebaseAuthApi implements AuthApiInterface {
       
       // Update display name
       await userCredential.user!.updateDisplayName(name);
+      
+      // Need to reload user to ensure the display name is available
+      await userCredential.user!.reload();
       
       // Create user document in Firestore and ensure it's created successfully
       try {
@@ -335,6 +359,34 @@ class FirebaseAuthApi implements AuthApiInterface {
       );
     } catch (e) {
       // Silent catch for security reasons
+    }
+  }
+  
+  /// Verify password reset code
+  @override
+  Future<String> verifyPasswordResetCode(String code) async {
+    try {
+      final auth = FirebaseAuth.instance;
+      return await auth.verifyPasswordResetCode(code);
+    } catch (e) {
+      print('❌ [API] Error verifying password reset code: $e');
+      throw 'Invalid or expired password reset link. Please request a new link.';
+    }
+  }
+
+  /// Confirm password reset with new password
+  @override
+  Future<void> confirmPasswordReset(String code, String newPassword) async {
+    try {
+      final auth = FirebaseAuth.instance;
+      await auth.confirmPasswordReset(
+        code: code, 
+        newPassword: newPassword
+      );
+      print('✅ [API] Password reset successfully confirmed');
+    } catch (e) {
+      print('❌ [API] Error confirming password reset: $e');
+      throw 'Failed to reset password. Please try again.';
     }
   }
   

@@ -492,4 +492,47 @@ class AuthProvider extends ChangeNotifier {
       debugPrint('🚪 AuthProvider: User logged out locally due to API error');
     }
   }
+  
+  /// Sends a password reset email to the specified email address
+  Future<void> sendPasswordResetEmail(String email) async {
+    try {
+      debugPrint('🔑 AuthProvider: Sending password reset email to: $email');
+      // Use Firebase Auth directly for better reliability
+      await firebase_auth.FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      debugPrint('✅ AuthProvider: Password reset email sent successfully');
+    } catch (e) {
+      debugPrint('⚠️ AuthProvider: Password reset email error: $e');
+      // For security reasons, we don't expose if the email exists or not
+    }
+  }
+  
+  /// Verifies a password reset code
+  Future<String> verifyPasswordResetCode(String code) async {
+    try {
+      debugPrint('🔑 AuthProvider: Verifying password reset code');
+      // Use Firebase Auth directly for better reliability
+      final email = await firebase_auth.FirebaseAuth.instance.verifyPasswordResetCode(code);
+      debugPrint('✅ AuthProvider: Reset code verified for email: $email');
+      return email;
+    } catch (e) {
+      debugPrint('⚠️ AuthProvider: Password reset code verification error: $e');
+      throw e;
+    }
+  }
+  
+  /// Completes the password reset process with a new password
+  Future<void> confirmPasswordReset(String code, String newPassword) async {
+    try {
+      debugPrint('🔑 AuthProvider: Confirming password reset');
+      // Use Firebase Auth directly for better reliability
+      await firebase_auth.FirebaseAuth.instance.confirmPasswordReset(
+        code: code, 
+        newPassword: newPassword
+      );
+      debugPrint('✅ AuthProvider: Password reset confirmed successfully');
+    } catch (e) {
+      debugPrint('⚠️ AuthProvider: Password reset confirmation error: $e');
+      throw e;
+    }
+  }
 }

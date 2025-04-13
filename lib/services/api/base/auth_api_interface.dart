@@ -31,6 +31,12 @@ abstract class AuthApiInterface {
   
   /// Request password reset
   Future<void> requestPasswordReset(String email);
+
+  /// Verify password reset code
+  Future<String> verifyPasswordResetCode(String code);
+
+  /// Confirm password reset with new password
+  Future<void> confirmPasswordReset(String code, String newPassword);
   
   /// Logs the user out
   Future<void> logout();

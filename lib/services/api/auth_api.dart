@@ -106,6 +106,7 @@ class AuthApi implements AuthApiInterface {
   }
   
   /// Request password reset
+  @override
   Future<void> requestPasswordReset(String email) async {
     try {
       await _apiClient.post(
@@ -117,6 +118,52 @@ class AuthApi implements AuthApiInterface {
     } catch (e) {
       // We don't want to reveal if the email exists or not for security reasons
       // So we just let this silently succeed even if it fails
+    }
+  }
+  
+  /// Verify password reset code
+  @override
+  Future<String> verifyPasswordResetCode(String code) async {
+    try {
+      final response = await _apiClient.post(
+        '/auth/verify-reset-code',
+        data: {
+          'code': code,
+        },
+      );
+      
+      // Return the email associated with the code
+      return response.data['email'] as String;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 400) {
+        throw 'Invalid or expired reset code';
+      } else {
+        throw 'Failed to verify reset code: ${e.message}';
+      }
+    } catch (e) {
+      throw 'An unexpected error occurred while verifying the reset code';
+    }
+  }
+
+  /// Confirm password reset with new password
+  @override
+  Future<void> confirmPasswordReset(String code, String newPassword) async {
+    try {
+      await _apiClient.post(
+        '/auth/confirm-reset-password',
+        data: {
+          'code': code,
+          'newPassword': newPassword,
+        },
+      );
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 400) {
+        throw 'Invalid or expired reset code';
+      } else {
+        throw 'Failed to reset password: ${e.message}';
+      }
+    } catch (e) {
+      throw 'An unexpected error occurred while resetting the password';
     }
   }
   

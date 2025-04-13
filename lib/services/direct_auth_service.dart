@@ -469,6 +469,32 @@ class DirectAuthService implements AuthApiInterface {
       debugPrint('DirectAuthService: Password reset request handled');
     }
   }
+  
+  /// Verify password reset code
+  @override
+  Future<String> verifyPasswordResetCode(String code) async {
+    try {
+      return await _auth.verifyPasswordResetCode(code);
+    } catch (e) {
+      debugPrint('DirectAuthService: Error verifying reset code: $e');
+      throw 'Invalid or expired reset link. Please request a new one.';
+    }
+  }
+
+  /// Confirm password reset with new password
+  @override
+  Future<void> confirmPasswordReset(String code, String newPassword) async {
+    try {
+      await _auth.confirmPasswordReset(
+        code: code,
+        newPassword: newPassword,
+      );
+      debugPrint('DirectAuthService: Password reset successfully');
+    } catch (e) {
+      debugPrint('DirectAuthService: Error confirming password reset: $e');
+      throw 'Failed to reset password. Please try again.';
+    }
+  }
 }
 
 // Global instance for easy access

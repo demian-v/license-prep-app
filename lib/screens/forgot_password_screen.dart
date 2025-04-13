@@ -2,26 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 
-class LoginScreen extends StatefulWidget {
+class ForgotPasswordScreen extends StatefulWidget {
   @override
-  _LoginScreenState createState() => _LoginScreenState();
+  _ForgotPasswordScreenState createState() => _ForgotPasswordScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
   bool _isLoading = false;
   String? _errorMessage;
 
   @override
   void dispose() {
     _emailController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
 
-  Future<void> _login() async {
+  Future<void> _sendResetEmail() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -32,55 +30,23 @@ class _LoginScreenState extends State<LoginScreen> {
     });
     
     final email = _emailController.text.trim();
-    final password = _passwordController.text;
     
     try {
-      // Use auth provider instead of direct service
-      debugPrint('LoginScreen: Logging in with email: $email');
-      
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final success = await authProvider.login(email, password);
-      
-      if (success) {
-        debugPrint('LoginScreen: Login successful');
-        if (mounted) {
-          // Navigate to home screen
-          Navigator.of(context).pushReplacementNamed('/home');
-        }
-      } else if (mounted) {
-        setState(() {
-          _errorMessage = 'Login failed. Please check your credentials.';
-        });
-      }
-    } catch (e) {
-      debugPrint('LoginScreen: Error during login: $e');
-      String errorMessage = 'An error occurred. Please try again.';
-      
-      // Check for specific Firebase auth errors to provide better guidance
-      String errorString = e.toString().toLowerCase();
-      
-      if (errorString.contains('user-not-found') || 
-          errorString.contains('no user record corresponding') ||
-          errorString.contains('invalid-email')) {
-        
-        errorMessage = 'Email not found. If you recently verified a new email address, please use that email to log in.';
-      } else if (errorString.contains('wrong-password') || 
-                errorString.contains('invalid-credential')) {
-        
-        errorMessage = 'Invalid password. Please try again.';
-      } else if (errorString.contains('user-disabled')) {
-        errorMessage = 'This account has been disabled. Please contact support.';
-      } else if (errorString.contains('too-many-requests')) {
-        errorMessage = 'Too many failed login attempts. Please try again later.';
-      } else if (errorString.contains('session-expired') || 
-                errorString.contains('user-token-expired')) {
-        
-        errorMessage = 'Your session has expired. If you recently changed your email, please use your new email address to log in.';
-      }
+      await authProvider.sendPasswordResetEmail(email);
       
       if (mounted) {
+        Navigator.pushNamed(
+          context, 
+          '/reset-email-sent',
+          arguments: {'email': email},
+        );
+      }
+    } catch (e) {
+      if (mounted) {
         setState(() {
-          _errorMessage = errorMessage;
+          // For security reasons, we don't show specific errors
+          _errorMessage = 'An error occurred. Please try again.';
         });
       }
     } finally {
@@ -95,6 +61,13 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text('Forgot Password'),
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -103,16 +76,6 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  'USA License Prep',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).primaryColor,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: 40),
                 Card(
                   elevation: 4,
                   shape: RoundedRectangleBorder(
@@ -126,12 +89,20 @@ class _LoginScreenState extends State<LoginScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Text(
-                            'Log In',
+                            'Forgot Your Password?',
                             style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
                             ),
                             textAlign: TextAlign.center,
+                          ),
+                          SizedBox(height: 16),
+                          Text(
+                            'Enter your email address and we will send you instructions to reset your password.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.grey[700],
+                            ),
                           ),
                           SizedBox(height: 24),
                           if (_errorMessage != null) ...[
@@ -151,7 +122,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           TextFormField(
                             controller: _emailController,
                             decoration: InputDecoration(
-                              labelText: 'Email',
+                              labelText: 'Email address',
+                              hintText: 'Enter your email',
                               border: OutlineInputBorder(),
                               prefixIcon: Icon(Icons.email),
                             ),
@@ -160,42 +132,19 @@ class _LoginScreenState extends State<LoginScreen> {
                               if (value == null || value.isEmpty) {
                                 return 'Please enter your email';
                               }
-                              return null;
-                            },
-                          ),
-                          SizedBox(height: 16),
-                          TextFormField(
-                            controller: _passwordController,
-                            decoration: InputDecoration(
-                              labelText: 'Password',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.lock),
-                            ),
-                            obscureText: true,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your password';
+                              
+                              // Basic email validation
+                              final emailRegExp = RegExp(r'^[^@]+@[^@]+\.[^@]+');
+                              if (!emailRegExp.hasMatch(value)) {
+                                return 'Please enter a valid email address';
                               }
+                              
                               return null;
                             },
                           ),
-                          SizedBox(height: 8),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton(
-                              onPressed: () {
-                                Navigator.pushNamed(context, '/forgot-password');
-                              },
-                              child: Text('Forgot password?'),
-                              style: TextButton.styleFrom(
-                                padding: EdgeInsets.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
-                            ),
-                          ),
-                          SizedBox(height: 16),
+                          SizedBox(height: 24),
                           ElevatedButton(
-                            onPressed: _isLoading ? null : _login,
+                            onPressed: _isLoading ? null : _sendResetEmail,
                             style: ElevatedButton.styleFrom(
                               padding: EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(
@@ -208,16 +157,16 @@ class _LoginScreenState extends State<LoginScreen> {
                                     strokeWidth: 3,
                                   )
                                 : Text(
-                                    'Log In',
+                                    'Continue',
                                     style: TextStyle(fontSize: 16),
                                   ),
                           ),
                           SizedBox(height: 16),
                           TextButton(
                             onPressed: () {
-                              Navigator.pushNamed(context, '/signup');
+                              Navigator.pop(context);
                             },
-                            child: Text('Don\'t have an account? Sign Up'),
+                            child: Text('Back to Log In'),
                           ),
                         ],
                       ),
