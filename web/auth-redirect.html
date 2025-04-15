@@ -165,53 +165,125 @@
     
     // iOS specific handling
     function handleIOSRedirect(mode, oobCode) {
-      // Set the manual link's href attribute
-      const deepLink = `licenseprep://${mode}?oobCode=${oobCode}`;
-      document.getElementById('manual-link').href = deepLink;
-      
-      // Try multiple approaches for iOS
-      tryMultipleSchemes([
-        `licenseprep://${mode}?oobCode=${oobCode}`, 
-        `licenseprepapp://${mode}?oobCode=${oobCode}`
-      ]);
-      
-      // For iOS 9+, also try using the universal links approach
-      setTimeout(function() {
-        window.location.href = `https://licenseprepapp.page.link/${mode}?oobCode=${oobCode}`;
-      }, 1500);
+      // Check if it's a password reset
+      if (mode === 'resetPassword') {
+        console.log("Detected iOS password reset - prioritizing direct routing");
+        
+        // Set the manual link's href attribute with reset-password route
+        const deepLink = `licenseprep:///reset-password?oobCode=${oobCode}`;
+        document.getElementById('manual-link').href = deepLink;
+        
+        // Try multiple approaches for iOS with better path specification
+        tryMultipleSchemes([
+          `licenseprep:///reset-password?oobCode=${oobCode}`,
+          `licenseprep://resetPassword?oobCode=${oobCode}`,
+          `licenseprepapp:///reset-password?oobCode=${oobCode}`,
+          `licenseprepapp://resetPassword?oobCode=${oobCode}`
+        ]);
+        
+        // Web fallback for password reset
+        setTimeout(function() {
+          window.location.href = `/password-reset.html?mode=${mode}&oobCode=${oobCode}`;
+        }, 1500);
+      } else {
+        // Regular link handling for non-password-reset cases
+        const deepLink = `licenseprep://${mode}?oobCode=${oobCode}`;
+        document.getElementById('manual-link').href = deepLink;
+        
+        // Try multiple approaches for iOS
+        tryMultipleSchemes([
+          `licenseprep://${mode}?oobCode=${oobCode}`, 
+          `licenseprepapp://${mode}?oobCode=${oobCode}`
+        ]);
+        
+        // For iOS 9+, also try using the universal links approach
+        setTimeout(function() {
+          window.location.href = `https://licenseprepapp.page.link/${mode}?oobCode=${oobCode}`;
+        }, 1500);
+      }
     }
     
     // Android specific handling
     function handleAndroidRedirect(mode, oobCode) {
-      // Set the manual link's href attribute
-      const deepLink = `licenseprep://${mode}?oobCode=${oobCode}`;
-      document.getElementById('manual-link').href = deepLink;
-      
-      // Try multiple schemes
-      tryMultipleSchemes([
-        `licenseprep://${mode}?oobCode=${oobCode}`, 
-        `licenseprepapp://${mode}?oobCode=${oobCode}`
-      ]);
-      
-      // For newer Android devices, try intent syntax
-      setTimeout(function() {
-        window.location.href = `intent://${mode}?oobCode=${oobCode}#Intent;scheme=licenseprep;package=com.license.prep.app;end`;
-      }, 1500);
+      // Check if it's a password reset
+      if (mode === 'resetPassword') {
+        console.log("Detected Android password reset - prioritizing direct routing");
+        
+        // Set the manual link's href attribute with reset-password route
+        const deepLink = `licenseprep:///reset-password?oobCode=${oobCode}`;
+        document.getElementById('manual-link').href = deepLink;
+        
+        // Try multiple approaches for Android with better path specification
+        tryMultipleSchemes([
+          `licenseprep:///reset-password?oobCode=${oobCode}`,
+          `licenseprep://resetPassword?oobCode=${oobCode}`,
+          `licenseprepapp:///reset-password?oobCode=${oobCode}`,
+          `licenseprepapp://resetPassword?oobCode=${oobCode}`
+        ]);
+        
+        // For newer Android devices, try intent syntax
+        setTimeout(function() {
+          window.location.href = `intent:///reset-password?oobCode=${oobCode}#Intent;scheme=licenseprep;package=com.license.prep.app;end`;
+        }, 1000);
+        
+        // Web fallback for password reset
+        setTimeout(function() {
+          window.location.href = `/password-reset.html?mode=${mode}&oobCode=${oobCode}`;
+        }, 2000);
+      } else {
+        // Regular link handling for non-password-reset cases
+        const deepLink = `licenseprep://${mode}?oobCode=${oobCode}`;
+        document.getElementById('manual-link').href = deepLink;
+        
+        // Try multiple schemes
+        tryMultipleSchemes([
+          `licenseprep://${mode}?oobCode=${oobCode}`, 
+          `licenseprepapp://${mode}?oobCode=${oobCode}`
+        ]);
+        
+        // For newer Android devices, try intent syntax
+        setTimeout(function() {
+          window.location.href = `intent://${mode}?oobCode=${oobCode}#Intent;scheme=licenseprep;package=com.license.prep.app;end`;
+        }, 1500);
+      }
     }
     
     // Generic fallback approach
     function handleGenericRedirect(mode, oobCode) {
-      // Set the manual link's href attribute
-      const deepLink = `licenseprep://${mode}?oobCode=${oobCode}`;
-      document.getElementById('manual-link').href = deepLink;
-      
-      // Try simple redirect
-      window.location.href = deepLink;
-      
-      // Try another scheme as fallback
-      setTimeout(function() {
-        window.location.href = `licenseprepapp://${mode}?oobCode=${oobCode}`;
-      }, 1000);
+      // Check if it's a password reset
+      if (mode === 'resetPassword') {
+        console.log("Detected generic browser password reset - prioritizing direct routing");
+        
+        // Set the manual link's href attribute with reset-password route
+        const deepLink = `licenseprep:///reset-password?oobCode=${oobCode}`;
+        document.getElementById('manual-link').href = deepLink;
+        
+        // Try multiple approaches for consistent path specification
+        tryMultipleSchemes([
+          `licenseprep:///reset-password?oobCode=${oobCode}`,
+          `licenseprep://resetPassword?oobCode=${oobCode}`,
+          `licenseprepapp:///reset-password?oobCode=${oobCode}`,
+          `licenseprepapp://resetPassword?oobCode=${oobCode}`
+        ]);
+        
+        // Web fallback for password reset - redirect to the custom password reset page
+        setTimeout(function() {
+          console.log("Redirecting to password-reset.html");
+          window.location.href = `/password-reset.html?mode=${mode}&oobCode=${oobCode}`;
+        }, 1500);
+      } else {
+        // Regular link handling for non-password-reset cases
+        const deepLink = `licenseprep://${mode}?oobCode=${oobCode}`;
+        document.getElementById('manual-link').href = deepLink;
+        
+        // Try simple redirect
+        window.location.href = deepLink;
+        
+        // Try another scheme as fallback
+        setTimeout(function() {
+          window.location.href = `licenseprepapp://${mode}?oobCode=${oobCode}`;
+        }, 1000);
+      }
     }
     
     // Try multiple URI schemes one after another

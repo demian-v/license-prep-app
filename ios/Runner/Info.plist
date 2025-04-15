@@ -76,6 +76,8 @@
         <array>
                 <string>https://licenseprepapp.firebaseapp.com/__/auth/action</string>
                 <string>https://licenseprepapp.web.app/auth-redirect.html</string>
+                <string>https://licenseprepapp.web.app/password-reset.html</string>
+                <string>https://licenseprepapp.web.app/resetPassword</string>
         </array>
         
         <!-- Support for Universal Links -->

@@ -47,6 +47,26 @@
                     android:host="licenseprepapp.web.app" 
                     android:pathPrefix="/auth-redirect.html" />
             </intent-filter>
+            <!-- Handle direct web links to our password-reset.html -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data 
+                    android:scheme="https" 
+                    android:host="licenseprepapp.web.app" 
+                    android:pathPrefix="/password-reset.html" />
+            </intent-filter>
+            <!-- Handle resetPassword deep links with specific paths -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="licenseprep" android:host="resetPassword" />
+                <data android:scheme="licenseprep" android:host="reset-password" />
+                <data android:scheme="licenseprep" android:path="/resetPassword" />
+                <data android:scheme="licenseprep" android:path="/reset-password" />
+            </intent-filter>
             <!-- Handle alternative URI scheme -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

@@ -342,7 +342,23 @@ class MyApp extends StatelessWidget {
         return supportedLocales.first;
       },
       
-      home: authProvider.user != null ? HomeScreen() : LoginScreen(),
+      // Initialize a route observer to track navigation
+      navigatorObservers: [RouteObserver<PageRoute>()],
+      initialRoute: '/',
+      home: Builder(
+        builder: (context) {
+          // Check for password reset deep links before deciding home screen
+          final deepLinkData = ModalRoute.of(context)?.settings.arguments;
+          if (deepLinkData != null && deepLinkData is Map<String, dynamic> && deepLinkData.containsKey('oobCode')) {
+            debugPrint('🔑 Found password reset code in deep link: ${deepLinkData['oobCode']}');
+            String code = deepLinkData['oobCode'];
+            return ResetPasswordScreen(code: code);
+          }
+          
+          // Normal flow - check if user is logged in
+          return authProvider.user != null ? HomeScreen() : LoginScreen();
+        }
+      ),
       routes: {
         '/login': (context) => LoginScreen(),
         '/signup': (context) => SignupScreen(),
@@ -375,32 +391,52 @@ class MyApp extends StatelessWidget {
             builder: (context) => PracticeTestScreen(licenseId: licenseId),
           );
         } 
-        // Handle password reset deep links
+        // Handle password reset deep links with improved detection
         else if (settings.name!.startsWith('/reset-password') || 
-                  settings.name! == 'resetPassword') {
-          // Handle password reset deep links
-          String routePath = settings.name!;
+                settings.name! == 'resetPassword' ||
+                settings.name! == '/resetPassword' ||
+                (settings.name!.contains('resetPassword') && settings.name!.contains('oobCode')) ||
+                settings.name! == 'mode=resetPassword') {
           
-          // Parse the URI
-          Uri uri;
+          debugPrint('📲 Password reset deep link detected: ${settings.name}');
+          
+          // Extract the oobCode using multiple methods to ensure we get it
+          String? code;
+          
+          // Method 1: Extract from query parameters if this is a proper URI
           try {
-            uri = Uri.parse(routePath);
+            // First try to parse as a complete URI
+            final uri = Uri.parse(settings.name!);
+            code = uri.queryParameters['oobCode'];
+            debugPrint('🔍 Extracted code from URI: $code');
           } catch (e) {
-            debugPrint('❌ Error parsing URI: $e');
-            return null;
-          }
-          
-          // Extract code from query parameters
-          String? code = uri.queryParameters['oobCode'];
-          
-          // If no code in query params, check if it's in the arguments
-          if (code == null && settings.arguments != null) {
-            if (settings.arguments is Map<String, dynamic>) {
-              code = (settings.arguments as Map<String, dynamic>)['oobCode'];
+            debugPrint('⚠️ Could not parse as URI: $e');
+            
+            // Method 2: Manual string parsing for query parameters
+            final routePath = settings.name!;
+            if (routePath.contains('?')) {
+              final queryString = routePath.split('?')[1];
+              final params = queryString.split('&');
+              
+              for (final param in params) {
+                if (param.startsWith('oobCode=')) {
+                  code = param.substring('oobCode='.length);
+                  debugPrint('🔍 Extracted code from query string: $code');
+                  break;
+                }
+              }
             }
           }
           
-          debugPrint('🔑 Password reset code: $code');
+          // Method 3: Check if code is in the arguments
+          if (code == null && settings.arguments != null) {
+            if (settings.arguments is Map<String, dynamic>) {
+              code = (settings.arguments as Map<String, dynamic>)['oobCode'];
+              debugPrint('🔍 Extracted code from arguments: $code');
+            }
+          }
+          
+          debugPrint('🔑 Final password reset code: $code');
           
           if (code != null) {
             // Use non-null assertion since we've already checked code is not null
@@ -408,6 +444,8 @@ class MyApp extends StatelessWidget {
             return MaterialPageRoute(
               builder: (context) => ResetPasswordScreen(code: nonNullableCode),
             );
+          } else {
+            debugPrint('❌ No reset code found in deep link');
           }
         }
         return null;
