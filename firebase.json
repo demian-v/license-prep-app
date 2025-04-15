@@ -1,1 +1,72 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"licenseprepapp","appId":"1:987638335534:android:f641ffe1a4f736717937bf","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"licenseprepapp","configurations":{"android":"1:987638335534:android:f641ffe1a4f736717937bf","ios":"1:987638335534:ios:da18bab6faa1b2187937bf","macos":"1:987638335534:ios:da18bab6faa1b2187937bf","web":"1:987638335534:web:d0f5efb48f240e567937bf","windows":"1:987638335534:web:87b69a558a1608fb7937bf"}}}}}}
+{
+  "hosting": {
+    "public": "web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "/auth-redirect.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/password-reset.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/__/auth/action",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "/__/auth/action",
+        "destination": "/password-reset.html"
+      },
+      {
+        "source": "/__/auth/action?**",
+        "destination": "/password-reset.html"
+      },
+      {
+        "source": "/__/auth/action?mode=resetPassword&oobCode=**",
+        "destination": "/password-reset.html"
+      },
+      {
+        "source": "/auth-redirect.html",
+        "destination": "/auth-redirect.html"
+      },
+      {
+        "source": "/password-reset.html",
+        "destination": "/password-reset.html"
+      },
+      {
+        "source": "/auth-redirect.html?mode=resetPassword*",
+        "destination": "/password-reset.html"
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "functions": {
+    "source": "functions"
+  }
+}

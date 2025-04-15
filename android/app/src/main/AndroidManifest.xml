@@ -19,6 +19,41 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Deep linking for password reset and other auth actions -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <!-- Accepts URIs that begin with "licenseprep://" -->
+                <data android:scheme="licenseprep" />
+            </intent-filter>
+                <!-- Handle links from Firebase Auth -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data 
+                    android:scheme="https" 
+                    android:host="licenseprepapp.firebaseapp.com" 
+                    android:pathPrefix="/__/auth/action" />
+            </intent-filter>
+            <!-- Handle direct web links to our auth-redirect.html -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data 
+                    android:scheme="https" 
+                    android:host="licenseprepapp.web.app" 
+                    android:pathPrefix="/auth-redirect.html" />
+            </intent-filter>
+            <!-- Handle alternative URI scheme -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="licenseprepapp" />
+            </intent-filter>
         </activity>
         <meta-data
             android:name="flutterEmbedding"

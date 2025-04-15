@@ -1,7 +1,7 @@
 import '../../models/user.dart';
 import 'firebase_functions_client.dart';
 import 'base/auth_api_interface.dart';
-import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth, FirebaseAuthException, EmailAuthProvider;
+import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth, FirebaseAuthException, EmailAuthProvider, ActionCodeSettings;
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseFirestore, FieldValue, SetOptions;
 
 class FirebaseAuthApi implements AuthApiInterface {
@@ -53,9 +53,19 @@ class FirebaseAuthApi implements AuthApiInterface {
         }
         
         // Final fallback if all methods fail - construct basic user
+        // When creating a fallback user, prioritize any available displayName from auth
+        // This ensures that if the user set their name during signup, it's maintained
+        String userName = userCredential.user?.displayName ?? "";
+        
+        // Only use email as fallback if we have no display name at all
+        if (userName.isEmpty) {
+          // This is just a last resort fallback - we should have a name from signup
+          userName = "User";
+        }
+        
         return User(
           id: userId,
-          name: userCredential.user?.displayName ?? email.split('@')[0],
+          name: userName, // Use display name instead of email
           email: email,
           language: 'en', // Updated to English
           state: null,    // No default state
@@ -353,12 +363,38 @@ class FirebaseAuthApi implements AuthApiInterface {
   @override
   Future<void> requestPasswordReset(String email) async {
     try {
-      await _functionsClient.callFunction<Map<String, dynamic>>(
-        'requestPasswordReset',
-        data: {'email': email},
+      // Define ActionCodeSettings to ensure proper redirection
+      final actionCodeSettings = ActionCodeSettings(
+        url: 'https://licenseprepapp.web.app/password-reset.html',
+        handleCodeInApp: true,
+        androidPackageName: 'com.license.prep.app',
+        androidInstallApp: true,
+        androidMinimumVersion: '12',
+        iOSBundleId: 'com.license.prep.app',
       );
+      
+      // First try to use Firebase Auth directly for more control over redirects
+      try {
+        await FirebaseAuth.instance.sendPasswordResetEmail(
+          email: email,
+          actionCodeSettings: actionCodeSettings,
+        );
+        print('✅ [API] Password reset email sent directly via Firebase Auth');
+        return;
+      } catch (directAuthError) {
+        print('⚠️ [API] Error sending reset email directly: $directAuthError, falling back to function');
+        // Fall back to cloud function if direct method fails
+        await _functionsClient.callFunction<Map<String, dynamic>>(
+          'requestPasswordReset',
+          data: {
+            'email': email,
+            'redirectUrl': 'https://licenseprepapp.web.app/password-reset.html',
+          },
+        );
+      }
     } catch (e) {
-      // Silent catch for security reasons
+      print('❌ [API] Error in password reset: $e');
+      // Silent catch for security reasons - don't expose whether email exists
     }
   }
   

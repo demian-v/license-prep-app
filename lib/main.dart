@@ -362,6 +362,8 @@ class MyApp extends StatelessWidget {
         '/reset-success': (context) => PasswordResetSuccessScreen(),
       },
       onGenerateRoute: (settings) {
+        debugPrint('🔗 Route requested: ${settings.name}');
+        
         if (settings.name!.startsWith('/theory/')) {
           final licenseId = settings.name!.split('/')[2];
           return MaterialPageRoute(
@@ -372,13 +374,39 @@ class MyApp extends StatelessWidget {
           return MaterialPageRoute(
             builder: (context) => PracticeTestScreen(licenseId: licenseId),
           );
-        } else if (settings.name!.startsWith('/reset-password')) {
+        } 
+        // Handle password reset deep links
+        else if (settings.name!.startsWith('/reset-password') || 
+                  settings.name! == 'resetPassword') {
           // Handle password reset deep links
-          final uri = Uri.parse(settings.name!);
-          final code = uri.queryParameters['oobCode'];
+          String routePath = settings.name!;
+          
+          // Parse the URI
+          Uri uri;
+          try {
+            uri = Uri.parse(routePath);
+          } catch (e) {
+            debugPrint('❌ Error parsing URI: $e');
+            return null;
+          }
+          
+          // Extract code from query parameters
+          String? code = uri.queryParameters['oobCode'];
+          
+          // If no code in query params, check if it's in the arguments
+          if (code == null && settings.arguments != null) {
+            if (settings.arguments is Map<String, dynamic>) {
+              code = (settings.arguments as Map<String, dynamic>)['oobCode'];
+            }
+          }
+          
+          debugPrint('🔑 Password reset code: $code');
+          
           if (code != null) {
+            // Use non-null assertion since we've already checked code is not null
+            final String nonNullableCode = code; // Explicitly create non-nullable string
             return MaterialPageRoute(
-              builder: (context) => ResetPasswordScreen(code: code),
+              builder: (context) => ResetPasswordScreen(code: nonNullableCode),
             );
           }
         }

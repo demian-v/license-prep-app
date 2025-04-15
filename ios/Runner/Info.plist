@@ -43,7 +43,46 @@
 	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
-	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
+        <key>UIApplicationSupportsIndirectInputEvents</key>
+        <true/>
+        <!-- URL Scheme for Deep Linking -->
+        <key>CFBundleURLTypes</key>
+        <array>
+                <dict>
+                        <key>CFBundleTypeRole</key>
+                        <string>Editor</string>
+                        <key>CFBundleURLName</key>
+                        <string>com.example.licenseprep</string>
+                        <key>CFBundleURLSchemes</key>
+                        <array>
+                                <string>licenseprep</string>
+                        </array>
+                </dict>
+                <dict>
+                        <key>CFBundleTypeRole</key>
+                        <string>Editor</string>
+                        <key>CFBundleURLName</key>
+                        <string>com.example.licenseprepapp</string>
+                        <key>CFBundleURLSchemes</key>
+                        <array>
+                                <string>licenseprepapp</string>
+                        </array>
+                </dict>
+        </array>
+        <!-- Configure Firebase Auth Domain -->
+        <key>FirebaseAppDelegateProxyEnabled</key>
+        <true/>
+        <key>FirebaseDynamicLinksCustomDomains</key>
+        <array>
+                <string>https://licenseprepapp.firebaseapp.com/__/auth/action</string>
+                <string>https://licenseprepapp.web.app/auth-redirect.html</string>
+        </array>
+        
+        <!-- Support for Universal Links -->
+        <key>com.apple.developer.associated-domains</key>
+        <array>
+                <string>applinks:licenseprepapp.web.app</string>
+                <string>applinks:licenseprepapp.firebaseapp.com</string>
+        </array>
 </dict>
 </plist>
