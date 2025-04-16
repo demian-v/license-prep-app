@@ -21,6 +21,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   String? _errorMessage;
   String? _email;
   List<String> _validationErrors = [];
+  bool _showValidationErrors = false;
   
   @override
   void initState() {
@@ -58,18 +59,29 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     bool hasNumber = password.contains(RegExp(r'[0-9]'));
     bool hasSpecialChar = password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'));
     
-    int strengthCount = 0;
-    if (hasLowercase) strengthCount++;
-    if (hasUppercase) strengthCount++;
-    if (hasNumber) strengthCount++;
-    if (hasSpecialChar) strengthCount++;
-    
+    // Required criteria - all of these must be met
     if (!hasMinLength) {
       _validationErrors.add('At least 8 characters');
     }
     
-    if (strengthCount < 3) {
-      _validationErrors.add('At least 3 of: lowercase letters, uppercase letters, numbers, special characters');
+    // Must have at least one uppercase letter
+    if (!hasUppercase) {
+      _validationErrors.add('Must include at least one uppercase letter');
+    }
+    
+    // Must have at least one lowercase letter
+    if (!hasLowercase) {
+      _validationErrors.add('Must include at least one lowercase letter');
+    }
+    
+    // Must have at least one number
+    if (!hasNumber) {
+      _validationErrors.add('Must include at least one number');
+    }
+    
+    // Must have at least one special character
+    if (!hasSpecialChar) {
+      _validationErrors.add('Must include at least one special character');
     }
     
     return _validationErrors.isEmpty;
@@ -84,7 +96,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     }
     
     if (!_validatePassword(_passwordController.text)) {
-      setState(() {}); // Refresh to show validation errors
+      setState(() {
+        _showValidationErrors = true; // Show validation errors visually
+      });
       return;
     }
     
@@ -212,7 +226,24 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 decoration: InputDecoration(
                   labelText: 'New password',
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.lock_outline),
+                  enabledBorder: _showValidationErrors && !_validatePassword(_passwordController.text)
+                      ? OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.red, width: 2.0),
+                          borderRadius: BorderRadius.circular(8),
+                        )
+                      : null,
+                  focusedBorder: _showValidationErrors && !_validatePassword(_passwordController.text)
+                      ? OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.red, width: 2.0),
+                          borderRadius: BorderRadius.circular(8),
+                        )
+                      : null,
+                  prefixIcon: Icon(
+                    Icons.lock_outline,
+                    color: _showValidationErrors && !_validatePassword(_passwordController.text) 
+                        ? Colors.red 
+                        : null,
+                  ),
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscurePassword ? Icons.visibility : Icons.visibility_off,
@@ -236,6 +267,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 onChanged: (value) {
                   setState(() {
                     _validatePassword(value);
+                    _showValidationErrors = false; // Reset validation error highlighting
                   });
                 },
               ),
@@ -245,7 +277,24 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 decoration: InputDecoration(
                   labelText: 'Re-enter new password',
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.lock_outline),
+                  enabledBorder: _showValidationErrors && (_passwordController.text != _confirmPasswordController.text)
+                      ? OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.red, width: 2.0),
+                          borderRadius: BorderRadius.circular(8),
+                        )
+                      : null,
+                  focusedBorder: _showValidationErrors && (_passwordController.text != _confirmPasswordController.text)
+                      ? OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.red, width: 2.0),
+                          borderRadius: BorderRadius.circular(8),
+                        )
+                      : null,
+                  prefixIcon: Icon(
+                    Icons.lock_outline,
+                    color: _showValidationErrors && (_passwordController.text != _confirmPasswordController.text)
+                        ? Colors.red
+                        : null,
+                  ),
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
@@ -267,14 +316,27 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   }
                   return null;
                 },
+                onChanged: (value) {
+                  setState(() {
+                    _showValidationErrors = false; // Reset validation error highlighting
+                  });
+                },
               ),
               SizedBox(height: 16),
               if (_validationErrors.isNotEmpty || _passwordController.text.isNotEmpty) ...[
                 Container(
                   padding: EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
+                    border: Border.all(
+                      color: _showValidationErrors && !_validatePassword(_passwordController.text)
+                          ? Colors.red 
+                          : Colors.grey.shade300,
+                      width: _showValidationErrors && !_validatePassword(_passwordController.text) ? 2.0 : 1.0,
+                    ),
                     borderRadius: BorderRadius.circular(8),
+                    color: _showValidationErrors && !_validatePassword(_passwordController.text)
+                        ? Colors.red.shade50
+                        : Colors.transparent,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -290,7 +352,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                       ),
                       SizedBox(height: 8),
                       _buildValidationItem(
-                        'At least 3 of the following:', 
+                        'All of the following criteria are required:', 
                         true
                       ),
                       SizedBox(height: 4),
@@ -352,29 +414,45 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   }
   
   Widget _buildValidationItem(String text, bool isValid) {
+    final bool highlightError = _showValidationErrors && !isValid;
+    
     return Row(
       children: [
         Icon(
-          isValid ? Icons.check_circle : Icons.circle_outlined,
-          color: isValid ? Colors.green : Colors.grey,
+          isValid ? Icons.check_circle : (highlightError ? Icons.cancel : Icons.circle_outlined),
+          color: isValid ? Colors.green : (highlightError ? Colors.red : Colors.grey),
           size: 16,
         ),
         SizedBox(width: 8),
-        Text(text),
+        Text(
+          text,
+          style: TextStyle(
+            color: highlightError ? Colors.red : null,
+            fontWeight: highlightError ? FontWeight.bold : null,
+          ),
+        ),
       ],
     );
   }
   
   Widget _buildValidationSubItem(String text, bool isValid) {
+    final bool highlightError = _showValidationErrors && !isValid;
+    
     return Row(
       children: [
         Icon(
-          isValid ? Icons.check_circle : Icons.circle_outlined,
-          color: isValid ? Colors.green : Colors.grey,
+          isValid ? Icons.check_circle : (highlightError ? Icons.cancel : Icons.circle_outlined),
+          color: isValid ? Colors.green : (highlightError ? Colors.red : Colors.grey),
           size: 16,
         ),
         SizedBox(width: 8),
-        Text(text),
+        Text(
+          text,
+          style: TextStyle(
+            color: highlightError ? Colors.red : null,
+            fontWeight: highlightError ? FontWeight.bold : null,
+          ),
+        ),
       ],
     );
   }
