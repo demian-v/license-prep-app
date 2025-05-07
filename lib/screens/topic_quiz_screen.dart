@@ -4,6 +4,7 @@ import '../models/quiz_topic.dart';
 import '../models/quiz_progress.dart';
 import '../providers/progress_provider.dart';
 import '../providers/language_provider.dart';
+import '../providers/state_provider.dart';
 import '../services/service_locator.dart';
 import '../screens/quiz_question_screen.dart';
 
@@ -16,6 +17,114 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> {
   List<QuizTopic> topics = [];
   bool isLoading = true;
   String? errorMessage;
+  
+  // Helper method to get subtitle text based on language
+  String _getSubtitleText(String language) {
+    switch (language) {
+      case 'en':
+        return 'Questions grouped by topics';
+      case 'es':
+        return 'Preguntas agrupadas por temas';
+      case 'uk':
+        return 'Запитання згруповані по темах';
+      case 'pl':
+        return 'Pytania pogrupowane według tematów';
+      case 'ru':
+        return 'Вопросы сгруппированы по темам';
+      default:
+        return 'Questions grouped by topics';
+    }
+  }
+  
+  // Helper method to get progress card title based on language
+  String _getProgressCardTitle(String language) {
+    switch (language) {
+      case 'en':
+        return 'Overall progress by topics:';
+      case 'es':
+        return 'Progreso general por temas:';
+      case 'uk':
+        return 'Загальний прогрес по темах:';
+      case 'pl':
+        return 'Ogólny postęp według tematów:';
+      case 'ru':
+        return 'Общий прогресс по темам:';
+      default:
+        return 'Overall progress by topics:';
+    }
+  }
+  
+  // Helper method to get questions count text based on language
+  String _getQuestionsCountText(String language, int count) {
+    switch (language) {
+      case 'en':
+        return '$count Questions';
+      case 'es':
+        return '$count Preguntas';
+      case 'uk':
+        return '$count Запитань';
+      case 'pl':
+        return '$count Pytań';
+      case 'ru':
+        return '$count Вопросов';
+      default:
+        return '$count Questions';
+    }
+  }
+  
+  // Helper method to get empty state title
+  String _getEmptyStateTitle(String language) {
+    switch (language) {
+      case 'en':
+        return 'No topics available';
+      case 'es':
+        return 'No hay temas disponibles';
+      case 'uk':
+        return 'Немає доступних тем';
+      case 'pl':
+        return 'Brak dostępnych tematów';
+      case 'ru':
+        return 'Нет доступных тем';
+      default:
+        return 'No topics available';
+    }
+  }
+  
+  // Helper method to get empty state message
+  String _getEmptyStateMessage(String language) {
+    switch (language) {
+      case 'en':
+        return 'There are currently no topics available for the selected language';
+      case 'es':
+        return 'Actualmente no hay temas disponibles para el idioma seleccionado';
+      case 'uk':
+        return 'На даний момент немає доступних тем для вибраної мови';
+      case 'pl':
+        return 'Obecnie nie ma dostępnych tematów dla wybranego języka';
+      case 'ru':
+        return 'В настоящее время нет доступных тем для выбранного языка';
+      default:
+        return 'There are currently no topics available for the selected language';
+    }
+  }
+  
+  // Helper method to get try again button text
+  String _getTryAgainText(String language) {
+    switch (language) {
+      case 'en':
+        return 'Try Again';
+      case 'es':
+        return 'Intentar de nuevo';
+      case 'uk':
+        return 'Повторити спробу';
+      case 'pl':
+        return 'Spróbuj ponownie';
+      case 'ru':
+        return 'Попробовать снова';
+      default:
+        return 'Try Again';
+    }
+  }
   
   @override
   void initState() {
@@ -32,9 +141,12 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> {
     try {
       final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
       final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
+      final stateProvider = Provider.of<StateProvider>(context, listen: false);
       
       final language = languageProvider.language;
-      final state = 'ALL'; // Match the case in Firebase ('ALL' instead of 'all')
+      final state = stateProvider.selectedStateId ?? 'ALL'; // Use actual state ID from provider
+      
+      print('TopicQuizScreen: Loading topics with language=$language, state=$state');
       
       // Get license type 
       final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
@@ -69,9 +181,35 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> {
     final topicProgress = progressProvider.progress.topicProgress;
     final overallProgress = progressProvider.progress.overallTopicProgress;
     
+    // Get current language
+    final languageProvider = Provider.of<LanguageProvider>(context);
+    final currentLanguage = languageProvider.language;
+    
+    // Title based on language
+    String screenTitle = '';
+    switch (currentLanguage) {
+      case 'en':
+        screenTitle = 'Learn by Topics';
+        break;
+      case 'es':
+        screenTitle = 'Aprender por Temas';
+        break;
+      case 'uk':
+        screenTitle = 'Вчити по темах';
+        break;
+      case 'pl':
+        screenTitle = 'Ucz się według tematów';
+        break;
+      case 'ru':
+        screenTitle = 'Учиться по темам';
+        break;
+      default:
+        screenTitle = 'Learn by Topics';
+    }
+    
     // Create app bar
     final appBar = AppBar(
-      title: Text('Вчити по темах'),
+      title: Text(screenTitle),
       backgroundColor: Colors.white,
       foregroundColor: Colors.black,
       elevation: 0,
@@ -110,7 +248,7 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> {
               SizedBox(height: 16),
               ElevatedButton(
                 onPressed: loadTopics,
-                child: Text('Повторити спробу'),
+                child: Text(_getTryAgainText(currentLanguage)),
               ),
             ],
           ),
@@ -125,7 +263,7 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> {
           Padding(
             padding: EdgeInsets.all(16),
             child: Text(
-              'Запитання згруповані по темах',
+              _getSubtitleText(currentLanguage),
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.grey[600],
@@ -145,7 +283,7 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Загальний прогрес по темах:',
+                    _getProgressCardTitle(currentLanguage),
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
@@ -181,7 +319,40 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> {
           // Topic list
           Expanded(
             child: topics.isEmpty 
-            ? Center(child: Text('Немає доступних тем')) 
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.format_list_bulleted,
+                      size: 64,
+                      color: Colors.grey[400],
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      _getEmptyStateTitle(currentLanguage),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[700],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 12),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 32),
+                      child: Text(
+                        _getEmptyStateMessage(currentLanguage),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[500],
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                ),
+              ) 
             : ListView.builder(
                 padding: EdgeInsets.all(16),
                 itemCount: topics.length,
@@ -230,7 +401,7 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> {
                                   ),
                                 ),
                                 Text(
-                                  '${topic.questionCount} Запитань',
+                                  _getQuestionsCountText(currentLanguage, topic.questionCount),
                                   style: TextStyle(
                                     color: Colors.grey[600],
                                     fontSize: 14,

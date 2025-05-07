@@ -464,14 +464,28 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
   }
 
   void _continueToApp(BuildContext context) {
+    // Get the state object from the selected state name
+    final selectedStateInfo = StateData.getStateByName(_selectedState!);
+    
     // Get the providers
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final stateProvider = Provider.of<StateProvider>(context, listen: false);
     
-    // Update both providers - StateProvider for new system, AuthProvider for backward compatibility
-    stateProvider.setSelectedStateByName(_selectedState!);
-    authProvider.updateUserState(_selectedState!);
-    print('🌎 [STATE SCREEN] User selected state: $_selectedState');
+    // Get the state ID (two-letter code)
+    final stateId = selectedStateInfo?.id;
+    
+    if (stateId == null) {
+      print('⚠️ [STATE SCREEN] Error: Could not find state ID for $_selectedState');
+      // Fallback to using the name if we can't find the ID for some reason
+      stateProvider.setSelectedStateByName(_selectedState!);
+      authProvider.updateUserState(_selectedState!);
+    } else {
+      print('🌎 [STATE SCREEN] User selected state: $_selectedState (ID: $stateId)');
+      
+      // Update both providers with the correct state ID
+      stateProvider.setSelectedStateByName(_selectedState!); // This already converts to ID internally
+      authProvider.updateUserState(stateId); // Pass the two-letter code to the auth provider
+    }
     
     // Navigate to home screen
     Navigator.of(context).pushReplacement(

@@ -1,11 +1,14 @@
+import 'package:flutter/material.dart';
 import '../../models/user.dart';
 import 'firebase_functions_client.dart';
 import 'base/auth_api_interface.dart';
 import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth, FirebaseAuthException, EmailAuthProvider, ActionCodeSettings;
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseFirestore, FieldValue, SetOptions;
+import '../../data/state_data.dart';
 
 class FirebaseAuthApi implements AuthApiInterface {
   final FirebaseFunctionsClient _functionsClient;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   
   FirebaseAuthApi(this._functionsClient);
   
@@ -22,6 +25,9 @@ class FirebaseAuthApi implements AuthApiInterface {
       
       // Get user data from Firestore
       final userId = userCredential.user!.uid;
+      final firebaseDisplayName = userCredential.user?.displayName;
+      
+      debugPrint('🔍 [FirebaseAuthApi] Login successful, Firebase Auth display name: $firebaseDisplayName');
       
       try {
         // Try to get from Firestore via function
@@ -29,9 +35,41 @@ class FirebaseAuthApi implements AuthApiInterface {
           'getUserData',
         );
         
+        // Check if name is derived from email before returning
+        if (userData['name'] != null) {
+          final emailPrefix = email.split('@').first.toLowerCase();
+          final currentName = userData['name'] as String;
+          
+          // Check if name is exactly the email prefix or very similar to it
+          if (currentName.toLowerCase() == emailPrefix.toLowerCase() || 
+              currentName.toLowerCase() == emailPrefix.toLowerCase().replaceAll('.', ' ')) {
+            
+            debugPrint('⚠️ [FirebaseAuthApi] Detected email-derived name in Firestore: $currentName');
+            
+            // If Firebase Auth has a non-empty display name that's different, use it instead
+            if (firebaseDisplayName != null && firebaseDisplayName.isNotEmpty && 
+                firebaseDisplayName.toLowerCase() != emailPrefix.toLowerCase()) {
+              
+              debugPrint('✅ [FirebaseAuthApi] Using Firebase Auth display name: $firebaseDisplayName instead of email-derived name');
+              userData['name'] = firebaseDisplayName;
+              
+              // Update Firestore with the correct name
+              try {
+                await _firestore.collection('users').doc(userId).update({
+                  'name': firebaseDisplayName,
+                  'lastUpdated': FieldValue.serverTimestamp(),
+                });
+                debugPrint('✅ [FirebaseAuthApi] Updated Firestore with correct name: $firebaseDisplayName');
+              } catch (e) {
+                debugPrint('⚠️ [FirebaseAuthApi] Failed to update Firestore with correct name: $e');
+              }
+            }
+          }
+        }
+        
         return User.fromJson(userData);
       } catch (firestoreError) {
-        print('Warning: Failed to get user data from function: $firestoreError');
+        debugPrint('Warning: Failed to get user data from function: $firestoreError');
         
         // Attempt to get data directly from Firestore
         try {
@@ -39,7 +77,7 @@ class FirebaseAuthApi implements AuthApiInterface {
           final docSnapshot = await firestore.collection('users').doc(userId).get();
           
           if (docSnapshot.exists && docSnapshot.data()?['name'] != null) {
-            print('Retrieved user data directly from Firestore');
+            debugPrint('Retrieved user data directly from Firestore');
             return User(
               id: userId,
               name: docSnapshot.data()?['name'],
@@ -49,7 +87,7 @@ class FirebaseAuthApi implements AuthApiInterface {
             );
           }
         } catch (directFirestoreError) {
-          print('Warning: Failed to get user data directly from Firestore: $directFirestoreError');
+          debugPrint('Warning: Failed to get user data directly from Firestore: $directFirestoreError');
         }
         
         // Final fallback if all methods fail - construct basic user
@@ -89,6 +127,8 @@ class FirebaseAuthApi implements AuthApiInterface {
   @override
   Future<User> register(String name, String email, String password) async {
     try {
+      debugPrint('🔍 [FirebaseAuthApi] Starting registration for email: $email with name: $name');
+      
       // First use Firebase Auth directly to create the user
       final auth = FirebaseAuth.instance;
       final userCredential = await auth.createUserWithEmailAndPassword(
@@ -98,51 +138,102 @@ class FirebaseAuthApi implements AuthApiInterface {
       
       // Update display name
       await userCredential.user!.updateDisplayName(name);
+      debugPrint('✅ [FirebaseAuthApi] Display name set to: $name');
       
       // Need to reload user to ensure the display name is available
       await userCredential.user!.reload();
       
+      // Verify the display name was set correctly
+      final createdUser = auth.currentUser;
+      if (createdUser != null) {
+        if (createdUser.displayName == null || createdUser.displayName != name) {
+          // Force update display name again if it didn't take
+          await createdUser.updateDisplayName(name);
+          await createdUser.reload();
+          debugPrint('⚠️ [FirebaseAuthApi] Display name was not set correctly, fixed it to: $name');
+        }
+      }
+      
+      // Explicitly check for any default values that might be coming from the system
+      final newUser = auth.currentUser;
+      if (newUser != null) {
+        // Check for any metadata that might have incorrect default values
+        debugPrint('🔍 [FirebaseAuthApi] New user properties:');
+        debugPrint('    - UID: ${newUser.uid}');
+        debugPrint('    - Display Name: ${newUser.displayName}');
+        debugPrint('    - Email: ${newUser.email}');
+        debugPrint('    - Email Verified: ${newUser.emailVerified}');
+        debugPrint('    - Phone Number: ${newUser.phoneNumber}');
+        // Try to get metadata or additional attributes
+        debugPrint('    - Metadata: creation=${newUser.metadata.creationTime}, last sign in=${newUser.metadata.lastSignInTime}');
+      }
+      
       // Create user document in Firestore and ensure it's created successfully
       try {
+        // Explicitly set correct default values - language "en" and state null
+        final userData = {
+          'userId': userCredential.user!.uid,
+          'name': name,
+          'email': email,
+          'language': 'en', // Explicitly set to English
+          'state': null,     // Explicitly set to null
+          'createdAt': FieldValue.serverTimestamp(),
+        };
+        
+        debugPrint('🔄 [FirebaseAuthApi] Creating user document with data:');
+        debugPrint('    - language: ${userData['language']}');
+        debugPrint('    - state: ${userData['state']}');
+        
         await _functionsClient.callFunction<Map<String, dynamic>>(
           'createOrUpdateUserDocument',
-          data: {
-            'userId': userCredential.user!.uid,
-            'name': name,
-            'email': email,
-            'language': 'en', // Default language (English)
-            'state': null,    // No default state - user will select explicitly
-          },
+          data: userData,
         );
-        print('✅ User document created successfully with name: $name');
+        debugPrint('✅ [FirebaseAuthApi] User document created successfully with name: $name');
       } catch (firestoreError) {
-        print('⚠️ Warning: Failed to create user document: $firestoreError');
+        debugPrint('⚠️ [FirebaseAuthApi] Warning: Failed to create user document: $firestoreError');
         
         // Implement fallback using Firestore SDK directly
         try {
           final firestore = FirebaseFirestore.instance;
-          await firestore.collection('users').doc(userCredential.user!.uid).set({
+          
+          // Explicitly set default values
+          final firestoreData = {
             'name': name,
             'email': email,
             'createdAt': FieldValue.serverTimestamp(),
             'lastLoginAt': FieldValue.serverTimestamp(),
-            'language': 'en',
-            'state': null,
-          });
-          print('✅ User document created with fallback method');
+            'language': 'en',    // Explicitly set to English
+            'state': null,       // Explicitly set to null
+          };
+          
+          debugPrint('🔄 [FirebaseAuthApi] Creating user document with fallback method:');
+          debugPrint('    - language: ${firestoreData['language']}');
+          debugPrint('    - state: ${firestoreData['state']}');
+          
+          await firestore.collection('users').doc(userCredential.user!.uid).set(firestoreData);
+          debugPrint('✅ [FirebaseAuthApi] User document created with fallback method');
+          
+          // Verify document was created with correct values
+          final docSnapshot = await firestore.collection('users').doc(userCredential.user!.uid).get();
+          if (docSnapshot.exists) {
+            final data = docSnapshot.data();
+            debugPrint('🔍 [FirebaseAuthApi] Verifying created document:');
+            debugPrint('    - language: ${data?['language']}');
+            debugPrint('    - state: ${data?['state']}');
+          }
         } catch (directFirestoreError) {
-          print('❌ Failed to create user document with fallback: $directFirestoreError');
+          debugPrint('❌ [FirebaseAuthApi] Failed to create user document with fallback: $directFirestoreError');
           // Continue with signup but warn about potential issues
         }
       }
       
-      // Return user data
+      // Return user data with explicitly defined defaults
       return User(
         id: userCredential.user!.uid,
         name: name,
         email: email,
-        language: 'en', // Default language (English)
-        state: null,    // No default state
+        language: 'en', // Explicitly set to English
+        state: null,    // Explicitly set to null
       );
     } catch (e) {
       if (e is FirebaseAuthException) {
@@ -168,7 +259,7 @@ class FirebaseAuthApi implements AuthApiInterface {
       
       // Add safeguards against null or invalid data
       if (response == null) {
-        print('Warning: getUserData returned null response');
+        debugPrint('Warning: getUserData returned null response');
         return null;
       }
       
@@ -182,14 +273,14 @@ class FirebaseAuthApi implements AuthApiInterface {
       if (response['id'] == null || 
           response['name'] == null || 
           response['email'] == null) {
-        print('Warning: User data is missing required fields: $response');
+        debugPrint('Warning: User data is missing required fields: $response');
         return null;
       }
       
       // Safe to create the user now
       return User.fromJson(response);
     } catch (e) {
-      print('Error in getCurrentUser: $e');
+      debugPrint('Error in getCurrentUser: $e');
       throw 'Failed to get user data: $e';
     }
   }
@@ -201,7 +292,22 @@ class FirebaseAuthApi implements AuthApiInterface {
       final Map<String, dynamic> data = {};
       if (name != null) data['name'] = name;
       if (language != null) data['language'] = language;
-      if (state != null) data['state'] = state;
+      
+      // Handle state conversion if needed
+      if (state != null) {
+        // Convert to state ID if it's a full name
+        if (state.length > 2) {
+          final stateInfo = StateData.getStateByName(state);
+          if (stateInfo != null) {
+            debugPrint('🔄 [API] Converting state name "$state" to ID: "${stateInfo.id}"');
+            data['state'] = stateInfo.id;
+          } else {
+            data['state'] = state;
+          }
+        } else {
+          data['state'] = state;
+        }
+      }
       
       final response = await _functionsClient.callFunction<Map<String, dynamic>>(
         'updateProfile',
@@ -218,7 +324,7 @@ class FirebaseAuthApi implements AuthApiInterface {
   @override
   Future<User> updateUserLanguage(String userId, String language) async {
     try {
-      print('🔤 [API] Updating user language to $language via Firebase function');
+      debugPrint('🔤 [API] Updating user language to $language via Firebase function');
       final result = await _functionsClient.callFunction<Map<String, dynamic>>(
         'updateUserLanguage',
         data: {'language': language},
@@ -230,7 +336,7 @@ class FirebaseAuthApi implements AuthApiInterface {
         // This prevents issues with the getUserData function
         final currentAuth = FirebaseAuth.instance.currentUser;
         if (currentAuth != null) {
-          print('✅ [API] Language updated successfully, creating local user object');
+          debugPrint('✅ [API] Language updated successfully, creating local user object');
           return User(
             id: userId,
             name: currentAuth.displayName ?? "User",
@@ -242,10 +348,10 @@ class FirebaseAuthApi implements AuthApiInterface {
       }
       
       // Try to fetch the updated user as a fallback
-      print('🔍 [API] Getting updated user data after language change');
+      debugPrint('🔍 [API] Getting updated user data after language change');
       final User? user = await getCurrentUser();
       if (user == null) {
-        print('❌ [API] Failed to get updated user after language change');
+        debugPrint('❌ [API] Failed to get updated user after language change');
         // Fallback to returning a basic user with the updated language
         final currentAuth = FirebaseAuth.instance.currentUser;
         if (currentAuth != null) {
@@ -260,14 +366,14 @@ class FirebaseAuthApi implements AuthApiInterface {
         throw 'Failed to retrieve updated user profile';
       }
       
-      print('✅ [API] Successfully updated language, user language is now: ${user.language}');
+      debugPrint('✅ [API] Successfully updated language, user language is now: ${user.language}');
       return user;
     } catch (e) {
-      print('❌ [API] Error updating language: $e');
+      debugPrint('❌ [API] Error updating language: $e');
       // Fallback to returning a user with the requested language
       final currentAuth = FirebaseAuth.instance.currentUser;
       if (currentAuth != null) {
-        print('⚠️ Using fallback user creation with updated language');
+        debugPrint('⚠️ Using fallback user creation with updated language');
         return User(
           id: userId,
           name: currentAuth.displayName ?? "User",
@@ -284,77 +390,91 @@ class FirebaseAuthApi implements AuthApiInterface {
   @override
   Future<User> updateUserState(String userId, String? state) async {
     try {
-      print('🗺️ [API] Updating user state to ${state ?? "null"} via Firebase function');
-      final result = await _functionsClient.callFunction<Map<String, dynamic>>(
-        'updateUserState',
-        data: {'state': state},
-      );
+      debugPrint('🗺️ [API] Updating user state to ${state ?? "null"} via Firebase function');
       
-      // Check if we got a proper success response
-      if (result != null && result['success'] == true) {
-        // Try to get the current language
-        final currentAuth = FirebaseAuth.instance.currentUser;
-        String? currentLanguage = 'en'; // Default to English
-        
+      // Ensure we're using the state ID and not a full state name or "null" string
+      String? stateId = state;
+      
+      // If state is "null" as a string, convert to actual null
+      if (state == "null") {
+        debugPrint('⚠️ [API] "null" string detected, converting to actual null');
+        stateId = null;
+      }
+      // If state is a full state name (longer than 2 chars), try to convert it to state ID
+      else if (state != null && state.length > 2) {
         try {
-          // Try to get current language from stored user data
-          final currentUser = await getCurrentUser();
-          if (currentUser != null && currentUser.language != null) {
-            currentLanguage = currentUser.language;
+          final stateInfo = StateData.getStateByName(state);
+          if (stateInfo != null) {
+            stateId = stateInfo.id;
+            debugPrint('🔄 [API] Converted state name "$state" to ID: "$stateId"');
+          } else {
+            debugPrint('⚠️ [API] Could not convert state name to ID: $state');
           }
         } catch (e) {
-          // Ignore error, we'll use the default
-          print('⚠️ Could not get current language, using default');
+          debugPrint('⚠️ [API] Error converting state name to ID: $e');
         }
+      }
+      
+      // Update Firestore directly for more reliable state updates
+      await _firestore.collection('users').doc(userId).update({
+        'state': stateId,
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+      
+      debugPrint('✅ [API] User state updated successfully to: $stateId in Firestore');
+      
+      // Also try using the Firebase function for legacy compatibility
+      try {
+        final result = await _functionsClient.callFunction<Map<String, dynamic>>(
+          'updateUserState',
+          data: {'state': stateId},
+        );
         
-        // Create a locally updated user with the new state
-        if (currentAuth != null) {
-          print('✅ [API] State updated successfully, creating local user object');
-          return User(
-            id: userId,
-            name: currentAuth.displayName ?? "User",
-            email: currentAuth.email ?? "",
-            language: currentLanguage,
-            state: state,
-          );
+        if (result != null && result['success'] == true) {
+          debugPrint('✅ [API] State update also confirmed via Firebase function');
         }
+      } catch (functionError) {
+        debugPrint('⚠️ [API] Firebase function update failed, but Firestore update succeeded: $functionError');
       }
       
-      // Try to fetch the updated user as a fallback
-      print('🔍 [API] Getting updated user data after state change');
-      final User? user = await getCurrentUser();
-      if (user == null) {
-        print('❌ [API] Failed to get updated user after state change');
-        // Fallback to returning a basic user with the updated state
-        final currentAuth = FirebaseAuth.instance.currentUser;
-        if (currentAuth != null) {
-          return User(
-            id: userId,
-            name: currentAuth.displayName ?? "User",
-            email: currentAuth.email ?? "",
-            language: 'en', // Default to English
-            state: state,
-          );
+      // Try to get the current language before creating a new user object
+      String currentLanguage = 'en'; // Default to English
+      
+      try {
+        // Try to get current language from stored user data
+        final currentUser = await getCurrentUser();
+        if (currentUser != null && currentUser.language != null) {
+          currentLanguage = currentUser.language ?? 'en';
         }
-        throw 'Failed to retrieve updated user profile';
+      } catch (e) {
+        // Ignore error, we'll use the default
+        debugPrint('⚠️ Could not get current language, using default');
       }
       
-      print('✅ [API] Successfully updated state, user state is now: ${user.state}');
-      return user;
-    } catch (e) {
-      print('❌ [API] Error updating state: $e');
-      // Fallback to returning a user with the requested state
+      // Create a locally updated user with the new state
       final currentAuth = FirebaseAuth.instance.currentUser;
       if (currentAuth != null) {
-        print('⚠️ Using fallback user creation with updated state');
         return User(
           id: userId,
           name: currentAuth.displayName ?? "User",
           email: currentAuth.email ?? "",
-          language: 'en', // Default to English
-          state: state,
+          language: currentLanguage,
+          state: stateId,
         );
       }
+      
+      // Try to fetch the updated user as a fallback
+      debugPrint('🔍 [API] Getting updated user data after state change');
+      final User? user = await getCurrentUser();
+      if (user == null) {
+        throw 'Failed to retrieve updated user profile';
+      }
+      
+      debugPrint('✅ [API] Successfully updated state, user state is now: ${user.state}');
+      return user;
+      
+    } catch (e) {
+      debugPrint('❌ [API] Error updating state: $e');
       throw 'Failed to update state: $e';
     }
   }
@@ -379,10 +499,10 @@ class FirebaseAuthApi implements AuthApiInterface {
           email: email,
           actionCodeSettings: actionCodeSettings,
         );
-        print('✅ [API] Password reset email sent directly via Firebase Auth');
+        debugPrint('✅ [API] Password reset email sent directly via Firebase Auth');
         return;
       } catch (directAuthError) {
-        print('⚠️ [API] Error sending reset email directly: $directAuthError, falling back to function');
+        debugPrint('⚠️ [API] Error sending reset email directly: $directAuthError, falling back to function');
         // Fall back to cloud function if direct method fails
         await _functionsClient.callFunction<Map<String, dynamic>>(
           'requestPasswordReset',
@@ -393,7 +513,7 @@ class FirebaseAuthApi implements AuthApiInterface {
         );
       }
     } catch (e) {
-      print('❌ [API] Error in password reset: $e');
+      debugPrint('❌ [API] Error in password reset: $e');
       // Silent catch for security reasons - don't expose whether email exists
     }
   }
@@ -405,7 +525,7 @@ class FirebaseAuthApi implements AuthApiInterface {
       final auth = FirebaseAuth.instance;
       return await auth.verifyPasswordResetCode(code);
     } catch (e) {
-      print('❌ [API] Error verifying password reset code: $e');
+      debugPrint('❌ [API] Error verifying password reset code: $e');
       throw 'Invalid or expired password reset link. Please request a new link.';
     }
   }
@@ -419,9 +539,9 @@ class FirebaseAuthApi implements AuthApiInterface {
         code: code, 
         newPassword: newPassword
       );
-      print('✅ [API] Password reset successfully confirmed');
+      debugPrint('✅ [API] Password reset successfully confirmed');
     } catch (e) {
-      print('❌ [API] Error confirming password reset: $e');
+      debugPrint('❌ [API] Error confirming password reset: $e');
       throw 'Failed to reset password. Please try again.';
     }
   }
@@ -455,7 +575,7 @@ class FirebaseAuthApi implements AuthApiInterface {
     required String name,
     required String email,
     String language = "en",   // Changed to English default
-    String? state = null,    // Changed to null for no default state
+    String? state,            // Changed to null for no default state
   }) async {
     try {
       await _functionsClient.callFunction<Map<String, dynamic>>(
@@ -479,7 +599,7 @@ class FirebaseAuthApi implements AuthApiInterface {
     try {
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser == null || currentUser.email == null) {
-        print('❌ [API] Reauthentication failed: No user is logged in or email is null');
+        debugPrint('❌ [API] Reauthentication failed: No user is logged in or email is null');
         return false;
       }
       
@@ -491,10 +611,10 @@ class FirebaseAuthApi implements AuthApiInterface {
       
       // Reauthenticate
       await currentUser.reauthenticateWithCredential(credential);
-      print('✅ [API] User reauthenticated successfully');
+      debugPrint('✅ [API] User reauthenticated successfully');
       return true;
     } catch (e) {
-      print('❌ [API] Reauthentication failed: $e');
+      debugPrint('❌ [API] Reauthentication failed: $e');
       return false;
     }
   }
@@ -503,7 +623,7 @@ class FirebaseAuthApi implements AuthApiInterface {
   @override
   Future<void> updateUserEmail(String userId, String email) async {
     try {
-      print('📧 [API] Updating user email to $email via Firebase function');
+      debugPrint('📧 [API] Updating user email to $email via Firebase function');
       
       // Update email in Firebase Auth first
       final currentAuth = FirebaseAuth.instance.currentUser;
@@ -524,9 +644,9 @@ class FirebaseAuthApi implements AuthApiInterface {
         throw 'Failed to update email in database';
       }
       
-      print('✅ [API] Email updated successfully');
+      debugPrint('✅ [API] Email updated successfully');
     } catch (e) {
-      print('❌ [API] Error updating email: $e');
+      debugPrint('❌ [API] Error updating email: $e');
       throw 'Failed to update email: $e';
     }
   }
@@ -542,41 +662,43 @@ class FirebaseAuthApi implements AuthApiInterface {
   @override
   Future<void> updateUserEmailSecure(String userId, String newEmail, String password) async {
     try {
-      print('📧 [API] Updating user email with reauthentication');
+      debugPrint('📧 [API] Updating email securely to $newEmail');
       
-      // First reauthenticate
-      final reauthSuccess = await reauthenticateUser(password);
-      if (!reauthSuccess) {
-        throw 'Authentication failed. Please check your password and try again.';
-      }
-      
-      // Get current user
+      // First reauthenticate the user
       final currentAuth = FirebaseAuth.instance.currentUser;
-      if (currentAuth == null) {
-        throw 'No authenticated user found';
+      if (currentAuth == null || currentAuth.email == null) {
+        throw 'No authenticated user found or email is null';
       }
       
-      try {
-        // Instead of directly updating email, send a verification email to the new address
-        await currentAuth.verifyBeforeUpdateEmail(newEmail);
-        
-        print('✅ [API] Verification email sent to $newEmail. User must verify before email is updated');
-        
-        // We don't update Firestore here because the email hasn't actually changed yet
-        // Firebase will update the email after the user clicks the verification link
-        // EmailSyncService will handle synchronizing the email to Firestore after verification
-        
-        return;
-      } catch (e) {
-        if (e.toString().contains('auth/requires-recent-login')) {
-          throw 'Authentication required. Please log out and log back in before changing your email.';
-        } else {
-          throw 'Failed to send verification email: $e';
-        }
-      }
+      // Create a credential with the current email and provided password
+      final credential = EmailAuthProvider.credential(
+        email: currentAuth.email!,
+        password: password,
+      );
+      
+      // Reauthenticate
+      await currentAuth.reauthenticateWithCredential(credential);
+      debugPrint('✅ [API] User reauthenticated successfully');
+      
+      // Instead of directly updating email, send a verification email to the new address
+      await currentAuth.verifyBeforeUpdateEmail(newEmail);
+      
+      debugPrint('✅ [API] Verification email sent to $newEmail. User must verify before email is updated');
+      
+      // We don't update Firestore here because the email hasn't actually changed yet
+      // Firebase will update the email after the user clicks the verification link
+      // EmailSyncService will handle synchronizing the email to Firestore after verification
     } catch (e) {
-      print('❌ [API] Error updating email: $e');
-      throw 'Failed to update email: $e';
+      if (e.toString().contains('auth/requires-recent-login')) {
+        throw 'Authentication required. Please log out and log back in before changing your email.';
+      } else if (e.toString().contains('auth/invalid-credential') || 
+                e.toString().contains('auth/wrong-password') ||
+                e.toString().contains('auth/user-mismatch')) {
+        throw 'Authentication failed. Incorrect password.';
+      } else {
+        debugPrint('❌ [API] Error during secure email update: $e');
+        throw 'Failed to update email: $e';
+      }
     }
   }
   
@@ -584,7 +706,7 @@ class FirebaseAuthApi implements AuthApiInterface {
   @override
   Future<void> deleteAccount(String userId) async {
     try {
-      print('🗑️ [API] Deleting user account via Firebase function');
+      debugPrint('🗑️ [API] Deleting user account via Firebase function');
       
       // Delete account in Firestore first via function
       final result = await _functionsClient.callFunction<Map<String, dynamic>>(
@@ -603,9 +725,9 @@ class FirebaseAuthApi implements AuthApiInterface {
       // Clear any stored tokens
       await _functionsClient.clearAuthToken();
       
-      print('✅ [API] Account deleted successfully');
+      debugPrint('✅ [API] Account deleted successfully');
     } catch (e) {
-      print('❌ [API] Error deleting account: $e');
+      debugPrint('❌ [API] Error deleting account: $e');
       
       // Try to clear tokens even if account deletion failed
       await _functionsClient.clearAuthToken();

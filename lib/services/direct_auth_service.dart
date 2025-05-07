@@ -14,7 +14,7 @@ class DirectAuthService implements AuthApiInterface {
   Future<bool> signUp(String name, String email, String password) async {
     // Step 1: Create the Auth user
     try {
-      debugPrint('DirectAuthService: Creating auth user for email: $email');
+      debugPrint('🔍 [DirectAuthService] Creating auth user for email: $email');
       
       final UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
         email: email,
@@ -23,25 +23,63 @@ class DirectAuthService implements AuthApiInterface {
       
       final User? firebaseUser = userCredential.user;
       if (firebaseUser == null) {
-        debugPrint('DirectAuthService: Auth user creation failed - no user returned');
+        debugPrint('❌ [DirectAuthService] Auth user creation failed - no user returned');
         return false;
       }
       
       final userId = firebaseUser.uid;
-      debugPrint('DirectAuthService: Auth user created with ID: $userId');
+      debugPrint('✅ [DirectAuthService] Auth user created with ID: $userId');
+      
+      // Check for any initial system-provided values
+      debugPrint('🔍 [DirectAuthService] Checking new user properties:');
+      debugPrint('    - UID: ${firebaseUser.uid}');
+      debugPrint('    - Display Name: ${firebaseUser.displayName}');
+      debugPrint('    - Email: ${firebaseUser.email}');
+      debugPrint('    - Email Verified: ${firebaseUser.emailVerified}');
+      debugPrint('    - Metadata: creation=${firebaseUser.metadata.creationTime}, last sign in=${firebaseUser.metadata.lastSignInTime}');
       
       // Step 2: Update the display name
       try {
         await firebaseUser.updateDisplayName(name);
-        debugPrint('DirectAuthService: Updated display name to: $name');
+        debugPrint('✅ [DirectAuthService] Updated display name to: $name');
       } catch (e) {
-        debugPrint('DirectAuthService: Error updating display name: $e');
+        debugPrint('⚠️ [DirectAuthService] Error updating display name: $e');
         // Continue even if this fails
       }
       
       // Step 3: Create Firestore user documents immediately and await it
       // to ensure the document is created before proceeding
       await createUserDocuments(userId, name, email);
+      
+      // Verify the document was created with correct values
+      try {
+        final docSnapshot = await _firestore.collection('users').doc(userId).get();
+        if (docSnapshot.exists) {
+          final userData = docSnapshot.data();
+          debugPrint('🔍 [DirectAuthService] Verifying created document:');
+          debugPrint('    - language: ${userData?['language']}');
+          debugPrint('    - state: ${userData?['state']}');
+          
+          // If document somehow has incorrect default values, fix them immediately
+          if (userData?['language'] != 'en' || userData?['state'] != null) {
+            debugPrint('⚠️ [DirectAuthService] Detected incorrect default values, fixing now');
+            await _firestore.collection('users').doc(userId).update({
+              'language': 'en',
+              'state': null,
+              'lastUpdated': FieldValue.serverTimestamp(),
+            });
+            
+            // Verify the fix
+            final fixedDoc = await _firestore.collection('users').doc(userId).get();
+            final fixedData = fixedDoc.data();
+            debugPrint('🔍 [DirectAuthService] Verified fixed values:');
+            debugPrint('    - language: ${fixedData?['language']}');
+            debugPrint('    - state: ${fixedData?['state']}');
+          }
+        }
+      } catch (verifyError) {
+        debugPrint('⚠️ [DirectAuthService] Error verifying document: $verifyError');
+      }
       
       // Successfully created Authentication user
       return true;
@@ -58,16 +96,25 @@ class DirectAuthService implements AuthApiInterface {
   /// Create Firestore documents for a new user
   Future<void> createUserDocuments(String userId, String name, String email) async {
     try {
-      // Create user document
-      await _firestore.collection('users').doc(userId).set({
+      // Create user document with explicit default values
+      final userData = {
         'name': name,
         'email': email,
         'createdAt': FieldValue.serverTimestamp(),
         'lastLoginAt': FieldValue.serverTimestamp(),
-        'language': 'en',
-        'state': null,
-      });
-      debugPrint('DirectAuthService: Created Firestore user document');
+        'language': 'en',    // Explicitly set to English 
+        'state': null,       // Explicitly set to null
+      };
+      
+      debugPrint('🔄 [DirectAuthService] Creating user document with data:');
+      debugPrint('    - User ID: $userId');
+      debugPrint('    - Name: $name');
+      debugPrint('    - Email: $email');
+      debugPrint('    - Language: ${userData['language']}');
+      debugPrint('    - State: ${userData['state']}');
+      
+      await _firestore.collection('users').doc(userId).set(userData);
+      debugPrint('✅ [DirectAuthService] Created Firestore user document');
       
       // Create progress document
       await _firestore.collection('progress').doc(userId).set({
@@ -77,7 +124,7 @@ class DirectAuthService implements AuthApiInterface {
         'testScores': {},
         'lastUpdated': FieldValue.serverTimestamp(),
       });
-      debugPrint('DirectAuthService: Created progress document');
+      debugPrint('✅ [DirectAuthService] Created progress document');
     } catch (e) {
       debugPrint('DirectAuthService: Error creating Firestore documents: $e');
       // Continue even if this fails, since the Auth user is already created

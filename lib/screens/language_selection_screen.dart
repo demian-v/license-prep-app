@@ -1,14 +1,80 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
 import '../localization/app_localizations.dart';
 import 'state_selection_screen.dart';
 
-class LanguageSelectionScreen extends StatelessWidget {
+class LanguageSelectionScreen extends StatefulWidget {
+  @override
+  _LanguageSelectionScreenState createState() => _LanguageSelectionScreenState();
+}
+
+class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Perform a final check for incorrect default values
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _verifyUserDefaults(context);
+    });
+  }
+  
+  Future<void> _verifyUserDefaults(BuildContext context) async {
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final currentUser = authProvider.user;
+      
+      if (currentUser != null) {
+        debugPrint('🔍 [LANGUAGE SCREEN] Verifying user default values:');
+        debugPrint('    - Language: ${currentUser.language}');
+        debugPrint('    - State: ${currentUser.state}');
+        
+        bool needsUpdate = false;
+        
+        // Verify language is correctly set to 'en' initially
+        if (currentUser.language != 'en') {
+          debugPrint('⚠️ [LANGUAGE SCREEN] Incorrect language detected: "${currentUser.language}", should be "en"');
+          needsUpdate = true;
+          
+          // Update language provider to ensure UI is consistent
+          final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+          languageProvider.setLanguage('en');
+        }
+        
+        // Verify state is correctly set to null initially
+        if (currentUser.state != null) {
+          debugPrint('⚠️ [LANGUAGE SCREEN] Incorrect state detected: "${currentUser.state}", should be null');
+          needsUpdate = true;
+        }
+        
+        // If needed, update the backend as final failsafe
+        if (needsUpdate) {
+          debugPrint('🔄 [LANGUAGE SCREEN] Fixing incorrect default values');
+          
+          try {
+            // Access Firestore directly for a final fix attempt
+            final firestore = FirebaseFirestore.instance;
+            await firestore.collection('users').doc(currentUser.id).update({
+              'language': 'en',
+              'state': null,
+              'lastUpdated': FieldValue.serverTimestamp(),
+            });
+            debugPrint('✅ [LANGUAGE SCREEN] Fixed user default values in Firestore');
+          } catch (e) {
+            debugPrint('⚠️ [LANGUAGE SCREEN] Failed to update default values in Firestore: $e');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ [LANGUAGE SCREEN] Error verifying user defaults: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    print('🏳️‍🌈 [LANGUAGE SCREEN] Building language selection screen');
+    debugPrint('🏳️‍🌈 [LANGUAGE SCREEN] Building language selection screen');
     return Scaffold(
       appBar: AppBar(
         title: Text(

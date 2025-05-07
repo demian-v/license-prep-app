@@ -58,6 +58,8 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
       final stateProvider = Provider.of<StateProvider>(context, listen: false);
       final state = stateProvider.selectedStateId ?? 'ALL'; // Default to ALL if null
       
+      print('QuizQuestionScreen: Loading questions with topicId=${widget.topic.id}, language=$language, state=$state');
+      
       // Fetch questions from Firebase
       final fetchedQuestions = await serviceLocator.content.getQuizQuestions(
         widget.topic.id, 

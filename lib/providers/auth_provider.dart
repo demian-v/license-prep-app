@@ -5,6 +5,7 @@ import 'dart:convert';
 import '../models/user.dart';
 import '../services/service_locator.dart';
 import '../services/email_sync_service.dart';
+import '../data/state_data.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AuthProvider extends ChangeNotifier {
@@ -36,8 +37,17 @@ class AuthProvider extends ChangeNotifier {
           bool nameIsFromEmail = false;
           if (loggedInUser.name.isNotEmpty) {
             final emailPrefix = email.split('@').first.toLowerCase();
-            if (emailPrefix.isNotEmpty && loggedInUser.name.toLowerCase().contains(emailPrefix)) {
-              debugPrint('⚠️ AuthProvider: Current user name appears to be derived from email: ${loggedInUser.name}');
+            
+            // More comprehensive check for email-derived names
+            // Check for exact match, with/without dots, and for shortened versions like 'ma3'
+            if (emailPrefix.isNotEmpty && (
+                loggedInUser.name.toLowerCase() == emailPrefix.toLowerCase() || 
+                loggedInUser.name.toLowerCase() == emailPrefix.toLowerCase().replaceAll('.', ' ') ||
+                (emailPrefix.length > 2 && 
+                 loggedInUser.name.toLowerCase() == emailPrefix.substring(0, emailPrefix.length).toLowerCase()) ||
+                (loggedInUser.name.length <= 4 && emailPrefix.startsWith(loggedInUser.name.toLowerCase()))
+            )) {
+              debugPrint('⚠️ AuthProvider: Current user name appears to be derived from email: ${loggedInUser.name}, emailPrefix: $emailPrefix');
               nameIsFromEmail = true;
             }
           }
@@ -105,22 +115,56 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> signup(String name, String email, String password) async {
     try {
-      debugPrint('AuthProvider: Creating user with name: $name, email: $email');
+      debugPrint('🔍 [AuthProvider] Creating user with name: $name, email: $email');
       
       if (name.isNotEmpty && email.isNotEmpty && password.isNotEmpty) {
         // Use API to register new user
         final registeredUser = await serviceLocator.auth.register(name, email, password);
         
-        // Store the user
-        user = registeredUser;
-        debugPrint('AuthProvider: User created successfully: ${registeredUser.name}');
+        // Verify and enforce correct default values
+        if (registeredUser.language != 'en' || registeredUser.state != null) {
+          debugPrint('⚠️ [AuthProvider] User was created with incorrect default values');
+          debugPrint('    - Current language: ${registeredUser.language}');
+          debugPrint('    - Current state: ${registeredUser.state}');
+          
+          // Create a corrected user with proper defaults
+          final correctedUser = User(
+            id: registeredUser.id,
+            name: registeredUser.name,
+            email: registeredUser.email,
+            language: 'en',    // Explicitly set to English
+            state: null,       // Explicitly set to null
+          );
+          
+          // Store the corrected user
+          user = correctedUser;
+          debugPrint('✅ [AuthProvider] Corrected user default values locally');
+          
+          // Try to update the backend as well
+          try {
+            // Update Firestore directly
+            await _firestore.collection('users').doc(registeredUser.id).update({
+              'language': 'en',
+              'state': null,
+              'lastUpdated': FieldValue.serverTimestamp(),
+            });
+            debugPrint('✅ [AuthProvider] Updated user defaults in Firestore');
+          } catch (e) {
+            debugPrint('⚠️ [AuthProvider] Failed to update defaults in Firestore: $e');
+          }
+        } else {
+          // Store the user as is since default values are correct
+          user = registeredUser;
+          debugPrint('✅ [AuthProvider] User created with correct default values');
+        }
         
-        // Sync emails between Auth and Firestore to ensure consistency
+        // Run email sync immediately to ensure consistency and fix any potential issues
+        debugPrint('🔄 [AuthProvider] Running email sync to ensure data consistency');
         await emailSyncService.syncEmailWithFirestore();
         
         // Save user to local storage
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('user', jsonEncode(registeredUser.toJson()));
+        await prefs.setString('user', jsonEncode(user!.toJson()));
         
         notifyListeners();
         return true;
@@ -182,31 +226,51 @@ class AuthProvider extends ChangeNotifier {
   Future<void> updateUserState(String? state) async {
     if (user != null) {
       try {
-        debugPrint('🗺️ AuthProvider: Updating user state to: ${state ?? "null"}');
+        debugPrint('🗺️ [AuthProvider] Updating user state to: ${state ?? "null"}');
         
-        if (state != null) {
+        // Ensure we're using the state ID and not a full state name or "null" string
+        String? stateId = state;
+        
+        // If state is a full state name (longer than 2 chars), try to convert it to state ID
+        if (state != null && state.length > 2) {
+          final stateInfo = StateData.getStateByName(state);
+          if (stateInfo != null) {
+            stateId = stateInfo.id;
+            debugPrint('🔄 [AuthProvider] Converted state name "$state" to ID: "$stateId"');
+          } else {
+            debugPrint('⚠️ [AuthProvider] Could not convert state name to ID: $state');
+          }
+        }
+        
+        // Handle special case where "null" might be passed as a string
+        if (state == "null") {
+          stateId = null;
+          debugPrint('🔄 [AuthProvider] Converted "null" string to actual null value');
+        }
+        
+        if (stateId != null) {
           // Try to use the API only if state is not null
-          await serviceLocator.auth.updateUserState(user!.id, state);
+          await serviceLocator.auth.updateUserState(user!.id, stateId);
           
           // Get the updated user from the API
           try {
             final updatedUserFromApi = await serviceLocator.auth.getCurrentUser();
             if (updatedUserFromApi != null) {
-              debugPrint('✅ AuthProvider: Successfully updated user state to $state via API');
+              debugPrint('✅ [AuthProvider] Successfully updated user state to $stateId via API');
               user = updatedUserFromApi;
             } else {
-              debugPrint('⚠️ AuthProvider: API returned null user, using local update');
-              user = user!.copyWith(state: state);
+              debugPrint('⚠️ [AuthProvider] API returned null user, using local update');
+              user = user!.copyWith(state: stateId);
             }
           } catch (getUserError) {
-            debugPrint('⚠️ AuthProvider: Error getting updated user: $getUserError');
+            debugPrint('⚠️ [AuthProvider] Error getting updated user: $getUserError');
             // Use local update as fallback
-            user = user!.copyWith(state: state);
+            user = user!.copyWith(state: stateId);
           }
         } else {
           // Just update the local user with null state
           user = user!.copyWith(clearState: true);
-          debugPrint('✅ AuthProvider: Updated user state to null locally');
+          debugPrint('✅ [AuthProvider] Updated user state to null locally');
         }
         
         final prefs = await SharedPreferences.getInstance();

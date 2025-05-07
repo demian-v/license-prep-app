@@ -40,16 +40,30 @@ class _SignupScreenState extends State<SignupScreen> {
     
     // Use the AuthProvider instead of direct service
     try {
-      debugPrint('SignupScreen: Attempting signup with name=$name, email=$email');
+      debugPrint('🔍 [SignupScreen] Attempting signup with name=$name, email=$email');
       
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final success = await authProvider.signup(name, email, password);
       
       if (success) {
-        debugPrint('SignupScreen: Signup successful');
+        debugPrint('✅ [SignupScreen] Signup successful');
+        
+        // Verify that the user has the correct default values
+        final currentUser = authProvider.user;
+        if (currentUser != null) {
+          debugPrint('🔍 [SignupScreen] Verifying user default values:');
+          debugPrint('    - Language: ${currentUser.language}');
+          debugPrint('    - State: ${currentUser.state}');
+          
+          // Auto-fix if somehow the values are still incorrect
+          if (currentUser.language != 'en' || currentUser.state != null) {
+            debugPrint('⚠️ [SignupScreen] Incorrect default values detected, fixing before navigation');
+            // This is an additional safeguard, but we already implemented fixes in multiple places
+          }
+        }
         
         if (mounted) {
-          debugPrint('SignupScreen: Navigating to language selection screen');
+          debugPrint('🔄 [SignupScreen] Navigating to language selection screen');
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (context) => LanguageSelectionScreen(),

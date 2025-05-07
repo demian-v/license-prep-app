@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/auth_provider.dart';
 import '../models/user.dart' as app_models;
+import '../data/state_data.dart';
 import 'package:provider/provider.dart';
 
 class EmailSyncService {
@@ -11,7 +12,7 @@ class EmailSyncService {
   final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
   
   // Sync emails if there's a mismatch - with improved debugging and forced updates
-  // While preserving user state information
+  // While preserving user state information and fixing incorrect default values
   Future<void> syncEmailWithFirestore() async {
     final user = _auth.currentUser;
     if (user == null || user.email == null) {
@@ -41,15 +42,86 @@ class EmailSyncService {
       debugPrint('📧 EmailSyncService: Firestore email: $firestoreEmail, Auth email: $authEmail');
       debugPrint('🌍 EmailSyncService: User state: $state, language: $language');
       
+      // Check for incorrect default values
+      bool needsDefaultValueFix = false;
+      Map<String, dynamic> fixedValues = {};
+      
+      // Check if language is incorrect (should be 'en' for new users, not 'ua' or others)
+      if (language != null && language != 'en' && language != 'es' && language != 'uk' && language != 'pl' && language != 'ru') {
+        debugPrint('⚠️ EmailSyncService: Detected incorrect language value: $language, should be "en" for new users');
+        fixedValues['language'] = 'en';
+        needsDefaultValueFix = true;
+      }
+      
+      // Process state value - could be null, String, or state ID
+      if (state != null) {
+        // Handle case where state is "null" as string
+        if (state is String && state == "null") {
+          debugPrint('⚠️ EmailSyncService: Found "null" as string for state, converting to actual null');
+          fixedValues['state'] = null;
+          needsDefaultValueFix = true;
+        } 
+        // Handle case where state is a full state name instead of ID
+        else if (state is String && state.length > 2) {
+          debugPrint('⚠️ EmailSyncService: State value is a full name instead of ID: $state');
+          try {
+            // Try to import StateData
+            final stateInfo = StateData.getStateByName(state);
+            if (stateInfo != null) {
+              debugPrint('🔄 EmailSyncService: Converting state name "$state" to ID: "${stateInfo.id}"');
+              fixedValues['state'] = stateInfo.id;
+              needsDefaultValueFix = true;
+            } else {
+              debugPrint('⚠️ EmailSyncService: Could not convert state name to ID, setting to null');
+              fixedValues['state'] = null;
+              needsDefaultValueFix = true;
+            }
+          } catch (e) {
+            debugPrint('⚠️ EmailSyncService: Error converting state name to ID: $e, setting to null');
+            fixedValues['state'] = null;
+            needsDefaultValueFix = true;
+          }
+        }
+      }
+      
+      // Fix incorrect default values if needed
+      if (needsDefaultValueFix) {
+        debugPrint('🔄 EmailSyncService: Fixing incorrect default values: $fixedValues');
+        
+        try {
+          await _firestore.collection('users').doc(userId).update(fixedValues);
+          debugPrint('✅ EmailSyncService: Fixed incorrect default values');
+          
+          // Verify the fix
+          final verifyDoc = await _firestore.collection('users').doc(userId).get();
+          final verifyData = verifyDoc.data() as Map<String, dynamic>;
+          debugPrint('🔍 EmailSyncService: Verified fixed values:');
+          debugPrint('    - language: ${verifyData['language']}');
+          debugPrint('    - state: ${verifyData['state']}');
+        } catch (fixError) {
+          debugPrint('❌ EmailSyncService: Error fixing default values: $fixError');
+        }
+      }
+      
       // Check if emails are different before updating
       if (firestoreEmail != authEmail) {
         debugPrint('🔄 EmailSyncService: Updating Firestore email to match Auth email: $authEmail');
         
         // Update Firestore with the email from Firebase Auth while preserving other fields
-        await _firestore.collection('users').doc(userId).update({
-          'email': authEmail,
-          'lastUpdated': FieldValue.serverTimestamp(),
-        });
+        // Make sure not to replace the name from Firebase as it might be derived from email
+        if (name != null && name.isNotEmpty) {
+          debugPrint('👤 EmailSyncService: Preserving user name: $name during email sync');
+          await _firestore.collection('users').doc(userId).update({
+            'email': authEmail,
+            'name': name, // Explicitly preserve the name from Firestore
+            'lastUpdated': FieldValue.serverTimestamp(),
+          });
+        } else {
+          await _firestore.collection('users').doc(userId).update({
+            'email': authEmail,
+            'lastUpdated': FieldValue.serverTimestamp(),
+          });
+        }
         
         // Verify the update
         final updatedDoc = await _firestore.collection('users').doc(userId).get();
@@ -189,10 +261,20 @@ class EmailSyncService {
       debugPrint('🔄 EmailSyncService: Preserving user state: $state, language: $language');
       
       // Now update the document with the new email while preserving other fields
-      await _firestore.collection('users').doc(userId).update({
-        'email': authEmail,
-        'lastUpdated': FieldValue.serverTimestamp(),
-      });
+      // Explicitly include the name to ensure it's preserved
+      if (name != null && name.isNotEmpty) {
+        debugPrint('👤 EmailSyncService: Preserving user name "$name" during updateFirestoreEmail');
+        await _firestore.collection('users').doc(userId).update({
+          'email': authEmail,
+          'name': name, // Explicitly preserve the name
+          'lastUpdated': FieldValue.serverTimestamp(),
+        });
+      } else {
+        await _firestore.collection('users').doc(userId).update({
+          'email': authEmail,
+          'lastUpdated': FieldValue.serverTimestamp(),
+        });
+      }
       
       // Verify the update
       final updatedDoc = await _firestore.collection('users').doc(userId).get();

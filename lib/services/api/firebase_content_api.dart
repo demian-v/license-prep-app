@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import '../../models/quiz_topic.dart';
 import '../../models/quiz_question.dart';
 import '../../models/theory_module.dart';
@@ -36,7 +37,29 @@ class FirebaseContentApi implements ContentApiInterface {
       }
       
       // Use 'ALL' as default if state is empty
-      final stateValue = state.isEmpty ? 'ALL' : state;
+      var stateValue = state.isEmpty ? 'ALL' : state;
+      
+      // First try to get the user's state from Firestore to ensure we're using the most up-to-date value
+      try {
+        final currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
+          if (userDoc.exists) {
+            final userData = userDoc.data() as Map<String, dynamic>;
+            final userState = userData['state'] as String?;
+            
+            // If the user has a state in Firestore, use that instead of the parameter
+            if (userState != null && userState.isNotEmpty) {
+              print('IMPORTANT - Overriding topic state parameter from "$stateValue" to Firestore user state: "$userState"');
+              stateValue = userState;
+            }
+            
+            print('DEBUG - User document state: ${userData['state']}, Final state for topics query: $stateValue');
+          }
+        }
+      } catch (e) {
+        print('Error checking user state for topics: $e');
+      }
       
       print('Fetching quiz topics with: licenseType=$licenseType, language=$language, state=$stateValue');
       
@@ -58,7 +81,46 @@ class FirebaseContentApi implements ContentApiInterface {
         return [];
       }
       
-      return response.map((item) {
+      // Filter to ensure we only show topics matching the user's language
+      // AND if state is "ALL", only show for appropriate language
+      print('Filtering topics based on language: $language');
+      final filteredResponse = response.where((item) {
+        try {
+          final Map<dynamic, dynamic> rawData = item as Map<dynamic, dynamic>;
+          // Convert to Map<String, dynamic>
+          final Map<String, dynamic> data = Map<String, dynamic>.from(rawData.map(
+            (key, value) => MapEntry(key.toString(), value),
+          ));
+          
+          // First, ensure the topic matches the user's language
+          final topicLanguage = data['language']?.toString() ?? '';
+          final languageMatches = (topicLanguage == language);
+          
+          if (!languageMatches) {
+            return false;  // Skip if language doesn't match
+          }
+          
+          // Then check state condition:
+          // If ALL state, only show if language is "uk"
+          final topicState = data['state']?.toString() ?? '';
+          if (topicState == 'ALL') {
+            return language == 'uk';  // Only show ALL state topics for Ukrainian
+          }
+          
+          // For specific state topics, we've already confirmed language match above
+          return true;
+        } catch (e) {
+          print('Error filtering topic: $e');
+          return false;
+        }
+      }).toList();
+      
+      if (filteredResponse.isEmpty) {
+        print('No topics match the language ($language) filter, returning empty list');
+        return [];
+      }
+      
+      return filteredResponse.map((item) {
         try {
           // Handle different possible types coming from Firebase Functions
           final Map<dynamic, dynamic> rawData = item as Map<dynamic, dynamic>;
@@ -123,7 +185,29 @@ class FirebaseContentApi implements ContentApiInterface {
       }
       
       // Use 'ALL' as default if state is empty
-      final stateValue = state.isEmpty ? 'ALL' : state;
+      var stateValue = state.isEmpty ? 'ALL' : state;
+      
+      // First try to get the user's state from Firestore to ensure we're using the most up-to-date value
+      try {
+        final currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
+          if (userDoc.exists) {
+            final userData = userDoc.data() as Map<String, dynamic>;
+            final userState = userData['state'] as String?;
+            
+            // If the user has a state in Firestore, use that instead of the parameter
+            if (userState != null && userState.isNotEmpty) {
+              print('IMPORTANT - Overriding state parameter from "$stateValue" to Firestore user state: "$userState"');
+              stateValue = userState;
+            }
+            
+            print('DEBUG - User document state: ${userData['state']}, Final state for query: $stateValue');
+          }
+        }
+      } catch (e) {
+        print('Error checking user state: $e');
+      }
       
       print('Fetching quiz questions with: topicId=$topicId, language=$language, state=$stateValue');
       
@@ -230,7 +314,29 @@ class FirebaseContentApi implements ContentApiInterface {
   Future<List<TrafficRuleTopic>> getTrafficRuleTopics(String language, String state, String licenseId) async {
     try {
       // Use 'ALL' as default if state is empty
-      final stateValue = state.isEmpty ? 'ALL' : state;
+      var stateValue = state.isEmpty ? 'ALL' : state;
+      
+      // First try to get the user's state from Firestore to ensure we're using the most up-to-date value
+      try {
+        final currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
+          if (userDoc.exists) {
+            final userData = userDoc.data() as Map<String, dynamic>;
+            final userState = userData['state'] as String?;
+            
+            // If the user has a state in Firestore, use that instead of the parameter
+            if (userState != null && userState.isNotEmpty) {
+              print('IMPORTANT - Overriding traffic topics state parameter from "$stateValue" to Firestore user state: "$userState"');
+              stateValue = userState;
+            }
+            
+            print('DEBUG - User document state: ${userData['state']}, Final state for traffic topics query: $stateValue');
+          }
+        }
+      } catch (e) {
+        print('Error checking user state for traffic topics: $e');
+      }
       
       print('Fetching traffic rule topics from Firestore with: language=$language, state=$stateValue, licenseId=$licenseId');
       
@@ -295,7 +401,29 @@ class FirebaseContentApi implements ContentApiInterface {
       }
       
       // Use 'ALL' as default if state is empty
-      final stateValue = state.isEmpty ? 'ALL' : state;
+      var stateValue = state.isEmpty ? 'ALL' : state;
+      
+      // First try to get the user's state from Firestore to ensure we're using the most up-to-date value
+      try {
+        final currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
+          if (userDoc.exists) {
+            final userData = userDoc.data() as Map<String, dynamic>;
+            final userState = userData['state'] as String?;
+            
+            // If the user has a state in Firestore, use that instead of the parameter
+            if (userState != null && userState.isNotEmpty) {
+              print('IMPORTANT - Overriding theory modules state parameter from "$stateValue" to Firestore user state: "$userState"');
+              stateValue = userState;
+            }
+            
+            print('DEBUG - User document state: ${userData['state']}, Final state for theory modules query: $stateValue');
+          }
+        }
+      } catch (e) {
+        print('Error checking user state for theory modules: $e');
+      }
       
       // Try to get from Firestore first
       try {
@@ -367,7 +495,29 @@ class FirebaseContentApi implements ContentApiInterface {
       }
       
       // Use 'ALL' as default if state is empty
-      final stateValue = state.isEmpty ? 'ALL' : state;
+      var stateValue = state.isEmpty ? 'ALL' : state;
+      
+      // First try to get the user's state from Firestore to ensure we're using the most up-to-date value
+      try {
+        final currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
+          if (userDoc.exists) {
+            final userData = userDoc.data() as Map<String, dynamic>;
+            final userState = userData['state'] as String?;
+            
+            // If the user has a state in Firestore, use that instead of the parameter
+            if (userState != null && userState.isNotEmpty) {
+              print('IMPORTANT - Overriding practice tests state parameter from "$stateValue" to Firestore user state: "$userState"');
+              stateValue = userState;
+            }
+            
+            print('DEBUG - User document state: ${userData['state']}, Final state for practice tests query: $stateValue');
+          }
+        }
+      } catch (e) {
+        print('Error checking user state for practice tests: $e');
+      }
       
       final response = await _functionsClient.callFunction<List<dynamic>>(
         'getPracticeTests',
