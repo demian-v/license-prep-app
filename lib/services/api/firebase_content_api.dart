@@ -36,8 +36,10 @@ class FirebaseContentApi implements ContentApiInterface {
         print('Corrected language code from ua to uk');
       }
       
-      // Use 'ALL' as default if state is empty
-      var stateValue = state.isEmpty ? 'ALL' : state;
+      // If state is null or empty, we'll query without state filtering
+      // This allows us to show the empty state UI when no state is selected
+      var stateValue = (state == null || state.isEmpty) ? 'ALL' : state;
+      print('State value for Firebase query: $stateValue (original value: $state)');
       
       // First try to get the user's state from Firestore to ensure we're using the most up-to-date value
       try {
@@ -184,8 +186,10 @@ class FirebaseContentApi implements ContentApiInterface {
         print('Corrected language code from ua to uk');
       }
       
-      // Use 'ALL' as default if state is empty
-      var stateValue = state.isEmpty ? 'ALL' : state;
+      // If state is null or empty, we'll query without state filtering
+      // This allows us to show the empty state UI when no state is selected
+      var stateValue = (state == null || state.isEmpty) ? 'ALL' : state;
+      print('State value for Firebase query: $stateValue (original value: $state)');
       
       // First try to get the user's state from Firestore to ensure we're using the most up-to-date value
       try {
@@ -313,8 +317,10 @@ class FirebaseContentApi implements ContentApiInterface {
   @override
   Future<List<TrafficRuleTopic>> getTrafficRuleTopics(String language, String state, String licenseId) async {
     try {
-      // Use 'ALL' as default if state is empty
-      var stateValue = state.isEmpty ? 'ALL' : state;
+      // If state is null or empty, we'll query without state filtering
+      // This allows us to show the empty state UI when no state is selected
+      var stateValue = (state == null || state.isEmpty) ? 'ALL' : state;
+      print('State value for Firebase query: $stateValue (original value: $state)');
       
       // First try to get the user's state from Firestore to ensure we're using the most up-to-date value
       try {
@@ -400,8 +406,10 @@ class FirebaseContentApi implements ContentApiInterface {
         print('Corrected language code from ua to uk');
       }
       
-      // Use 'ALL' as default if state is empty
-      var stateValue = state.isEmpty ? 'ALL' : state;
+      // If state is null or empty, we'll query without state filtering
+      // This allows us to show the empty state UI when no state is selected
+      var stateValue = (state == null || state.isEmpty) ? 'ALL' : state;
+      print('State value for Firebase query: $stateValue (original value: $state)');
       
       // First try to get the user's state from Firestore to ensure we're using the most up-to-date value
       try {
@@ -425,13 +433,17 @@ class FirebaseContentApi implements ContentApiInterface {
         print('Error checking user state for theory modules: $e');
       }
       
-      // Try to get from Firestore first
+      print('Attempting to fetch theory modules with state=$stateValue, language=$language');
+      
+      List<TheoryModule> modules = [];
+      
+      // Try to get from Firestore directly first
       try {
-        print('Attempting to fetch theory modules from Firestore');
         // Query Firestore collection
-        QuerySnapshot querySnapshot;
+        print('Querying Firestore collection: theoryModules');
+        print('Query parameters: language=$language, state=[${stateValue}, ALL], licenseId=$licenseType');
         
-        querySnapshot = await _firestore
+        QuerySnapshot querySnapshot = await _firestore
             .collection('theoryModules')
             .where('language', isEqualTo: language)
             .where('state', whereIn: [stateValue, 'ALL'])
@@ -441,44 +453,104 @@ class FirebaseContentApi implements ContentApiInterface {
         
         print('Got ${querySnapshot.docs.length} theory modules from Firestore');
         
+        // Process results
         if (querySnapshot.docs.isNotEmpty) {
-          // Process results
-          return querySnapshot.docs.map((doc) {
-            Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-            return TheoryModule.fromFirestore(data, doc.id);
-          }).toList();
+          modules = querySnapshot.docs.map((doc) {
+            try {
+              final data = doc.data() as Map<String, dynamic>;
+              print('Processing module: ${data['id'] ?? doc.id} - ${data['title'] ?? 'No title'}');
+              return TheoryModule.fromFirestore(data, doc.id);
+            } catch (e) {
+              print('Error processing module doc: $e');
+              return null;
+            }
+          })
+          .where((module) => module != null)
+          .cast<TheoryModule>()
+          .toList();
+          
+          if (modules.isNotEmpty) {
+            print('Successfully processed ${modules.length} modules from Firestore');
+            return modules;
+          } else {
+            print('No valid modules found in Firestore results');
+          }
+        } else {
+          print('No theory modules found in Firestore');
         }
       } catch (e) {
         print('Error fetching theory modules from Firestore: $e');
-        print('Falling back to Firebase Functions');
+        print('Will try Firebase Functions');
       }
       
-      // Fallback to Firebase Functions
-      final functionsResponse = await _functionsClient.callFunction<List<dynamic>>(
-        'getTheoryModules',
-        data: {
-          'licenseType': licenseType,
-          'language': language,
-          'state': stateValue,
-        },
-      );
-      
-      return functionsResponse.map((item) {
-        final Map<String, dynamic> data = item as Map<String, dynamic>;
-        return TheoryModule(
-          id: data['id'] as String,
-          licenseId: data['licenseId'] as String,
-          title: data['title'] as String,
-          description: data['description'] as String,
-          estimatedTime: data['estimatedTime'] as int? ?? 30, // Default to 30 minutes if not provided
-          topics: List<String>.from(data['topics'] ?? []),
-          language: data['language'] as String? ?? language,
-          state: data['state'] as String? ?? stateValue,
-          icon: data['icon'] as String? ?? 'menu_book',
-          type: data['type'] as String? ?? 'module',
-          order: data['order'] as int? ?? 0,
+      // Try to use Firebase Functions API as a fallback
+      try {
+        print('Attempting to use Firebase Functions API');
+        final functionsResponse = await _functionsClient.callFunction<List<dynamic>>(
+          'getTheoryModules',
+          data: {
+            'licenseType': licenseType,
+            'language': language,
+            'state': stateValue,
+          },
         );
-      }).toList();
+        
+        if (functionsResponse != null && functionsResponse.isNotEmpty) {
+          print('Received response from Firebase Functions');
+          modules = functionsResponse.map((item) {
+            try {
+              if (item is Map) {
+                // Convert to Map<String, dynamic> safely
+                final Map<String, dynamic> data = Map<String, dynamic>.from(
+                  (item as Map).map((key, value) => MapEntry(key.toString(), value))
+                );
+                
+                return TheoryModule(
+                  id: data['id'].toString(),
+                  licenseId: data['licenseId'].toString(),
+                  title: data['title'].toString(),
+                  description: data['description'].toString(),
+                  estimatedTime: (data['estimatedTime'] is int) 
+                    ? data['estimatedTime'] as int 
+                    : int.tryParse(data['estimatedTime'].toString()) ?? 30,
+                  topics: data['topics'] is List 
+                    ? List<String>.from(data['topics']) 
+                    : <String>[],
+                  language: data['language']?.toString() ?? language,
+                  state: data['state']?.toString() ?? stateValue,
+                  icon: data['icon']?.toString() ?? 'menu_book',
+                  type: data['type']?.toString() ?? 'module',
+                  order: (data['order'] is int) 
+                    ? data['order'] as int 
+                    : int.tryParse(data['order'].toString()) ?? 0,
+                );
+              }
+              return null;
+            } catch (e) {
+              print('Error processing module from functions: $e');
+              return null;
+            }
+          })
+          .where((module) => module != null)
+          .cast<TheoryModule>()
+          .toList();
+          
+          if (modules.isNotEmpty) {
+            print('Successfully processed ${modules.length} modules from Firebase Functions');
+            return modules;
+          } else {
+            print('No valid modules found in Firebase Functions results');
+          }
+        } else {
+          print('No results from Firebase Functions');
+        }
+      } catch (e) {
+        print('Error fetching theory modules from Firebase Functions: $e');
+      }
+      
+      // If we got here, return an empty list
+      print('No theory modules found through any method, returning empty list');
+      return [];
     } catch (e) {
       throw 'Failed to fetch theory modules: $e';
     }
@@ -494,8 +566,10 @@ class FirebaseContentApi implements ContentApiInterface {
         print('Corrected language code from ua to uk');
       }
       
-      // Use 'ALL' as default if state is empty
-      var stateValue = state.isEmpty ? 'ALL' : state;
+      // If state is null or empty, we'll query without state filtering
+      // This allows us to show the empty state UI when no state is selected
+      var stateValue = (state == null || state.isEmpty) ? 'ALL' : state;
+      print('State value for Firebase query: $stateValue (original value: $state)');
       
       // First try to get the user's state from Firestore to ensure we're using the most up-to-date value
       try {

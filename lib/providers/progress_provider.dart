@@ -284,6 +284,11 @@ class ProgressProvider extends ChangeNotifier {
     return orderMap[questionId] ?? 0;
   }
   
+  // Check if a module is completed
+  bool isModuleCompleted(String moduleId) {
+    return progress.completedModules.contains(moduleId);
+  }
+  
   // Migrate saved questions from old to new structure if needed
   Future<void> migrateSavedQuestionsIfNeeded(String userId) async {
     if (progress.savedQuestions.isNotEmpty && 

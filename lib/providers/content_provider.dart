@@ -116,6 +116,14 @@ class ContentProvider extends ChangeNotifier {
     // Mark content as explicitly requested
     _contentRequestedExplicitly = true;
     
+    // Clear any previous caches to ensure fresh content
+    if (forceRefresh) {
+      _clearRelevantCaches();
+    }
+    
+    print('ContentProvider: fetchContentAfterSelection called with forceRefresh=$forceRefresh');
+    print('ContentProvider: Current state=$_currentState, language=$_currentLanguage');
+    
     // Now fetch the content
     return fetchContent(forceRefresh: forceRefresh);
   }
@@ -199,10 +207,13 @@ class ContentProvider extends ChangeNotifier {
       // Use 'ALL' as default if state is null
       final stateValue = _currentState ?? 'ALL';
       
+      print('Fetching theory modules with: licenseId=$_currentLicenseId, language=$_currentLanguage, state=$stateValue');
+      
+      // Note: Corrected parameter order to match Firebase API
       _modules = await contentService.getTheoryModules(
-        _currentLanguage, 
-        stateValue, 
-        _currentLicenseId
+        _currentLicenseId,  // licenseType should be first
+        _currentLanguage,   // language second
+        stateValue          // state third
       );
       
       // If no modules found and language isn't English, try English as fallback
@@ -210,10 +221,11 @@ class ContentProvider extends ChangeNotifier {
         print('No modules found in $_currentLanguage, trying English fallback');
         final stateValue = _currentState ?? 'ALL';
         
+        // Also fix the parameter order here
         _modules = await contentService.getTheoryModules(
-          'en', 
-          stateValue, 
-          _currentLicenseId
+          _currentLicenseId,  // licenseType should be first
+          'en',               // language second
+          stateValue          // state third
         );
       }
       
@@ -237,6 +249,8 @@ class ContentProvider extends ChangeNotifier {
         // Use 'ALL' as default if state is null
         final stateValue = _currentState ?? 'ALL';
         
+        print('Fetching traffic rule topics with: language=$_currentLanguage, state=$stateValue, licenseId=$_currentLicenseId');
+        
         _topics = await contentService.getTrafficRuleTopics(
           _currentLanguage, 
           stateValue, 
@@ -247,6 +261,8 @@ class ContentProvider extends ChangeNotifier {
         if (_topics.isEmpty && _currentLanguage != 'en') {
           print('No topics found in $_currentLanguage, trying English fallback');
           final stateValue = _currentState ?? 'ALL';
+          
+          print('Trying English fallback for topics: language=en, state=$stateValue, licenseId=$_currentLicenseId');
           
           _topics = await contentService.getTrafficRuleTopics(
             'en', 

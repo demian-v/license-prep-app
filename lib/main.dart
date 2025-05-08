@@ -30,6 +30,7 @@ import 'screens/password_reset_success_screen.dart';
 import 'models/user.dart';
 import 'models/subscription.dart';
 import 'models/progress.dart';
+import 'models/theory_module.dart';
 import 'providers/auth_provider.dart';
 import 'providers/subscription_provider.dart';
 import 'providers/progress_provider.dart';
@@ -381,10 +382,32 @@ class MyApp extends StatelessWidget {
         debugPrint('🔗 Route requested: ${settings.name}');
         
         if (settings.name!.startsWith('/theory/')) {
-          final licenseId = settings.name!.split('/')[2];
-          return MaterialPageRoute(
-            builder: (context) => TheoryModuleScreen(licenseId: licenseId),
-          );
+          final moduleId = settings.name!.split('/')[2];
+          // Fetch the module using ContentProvider
+          final contentProvider = Provider.of<ContentProvider>(context, listen: false);
+          final modules = contentProvider.modules;
+          TheoryModule? module;
+          try {
+            module = modules.firstWhere(
+              (m) => m.id == moduleId,
+            );
+          } catch (e) {
+            module = null;
+          }
+          
+          // If module found, navigate to the module screen
+          if (module != null) {
+            // Use non-null assertion since we've already checked module is not null
+            final nonNullModule = module;
+            return MaterialPageRoute(
+              builder: (context) => TheoryModuleScreen(module: nonNullModule),
+            );
+          } else {
+            // If module not found, redirect to theory screen
+            return MaterialPageRoute(
+              builder: (context) => TrafficRulesTopicsScreen(),
+            );
+          }
         } else if (settings.name!.startsWith('/practice/')) {
           final licenseId = settings.name!.split('/')[2];
           return MaterialPageRoute(

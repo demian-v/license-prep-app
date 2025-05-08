@@ -1,222 +1,225 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/theory_module.dart';
-import '../models/license_type.dart';
+import '../models/traffic_rule_topic.dart';
+import '../providers/content_provider.dart';
 import '../providers/progress_provider.dart';
-import '../providers/subscription_provider.dart';
-import '../providers/language_provider.dart';
-import '../services/service_locator.dart';
-import '../widgets/module_card.dart';
-import '../data/license_data.dart' as license_data;
+import 'traffic_rule_content_screen.dart';
 
 class TheoryModuleScreen extends StatefulWidget {
-  final String licenseId;
+  final TheoryModule module;
 
-  TheoryModuleScreen({required this.licenseId});
+  const TheoryModuleScreen({
+    Key? key,
+    required this.module,
+  }) : super(key: key);
 
   @override
   _TheoryModuleScreenState createState() => _TheoryModuleScreenState();
 }
 
 class _TheoryModuleScreenState extends State<TheoryModuleScreen> {
-  List<TheoryModule> modules = [];
-  LicenseType? license;
-  bool isLoading = true;
-  String? errorMessage;
-  
+  List<TrafficRuleTopic> _moduleTopics = [];
+  bool _isLoading = true;
+
   @override
   void initState() {
     super.initState();
-    loadModules();
+    _loadTopics();
   }
-  
-  Future<void> loadModules() async {
+
+  Future<void> _loadTopics() async {
     setState(() {
-      isLoading = true;
-      errorMessage = null;
+      _isLoading = true;
     });
+
+    final contentProvider = Provider.of<ContentProvider>(context, listen: false);
     
-    try {
-      final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
-      final language = languageProvider.language;
-      final state = 'all'; // Or get from user preferences
+    print('TheoryModuleScreen: Loading topics for module ${widget.module.id}');
+    print('Module topics: ${widget.module.topics}');
+    print('Module state: ${widget.module.state}, language: ${widget.module.language}');
+    
+    // Using the topics from the provider
+    final allTopics = contentProvider.topics;
+    
+    // Filter topics based on the topics listed in the module
+    final filteredTopics = <TrafficRuleTopic>[];
+    
+    // First try to match topics from the ones already loaded in memory
+    for (var topicId in widget.module.topics) {
+      print('Looking for topic ID: $topicId');
       
-      // Find the license from hard-coded data (ideally this would come from Firebase too)
-      license = license_data.licenseTypes.firstWhere(
-        (l) => l.id == widget.licenseId,
-        orElse: () => license_data.licenseTypes.first,
+      // Try multiple ways to match the topic ID
+      final topic = allTopics.firstWhere(
+        (t) => t.id == topicId || 
+               t.id == topicId.replaceAll('topic_', '') || 
+               'topic_${t.id}' == topicId,
+        orElse: () => null as TrafficRuleTopic,
       );
       
-      // Fetch theory modules from Firebase
-      final fetchedModules = await serviceLocator.content.getTheoryModules(
-        widget.licenseId,
-        language,
-        state
-      );
-      
-      if (mounted) {
-        setState(() {
-          modules = fetchedModules;
-          isLoading = false;
-        });
-      }
-    } catch (e) {
-      print('Error loading theory modules: $e');
-      if (mounted) {
-        setState(() {
-          errorMessage = 'Failed to load theory modules. Please try again.';
-          isLoading = false;
-        });
+      if (topic != null) {
+        print('Found topic in memory: ${topic.id} - ${topic.title}');
+        filteredTopics.add(topic);
+      } else {
+        print('Topic not found in memory, fetching from database: $topicId');
+        // If topic not found in memory, try to fetch it directly
+        final fetchedTopic = await contentProvider.getTopicById(topicId);
+        if (fetchedTopic != null) {
+          print('Successfully fetched topic: ${fetchedTopic.id} - ${fetchedTopic.title}');
+          filteredTopics.add(fetchedTopic);
+        } else {
+          print('Failed to fetch topic: $topicId');
+        }
       }
     }
+    
+    // If we still don't have any topics and the content provider has topics,
+    // try to match by state and language
+    if (filteredTopics.isEmpty && allTopics.isNotEmpty) {
+      print('No direct topic matches found. Trying to filter by state and language...');
+      filteredTopics.addAll(allTopics.where((topic) => 
+        (topic.state == widget.module.state || topic.state == 'ALL') && 
+        topic.language == widget.module.language &&
+        topic.licenseId == widget.module.licenseId
+      ).toList());
+      
+      print('Found ${filteredTopics.length} topics by filtering');
+    }
+    
+    // Sort by order
+    filteredTopics.sort((a, b) => a.order.compareTo(b.order));
+    
+    setState(() {
+      _moduleTopics = filteredTopics;
+      _isLoading = false;
+    });
+    
+    print('Loaded ${_moduleTopics.length} topics for module ${widget.module.id}');
   }
 
   @override
   Widget build(BuildContext context) {
-    final progressProvider = Provider.of<ProgressProvider>(context);
-    final subscriptionProvider = Provider.of<SubscriptionProvider>(context);
-    
-    // Check subscription status
-    final isSubscriptionActive = subscriptionProvider.isSubscriptionActive;
-    
-    // Common AppBar
-    final appBar = AppBar(
-      title: Text(license != null ? '${license!.name} - Theory' : 'Theory Modules'),
-    );
-
-    // Show loading state
-    if (isLoading) {
-      return Scaffold(
-        appBar: appBar,
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-    
-    // Show error state
-    if (errorMessage != null) {
-      return Scaffold(
-        appBar: appBar,
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 32),
-                child: Text(
-                  errorMessage!,
-                  style: TextStyle(color: Colors.red),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: loadModules,
-                child: Text('Повторити спробу'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-    
-    // Show empty state
-    if (modules.isEmpty) {
-      return Scaffold(
-        appBar: appBar,
-        body: Center(
-          child: Text('No theory modules available for this license type'),
-        ),
-      );
-    }
-    
-    void handleModuleSelect(String moduleId) {
-      if (!isSubscriptionActive) {
-        Navigator.pushNamed(context, '/subscription');
-        return;
-      }
-      
-      // Mark module as completed for demo purposes
-      progressProvider.completeModule(moduleId);
-      
-      // In a real app, this would navigate to module content
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Module completed!'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
-
     return Scaffold(
-      appBar: appBar,
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (!isSubscriptionActive)
-            Container(
-              margin: EdgeInsets.all(16.0),
-              padding: EdgeInsets.all(16.0),
-              decoration: BoxDecoration(
-                color: Colors.red.shade100,
-                borderRadius: BorderRadius.circular(8.0),
-              ),
-              child: Column(
+      appBar: AppBar(
+        title: Text(
+          widget.module.title,
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        elevation: 0,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        foregroundColor: Colors.black,
+      ),
+      body: _isLoading
+          ? Center(child: CircularProgressIndicator())
+          : _buildTopicsList(),
+    );
+  }
+
+  Widget _buildTopicsList() {
+    if (_moduleTopics.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('No topics available for this module'),
+            SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadTopics,
+              child: Text('Refresh'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: EdgeInsets.all(16),
+      itemCount: _moduleTopics.length,
+      itemBuilder: (context, index) {
+        final topic = _moduleTopics[index];
+        return Card(
+          margin: EdgeInsets.only(bottom: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => TrafficRuleContentScreen(topic: topic),
+                ),
+              );
+            },
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Row(
                 children: [
-                  Text(
-                    'Your trial has ended. Subscribe to continue learning.',
-                    style: TextStyle(
-                      color: Colors.red.shade900,
-                      fontSize: 16,
+                  CircleAvatar(
+                    backgroundColor: Colors.blue.shade100,
+                    child: Text(
+                      (index + 1).toString(),
+                      style: TextStyle(
+                        color: Colors.blue,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    textAlign: TextAlign.center,
                   ),
-                  SizedBox(height: 8),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/subscription');
-                    },
-                    child: Text('Subscribe Now'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.shade900,
-                      foregroundColor: Colors.white,
+                  SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      topic.title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
+                  ),
+                  Consumer<ProgressProvider>(
+                    builder: (context, progressProvider, _) {
+                      // Show progress indicator for this topic
+                      final progress = progressProvider.progress.topicProgress[topic.id] ?? 0.0;
+                      
+                      if (progress > 0) {
+                        return Container(
+                          width: 40,
+                          height: 40,
+                          child: Stack(
+                            children: [
+                              CircularProgressIndicator(
+                                value: progress,
+                                backgroundColor: Colors.grey.shade200,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  progress >= 1.0 ? Colors.green : Colors.blue,
+                                ),
+                              ),
+                              if (progress >= 1.0)
+                                Center(
+                                  child: Icon(
+                                    Icons.check,
+                                    color: Colors.green,
+                                    size: 16,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      } else {
+                        return Icon(
+                          Icons.arrow_forward_ios,
+                          size: 16,
+                          color: Colors.grey,
+                        );
+                      }
+                    },
                   ),
                 ],
               ),
             ),
-          Expanded(
-            child: ListView.builder(
-              padding: EdgeInsets.all(16.0),
-              itemCount: modules.length,
-              itemBuilder: (context, index) {
-                final module = modules[index];
-                return Padding(
-                  padding: EdgeInsets.only(bottom: 16.0),
-                  child: ModuleCard(
-                    module: module,
-                    isCompleted: progressProvider.progress.completedModules.contains(module.id),
-                    onSelect: () => handleModuleSelect(module.id),
-                  ),
-                );
-              },
-            ),
           ),
-          Padding(
-            padding: EdgeInsets.all(16.0),
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.pushNamed(context, '/practice/${widget.licenseId}');
-              },
-              child: Text('Go to Practice Tests'),
-              style: ElevatedButton.styleFrom(
-                padding: EdgeInsets.symmetric(vertical: 12),
-              ),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

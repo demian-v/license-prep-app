@@ -42,47 +42,41 @@ class EmailSyncService {
       debugPrint('📧 EmailSyncService: Firestore email: $firestoreEmail, Auth email: $authEmail');
       debugPrint('🌍 EmailSyncService: User state: $state, language: $language');
       
-      // Check for incorrect default values
+      // For new users, we should NOT set any default values
+      // The language and state selection will be handled by the proper onboarding flow
+      // We will only fix values if they are in obviously incorrect formats
+      
       bool needsDefaultValueFix = false;
       Map<String, dynamic> fixedValues = {};
       
-      // Check if language is incorrect (should be 'en' for new users, not 'ua' or others)
-      if (language != null && language != 'en' && language != 'es' && language != 'uk' && language != 'pl' && language != 'ru') {
-        debugPrint('⚠️ EmailSyncService: Detected incorrect language value: $language, should be "en" for new users');
-        fixedValues['language'] = 'en';
+      // Only fix format issues, not set defaults
+      
+      // Handle case where state is "null" as string
+      if (state is String && state == "null") {
+        debugPrint('⚠️ EmailSyncService: Found "null" as string for state, converting to actual null');
+        fixedValues['state'] = null;
         needsDefaultValueFix = true;
       }
       
-      // Process state value - could be null, String, or state ID
-      if (state != null) {
-        // Handle case where state is "null" as string
-        if (state is String && state == "null") {
-          debugPrint('⚠️ EmailSyncService: Found "null" as string for state, converting to actual null');
-          fixedValues['state'] = null;
-          needsDefaultValueFix = true;
-        } 
-        // Handle case where state is a full state name instead of ID
-        else if (state is String && state.length > 2) {
-          debugPrint('⚠️ EmailSyncService: State value is a full name instead of ID: $state');
-          try {
-            // Try to import StateData
-            final stateInfo = StateData.getStateByName(state);
-            if (stateInfo != null) {
-              debugPrint('🔄 EmailSyncService: Converting state name "$state" to ID: "${stateInfo.id}"');
-              fixedValues['state'] = stateInfo.id;
-              needsDefaultValueFix = true;
-            } else {
-              debugPrint('⚠️ EmailSyncService: Could not convert state name to ID, setting to null');
-              fixedValues['state'] = null;
-              needsDefaultValueFix = true;
-            }
-          } catch (e) {
-            debugPrint('⚠️ EmailSyncService: Error converting state name to ID: $e, setting to null');
-            fixedValues['state'] = null;
+      // Handle case where state is a full state name instead of ID
+      else if (state is String && state.length > 2 && state != "null") {
+        debugPrint('⚠️ EmailSyncService: State value is a full name instead of ID: $state');
+        try {
+          // Try to import StateData
+          final stateInfo = StateData.getStateByName(state);
+          if (stateInfo != null) {
+            debugPrint('🔄 EmailSyncService: Converting state name "$state" to ID: "${stateInfo.id}"');
+            fixedValues['state'] = stateInfo.id;
             needsDefaultValueFix = true;
           }
+        } catch (e) {
+          debugPrint('⚠️ EmailSyncService: Error converting state name to ID: $e');
+          // Do NOT set to null - leave as is
         }
       }
+      
+      // DO NOT add default values for language or state
+      // This should be handled by the onboarding flow
       
       // Fix incorrect default values if needed
       if (needsDefaultValueFix) {
@@ -172,16 +166,20 @@ class EmailSyncService {
           final language = userData['language']; // Get language
           final name = userData['name']; // Get name
           
-          await _firestore.collection('users').doc(userId).set({
+          // Only include fields that actually exist in the document
+          Map<String, dynamic> updateData = {
             'email': authEmail,
-            'state': state,
-            'language': language,
-            'name': name,
             'lastUpdated': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
+          };
+          
+          if (name != null) updateData['name'] = name;
+          if (state != null) updateData['state'] = state;
+          if (language != null) updateData['language'] = language;
+          
+          await _firestore.collection('users').doc(userId).set(updateData, SetOptions(merge: true));
           debugPrint('✅ EmailSyncService: Alternative update method completed with preserved data');
         } else {
-          // Simple fallback if we can't get the user document
+          // Simple fallback if we can't get the user document - only update email
           await _firestore.collection('users').doc(userId).set({
             'email': authEmail,
             'lastUpdated': FieldValue.serverTimestamp(),
@@ -287,14 +285,17 @@ class EmailSyncService {
       } else {
         debugPrint('❌ EmailSyncService: FAILED - Firestore email ($updatedEmail) still doesn\'t match Auth email ($authEmail)');
         
-        // Use alternative method if the first approach failed - preserve all fields with merge
-        await _firestore.collection('users').doc(userId).set({
-          'email': authEmail,
-          'state': state,
-          'language': language,
-          'name': name,
-          'lastUpdated': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+          // Use alternative method if the first approach failed - only include fields that exist
+          Map<String, dynamic> updateData = {
+            'email': authEmail,
+            'lastUpdated': FieldValue.serverTimestamp(),
+          };
+          
+          if (name != null) updateData['name'] = name;
+          if (state != null) updateData['state'] = state;
+          if (language != null) updateData['language'] = language;
+          
+          await _firestore.collection('users').doc(userId).set(updateData, SetOptions(merge: true));
         
         debugPrint('✅ EmailSyncService: Alternative update method completed with preserved state');
       }
