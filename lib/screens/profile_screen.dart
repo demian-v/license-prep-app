@@ -11,6 +11,7 @@ import '../examples/api_switcher_example.dart';
 import '../examples/function_name_mapping_example.dart';
 import '../services/email_sync_service.dart';
 import '../models/user.dart';
+import '../data/state_data.dart';
 import 'personal_info_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -331,6 +332,17 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     }
     return state;
   }
+  
+  // Helper method to convert state abbreviation to full name
+  String _getFullStateName(String? stateCode) {
+    if (stateCode == null || stateCode.isEmpty) {
+      return 'Not selected';
+    }
+    
+    // Try to find the state by its ID (abbreviation)
+    final stateInfo = StateData.getStateById(stateCode);
+    return stateInfo?.name ?? stateCode; // Return full name or code if not found
+  }
 
   // This method forces a sync of the email in Firestore when the profile screen loads
   void _syncEmailOnScreenLoad() {
@@ -645,7 +657,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                     _isLoadingState 
                       ? "Loading..." // Show loading indicator while fetching state
                       : ((authProvider.user?.state?.isNotEmpty == true) 
-                          ? authProvider.user!.state! 
+                          ? _getFullStateName(authProvider.user!.state!) // Display full state name instead of abbreviation
                           : _translate('Not selected', languageProvider)),
                     Icons.location_on,
                     Colors.blue[50]!,
@@ -815,7 +827,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
           children: [
             _buildLanguageOption(context, 'English', 'en', languageProvider, authProvider),
             _buildLanguageOption(context, 'Spanish', 'es', languageProvider, authProvider),
-            _buildLanguageOption(context, 'Українська', 'uk', languageProvider, authProvider),
+            _buildLanguageOption(context, 'Ukrainian', 'uk', languageProvider, authProvider),
             _buildLanguageOption(context, 'Polish', 'pl', languageProvider, authProvider),
             _buildLanguageOption(context, 'Russian', 'ru', languageProvider, authProvider),
           ],
@@ -936,7 +948,11 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                   
                   Navigator.pop(context);
                   
-                  // Visual feedback
+                  // Get the state abbreviation (ID) from the full name for more accurate display
+                  final stateInfo = StateData.getStateByName(state);
+                  final stateId = stateInfo?.id ?? state;
+                  
+                  // Visual feedback showing the full state name
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('${_translate('state_changed', languageProvider)} $state'),
