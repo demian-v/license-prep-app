@@ -36,17 +36,30 @@ class TrafficRuleTopic {
     sections = [];
 
   // Add compatibility method to get full content from sections
-  String get fullContent {
-    if (content != null && content!.isNotEmpty) {
-      return content!;
-    }
-    
-    // Otherwise combine sections content
-    if (sections.isEmpty) {
+  String? get fullContent {
+    try {
+      // First try to use the content field if it exists
+      if (content != null && content!.isNotEmpty) {
+        return content;
+      }
+      
+      // If no content field, try to combine sections content
+      if (sections.isNotEmpty) {
+        return sections.map((section) {
+          if (section.title.isNotEmpty) {
+            return "${section.title}\n\n${section.content}";
+          } else {
+            return section.content;
+          }
+        }).join("\n\n");
+      }
+      
+      // If no content and no sections, return empty string
       return '';
+    } catch (e) {
+      print('Error computing fullContent for topic $id: $e');
+      return 'Content not available';
     }
-    
-    return sections.map((section) => "${section.title}\n\n${section.content}").join("\n\n");
   }
 
   factory TrafficRuleTopic.fromFirestore(Map<String, dynamic> data, String documentId) {

@@ -331,21 +331,64 @@ class ContentProvider extends ChangeNotifier {
   
   // Get a specific topic by ID
   Future<TrafficRuleTopic?> getTopicById(String topicId) async {
+    print('ContentProvider: Attempting to get topic with ID: $topicId');
+    
+    if (topicId.isEmpty) {
+      print('ContentProvider: Empty topic ID provided');
+      return null;
+    }
+    
     // First check if we have it in cache
     if (_topicDetailCache.containsKey(topicId)) {
+      print('ContentProvider: Found topic in cache: $topicId');
       return _topicDetailCache[topicId];
     }
     
-    // Then check if we already have it in memory
-    TrafficRuleTopic? topic = _topics.where(
-      (t) => t.id == topicId || t.id == topicId.replaceAll('topic_', '')
-    ).firstOrNull;
+    // Try multiple ID formats for matching
+    List<String> possibleIds = [
+      topicId,
+      topicId.replaceAll('topic_', ''),
+      'topic_$topicId',
+      topicId.toLowerCase(),
+      topicId.replaceAll('topic_', '').toLowerCase(),
+    ];
+    
+    // Then check if we already have it in memory using any of the possible IDs
+    TrafficRuleTopic? topic;
+    
+    for (var possibleId in possibleIds) {
+      try {
+        // First try exact match
+        try {
+          topic = _topics.firstWhere((t) => t.id == possibleId);
+        } catch (_) {
+          // If not found, try more flexible matching
+          try {
+            topic = _topics.firstWhere((t) => 
+              t.id.toLowerCase() == possibleId.toLowerCase() ||
+              t.id.replaceAll('topic_', '').toLowerCase() == possibleId.replaceAll('topic_', '').toLowerCase()
+            );
+          } catch (_) {
+            // Topic not found with this ID format
+          }
+        }
+        
+        if (topic != null) {
+          print('ContentProvider: Found topic in memory with ID: ${topic.id} (using match: $possibleId)');
+          break;
+        }
+      } catch (e) {
+        print('ContentProvider: Error searching for topic with ID $possibleId: $e');
+      }
+    }
     
     // If found in memory, cache and return it
     if (topic != null) {
       _topicDetailCache[topicId] = topic;
       return topic;
     }
+    
+    print('ContentProvider: Topic not found in memory, checking Firestore for ID: $topicId');
     
     // Check connectivity before fetching
     final isConnected = await _isConnected();
@@ -356,50 +399,78 @@ class ContentProvider extends ChangeNotifier {
     
     // Otherwise fetch from API
     try {
-      final topic = await serviceLocator.content.getTrafficRuleTopic(topicId);
-      
-      if (topic != null) {
-        // Cache the topic
-        _topicDetailCache[topicId] = topic;
+      // Try each possible ID format with the API
+      for (var possibleId in possibleIds) {
+        print('ContentProvider: Trying to fetch topic with ID: $possibleId');
         
-        // If this is a new topic not in our list, add it
-        if (!_topics.any((t) => t.id == topic.id)) {
-          _topics.add(topic);
-          notifyListeners();
+        // Skip empty IDs
+        if (possibleId.isEmpty) continue;
+        
+        try {
+          final fetchedTopic = await serviceLocator.content.getTrafficRuleTopic(possibleId);
+          
+          if (fetchedTopic != null) {
+            print('ContentProvider: Successfully fetched topic: ${fetchedTopic.id}');
+            
+            // Cache the topic under the original ID
+            _topicDetailCache[topicId] = fetchedTopic;
+            
+            // Also cache under its actual ID
+            _topicDetailCache[fetchedTopic.id] = fetchedTopic;
+            
+            // If this is a new topic not in our list, add it
+            if (!_topics.any((t) => t.id == fetchedTopic.id)) {
+              _topics.add(fetchedTopic);
+              notifyListeners();
+            }
+            
+            return fetchedTopic;
+          }
+        } catch (fetchError) {
+          print('ContentProvider: Error fetching topic with ID $possibleId: $fetchError');
+          // Continue to try other IDs
         }
-        
-        return topic;
       }
       
-      // Try fetching English version if needed
+      // If we get here, try fetching English version as last resort
       if (_currentLanguage != 'en') {
+        print('ContentProvider: Trying English fallback for topic');
+        
         // Look for English version - modify the ID if it contains language code
         String englishTopicId = topicId;
         if (topicId.contains('_${_currentLanguage}_')) {
           englishTopicId = topicId.replaceAll('_${_currentLanguage}_', '_en_');
-        }
-        
-        final englishTopic = await serviceLocator.content.getTrafficRuleTopic(englishTopicId);
-        
-        if (englishTopic != null) {
-          // Cache the topic under both IDs
-          _topicDetailCache[topicId] = englishTopic;
-          _topicDetailCache[englishTopicId] = englishTopic;
+          print('ContentProvider: Generated English topic ID: $englishTopicId');
           
-          // If this is a new topic not in our list, add it
-          if (!_topics.any((t) => t.id == englishTopic.id)) {
-            _topics.add(englishTopic);
-            notifyListeners();
+          try {
+            final englishTopic = await serviceLocator.content.getTrafficRuleTopic(englishTopicId);
+            
+            if (englishTopic != null) {
+              print('ContentProvider: Found English fallback topic: ${englishTopic.id}');
+              
+              // Cache the topic under both IDs
+              _topicDetailCache[topicId] = englishTopic;
+              _topicDetailCache[englishTopicId] = englishTopic;
+              
+              // If this is a new topic not in our list, add it
+              if (!_topics.any((t) => t.id == englishTopic.id)) {
+                _topics.add(englishTopic);
+                notifyListeners();
+              }
+              
+              return englishTopic;
+            }
+          } catch (englishError) {
+            print('ContentProvider: Error fetching English fallback topic: $englishError');
           }
-          
-          return englishTopic;
         }
       }
       
+      print('ContentProvider: No topic found after trying all methods for ID: $topicId');
       return null;
     } catch (e) {
       _lastError = 'Error fetching traffic rule topic: $e';
-      print(_lastError);
+      print('ContentProvider: $_lastError');
       return null;
     }
   }

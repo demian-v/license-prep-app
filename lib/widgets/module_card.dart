@@ -62,20 +62,7 @@ class ModuleCard extends StatelessWidget {
                   color: Colors.grey.shade700,
                 ),
               ),
-              SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildInfoChip(
-                    Icons.access_time,
-                    '${module.estimatedTime} min',
-                  ),
-                  _buildInfoChip(
-                    Icons.subject,
-                    '${module.topics.length} topics',
-                  ),
-                ],
-              ),
+              // Topic count and extra spacing removed as requested
             ],
           ),
         ),

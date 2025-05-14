@@ -7,6 +7,7 @@ import '../providers/progress_provider.dart';
 import '../providers/state_provider.dart';
 import '../widgets/module_card.dart';
 import 'theory_module_screen.dart';
+import 'traffic_rule_content_screen.dart';
 
 class TheoryScreen extends StatefulWidget {
   @override
@@ -191,7 +192,29 @@ class _TheoryScreenState extends State<TheoryScreen> {
                 child: ModuleCard(
                   module: module,
                   isCompleted: isCompleted,
-                  onSelect: () {
+                  onSelect: () async {
+                    final contentProvider = Provider.of<ContentProvider>(context, listen: false);
+                    
+                    // Get the topic ID from the module
+                    final topicId = module.getTopicId();
+                    
+                    if (topicId.isNotEmpty) {
+                      // Try to get the topic directly
+                      final topic = await contentProvider.getTopicById(topicId);
+                      
+                      if (topic != null) {
+                        // Navigate directly to content screen
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => TrafficRuleContentScreen(topic: topic),
+                          ),
+                        );
+                        return;
+                      }
+                    }
+                    
+                    // Fallback to the module screen if topic couldn't be loaded or no topic ID
                     Navigator.push(
                       context,
                       MaterialPageRoute(

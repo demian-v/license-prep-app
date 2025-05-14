@@ -42,25 +42,27 @@ class _TheoryModuleScreenState extends State<TheoryModuleScreen> {
     // Using the topics from the provider
     final allTopics = contentProvider.topics;
     
+    // Get module topics list using the helper method to handle both string and list
+    final topicsList = widget.module.getTopicsList();
+    
     // Filter topics based on the topics listed in the module
     final filteredTopics = <TrafficRuleTopic>[];
     
     // First try to match topics from the ones already loaded in memory
-    for (var topicId in widget.module.topics) {
+    for (var topicId in topicsList) {
       print('Looking for topic ID: $topicId');
       
       // Try multiple ways to match the topic ID
-      final topic = allTopics.firstWhere(
-        (t) => t.id == topicId || 
-               t.id == topicId.replaceAll('topic_', '') || 
-               'topic_${t.id}' == topicId,
-        orElse: () => null as TrafficRuleTopic,
-      );
-      
-      if (topic != null) {
+      TrafficRuleTopic? topic;
+      try {
+        topic = allTopics.firstWhere(
+          (t) => t.id == topicId || 
+                 t.id == topicId.replaceAll('topic_', '') || 
+                 'topic_${t.id}' == topicId,
+        );
         print('Found topic in memory: ${topic.id} - ${topic.title}');
         filteredTopics.add(topic);
-      } else {
+      } catch (e) {
         print('Topic not found in memory, fetching from database: $topicId');
         // If topic not found in memory, try to fetch it directly
         final fetchedTopic = await contentProvider.getTopicById(topicId);
