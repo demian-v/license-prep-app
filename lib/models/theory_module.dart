@@ -11,6 +11,7 @@ class TheoryModule {
   final String icon;
   final String type;
   final int order;
+  final String theoryModulesCount; // Field to hold the modules count from Firestore
 
   TheoryModule({
     required this.id,
@@ -24,6 +25,7 @@ class TheoryModule {
     this.icon = 'menu_book',
     this.type = 'traffic_rules',
     this.order = 0,
+    this.theoryModulesCount = '0', // Default to '0' if not provided
   });
 
   factory TheoryModule.fromFirestore(Map<String, dynamic> data, String documentId) {
@@ -39,6 +41,7 @@ class TheoryModule {
       icon: data['icon'] ?? 'menu_book',
       type: data['type'] ?? '',
       order: data['order'] ?? 0,
+      theoryModulesCount: data['theory_modules_count'] ?? '0', // Load from Firestore
     );
   }
 
@@ -75,6 +78,7 @@ class TheoryModule {
       'icon': icon,
       'type': type,
       'order': order,
+      'theory_modules_count': theoryModulesCount,
     };
   }
 }

@@ -69,9 +69,28 @@ class _TheoryScreenState extends State<TheoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'Теорія',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Builder(
+          builder: (context) {
+            // Get the current language from the LanguageProvider
+            final language = Provider.of<LanguageProvider>(context, listen: false).language;
+            
+            // Translation map for "Theory" title in different languages
+            final Map<String, String> theoryTitleTranslations = {
+              'en': 'Theory',
+              'uk': 'Теорія',
+              'es': 'Teoría',
+              'ru': 'Теория',
+              'pl': 'Teoria',
+            };
+            
+            // Get the correct translation based on the current language
+            final titleText = theoryTitleTranslations[language] ?? 'Theory';
+            
+            return Text(
+              titleText,
+              style: TextStyle(fontWeight: FontWeight.bold),
+            );
+          }
         ),
         elevation: 0,
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,

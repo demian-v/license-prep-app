@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../screens/test_screen.dart';
 import '../screens/theory_screen.dart';
 import '../screens/profile_screen.dart';
-import '../widgets/bottom_navigation.dart';
+import '../widgets/enhanced_bottom_navigation.dart';
 import '../services/service_locator_extensions.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -78,7 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // Show the regular home screen once content is loaded
     return Scaffold(
       body: _screens[_currentIndex],
-      bottomNavigationBar: BottomNavigation(
+      bottomNavigationBar: EnhancedBottomNavigation(
         currentIndex: _currentIndex,
         onTap: _onTabTapped,
       ),

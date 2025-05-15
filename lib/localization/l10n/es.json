@@ -53,5 +53,6 @@
   "skip": "Omitir",
   "check": "Comprobar",
   "finish_topic": "Finalizar tema",
-  "traffic_rules": "Reglas de tráfico"
+  "traffic_rules": "Reglas de tráfico",
+  "modules_count": "módulos"
 }
