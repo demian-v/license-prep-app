@@ -95,12 +95,7 @@ class _TheoryScreenState extends State<TheoryScreen> {
         elevation: 0,
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         foregroundColor: Colors.black,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
-          },
-        ),
+        centerTitle: true,
         actions: [
           IconButton(
             icon: Icon(Icons.refresh),

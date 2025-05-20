@@ -12,6 +12,7 @@ import '../examples/function_name_mapping_example.dart';
 import '../services/email_sync_service.dart';
 import '../models/user.dart';
 import '../data/state_data.dart';
+import '../widgets/enhanced_profile_card.dart';
 import 'personal_info_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -582,77 +583,97 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
               padding: EdgeInsets.all(16.0),
               child: Column(
                 children: [
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 30,
-                        backgroundColor: Colors.orange,
-                        child: Text(
-                          user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                  Container(
+                    padding: EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Colors.white, Colors.indigo.shade50.withOpacity(0.4)],
+                        stops: [0.0, 1.0],
                       ),
-                      SizedBox(width: 16),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            user.name,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.2),
+                          spreadRadius: 0,
+                          blurRadius: 6,
+                          offset: Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 30,
+                          backgroundColor: Colors.indigo.shade400,
+                          child: Text(
+                            user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
                             style: TextStyle(
-                              fontSize: 20,
+                              color: Colors.white,
+                              fontSize: 24,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          GestureDetector(
-                            onTap: () {
-                              // Navigate to edit profile screen
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => PersonalInfoScreen(),
+                        ),
+                        SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                user.name,
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                              );
-                            },
-                            child: Text(
-                              _translate('edit_profile', languageProvider),
-                              style: TextStyle(
-                                color: Colors.green,
-                                fontSize: 14,
                               ),
-                            ),
+                              GestureDetector(
+                                onTap: () {
+                                  // Navigate to edit profile screen
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => PersonalInfoScreen(),
+                                    ),
+                                  );
+                                },
+                                child: Text(
+                                  _translate('edit_profile', languageProvider),
+                                  style: TextStyle(
+                                    color: Colors.indigo.shade400,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ],
+                        ),
+                      ],
+                    ),
                   ),
                   SizedBox(height: 16),
-                  _buildMenuCard(
+                  _buildEnhancedMenuCard(
                     _translate('support', languageProvider),
                     _translate('support_desc', languageProvider),
                     Icons.help_outline,
-                    Colors.green[50]!,
-                    Colors.green,
+                    0, // Support - Green
+                    false,
                     () {},
-                    languageProvider,
                   ),
                   SizedBox(height: 16),
-                  _buildMenuCard(
+                  _buildEnhancedMenuCard(
                     _translate('select_language', languageProvider),
                     languageProvider.languageName,
                     Icons.language,
-                    Colors.teal[50]!,
-                    Colors.teal,
+                    1, // Language - Blue
+                    true, // Highlight language name
                     () {
                       _showLanguageSelector(context, languageProvider);
                     },
-                    languageProvider,
                   ),
                   SizedBox(height: 16),
-                  _buildMenuCard(
+                  _buildEnhancedMenuCard(
                     _translate('state', languageProvider),
                     _isLoadingState 
                       ? "Loading..." // Show loading indicator while fetching state
@@ -660,8 +681,8 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                           ? _getFullStateName(authProvider.user!.state!) // Display full state name instead of abbreviation
                           : _translate('Not selected', languageProvider)),
                     Icons.location_on,
-                    Colors.blue[50]!,
-                    Colors.blue,
+                    2, // State - Purple
+                    false,
                     () {
                       // Force Firestore refresh and wait for it to complete before showing selector
                       setState(() { _isLoadingState = true; });
@@ -669,49 +690,81 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                         _showStateSelector(context, languageProvider);
                       });
                     },
-                    languageProvider,
                   ),
                   SizedBox(height: 16),
-                  _buildMenuCard(
+                  _buildEnhancedMenuCard(
                     _translate('subscription', languageProvider),
                     subscriptionProvider.isSubscriptionActive 
                         ? _translate('active', languageProvider) 
                         : _translate('try_premium', languageProvider),
                     Icons.workspace_premium,
-                    Colors.amber[50]!,
-                    Colors.amber,
+                    3, // Subscription - Amber
+                    subscriptionProvider.isSubscriptionActive, // Highlight if active
                     () {
                       Navigator.pushNamed(context, '/subscription');
                     },
-                    languageProvider,
                   ),
                   SizedBox(height: 16),
-                  _buildMenuCard(
+                  _buildEnhancedMenuCard(
                     _translate('reset_statistics', languageProvider),
                     _translate('reset_desc', languageProvider),
                     Icons.restart_alt,
-                    Colors.red[50]!,
-                    Colors.red,
+                    4, // Reset Statistics - Red
+                    false,
                     () {
                       _showResetProgressConfirmation(context, languageProvider);
                     },
-                    languageProvider,
                   ),
                   SizedBox(height: 24),
-                  Container(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        await authProvider.logout();
-                        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-                      },
-                      child: Text(_translate('logout', languageProvider)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                  // Custom logout button with centered text
+                  Card(
+                    elevation: 3,
+                    shadowColor: Colors.black.withOpacity(0.3),
+                    margin: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Colors.white, Colors.red.shade50.withOpacity(0.4)],
+                          stops: [0.0, 1.0],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.2),
+                            spreadRadius: 0,
+                            blurRadius: 6,
+                            offset: Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () async {
+                            await authProvider.logout();
+                            Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          splashColor: Colors.white.withOpacity(0.3),
+                          highlightColor: Colors.white.withOpacity(0.2),
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16.0, horizontal: 20.0),
+                            child: Center(
+                              child: Text(
+                                _translate('logout', languageProvider),
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -745,64 +798,21 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     );
   }
 
-  Widget _buildMenuCard(
+  Widget _buildEnhancedMenuCard(
     String title,
     String subtitle,
     IconData icon,
-    Color backgroundColor,
-    Color iconColor,
+    int cardType,
+    bool isHighlighted,
     VoidCallback onTap,
-    LanguageProvider languageProvider,
   ) {
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: backgroundColor,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  icon,
-                  color: iconColor,
-                ),
-              ),
-              SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        color: title == _translate('select_language', languageProvider) ? Colors.green : Colors.grey[600],
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return EnhancedProfileCard(
+      title: title,
+      subtitle: subtitle,
+      icon: icon,
+      cardType: cardType,
+      isHighlighted: isHighlighted,
+      onTap: onTap,
     );
   }
 
