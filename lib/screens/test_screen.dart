@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/license_data.dart';
-import '../widgets/test_card.dart';
+import '../widgets/enhanced_test_card.dart';
 import '../providers/exam_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/progress_provider.dart';
@@ -122,6 +122,7 @@ class TestScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _buildSectionHeader(_translate('testing', languageProvider)),
+                  // Take Exam card with left and right info
                   _buildTestItem(
                     context,
                     'assets/images/exam.png',
@@ -153,7 +154,11 @@ class TestScreen extends StatelessWidget {
                         ),
                       );
                     },
+                    leftInfoText: "60 minutes",
+                    rightInfoText: "40 questions",
+                    cardType: 0,
                   ),
+                  // Learn by Topics card with only right info
                   _buildTestItem(
                     context,
                     'assets/images/themes.png',
@@ -168,7 +173,10 @@ class TestScreen extends StatelessWidget {
                         ),
                       );
                     },
+                    rightInfoText: "Questions sorted by topics",
+                    cardType: 1,
                   ),
+                  // Practice Tickets card with left and right info
                   _buildTestItem(
                     context,
                     'assets/images/random.png',
@@ -197,9 +205,13 @@ class TestScreen extends StatelessWidget {
                         );
                       });
                     },
+                    leftInfoText: "Unlimited time",
+                    rightInfoText: "40 questions",
+                    cardType: 2,
                   ),
                   SizedBox(height: 16),
                   _buildSectionHeader(_translate('working_on_mistakes', languageProvider)),
+                  // Saved card with no info text
                   _buildTestItem(
                     context,
                     'assets/images/saved.png',
@@ -214,6 +226,7 @@ class TestScreen extends StatelessWidget {
                         ),
                       );
                     },
+                    cardType: 3,
                   ),
                 ],
               ),
@@ -255,56 +268,19 @@ class TestScreen extends StatelessWidget {
     String imagePath,
     String title,
     String subtitle,
-    VoidCallback onTap,
-  ) {
-    return Card(
-      margin: EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: Colors.blue[50],
-                  borderRadius: BorderRadius.circular(28),
-                ),
-                child: Icon(Icons.description, color: Colors.blue),
-                // In a real app, you'd load the actual image:
-                // child: Image.asset(imagePath),
-              ),
-              SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    VoidCallback onTap, {
+    String? leftInfoText,
+    String? rightInfoText,
+    int cardType = 0,
+  }) {
+    return EnhancedTestCard(
+      title: title,
+      description: subtitle,
+      icon: Icons.description, // Using the same icon for all cards for consistency
+      leftInfoText: leftInfoText,
+      rightInfoText: rightInfoText,
+      cardType: cardType,
+      onTap: onTap,
     );
   }
 }

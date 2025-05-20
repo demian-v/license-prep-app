@@ -47,39 +47,51 @@ class _ModuleCardState extends State<ModuleCard> with SingleTickerProviderStateM
     Color startColor = Colors.white;
     Color endColor;
     
-    // Determine subtle end color based on module type or category
-    switch(module.type) {
-      case 'traffic_rules':
-        endColor = Colors.blue.shade50.withOpacity(0.4);
-        break;
-      case 'road_signs':
-        endColor = Colors.green.shade50.withOpacity(0.4);
-        break;
-      case 'safety':
-        endColor = Colors.orange.shade50.withOpacity(0.4);
-        break;
-      default:
-        // Fallback based on the module order to create variety
-        final int colorSeed = module.order % 5;
-        switch(colorSeed) {
-          case 0:
-            endColor = Colors.purple.shade50.withOpacity(0.4);
-            break;
-          case 1:
-            endColor = Colors.teal.shade50.withOpacity(0.4);
-            break;
-          case 2:
-            endColor = Colors.indigo.shade50.withOpacity(0.4);
-            break;
-          case 3:
-            endColor = Colors.amber.shade50.withOpacity(0.4);
-            break;
-          case 4:
-            endColor = Colors.cyan.shade50.withOpacity(0.4);
-            break;
-          default:
-            endColor = Colors.grey.shade50.withOpacity(0.4);
-        }
+    // Check if the title contains specific keywords to categorize modules
+    String title = widget.module.title.toLowerCase();
+    
+    if (title.contains("general") || title.contains("загальн")) {
+      // General Provisions - Blue
+      endColor = Colors.blue.shade50.withOpacity(0.4);
+    } 
+    else if (title.contains("traffic") || title.contains("правила") || title.contains("дорожн")) {
+      // Traffic Rules - Green
+      endColor = Colors.green.shade50.withOpacity(0.4);
+    }
+    else if (title.contains("passenger") || title.contains("пасажир") || title.contains("безпек")) {
+      // Passenger Safety - Orange
+      endColor = Colors.orange.shade50.withOpacity(0.4);
+    }
+    else if (title.contains("pedestrian") || title.contains("пішох")) {
+      // Pedestrian Rights - Purple
+      endColor = Colors.purple.shade50.withOpacity(0.4);
+    }
+    else if (title.contains("bicycle") || title.contains("motorcycl") || title.contains("велосипед") || title.contains("мотоцикл")) {
+      // Bicycles and Motorcycles - Teal
+      endColor = Colors.teal.shade50.withOpacity(0.4);
+    }
+    else {
+      // Fallback based on the module order to create variety
+      final int colorSeed = module.order % 5;
+      switch(colorSeed) {
+        case 0:
+          endColor = Colors.indigo.shade50.withOpacity(0.4);
+          break;
+        case 1:
+          endColor = Colors.amber.shade50.withOpacity(0.4);
+          break;
+        case 2:
+          endColor = Colors.pink.shade50.withOpacity(0.4);
+          break;
+        case 3:
+          endColor = Colors.cyan.shade50.withOpacity(0.4);
+          break;
+        case 4:
+          endColor = Colors.deepPurple.shade50.withOpacity(0.4);
+          break;
+        default:
+          endColor = Colors.grey.shade50.withOpacity(0.4);
+      }
     }
     
     return LinearGradient(
