@@ -147,7 +147,7 @@ class _EnhancedBottomNavigationState extends State<EnhancedBottomNavigation> wit
                     style: TextStyle(
                       color: isSelected ? primaryColor : unselectedColor,
                       fontSize: 12,
-                      fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
+                      fontWeight: FontWeight.normal,
                     ),
                   ),
                 ],

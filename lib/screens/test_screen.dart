@@ -158,7 +158,7 @@ class TestScreen extends StatelessWidget {
                     rightInfoText: "40 questions",
                     cardType: 0,
                   ),
-                  // Learn by Topics card with only right info
+                  // Learn by Topics card with left and right info
                   _buildTestItem(
                     context,
                     'assets/images/themes.png',
@@ -173,7 +173,8 @@ class TestScreen extends StatelessWidget {
                         ),
                       );
                     },
-                    rightInfoText: "Questions sorted by topics",
+                    leftInfoText: "Unlimited time",
+                    rightInfoText: "100+ questions sorted by topics",
                     cardType: 1,
                   ),
                   // Practice Tickets card with left and right info

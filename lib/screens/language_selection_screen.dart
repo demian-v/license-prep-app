@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
 import '../localization/app_localizations.dart';
+import '../widgets/enhanced_language_card.dart';
 import 'state_selection_screen.dart';
 
 class LanguageSelectionScreen extends StatefulWidget {
@@ -90,25 +91,28 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildSectionHeader('Select your language'), // This remains hardcoded in English as specified
-              Consumer<LanguageProvider>(
-                builder: (context, languageProvider, _) => Column(
-                  children: [
-                    _buildLanguageButton(context, 'English', 'en'),
-                    _buildLanguageButton(context, 'Spanish', 'es'),
-                    _buildLanguageButton(context, 'Ukrainian', 'uk'),
-                    _buildLanguageButton(context, 'Polish', 'pl'),
-                    _buildLanguageButton(context, 'Russian', 'ru'),
-                  ],
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSectionHeader('Select your language'), // This remains hardcoded in English as specified
+                SizedBox(height: 8),
+                Consumer<LanguageProvider>(
+                  builder: (context, languageProvider, _) => Column(
+                    children: [
+                      _buildLanguageButton(context, 'English', 'en'),
+                      _buildLanguageButton(context, 'Spanish', 'es'),
+                      _buildLanguageButton(context, 'Ukrainian', 'uk'),
+                      _buildLanguageButton(context, 'Polish', 'pl'),
+                      _buildLanguageButton(context, 'Russian', 'ru'),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -130,7 +134,9 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
               style: TextStyle(
                 color: Colors.grey[500],
                 fontWeight: FontWeight.w500,
+                fontSize: 16,
               ),
+              textAlign: TextAlign.center,
             ),
           ),
           Expanded(
@@ -142,16 +148,7 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
   }
 
   Widget _buildLanguageButton(BuildContext context, String language, String code) {
-    // Beautiful language icons/flags mapping with distinctive icons for each language
-    final Map<String, IconData> languageIcons = {
-      'en': Icons.flag_circle,
-      'es': Icons.language,
-      'uk': Icons.emoji_flags,
-      'pl': Icons.flag,
-      'ru': Icons.flag_outlined,
-    };
-    
-    // Color scheme based on language (keeping these for the icon backgrounds)
+    // Get the color for the language (for the snackbar)
     final Map<String, Color> languageColors = {
       'en': Color(0xFF3F51B5), // Indigo for English
       'es': Color(0xFFE91E63), // Pink for Spanish
@@ -160,107 +157,69 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
       'ru': Color(0xFFF44336), // Red for Russian
     };
     
-    return Card(
-      margin: EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () async {
-          // Visual feedback
-          ScaffoldMessenger.of(context).clearSnackBars();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Setting UI language to $language...'), // Updated message
-              duration: Duration(seconds: 2),
-              backgroundColor: languageColors[code],
-            ),
-          );
+    return EnhancedLanguageCard(
+      language: language,
+      languageCode: code,
+      onTap: () async {
+        // Visual feedback
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Setting UI language to $language...'), // Updated message
+            duration: Duration(seconds: 2),
+            backgroundColor: languageColors[code],
+          ),
+        );
+        
+        try {
+          // Update language provider
+          final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+          print('🔄 [LANGUAGE SCREEN] Setting language to: $code');
+          await languageProvider.setLanguage(code);
           
-          try {
-            // Update language provider
-            final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
-            print('🔄 [LANGUAGE SCREEN] Setting language to: $code');
-            await languageProvider.setLanguage(code);
+          // Verify language was set correctly
+          print('✅ [LANGUAGE SCREEN] Language set to: ${languageProvider.language}');
+          
+          // Update auth provider
+          final authProvider = Provider.of<AuthProvider>(context, listen: false);
+          await authProvider.updateUserLanguage(code);
+          print('✅ [LANGUAGE SCREEN] User language updated in auth provider');
+          
+          // Wait longer to ensure the language is properly loaded
+          print('⏳ [LANGUAGE SCREEN] Waiting for language to propagate...');
+          await Future.delayed(Duration(milliseconds: 800));
+          
+          if (context.mounted) {
+            // Pop all routes except first one
+            Navigator.of(context).popUntil((route) => route.isFirst);
             
-            // Verify language was set correctly
-            print('✅ [LANGUAGE SCREEN] Language set to: ${languageProvider.language}');
+            print('🔍 [LANGUAGE SCREEN] Current language before navigation: ${languageProvider.language}');
             
-            // Update auth provider
-            final authProvider = Provider.of<AuthProvider>(context, listen: false);
-            await authProvider.updateUserLanguage(code);
-            print('✅ [LANGUAGE SCREEN] User language updated in auth provider');
-            
-            // Wait longer to ensure the language is properly loaded
-            print('⏳ [LANGUAGE SCREEN] Waiting for language to propagate...');
-            await Future.delayed(Duration(milliseconds: 800));
-            
-            if (context.mounted) {
-              // Pop all routes except first one
-              Navigator.of(context).popUntil((route) => route.isFirst);
-              
-              print('🔍 [LANGUAGE SCREEN] Current language before navigation: ${languageProvider.language}');
-              
-              // Use pushReplacement with unique key to force rebuild
-              Navigator.of(context).pushReplacement(
-                PageRouteBuilder(
-                  settings: RouteSettings(
-                    name: 'state_selection_${code}_${DateTime.now().millisecondsSinceEpoch}'
-                  ),
-                  pageBuilder: (context, animation1, animation2) => StateSelectionScreen(
-                    key: UniqueKey(), // Force complete rebuild
-                  ),
-                  transitionDuration: Duration.zero,
+            // Use pushReplacement with unique key to force rebuild
+            Navigator.of(context).pushReplacement(
+              PageRouteBuilder(
+                settings: RouteSettings(
+                  name: 'state_selection_${code}_${DateTime.now().millisecondsSinceEpoch}'
                 ),
-              );
-              print('🔄 [LANGUAGE SCREEN] Navigated to state selection screen');
-            }
-          } catch (e) {
-            print('🚨 [LANGUAGE SCREEN] Error updating language: $e');
-            // Show error snackbar
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Error selecting language: $e'), // Error message in English
-                backgroundColor: Colors.red,
+                pageBuilder: (context, animation1, animation2) => StateSelectionScreen(
+                  key: UniqueKey(), // Force complete rebuild
+                ),
+                transitionDuration: Duration.zero,
               ),
             );
+            print('🔄 [LANGUAGE SCREEN] Navigated to state selection screen');
           }
-        },
-        child: Padding(
-          padding: EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: languageColors[code]!.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(28),
-                ),
-                child: Icon(
-                  languageIcons[code],
-                  color: languageColors[code],
-                  size: 28,
-                ),
-              ),
-              SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  language,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-              Icon(
-                Icons.arrow_forward_ios,
-                color: Colors.grey[400],
-                size: 16,
-              ),
-            ],
-          ),
-        ),
-      ),
+        } catch (e) {
+          print('🚨 [LANGUAGE SCREEN] Error updating language: $e');
+          // Show error snackbar
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error selecting language: $e'), // Error message in English
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      },
     );
   }
 }

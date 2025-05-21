@@ -678,7 +678,9 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                     _isLoadingState 
                       ? "Loading..." // Show loading indicator while fetching state
                       : ((authProvider.user?.state?.isNotEmpty == true) 
-                          ? _getFullStateName(authProvider.user!.state!) // Display full state name instead of abbreviation
+                          ? _getFullStateName(authProvider.user!.state!).split(' ').map((word) => 
+                              word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}' : ''
+                            ).join(' ') // Convert to title case
                           : _translate('Not selected', languageProvider)),
                     Icons.location_on,
                     2, // State - Purple
@@ -941,8 +943,13 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
               final state = allStates[index];
               final isSelected = state == currentState;
               
+              // Convert state name to title case for display
+              final titleCaseState = state.split(' ').map((word) => 
+                word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}' : ''
+              ).join(' ');
+              
               return ListTile(
-                title: Text(state),
+                title: Text(titleCaseState),
                 trailing: isSelected ? Icon(Icons.check, color: Colors.green) : null,
                 onTap: () async {
                   // Update state in auth provider
@@ -963,9 +970,14 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                   final stateId = stateInfo?.id ?? state;
                   
                   // Visual feedback showing the full state name
+                  // Convert state to title case for display in snackbar
+                  final titleCaseStateForDisplay = state.split(' ').map((word) => 
+                    word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}' : ''
+                  ).join(' ');
+                  
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('${_translate('state_changed', languageProvider)} $state'),
+                      content: Text('${_translate('state_changed', languageProvider)} $titleCaseStateForDisplay'),
                       duration: Duration(seconds: 1),
                     ),
                   );

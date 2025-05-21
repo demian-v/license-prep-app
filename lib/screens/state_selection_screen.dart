@@ -10,6 +10,7 @@ import '../screens/language_selection_screen.dart';
 import '../localization/app_localizations.dart';
 import '../data/state_data.dart';
 import '../services/service_locator_extensions.dart';
+import '../widgets/enhanced_state_card.dart';
 
 class StateSelectionScreen extends StatefulWidget {
   // Add constructor with key parameter
@@ -19,12 +20,16 @@ class StateSelectionScreen extends StatefulWidget {
   _StateSelectionScreenState createState() => _StateSelectionScreenState();
 }
 
-class _StateSelectionScreenState extends State<StateSelectionScreen> {
+class _StateSelectionScreenState extends State<StateSelectionScreen> with TickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   String? _selectedState;
   bool _showStateList = true; // Show state list by default
   List<String> _filteredStates = [];
   AppLocalizations? _localizations;
+  
+  // Animation controller for continue button press effect
+  late AnimationController _continueButtonController;
+  late Animation<double> _continueButtonScaleAnimation;
 
   // Get states from hardcoded data in StateData class
   final List<String> _allStates = StateData.getAllStateNames();
@@ -35,6 +40,15 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
     // Initialize filtered states with all states
     _filteredStates = List.from(_allStates);
     print('🔧 [STATE SCREEN] initState - filteredStates initialized with ${_filteredStates.length} states');
+    
+    // Initialize animation controller for continue button
+    _continueButtonController = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 100),
+    );
+    _continueButtonScaleAnimation = Tween<double>(begin: 1.0, end: 0.98).animate(
+      CurvedAnimation(parent: _continueButtonController, curve: Curves.easeInOut),
+    );
     
     // No longer forcing language to English
     // This allows the selected language from the Language Selection screen to be used
@@ -51,6 +65,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _continueButtonController.dispose();
     super.dispose();
   }
 
@@ -190,12 +205,20 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
           // Section header
           _buildSectionHeader(_translate('select_state', Provider.of<LanguageProvider>(context, listen: false))),
           
-          // Enhanced search bar
+          // Enhanced search bar styled like Language Selection
           Container(
             margin: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey[300]!),
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.2),
+                  spreadRadius: 0,
+                  blurRadius: 3,
+                  offset: Offset(0, 1),
+                ),
+              ],
             ),
             child: TextField(
               controller: _searchController,
@@ -204,15 +227,20 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
                 hintStyle: TextStyle(color: Colors.grey[400]),
                 contentPadding: EdgeInsets.symmetric(vertical: 16),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
+                  borderRadius: BorderRadius.circular(16),
                   borderSide: BorderSide.none,
                 ),
                 filled: true,
                 fillColor: Colors.white,
-                prefixIcon: Icon(
-                  Icons.search_rounded,
-                  color: Color(0xFF2196F3),
-                  size: 26,
+                prefixIcon: Container(
+                  width: 42,
+                  height: 42,
+                  padding: EdgeInsets.all(10),
+                  child: Icon(
+                    Icons.search_rounded,
+                    color: Color(0xFF2196F3),
+                    size: 26,
+                  ),
                 ),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? Container(
@@ -244,7 +272,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
               onChanged: _filterStates,
             ),
           ),
-          // Beautiful state list
+          // Enhanced state list with EnhancedStateCard widget
           Expanded(
             child: _filteredStates.isEmpty
                 ? Center(
@@ -273,74 +301,20 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
                     itemBuilder: (context, index) {
                       final state = _filteredStates[index];
                       final isSelected = state == _selectedState;
+                      final subtitleText = isSelected 
+                          ? _translate('selected', Provider.of<LanguageProvider>(context, listen: false)) 
+                          : _translate('tap_to_select', Provider.of<LanguageProvider>(context, listen: false));
                       
-                      return Card(
-                        margin: EdgeInsets.only(bottom: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: () {
-                              setState(() {
-                                _selectedState = state;
-                              });
-                            },
-                            child: Padding(
-                              padding: EdgeInsets.all(16),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 56,
-                                    height: 56,
-                                    decoration: BoxDecoration(
-                                      color: isSelected
-                                          ? Color(0xFF2196F3).withOpacity(0.1)
-                                          : Colors.blue[50],
-                                      borderRadius: BorderRadius.circular(28),
-                                    ),
-                                    child: Icon(
-                                      Icons.location_on_rounded,
-                                      color: isSelected ? Color(0xFF2196F3) : Colors.blue,
-                                      size: 28,
-                                    ),
-                                  ),
-                                  SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          state, // Keep English name for consistency
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                          ),
-                                        ),
-                                        SizedBox(height: 4),
-                                        Text(
-                                          isSelected 
-                                              ? _translate('selected', Provider.of<LanguageProvider>(context, listen: false)) 
-                                              : _translate('tap_to_select', Provider.of<LanguageProvider>(context, listen: false)),
-                                          style: TextStyle(
-                                            color: Colors.grey[600],
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  if (isSelected)
-                                    Icon(
-                                      Icons.check_circle,
-                                      color: Colors.green,
-                                      size: 24,
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
+                      // Use the new enhanced state card
+                      return EnhancedStateCard(
+                        stateName: state,
+                        isSelected: isSelected,
+                        subtitleText: subtitleText,
+                        onTap: () {
+                          setState(() {
+                            _selectedState = state;
+                          });
+                        },
                       );
                     },
                   ),
@@ -384,77 +358,57 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
         children: [
           _buildSectionHeader(_translate('selected_state', Provider.of<LanguageProvider>(context, listen: false))),
           
-          // Selected state card
-          Card(
-            margin: EdgeInsets.only(bottom: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      borderRadius: BorderRadius.circular(28),
-                    ),
-                    child: Icon(
-                      Icons.location_on,
-                      color: Colors.blue,
-                      size: 28,
-                    ),
-                  ),
-                  SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _selectedState!,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          _translate('selected_state', Provider.of<LanguageProvider>(context, listen: false)),
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(
-                    Icons.check_circle,
-                    color: Colors.green,
-                    size: 24,
-                  ),
-                ],
-              ),
-            ),
+          // Selected state card using EnhancedStateCard
+          EnhancedStateCard(
+            stateName: _selectedState!,
+            isSelected: true,
+            subtitleText: _translate('selected_state', Provider.of<LanguageProvider>(context, listen: false)),
+            onTap: () {}, // No action needed here as it's already selected
           ),
           
-          // Continue button
-          ElevatedButton(
-            onPressed: () => _continueToApp(context),
-            style: ElevatedButton.styleFrom(
-              foregroundColor: Colors.white,
-              backgroundColor: Colors.green,
-              padding: EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              minimumSize: Size(double.infinity, 56),
-            ),
-            child: Text(
-              _translate('continue', Provider.of<LanguageProvider>(context, listen: false)),
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+          // Styled continue button that matches Log In button
+          GestureDetector(
+            onTapDown: (_) => _continueButtonController.forward(),
+            onTapUp: (_) => _continueButtonController.reverse(),
+            onTapCancel: () => _continueButtonController.reverse(),
+            child: ScaleTransition(
+              scale: _continueButtonScaleAnimation,
+              child: Container(
+                margin: EdgeInsets.only(top: 8),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Colors.white, Colors.indigo.shade50.withOpacity(0.7)],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => _continueToApp(context),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      alignment: Alignment.center,
+                      child: Text(
+                        _translate('continue', Provider.of<LanguageProvider>(context, listen: false)),
+                        style: TextStyle(
+                          color: Colors.indigo.shade700,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
