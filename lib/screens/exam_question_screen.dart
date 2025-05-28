@@ -162,24 +162,60 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
                   bool isAnswered = exam.answers.containsKey(questionId);
                   bool isAnsweredCorrectly = isAnswered ? exam.answers[questionId]! : false;
                   
-                  Color pillColor = isActive
-                      ? Colors.blue
-                      : isAnswered
-                          ? isAnsweredCorrectly ? Colors.green : Colors.red
-                          : Colors.grey[200]!;
+                  // Determine gradient for pill
+                  LinearGradient pillGradient;
+                  if (isActive) {
+                    // Current question - blue pastel gradient (like "Take Exam" card)
+                    pillGradient = LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Colors.white, Colors.blue.shade100],
+                    );
+                  } else if (isAnswered) {
+                    if (isAnsweredCorrectly) {
+                      // Correctly answered - use green pastel gradient
+                      pillGradient = LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Colors.white, Colors.green.shade100],
+                      );
+                    } else {
+                      // Incorrectly answered - use red pastel gradient
+                      pillGradient = LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Colors.white, Colors.red.shade100],
+                      );
+                    }
+                  } else {
+                    // Unanswered - light gray pastel gradient
+                    pillGradient = LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Colors.white, Colors.grey.shade100],
+                    );
+                  }
                   
                   return Container(
                     width: 40,
                     margin: EdgeInsets.symmetric(horizontal: 4),
                     decoration: BoxDecoration(
-                      color: pillColor,
+                      gradient: pillGradient,
                       borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.2),
+                          spreadRadius: 0,
+                          blurRadius: 4,
+                          offset: Offset(0, 1),
+                        ),
+                      ],
                     ),
                     child: Center(
                       child: Text(
                         '${index + 1}',
                         style: TextStyle(
-                          color: isActive || isAnswered ? Colors.white : Colors.black,
+                          color: Colors.black,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -250,7 +286,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
                     isCorrectOption = option == currentQuestion.correctAnswer.toString();
                   }
                   
-  // Get gradient based on card state instead of solid color
+                  // Get gradient based on card state instead of solid color
   LinearGradient cardGradient = _getGradientForAnswerCard(isSelected, showResult, isCorrectOption, index);
                   
                   // Use circular indicators
@@ -322,88 +358,154 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
             Padding(
               padding: EdgeInsets.all(16),
               child: isAnswerChecked
-                  ? ElevatedButton(
-                      onPressed: () {
-                        // Save answer and move to next question
-                        examProvider.answerQuestion(
-                          currentQuestion.id,
-                          isCorrect ?? false,
-                        );
-                        
-                        setState(() {
-                          selectedAnswer = null;
-                          isAnswerChecked = false;
-                          isCorrect = null;
-                        });
-                        
-                        examProvider.goToNextQuestion();
-                        
-                        // Scroll to the current pill after navigation
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          _scrollToCurrentPill();
-                        });
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.black,
-                        minimumSize: Size(double.infinity, 56),
-                        shape: RoundedRectangleBorder(
+                  ? Container(
+                      width: double.infinity,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        gradient: _getGradientForButton(2), // Next button
+                        borderRadius: BorderRadius.circular(30),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.2),
+                            spreadRadius: 0,
+                            blurRadius: 6,
+                            offset: Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            // Save answer and move to next question
+                            examProvider.answerQuestion(
+                              currentQuestion.id,
+                              isCorrect ?? false,
+                            );
+                            
+                            setState(() {
+                              selectedAnswer = null;
+                              isAnswerChecked = false;
+                              isCorrect = null;
+                            });
+                            
+                            examProvider.goToNextQuestion();
+                            
+                            // Scroll to the current pill after navigation
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              _scrollToCurrentPill();
+                            });
+                          },
                           borderRadius: BorderRadius.circular(30),
+                          child: Center(
+                            child: Text(
+                              "Наступне",
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                      child: Text("Наступне"),
                     )
                   : Row(
                       children: [
+                        // Skip button with gradient
                         Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              // Skip question
-                              examProvider.skipQuestion();
-                              
-                              // Scroll to the current pill after navigation
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                _scrollToCurrentPill();
-                              });
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: Colors.black,
-                              padding: EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
+                          child: Container(
+                            height: 48,
+                            decoration: BoxDecoration(
+                              gradient: _getGradientForButton(0), // Skip button
+                              borderRadius: BorderRadius.circular(30),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withOpacity(0.2),
+                                  spreadRadius: 0,
+                                  blurRadius: 6,
+                                  offset: Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () {
+                                  // Skip question
+                                  examProvider.skipQuestion();
+                                  
+                                  // Scroll to the current pill after navigation
+                                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                                    _scrollToCurrentPill();
+                                  });
+                                },
                                 borderRadius: BorderRadius.circular(30),
+                                child: Center(
+                                  child: Text(
+                                    "Пропустити",
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
-                            child: Text("Пропустити"),
                           ),
                         ),
                         SizedBox(width: 16),
+                        // Choose button with gradient
                         Expanded(
-                          child: ElevatedButton(
-                            onPressed: selectedAnswer == null
-                                ? null
-                                : () {
-                                    // Check answer
-                                    setState(() {
-                                      isAnswerChecked = true;
-                                      
-                                      if (currentQuestion.correctAnswer is List<String>) {
-                                        isCorrect = (currentQuestion.correctAnswer as List<String>)
-                                            .contains(selectedAnswer);
-                                      } else {
-                                        isCorrect = selectedAnswer == currentQuestion.correctAnswer;
-                                      }
-                                    });
-                                  },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
+                          child: Container(
+                            height: 48,
+                            decoration: BoxDecoration(
+                              gradient: selectedAnswer == null
+                                  ? LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [Colors.grey.shade300, Colors.grey.shade200],
+                                    )
+                                  : _getGradientForButton(1), // Choose button
+                              borderRadius: BorderRadius.circular(30),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withOpacity(0.2),
+                                  spreadRadius: 0,
+                                  blurRadius: 6,
+                                  offset: Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: selectedAnswer == null
+                                    ? null
+                                    : () {
+                                        // Check answer
+                                        setState(() {
+                                          isAnswerChecked = true;
+                                          
+                                          if (currentQuestion.correctAnswer is List<String>) {
+                                            isCorrect = (currentQuestion.correctAnswer as List<String>)
+                                                .contains(selectedAnswer);
+                                          } else {
+                                            isCorrect = selectedAnswer == currentQuestion.correctAnswer;
+                                          }
+                                        });
+                                      },
                                 borderRadius: BorderRadius.circular(30),
+                                child: Center(
+                                  child: Text(
+                                    "Обрати",
+                                    style: TextStyle(
+                                      color: selectedAnswer == null ? Colors.grey.shade600 : Colors.black,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
-                            child: Text("Обрати"),
                           ),
                         ),
                       ],
@@ -415,6 +517,35 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
     );
   }
 
+  // Helper method for button gradients
+  LinearGradient _getGradientForButton(int buttonType) {
+    // Start with white as base color
+    Color startColor = Colors.white;
+    Color endColor;
+    
+    // Determine end color based on button type
+    switch(buttonType) {
+      case 0: // Skip button
+        endColor = Colors.blue.shade50.withOpacity(0.4); // Like "Take Exam" card
+        break;
+      case 1: // Choose button
+        endColor = Colors.green.shade50.withOpacity(0.4); // Like "Learn by Topics" card
+        break;
+      case 2: // Next button
+        endColor = Colors.orange.shade50.withOpacity(0.4); // Like "Practice Tickets" card
+        break;
+      default:
+        endColor = Colors.grey.shade50.withOpacity(0.4);
+    }
+    
+    return LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [startColor, endColor],
+      stops: [0.0, 1.0],
+    );
+  }
+
   // Helper method to determine gradient colors based on answer card state
   LinearGradient _getGradientForAnswerCard(bool isSelected, bool showResult, bool isCorrectOption, [int index = 0]) {
     // Start with white as base color
@@ -423,11 +554,11 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
     
     if (showResult) {
       if (isSelected && isCorrectOption) {
-        endColor = Colors.green.shade50.withOpacity(0.6);
+        endColor = Colors.green.shade50.withOpacity(0.6); // Using green for correct answers
       } else if (isSelected && !isCorrectOption) {
-        endColor = Colors.red.shade50.withOpacity(0.6);
+        endColor = Colors.red.shade50.withOpacity(0.6); // Using red for incorrect answers
       } else if (isCorrectOption) {
-        endColor = Colors.green.shade50.withOpacity(0.6);
+        endColor = Colors.green.shade50.withOpacity(0.6); // Using green for correct answers
       } else {
         endColor = Colors.grey.shade50.withOpacity(0.2);
       }
@@ -475,24 +606,82 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
           "Якщо ви вийдете з іспиту, результат вашого проходження не збережеться",
         ),
         actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop(true); // Yes, exit
-              // Cancel the exam
-              Provider.of<ExamProvider>(context, listen: false).cancelExam();
-              Navigator.of(context).pop(); // Return to previous screen
-            },
-            child: Text("Вийти"),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop(false); // No, stay
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
+          // Exit button with gradient
+          Container(
+            height: 40,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Colors.white, Colors.blue.shade50.withOpacity(0.4)], // Like "Take Exam" card
+              ),
+              borderRadius: BorderRadius.circular(20),
             ),
-            child: Text("Залишитися"),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  Navigator.of(context).pop(true); // Yes, exit
+                  // Cancel the exam
+                  Provider.of<ExamProvider>(context, listen: false).cancelExam();
+                  Navigator.of(context).pop(); // Return to previous screen
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Center(
+                    child: Text(
+                      "Вийти",
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Stay button with gradient
+          Container(
+            height: 40,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Colors.white, Colors.green.shade50.withOpacity(0.4)], // Like "Learn by Topics" card
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.2),
+                  spreadRadius: 0,
+                  blurRadius: 4,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  Navigator.of(context).pop(false); // No, stay
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Center(
+                    child: Text(
+                      "Залишитися",
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),
