@@ -12,15 +12,35 @@ class ExamQuestionScreen extends StatefulWidget {
   _ExamQuestionScreenState createState() => _ExamQuestionScreenState();
 }
 
-class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
+class _ExamQuestionScreenState extends State<ExamQuestionScreen> with TickerProviderStateMixin {
   dynamic selectedAnswer;
   bool isAnswerChecked = false;
   bool? isCorrect;
   ScrollController _pillsScrollController = ScrollController();
+  late AnimationController _timerAnimationController;
+  late Animation<double> _timerPulseAnimation;
   
   @override
   void initState() {
     super.initState();
+    
+    // Initialize timer animation
+    _timerAnimationController = AnimationController(
+      duration: Duration(seconds: 2),
+      vsync: this,
+    );
+    
+    _timerPulseAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.05,
+    ).animate(CurvedAnimation(
+      parent: _timerAnimationController,
+      curve: Curves.easeInOut,
+    ));
+    
+    // Start the pulse animation
+    _timerAnimationController.repeat(reverse: true);
+    
     // Scroll to current pill when screen initializes
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToCurrentPill();
@@ -29,6 +49,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
   
   @override
   void dispose() {
+    _timerAnimationController.dispose();
     _pillsScrollController.dispose();
     super.dispose();
   }
@@ -51,6 +72,80 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
       scrollOffset.clamp(0.0, _pillsScrollController.position.maxScrollExtent),
       duration: Duration(milliseconds: 300),
       curve: Curves.easeOut,
+    );
+  }
+
+  // Helper method to get timer gradient based on remaining time
+  LinearGradient _getTimerGradient(Duration remainingTime) {
+    Color startColor = Colors.white;
+    Color endColor;
+    
+    if (remainingTime.inMinutes > 30) {
+      // Safe zone - green gradient
+      endColor = Colors.green.shade50.withOpacity(0.6);
+    } else if (remainingTime.inMinutes > 10) {
+      // Caution zone - orange gradient
+      endColor = Colors.orange.shade50.withOpacity(0.6);
+    } else {
+      // Critical zone - red gradient
+      endColor = Colors.red.shade50.withOpacity(0.8);
+    }
+    
+    return LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [startColor, endColor],
+      stops: [0.0, 1.0],
+    );
+  }
+
+  // Enhanced timer widget
+  Widget _buildEnhancedTimer(Duration remainingTime, String timeText) {
+    bool isCritical = remainingTime.inMinutes < 5;
+    
+    return AnimatedBuilder(
+      animation: _timerPulseAnimation,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: isCritical ? _timerPulseAnimation.value : 1.0,
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              gradient: _getTimerGradient(remainingTime),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.2),
+                  spreadRadius: 0,
+                  blurRadius: 6,
+                  offset: Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.schedule,
+                  size: 16,
+                  color: Colors.black,
+                ),
+                SizedBox(width: 4),
+                Text(
+                  timeText,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                    fontFamily: 'monospace',
+                    letterSpacing: 1.0,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -82,6 +177,13 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
     final seconds = remainingTime.inSeconds % 60;
     final timeText = "${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}";
     
+    // Update animation speed for critical time
+    if (remainingTime.inMinutes < 5) {
+      _timerAnimationController.duration = Duration(milliseconds: 800);
+    } else {
+      _timerAnimationController.duration = Duration(seconds: 2);
+    }
+    
     // Check if we need to show result screen
     if (exam.isCompleted) {
       // Navigate to results
@@ -104,7 +206,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
       onWillPop: _onWillPop,
       child: Scaffold(
         appBar: AppBar(
-          title: Text("Іспит $timeText"),
+          title: _buildEnhancedTimer(remainingTime, timeText),
           centerTitle: true,
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
@@ -225,47 +327,42 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
               ),
             ),
             
-            // Question image (if available)
+            // Question image (if available) with rounded borders
             if (currentQuestion.imagePath != null)
               Container(
-                width: double.infinity,
-                height: 200,
-                child: serviceLocator.storage.getImage(
-                  storagePath: 'quiz_images/${currentQuestion.imagePath}',
-                  assetFallback: currentQuestion.imagePath,
-                  fit: BoxFit.contain,
-                  placeholderIcon: Icons.broken_image,
-                  placeholderColor: Colors.grey[200],
+                margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.2),
+                      spreadRadius: 0,
+                      blurRadius: 6,
+                      offset: Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: double.infinity,
+                    height: 200,
+                    child: serviceLocator.storage.getImage(
+                      storagePath: 'quiz_images/${currentQuestion.imagePath}',
+                      assetFallback: currentQuestion.imagePath,
+                      fit: BoxFit.cover,
+                      placeholderIcon: Icons.broken_image,
+                      placeholderColor: Colors.grey[200],
+                    ),
+                  ),
                 ),
               ),
             
-            // Question text
-            Padding(
-              padding: EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    currentQuestion.questionText,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  if (currentQuestion.type == QuestionType.multipleChoice)
-                    Padding(
-                      padding: EdgeInsets.only(top: 8),
-                      child: Text(
-                        "Оберіть всі правильні відповіді",
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.blue,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+            // Enhanced question card
+            _buildEnhancedQuestionCard(
+              currentQuestion, 
+              exam.currentQuestionIndex + 1, 
+              exam.questionIds.length,
             ),
             
             // Answer options
@@ -287,7 +384,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
                   }
                   
                   // Get gradient based on card state instead of solid color
-  LinearGradient cardGradient = _getGradientForAnswerCard(isSelected, showResult, isCorrectOption, index);
+                  LinearGradient cardGradient = _getGradientForAnswerCard(isSelected, showResult, isCorrectOption, index);
                   
                   // Use circular indicators
                   Widget selectionIndicator = Container(
@@ -414,7 +511,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
                         // Skip button with gradient
                         Expanded(
                           child: Container(
-                            height: 48,
+                            height: 56,
                             decoration: BoxDecoration(
                               gradient: _getGradientForButton(0), // Skip button
                               borderRadius: BorderRadius.circular(30),
@@ -457,7 +554,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
                         // Choose button with gradient
                         Expanded(
                           child: Container(
-                            height: 48,
+                            height: 56,
                             decoration: BoxDecoration(
                               gradient: selectedAnswer == null
                                   ? LinearGradient(
@@ -513,6 +610,146 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // Helper method for question card gradient
+  LinearGradient _getQuestionCardGradient(int currentQuestionNumber) {
+    Color startColor = Colors.white;
+    Color endColor;
+    
+    // Cycle through pastel colors based on question number
+    switch (currentQuestionNumber % 4) {
+      case 0:
+        endColor = Colors.blue.shade50.withOpacity(0.3); // Like "Take Exam" card
+        break;
+      case 1:
+        endColor = Colors.green.shade50.withOpacity(0.3); // Like "Learn by Topics" card
+        break;
+      case 2:
+        endColor = Colors.orange.shade50.withOpacity(0.3); // Like "Practice Tickets" card
+        break;
+      case 3:
+        endColor = Colors.purple.shade50.withOpacity(0.3); // Like "Saved" card
+        break;
+      default:
+        endColor = Colors.blue.shade50.withOpacity(0.3);
+    }
+    
+    return LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [startColor, endColor],
+      stops: [0.0, 1.0],
+    );
+  }
+
+  // Enhanced question card widget
+  Widget _buildEnhancedQuestionCard(QuizQuestion currentQuestion, int currentQuestionNumber, int totalQuestions) {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: _getQuestionCardGradient(currentQuestionNumber),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            spreadRadius: 0,
+            blurRadius: 6,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Question number indicator
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  "Питання ${currentQuestionNumber} з ${totalQuestions}",
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black.withOpacity(0.7),
+                  ),
+                ),
+              ),
+              if (currentQuestion.type == QuestionType.multipleChoice) ...[
+                SizedBox(width: 8),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    "Декілька відповідей",
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.blue.shade700,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          SizedBox(height: 12),
+          // Question text
+          Text(
+            currentQuestion.questionText,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+              height: 1.4,
+            ),
+          ),
+          if (currentQuestion.type == QuestionType.multipleChoice)
+            Padding(
+              padding: EdgeInsets.only(top: 12),
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.blue.withOpacity(0.2),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: Colors.blue.shade700,
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        "Оберіть всі правильні відповіді",
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.blue.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -601,9 +838,9 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text("Вийти з іспиту?"),
+        title: Text("Вийти з тесту?"),
         content: Text(
-          "Якщо ви вийдете з іспиту, результат вашого проходження не збережеться",
+          "Якщо ви вийдете з тесту, результат вашого проходження не збережеться",
         ),
         actions: [
           // Exit button with gradient
