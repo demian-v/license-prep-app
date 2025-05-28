@@ -12,15 +12,35 @@ class PracticeQuestionScreen extends StatefulWidget {
   _PracticeQuestionScreenState createState() => _PracticeQuestionScreenState();
 }
 
-class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> {
+class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with TickerProviderStateMixin {
   dynamic selectedAnswer;
   bool isAnswerChecked = false;
   bool? isCorrect;
   ScrollController _pillsScrollController = ScrollController();
+  late AnimationController _titleAnimationController;
+  late Animation<double> _titlePulseAnimation;
   
   @override
   void initState() {
     super.initState();
+    
+    // Initialize title animation
+    _titleAnimationController = AnimationController(
+      duration: Duration(seconds: 3),
+      vsync: this,
+    );
+    
+    _titlePulseAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.02,
+    ).animate(CurvedAnimation(
+      parent: _titleAnimationController,
+      curve: Curves.easeInOut,
+    ));
+    
+    // Start the subtle pulse animation
+    _titleAnimationController.repeat(reverse: true);
+    
     // Scroll to current pill when screen initializes
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToCurrentPill();
@@ -29,6 +49,7 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> {
   
   @override
   void dispose() {
+    _titleAnimationController.dispose();
     _pillsScrollController.dispose();
     super.dispose();
   }
@@ -51,6 +72,272 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> {
       scrollOffset.clamp(0.0, _pillsScrollController.position.maxScrollExtent),
       duration: Duration(milliseconds: 300),
       curve: Curves.easeOut,
+    );
+  }
+
+  // Enhanced practice title widget
+  Widget _buildEnhancedPracticeTitle() {
+    return AnimatedBuilder(
+      animation: _titlePulseAnimation,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _titlePulseAnimation.value,
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Colors.white, Colors.orange.shade50.withOpacity(0.6)], // Practice theme color
+                stops: [0.0, 1.0],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.2),
+                  spreadRadius: 0,
+                  blurRadius: 6,
+                  offset: Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.fitness_center,
+                  size: 18,
+                  color: Colors.black,
+                ),
+                SizedBox(width: 8),
+                Text(
+                  "Тренування по білетах",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Helper method for question card gradient
+  LinearGradient _getQuestionCardGradient(int currentQuestionNumber) {
+    Color startColor = Colors.white;
+    Color endColor;
+    
+    // Cycle through pastel colors based on question number
+    switch (currentQuestionNumber % 4) {
+      case 0:
+        endColor = Colors.blue.shade50.withOpacity(0.3); // Like "Take Exam" card
+        break;
+      case 1:
+        endColor = Colors.green.shade50.withOpacity(0.3); // Like "Learn by Topics" card
+        break;
+      case 2:
+        endColor = Colors.orange.shade50.withOpacity(0.3); // Like "Practice Tickets" card
+        break;
+      case 3:
+        endColor = Colors.purple.shade50.withOpacity(0.3); // Like "Saved" card
+        break;
+      default:
+        endColor = Colors.blue.shade50.withOpacity(0.3);
+    }
+    
+    return LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [startColor, endColor],
+      stops: [0.0, 1.0],
+    );
+  }
+
+  // Enhanced question card widget
+  Widget _buildEnhancedQuestionCard(QuizQuestion currentQuestion, int currentQuestionNumber, int totalQuestions) {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: _getQuestionCardGradient(currentQuestionNumber),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            spreadRadius: 0,
+            blurRadius: 6,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Question number indicator
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  "Питання ${currentQuestionNumber} з ${totalQuestions}",
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black.withOpacity(0.7),
+                  ),
+                ),
+              ),
+              if (currentQuestion.type == QuestionType.multipleChoice) ...[
+                SizedBox(width: 8),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    "Декілька відповідей",
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.blue.shade700,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          SizedBox(height: 12),
+          // Question text
+          Text(
+            currentQuestion.questionText,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+              height: 1.4,
+            ),
+          ),
+          if (currentQuestion.type == QuestionType.multipleChoice)
+            Padding(
+              padding: EdgeInsets.only(top: 12),
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.blue.withOpacity(0.2),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: Colors.blue.shade700,
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        "Оберіть всі правильні відповіді",
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.blue.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // Helper method for button gradients
+  LinearGradient _getGradientForButton(int buttonType) {
+    // Start with white as base color
+    Color startColor = Colors.white;
+    Color endColor;
+    
+    // Determine end color based on button type
+    switch(buttonType) {
+      case 0: // Skip button
+        endColor = Colors.blue.shade50.withOpacity(0.4); // Like "Take Exam" card
+        break;
+      case 1: // Choose button
+        endColor = Colors.green.shade50.withOpacity(0.4); // Like "Learn by Topics" card
+        break;
+      case 2: // Next button
+        endColor = Colors.orange.shade50.withOpacity(0.4); // Like "Practice Tickets" card
+        break;
+      default:
+        endColor = Colors.grey.shade50.withOpacity(0.4);
+    }
+    
+    return LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [startColor, endColor],
+      stops: [0.0, 1.0],
+    );
+  }
+
+  // Helper method to determine gradient colors based on answer card state
+  LinearGradient _getGradientForAnswerCard(bool isSelected, bool showResult, bool isCorrectOption, [int index = 0]) {
+    // Start with white as base color
+    Color startColor = Colors.white;
+    Color endColor;
+    
+    if (showResult) {
+      if (isSelected && isCorrectOption) {
+        endColor = Colors.green.shade50.withOpacity(0.6); // Using green for correct answers
+      } else if (isSelected && !isCorrectOption) {
+        endColor = Colors.red.shade50.withOpacity(0.6); // Using red for incorrect answers
+      } else if (isCorrectOption) {
+        endColor = Colors.green.shade50.withOpacity(0.6); // Using green for correct answers
+      } else {
+        endColor = Colors.grey.shade50.withOpacity(0.2);
+      }
+    } else if (isSelected) {
+      endColor = Colors.blue.shade50.withOpacity(0.4); // Similar to "Take Exam" card
+    } else {
+      // Cycle through pastel colors for unselected cards
+      switch (index % 4) {
+        case 0:
+          endColor = Colors.blue.shade50.withOpacity(0.4); // Take Exam color
+          break;
+        case 1:
+          endColor = Colors.green.shade50.withOpacity(0.4); // Learn by Topics color
+          break;
+        case 2:
+          endColor = Colors.orange.shade50.withOpacity(0.4); // Practice Tickets color
+          break;
+        case 3:
+          endColor = Colors.purple.shade50.withOpacity(0.4); // Saved color
+          break;
+        default:
+          endColor = Colors.grey.shade50.withOpacity(0.2);
+      }
+    }
+    
+    return LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [startColor, endColor],
+      stops: [0.0, 1.0],
     );
   }
 
@@ -98,7 +385,7 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> {
       onWillPop: _onWillPop,
       child: Scaffold(
         appBar: AppBar(
-          title: Text("Тренування по білетах"),
+          title: _buildEnhancedPracticeTitle(),
           centerTitle: true,
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
@@ -142,7 +429,7 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> {
         ),
         body: Column(
           children: [
-            // Question number indicator
+            // Question number indicator with gradients
             Container(
               height: 50,
               child: ListView.builder(
@@ -156,24 +443,60 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> {
                   bool isAnswered = practice.answers.containsKey(questionId);
                   bool isAnsweredCorrectly = isAnswered ? practice.answers[questionId]! : false;
                   
-                  Color pillColor = isActive
-                      ? Colors.blue
-                      : isAnswered
-                          ? isAnsweredCorrectly ? Colors.green : Colors.red
-                          : Colors.grey[200]!;
+                  // Determine gradient for pill
+                  LinearGradient pillGradient;
+                  if (isActive) {
+                    // Current question - blue pastel gradient (like "Take Exam" card)
+                    pillGradient = LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Colors.white, Colors.blue.shade100],
+                    );
+                  } else if (isAnswered) {
+                    if (isAnsweredCorrectly) {
+                      // Correctly answered - use green pastel gradient
+                      pillGradient = LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Colors.white, Colors.green.shade100],
+                      );
+                    } else {
+                      // Incorrectly answered - use red pastel gradient
+                      pillGradient = LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Colors.white, Colors.red.shade100],
+                      );
+                    }
+                  } else {
+                    // Unanswered - light gray pastel gradient
+                    pillGradient = LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Colors.white, Colors.grey.shade100],
+                    );
+                  }
                   
                   return Container(
                     width: 40,
                     margin: EdgeInsets.symmetric(horizontal: 4),
                     decoration: BoxDecoration(
-                      color: pillColor,
+                      gradient: pillGradient,
                       borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.2),
+                          spreadRadius: 0,
+                          blurRadius: 4,
+                          offset: Offset(0, 1),
+                        ),
+                      ],
                     ),
                     child: Center(
                       child: Text(
                         '${index + 1}',
                         style: TextStyle(
-                          color: isActive || isAnswered ? Colors.white : Colors.black,
+                          color: Colors.black,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -183,33 +506,45 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> {
               ),
             ),
             
-            // Question image (if available)
+            // Question image (if available) with rounded borders
             if (currentQuestion.imagePath != null)
               Container(
-                width: double.infinity,
-                height: 200,
-                child: serviceLocator.storage.getImage(
-                  storagePath: 'quiz_images/${currentQuestion.imagePath}',
-                  assetFallback: currentQuestion.imagePath,
-                  fit: BoxFit.contain,
-                  placeholderIcon: Icons.broken_image,
-                  placeholderColor: Colors.grey[200],
+                margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.2),
+                      spreadRadius: 0,
+                      blurRadius: 6,
+                      offset: Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: double.infinity,
+                    height: 200,
+                    child: serviceLocator.storage.getImage(
+                      storagePath: 'quiz_images/${currentQuestion.imagePath}',
+                      assetFallback: currentQuestion.imagePath,
+                      fit: BoxFit.cover,
+                      placeholderIcon: Icons.broken_image,
+                      placeholderColor: Colors.grey[200],
+                    ),
+                  ),
                 ),
               ),
             
-            // Question text
-            Padding(
-              padding: EdgeInsets.all(16),
-              child: Text(
-                currentQuestion.questionText,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+            // Enhanced question card
+            _buildEnhancedQuestionCard(
+              currentQuestion, 
+              practice.currentQuestionIndex + 1, 
+              practice.questionIds.length,
             ),
             
-            // Answer options
+            // Answer options with gradients
             Expanded(
               child: ListView.builder(
                 padding: EdgeInsets.all(16),
@@ -218,22 +553,19 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> {
                   final option = currentQuestion.options[index];
                   bool isSelected = selectedAnswer == option;
                   bool showResult = isAnswerChecked;
-                  bool isCorrectOption = option == currentQuestion.correctAnswer;
+                  bool isCorrectOption = false;
                   
-                  Color backgroundColor = Colors.white;
-                  if (showResult) {
-                    if (isSelected && isCorrectOption) {
-                      backgroundColor = Colors.green;
-                    } else if (isSelected && !isCorrectOption) {
-                      backgroundColor = Colors.red;
-                    } else if (isCorrectOption) {
-                      backgroundColor = Colors.green;
-                    }
-                  } else if (isSelected) {
-                    backgroundColor = Colors.blue.shade100;
+                  // Check if this option is a correct answer
+                  if (currentQuestion.correctAnswer is List<String>) {
+                    isCorrectOption = (currentQuestion.correctAnswer as List<String>).contains(option);
+                  } else {
+                    isCorrectOption = option == currentQuestion.correctAnswer.toString();
                   }
                   
-                  // Use circular indicators for both single and multiple choice questions
+                  // Get gradient based on card state instead of solid color
+                  LinearGradient cardGradient = _getGradientForAnswerCard(isSelected, showResult, isCorrectOption, index);
+                  
+                  // Use circular indicators
                   Widget selectionIndicator = Container(
                     width: 24,
                     height: 24,
@@ -265,8 +597,16 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> {
                       margin: EdgeInsets.only(bottom: 12),
                       padding: EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: backgroundColor,
-                        borderRadius: BorderRadius.circular(8),
+                        gradient: cardGradient,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.2),
+                            spreadRadius: 0,
+                            blurRadius: 6,
+                            offset: Offset(0, 3),
+                          ),
+                        ],
                       ),
                       child: Row(
                         children: [
@@ -276,8 +616,9 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> {
                               option,
                               style: TextStyle(
                                 color: showResult && (isSelected || isCorrectOption)
-                                    ? Colors.white
+                                    ? (isSelected && !isCorrectOption) ? Colors.red.shade900 : Colors.green.shade900
                                     : Colors.black,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                               ),
                             ),
                           ),
@@ -289,86 +630,158 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> {
               ),
             ),
             
-            // Action buttons
+            // Enhanced action buttons with gradients
             Padding(
               padding: EdgeInsets.all(16),
               child: isAnswerChecked
-                  ? ElevatedButton(
-                      onPressed: () {
-                        // Save answer and move to next question
-                        practiceProvider.answerQuestion(
-                          currentQuestion.id,
-                          isCorrect ?? false,
-                        );
-                        
-                        setState(() {
-                          selectedAnswer = null;
-                          isAnswerChecked = false;
-                          isCorrect = null;
-                        });
-                        
-                        practiceProvider.goToNextQuestion();
-                        
-                        // Scroll to the current pill after navigation
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          _scrollToCurrentPill();
-                        });
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.black,
-                        minimumSize: Size(double.infinity, 56),
-                        shape: RoundedRectangleBorder(
+                  ? Container(
+                      width: double.infinity,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        gradient: _getGradientForButton(2), // Next button
+                        borderRadius: BorderRadius.circular(30),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.2),
+                            spreadRadius: 0,
+                            blurRadius: 6,
+                            offset: Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            // Save answer and move to next question
+                            practiceProvider.answerQuestion(
+                              currentQuestion.id,
+                              isCorrect ?? false,
+                            );
+                            
+                            setState(() {
+                              selectedAnswer = null;
+                              isAnswerChecked = false;
+                              isCorrect = null;
+                            });
+                            
+                            practiceProvider.goToNextQuestion();
+                            
+                            // Scroll to the current pill after navigation
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              _scrollToCurrentPill();
+                            });
+                          },
                           borderRadius: BorderRadius.circular(30),
+                          child: Center(
+                            child: Text(
+                              "Наступне",
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                      child: Text("Наступне"),
                     )
                   : Row(
                       children: [
+                        // Skip button with gradient
                         Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              // Skip question
-                              practiceProvider.skipQuestion();
-                              
-                              // Scroll to the current pill after navigation
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                _scrollToCurrentPill();
-                              });
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: Colors.black,
-                              padding: EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
+                          child: Container(
+                            height: 56,
+                            decoration: BoxDecoration(
+                              gradient: _getGradientForButton(0), // Skip button
+                              borderRadius: BorderRadius.circular(30),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withOpacity(0.2),
+                                  spreadRadius: 0,
+                                  blurRadius: 6,
+                                  offset: Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () {
+                                  // Skip question
+                                  practiceProvider.skipQuestion();
+                                  
+                                  // Scroll to the current pill after navigation
+                                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                                    _scrollToCurrentPill();
+                                  });
+                                },
                                 borderRadius: BorderRadius.circular(30),
+                                child: Center(
+                                  child: Text(
+                                    "Пропустити",
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
-                            child: Text("Пропустити"),
                           ),
                         ),
                         SizedBox(width: 16),
+                        // Choose button with gradient
                         Expanded(
-                          child: ElevatedButton(
-                            onPressed: selectedAnswer == null
-                                ? null
-                                : () {
-                                    // Check answer
-                                    setState(() {
-                                      isAnswerChecked = true;
-                                      isCorrect = selectedAnswer == currentQuestion.correctAnswer;
-                                    });
-                                  },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
+                          child: Container(
+                            height: 56,
+                            decoration: BoxDecoration(
+                              gradient: selectedAnswer == null
+                                  ? LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [Colors.grey.shade300, Colors.grey.shade200],
+                                    )
+                                  : _getGradientForButton(1), // Choose button
+                              borderRadius: BorderRadius.circular(30),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withOpacity(0.2),
+                                  spreadRadius: 0,
+                                  blurRadius: 6,
+                                  offset: Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: selectedAnswer == null
+                                    ? null
+                                    : () {
+                                        // Check answer
+                                        setState(() {
+                                          isAnswerChecked = true;
+                                          
+                                          if (currentQuestion.correctAnswer is List<String>) {
+                                            isCorrect = (currentQuestion.correctAnswer as List<String>)
+                                                .contains(selectedAnswer);
+                                          } else {
+                                            isCorrect = selectedAnswer == currentQuestion.correctAnswer;
+                                          }
+                                        });
+                                      },
                                 borderRadius: BorderRadius.circular(30),
+                                child: Center(
+                                  child: Text(
+                                    "Обрати",
+                                    style: TextStyle(
+                                      color: selectedAnswer == null ? Colors.grey.shade600 : Colors.black,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
-                            child: Text("Обрати"),
                           ),
                         ),
                       ],
@@ -394,24 +807,82 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> {
           "Якщо ви вийдете з тренування, результат вашого проходження не збережеться",
         ),
         actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop(true); // Yes, exit
-              // Cancel the practice
-              Provider.of<PracticeProvider>(context, listen: false).cancelPractice();
-              Navigator.of(context).pop(); // Return to previous screen
-            },
-            child: Text("Вийти"),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop(false); // No, stay
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
+          // Exit button with gradient
+          Container(
+            height: 40,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Colors.white, Colors.blue.shade50.withOpacity(0.4)], // Like "Take Exam" card
+              ),
+              borderRadius: BorderRadius.circular(20),
             ),
-            child: Text("Залишитися"),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  Navigator.of(context).pop(true); // Yes, exit
+                  // Cancel the practice
+                  Provider.of<PracticeProvider>(context, listen: false).cancelPractice();
+                  Navigator.of(context).pop(); // Return to previous screen
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Center(
+                    child: Text(
+                      "Вийти",
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Stay button with gradient
+          Container(
+            height: 40,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Colors.white, Colors.green.shade50.withOpacity(0.4)], // Like "Learn by Topics" card
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.2),
+                  spreadRadius: 0,
+                  blurRadius: 4,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  Navigator.of(context).pop(false); // No, stay
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Center(
+                    child: Text(
+                      "Залишитися",
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),

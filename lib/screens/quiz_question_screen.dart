@@ -22,7 +22,7 @@ class QuizQuestionScreen extends StatefulWidget {
   _QuizQuestionScreenState createState() => _QuizQuestionScreenState();
 }
 
-class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
+class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProviderStateMixin {
   int currentQuestionIndex = 0;
   List<QuizQuestion> questions = [];
   Set<String> selectedAnswers = {};
@@ -32,17 +32,471 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
   bool isLoading = true;
   String? errorMessage;
   ScrollController _pillsScrollController = ScrollController();
+  late AnimationController _titleAnimationController;
+  late Animation<double> _titlePulseAnimation;
   
   @override
   void initState() {
     super.initState();
+    
+    // Initialize title animation
+    _titleAnimationController = AnimationController(
+      duration: Duration(seconds: 3),
+      vsync: this,
+    );
+    
+    _titlePulseAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.03,
+    ).animate(CurvedAnimation(
+      parent: _titleAnimationController,
+      curve: Curves.easeInOut,
+    ));
+    
+    // Start the subtle pulse animation
+    _titleAnimationController.repeat(reverse: true);
+    
     loadQuestions();
   }
   
   @override
   void dispose() {
+    _titleAnimationController.dispose();
     _pillsScrollController.dispose();
     super.dispose();
+  }
+
+  // Helper method to get correct translations (same as bottom navigation)
+  String _translate(String key, LanguageProvider languageProvider) {
+    try {
+      switch (languageProvider.language) {
+        case 'es':
+          return {
+            'skip': 'Omitir',
+            'check': 'Comprobar',
+            'next': 'Siguiente',
+            'finish_topic': 'Finalizar tema',
+            'select_all_correct': 'Seleccionar todas las correctas',
+            'try_again': 'Intentar de nuevo',
+            'no_questions': 'No hay preguntas disponibles',
+          }[key] ?? key;
+        case 'uk':
+          return {
+            'skip': 'Пропустити',
+            'check': 'Перевірити',
+            'next': 'Далі',
+            'finish_topic': 'Завершити тему',
+            'select_all_correct': 'Виберіть всі правильні',
+            'try_again': 'Спробувати знову',
+            'no_questions': 'Немає доступних питань',
+          }[key] ?? key;
+        case 'ru':
+          return {
+            'skip': 'Пропустить',
+            'check': 'Проверить',
+            'next': 'Далее',
+            'finish_topic': 'Завершить тему',
+            'select_all_correct': 'Выберите все правильные',
+            'try_again': 'Попробовать снова',
+            'no_questions': 'Нет доступных вопросов',
+          }[key] ?? key;
+        case 'pl':
+          return {
+            'skip': 'Pomiń',
+            'check': 'Sprawdź',
+            'next': 'Dalej',
+            'finish_topic': 'Zakończ temat',
+            'select_all_correct': 'Wybierz wszystkie poprawne',
+            'try_again': 'Spróbuj ponownie',
+            'no_questions': 'Brak dostępnych pytań',
+          }[key] ?? key;
+        case 'en':
+        default:
+          return {
+            'skip': 'Skip',
+            'check': 'Check',
+            'next': 'Next',
+            'finish_topic': 'End Topic',
+            'select_all_correct': 'Select all correct answers',
+            'try_again': 'Try again',
+            'no_questions': 'No questions available',
+          }[key] ?? key;
+      }
+    } catch (e) {
+      print('🚨 [QUIZ] Error getting translation: $e');
+      return key;
+    }
+  }
+
+  // Enhanced topic title widget
+  Widget _buildEnhancedTopicTitle(String topicTitle) {
+    // Choose gradient color based on topic for variety
+    Color endColor;
+    IconData topicIcon;
+    
+    // Dynamic theming based on topic content
+    if (topicTitle.toLowerCase().contains('загальн')) {
+      endColor = Colors.purple.shade50.withOpacity(0.6);
+      topicIcon = Icons.info_outline;
+    } else if (topicTitle.toLowerCase().contains('правила')) {
+      endColor = Colors.blue.shade50.withOpacity(0.6);
+      topicIcon = Icons.rule;
+    } else if (topicTitle.toLowerCase().contains('безпек')) {
+      endColor = Colors.green.shade50.withOpacity(0.6);
+      topicIcon = Icons.security;
+    } else if (topicTitle.toLowerCase().contains('велосипед')) {
+      endColor = Colors.orange.shade50.withOpacity(0.6);
+      topicIcon = Icons.directions_bike;
+    } else {
+      endColor = Colors.indigo.shade50.withOpacity(0.6);
+      topicIcon = Icons.school;
+    }
+    
+    return AnimatedBuilder(
+      animation: _titlePulseAnimation,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _titlePulseAnimation.value,
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Colors.white, endColor],
+                stops: [0.0, 1.0],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.2),
+                  spreadRadius: 0,
+                  blurRadius: 6,
+                  offset: Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  topicIcon,
+                  size: 16,
+                  color: Colors.black,
+                ),
+                SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    topicTitle,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Helper method for question card gradient
+  LinearGradient _getQuestionCardGradient(int currentQuestionNumber) {
+    Color startColor = Colors.white;
+    Color endColor;
+    
+    // Cycle through pastel colors based on question number
+    switch (currentQuestionNumber % 4) {
+      case 0:
+        endColor = Colors.blue.shade50.withOpacity(0.3);
+        break;
+      case 1:
+        endColor = Colors.green.shade50.withOpacity(0.3);
+        break;
+      case 2:
+        endColor = Colors.orange.shade50.withOpacity(0.3);
+        break;
+      case 3:
+        endColor = Colors.purple.shade50.withOpacity(0.3);
+        break;
+      default:
+        endColor = Colors.blue.shade50.withOpacity(0.3);
+    }
+    
+    return LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [startColor, endColor],
+      stops: [0.0, 1.0],
+    );
+  }
+
+  // Enhanced question card widget with reactive translation
+  Widget _buildEnhancedQuestionCard(QuizQuestion currentQuestion, int currentQuestionNumber, int totalQuestions) {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: _getQuestionCardGradient(currentQuestionNumber),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            spreadRadius: 0,
+            blurRadius: 6,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Question number indicator
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  "Питання ${currentQuestionNumber} з ${totalQuestions}",
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black.withOpacity(0.7),
+                  ),
+                ),
+              ),
+              if (currentQuestion.type == QuestionType.multipleChoice) ...[
+                SizedBox(width: 8),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    "Декілька відповідей",
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.blue.shade700,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          SizedBox(height: 12),
+          // Question text
+          Text(
+            currentQuestion.questionText,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+              height: 1.4,
+            ),
+          ),
+          if (currentQuestion.type == QuestionType.multipleChoice)
+            Padding(
+              padding: EdgeInsets.only(top: 12),
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.blue.withOpacity(0.2),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: Colors.blue.shade700,
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Consumer<LanguageProvider>(
+                        builder: (context, languageProvider, _) {
+                          return Text(
+                            _translate('select_all_correct', languageProvider),
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.blue.shade700,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // Helper method for button gradients
+  LinearGradient _getGradientForButton(int buttonType) {
+    Color startColor = Colors.white;
+    Color endColor;
+    
+    switch(buttonType) {
+      case 0: // Skip/Next button
+        endColor = Colors.blue.shade50.withOpacity(0.4);
+        break;
+      case 1: // Check button
+        endColor = Colors.green.shade50.withOpacity(0.4);
+        break;
+      case 2: // End Topic button
+        endColor = Colors.purple.shade50.withOpacity(0.4);
+        break;
+      default:
+        endColor = Colors.grey.shade50.withOpacity(0.4);
+    }
+    
+    return LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [startColor, endColor],
+      stops: [0.0, 1.0],
+    );
+  }
+
+  // Helper method for answer card gradients
+  LinearGradient _getGradientForAnswerCard(bool isSelected, bool showResult, bool isCorrectOption, [int index = 0]) {
+    Color startColor = Colors.white;
+    Color endColor;
+    
+    if (showResult) {
+      if (isSelected && isCorrectOption) {
+        endColor = Colors.green.shade50.withOpacity(0.6);
+      } else if (isSelected && !isCorrectOption) {
+        endColor = Colors.red.shade50.withOpacity(0.6);
+      } else if (isCorrectOption) {
+        endColor = Colors.green.shade50.withOpacity(0.6);
+      } else {
+        endColor = Colors.grey.shade50.withOpacity(0.2);
+      }
+    } else if (isSelected) {
+      endColor = Colors.blue.shade50.withOpacity(0.4);
+    } else {
+      // Cycle through pastel colors
+      switch (index % 4) {
+        case 0:
+          endColor = Colors.blue.shade50.withOpacity(0.4);
+          break;
+        case 1:
+          endColor = Colors.green.shade50.withOpacity(0.4);
+          break;
+        case 2:
+          endColor = Colors.orange.shade50.withOpacity(0.4);
+          break;
+        case 3:
+          endColor = Colors.purple.shade50.withOpacity(0.4);
+          break;
+        default:
+          endColor = Colors.grey.shade50.withOpacity(0.2);
+      }
+    }
+    
+    return LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [startColor, endColor],
+      stops: [0.0, 1.0],
+    );
+  }
+
+  // Enhanced explanation panel
+  Widget _buildEnhancedExplanationPanel(QuizQuestion question) {
+    if (!isAnswerChecked || question.explanation == null) {
+      return SizedBox.shrink();
+    }
+    
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.white, Colors.indigo.shade50.withOpacity(0.3)],
+          stops: [0.0, 1.0],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            spreadRadius: 0,
+            blurRadius: 6,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.lightbulb_outline,
+                size: 20,
+                color: Colors.indigo.shade700,
+              ),
+              SizedBox(width: 8),
+              Text(
+                "Пояснення",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.indigo.shade700,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+          if (question.ruleReference != null) ...[
+            SizedBox(height: 12),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.indigo.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                question.ruleReference!,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.indigo.shade800,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+          SizedBox(height: 12),
+          Text(
+            question.explanation!,
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.4,
+              color: Colors.black87,
+            ),
+          ),
+        ],
+      ),
+    );
   }
   
   Future<void> loadQuestions() async {
@@ -159,7 +613,6 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
     if (_pillsScrollController.hasClients) {
       final pillWidth = 48.0; // Width of pill including margins
       final screenWidth = MediaQuery.of(context).size.width;
-      final visiblePills = screenWidth / pillWidth;
       final targetPosition = pillWidth * currentQuestionIndex;
       final screenCenter = screenWidth / 2;
       
@@ -177,7 +630,8 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
   Widget build(BuildContext context) {
     // Common AppBar for all states
     final appBar = AppBar(
-      title: Text(widget.topic.title),
+      title: _buildEnhancedTopicTitle(widget.topic.title),
+      centerTitle: true,
       backgroundColor: Colors.white,
       foregroundColor: Colors.black,
       elevation: 0,
@@ -197,7 +651,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
       );
     }
     
-    // Show error state
+    // Show error state with reactive translation
     if (errorMessage != null) {
       return Scaffold(
         appBar: appBar,
@@ -211,9 +665,13 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
                 textAlign: TextAlign.center,
               ),
               SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: loadQuestions,
-                child: Text(AppLocalizations.of(context).translate('try_again')),
+              Consumer<LanguageProvider>(
+                builder: (context, languageProvider, _) {
+                  return ElevatedButton(
+                    onPressed: loadQuestions,
+                    child: Text(_translate('try_again', languageProvider)),
+                  );
+                },
               ),
             ],
           ),
@@ -221,12 +679,16 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
       );
     }
     
-    // Show empty state
+    // Show empty state with reactive translation
     if (questions.isEmpty) {
       return Scaffold(
         appBar: appBar,
         body: Center(
-          child: Text(AppLocalizations.of(context).translate('no_questions')),
+          child: Consumer<LanguageProvider>(
+            builder: (context, languageProvider, _) {
+              return Text(_translate('no_questions', languageProvider));
+            },
+          ),
         ),
       );
     }
@@ -235,7 +697,8 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
     
     // Create AppBar with actions for the question view
     final questionAppBar = AppBar(
-      title: Text(widget.topic.title),
+      title: _buildEnhancedTopicTitle(widget.topic.title),
+      centerTitle: true,
       backgroundColor: Colors.white,
       foregroundColor: Colors.black,
       elevation: 0,
@@ -276,7 +739,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
       appBar: questionAppBar,
       body: Column(
         children: [
-          // Question number pills
+          // Enhanced question number pills
           Container(
             height: 50,
             child: ListView.builder(
@@ -289,24 +752,56 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
                 bool isAnswered = answers.containsKey(questions[index].id);
                 bool isAnsweredCorrectly = isAnswered ? answers[questions[index].id]! : false;
                 
-                Color pillColor = isActive
-                    ? Colors.blue
-                    : isAnswered
-                        ? isAnsweredCorrectly ? Colors.green : Colors.red
-                        : Colors.grey[200]!;
+                // Determine gradient for pill
+                LinearGradient pillGradient;
+                if (isActive) {
+                  pillGradient = LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Colors.white, Colors.blue.shade100],
+                  );
+                } else if (isAnswered) {
+                  if (isAnsweredCorrectly) {
+                    pillGradient = LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Colors.white, Colors.green.shade100],
+                    );
+                  } else {
+                    pillGradient = LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Colors.white, Colors.red.shade100],
+                    );
+                  }
+                } else {
+                  pillGradient = LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Colors.white, Colors.grey.shade100],
+                  );
+                }
                 
                 return Container(
                   width: 40,
                   margin: EdgeInsets.symmetric(horizontal: 4),
                   decoration: BoxDecoration(
-                    color: pillColor,
+                    gradient: pillGradient,
                     borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.2),
+                        spreadRadius: 0,
+                        blurRadius: 4,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
                   ),
                   child: Center(
                     child: Text(
                       '${index + 1}',
                       style: TextStyle(
-                        color: isActive || isAnswered ? Colors.white : Colors.black,
+                        color: Colors.black,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -316,50 +811,45 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
             ),
           ),
           
-          // Question image (if available)
+          // Enhanced question image (if available)
           if (question.imagePath != null)
             Container(
-              width: double.infinity,
-              height: 200,
-              child: serviceLocator.storage.getImage(
-                storagePath: 'quiz_images/${question.imagePath}',
-                assetFallback: 'assets/images/quiz/default.png',
-                fit: BoxFit.contain,
-                placeholderIcon: Icons.broken_image,
-                placeholderColor: Colors.grey[200],
+              margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.2),
+                    spreadRadius: 0,
+                    blurRadius: 6,
+                    offset: Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  width: double.infinity,
+                  height: 200,
+                  child: serviceLocator.storage.getImage(
+                    storagePath: 'quiz_images/${question.imagePath}',
+                    assetFallback: 'assets/images/quiz/default.png',
+                    fit: BoxFit.cover,
+                    placeholderIcon: Icons.broken_image,
+                    placeholderColor: Colors.grey[200],
+                  ),
+                ),
               ),
             ),
           
-          // Question text and selection type indicator
-          Padding(
-            padding: EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  question.questionText,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (question.type == QuestionType.multipleChoice)
-                  Padding(
-                    padding: EdgeInsets.only(top: 8),
-                    child: Text(
-                      AppLocalizations.of(context).translate('select_all_correct'),
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.blue,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+          // Enhanced question card
+          _buildEnhancedQuestionCard(
+            question,
+            currentQuestionIndex + 1,
+            questions.length,
           ),
           
-          // Answer options
+          // Enhanced answer options
           Expanded(
             child: ListView.builder(
               padding: EdgeInsets.all(16),
@@ -377,21 +867,10 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
                   isCorrectOption = option == question.correctAnswer.toString();
                 }
                 
-                // Define colors based on selection state
-                Color backgroundColor = Colors.white;
-                if (showResult) {
-                  if (isSelected && isCorrectOption) {
-                    backgroundColor = Colors.green;
-                  } else if (isSelected && !isCorrectOption) {
-                    backgroundColor = Colors.red;
-                  } else if (isCorrectOption) {
-                    backgroundColor = Colors.green;
-                  }
-                } else if (isSelected) {
-                  backgroundColor = Colors.blue.shade100;
-                }
+                // Get gradient for answer card
+                LinearGradient cardGradient = _getGradientForAnswerCard(isSelected, showResult, isCorrectOption, index);
                 
-                // Use circular indicators for both single and multiple choice questions
+                // Use circular indicators
                 Widget selectionIndicator = Container(
                   width: 24,
                   height: 24,
@@ -433,8 +912,16 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
                     margin: EdgeInsets.only(bottom: 12),
                     padding: EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: backgroundColor,
-                      borderRadius: BorderRadius.circular(8),
+                      gradient: cardGradient,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.2),
+                          spreadRadius: 0,
+                          blurRadius: 6,
+                          offset: Offset(0, 3),
+                        ),
+                      ],
                     ),
                     child: Row(
                       children: [
@@ -444,8 +931,9 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
                             option,
                             style: TextStyle(
                               color: showResult && (isSelected || isCorrectOption)
-                                  ? Colors.white
+                                  ? (isSelected && !isCorrectOption) ? Colors.red.shade900 : Colors.green.shade900
                                   : Colors.black,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                             ),
                           ),
                         ),
@@ -457,78 +945,140 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
             ),
           ),
           
-          // Explanation panel (if answer is checked)
-          if (isAnswerChecked && question.explanation != null)
-            Container(
-              padding: EdgeInsets.all(16),
-              color: Colors.grey[100],
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (question.ruleReference != null)
-                    Text(
-                      question.ruleReference!,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  SizedBox(height: 8),
-                  Text(question.explanation!),
-                ],
-              ),
-            ),
+          // Enhanced explanation panel
+          _buildEnhancedExplanationPanel(question),
           
-          // Action buttons
+          // Enhanced action buttons with REACTIVE TRANSLATION
           Padding(
             padding: EdgeInsets.all(16),
             child: Row(
               children: [
                 Expanded(
-                  child: ElevatedButton(
-                    onPressed: isAnswerChecked ? goToNextQuestion : skipQuestion,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Container(
+                    height: 56,
+                    decoration: BoxDecoration(
+                      gradient: _getGradientForButton(0), // Skip/Next button
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.2),
+                          spreadRadius: 0,
+                          blurRadius: 6,
+                          offset: Offset(0, 3),
+                        ),
+                      ],
                     ),
-                    child: Text(isAnswerChecked 
-                      ? AppLocalizations.of(context).translate('next') 
-                      : AppLocalizations.of(context).translate('skip')),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: isAnswerChecked ? goToNextQuestion : skipQuestion,
+                        borderRadius: BorderRadius.circular(30),
+                        child: Center(
+                          child: Consumer<LanguageProvider>(
+                            builder: (context, languageProvider, _) {
+                              return Text(
+                                isAnswerChecked 
+                                  ? _translate('next', languageProvider)
+                                  : _translate('skip', languageProvider),
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 SizedBox(width: 16),
                 Expanded(
-                  child: ElevatedButton(
-                    onPressed: selectedAnswers.isEmpty || isAnswerChecked 
-                        ? null 
-                        : checkAnswer,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Container(
+                    height: 56,
+                    decoration: BoxDecoration(
+                      gradient: selectedAnswers.isEmpty || isAnswerChecked
+                          ? LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [Colors.grey.shade300, Colors.grey.shade200],
+                            )
+                          : _getGradientForButton(1), // Check button
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.2),
+                          spreadRadius: 0,
+                          blurRadius: 6,
+                          offset: Offset(0.0, 3.0),
+                        ),
+                      ],
                     ),
-                    child: Text(AppLocalizations.of(context).translate('check')),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: selectedAnswers.isEmpty || isAnswerChecked 
+                            ? null 
+                            : checkAnswer,
+                        borderRadius: BorderRadius.circular(30),
+                        child: Center(
+                          child: Consumer<LanguageProvider>(
+                            builder: (context, languageProvider, _) {
+                              return Text(
+                                _translate('check', languageProvider),
+                                style: TextStyle(
+                                  color: selectedAnswers.isEmpty || isAnswerChecked ? Colors.grey.shade600 : Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
           ),
           
-          // End topic button
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: Text(
-              AppLocalizations.of(context).translate('finish_topic'),
-              style: TextStyle(
-                color: Colors.grey,
+          // Enhanced End Topic button with REACTIVE TRANSLATION
+          Container(
+            width: double.infinity,
+            margin: EdgeInsets.symmetric(horizontal: 16),
+            height: 48,
+            decoration: BoxDecoration(
+              gradient: _getGradientForButton(2),
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  spreadRadius: 0,
+                  blurRadius: 4,
+                  offset: Offset(0.0, 2.0),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  Navigator.pop(context);
+                },
+                borderRadius: BorderRadius.circular(30),
+                child: Center(
+                  child: Consumer<LanguageProvider>(
+                    builder: (context, languageProvider, _) {
+                      return Text(
+                        _translate('finish_topic', languageProvider),
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ),
             ),
           ),
