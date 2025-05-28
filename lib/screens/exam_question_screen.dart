@@ -250,18 +250,8 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
                     isCorrectOption = option == currentQuestion.correctAnswer.toString();
                   }
                   
-                  Color backgroundColor = Colors.white;
-                  if (showResult) {
-                    if (isSelected && isCorrectOption) {
-                      backgroundColor = Colors.green;
-                    } else if (isSelected && !isCorrectOption) {
-                      backgroundColor = Colors.red;
-                    } else if (isCorrectOption) {
-                      backgroundColor = Colors.green;
-                    }
-                  } else if (isSelected) {
-                    backgroundColor = Colors.blue.shade100;
-                  }
+  // Get gradient based on card state instead of solid color
+  LinearGradient cardGradient = _getGradientForAnswerCard(isSelected, showResult, isCorrectOption, index);
                   
                   // Use circular indicators
                   Widget selectionIndicator = Container(
@@ -295,8 +285,16 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
                       margin: EdgeInsets.only(bottom: 12),
                       padding: EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: backgroundColor,
-                        borderRadius: BorderRadius.circular(8),
+                        gradient: cardGradient,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.2),
+                            spreadRadius: 0,
+                            blurRadius: 6,
+                            offset: Offset(0, 3),
+                          ),
+                        ],
                       ),
                       child: Row(
                         children: [
@@ -306,8 +304,9 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
                               option,
                               style: TextStyle(
                                 color: showResult && (isSelected || isCorrectOption)
-                                    ? Colors.white
+                                    ? (isSelected && !isCorrectOption) ? Colors.red.shade900 : Colors.green.shade900
                                     : Colors.black,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                               ),
                             ),
                           ),
@@ -413,6 +412,52 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  // Helper method to determine gradient colors based on answer card state
+  LinearGradient _getGradientForAnswerCard(bool isSelected, bool showResult, bool isCorrectOption, [int index = 0]) {
+    // Start with white as base color
+    Color startColor = Colors.white;
+    Color endColor;
+    
+    if (showResult) {
+      if (isSelected && isCorrectOption) {
+        endColor = Colors.green.shade50.withOpacity(0.6);
+      } else if (isSelected && !isCorrectOption) {
+        endColor = Colors.red.shade50.withOpacity(0.6);
+      } else if (isCorrectOption) {
+        endColor = Colors.green.shade50.withOpacity(0.6);
+      } else {
+        endColor = Colors.grey.shade50.withOpacity(0.2);
+      }
+    } else if (isSelected) {
+      endColor = Colors.blue.shade50.withOpacity(0.4); // Similar to "Take Exam" card
+    } else {
+      // Cycle through pastel colors for unselected cards
+      switch (index % 4) {
+        case 0:
+          endColor = Colors.blue.shade50.withOpacity(0.4); // Take Exam color
+          break;
+        case 1:
+          endColor = Colors.green.shade50.withOpacity(0.4); // Learn by Topics color
+          break;
+        case 2:
+          endColor = Colors.orange.shade50.withOpacity(0.4); // Practice Tickets color
+          break;
+        case 3:
+          endColor = Colors.purple.shade50.withOpacity(0.4); // Saved color
+          break;
+        default:
+          endColor = Colors.grey.shade50.withOpacity(0.2);
+      }
+    }
+    
+    return LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [startColor, endColor],
+      stops: [0.0, 1.0],
     );
   }
 
