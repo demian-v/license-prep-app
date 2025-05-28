@@ -849,104 +849,183 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
             questions.length,
           ),
           
-          // Enhanced answer options
+          // Enhanced answer options and explanation in single scrollable area
           Expanded(
-            child: ListView.builder(
+            child: SingleChildScrollView(
               padding: EdgeInsets.all(16),
-              itemCount: question.options.length,
-              itemBuilder: (context, index) {
-                final option = question.options[index];
-                bool isSelected = selectedAnswers.contains(option);
-                bool showResult = isAnswerChecked;
-                bool isCorrectOption = false;
-                
-                // Check if this option is a correct answer
-                if (question.correctAnswer is List<String>) {
-                  isCorrectOption = (question.correctAnswer as List<String>).contains(option);
-                } else {
-                  isCorrectOption = option == question.correctAnswer.toString();
-                }
-                
-                // Get gradient for answer card
-                LinearGradient cardGradient = _getGradientForAnswerCard(isSelected, showResult, isCorrectOption, index);
-                
-                // Use circular indicators
-                Widget selectionIndicator = Container(
-                  width: 24,
-                  height: 24,
-                  margin: EdgeInsets.only(right: 12),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.grey),
-                  ),
-                  child: isSelected
-                      ? Container(
-                          margin: EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.blue,
-                          ),
-                        )
-                      : null,
-                );
-                
-                return GestureDetector(
-                  onTap: isAnswerChecked 
-                      ? null 
-                      : () {
-                          setState(() {
-                            if (question.type == QuestionType.multipleChoice) {
-                              // Toggle selection for multiple choice
-                              if (isSelected) {
-                                selectedAnswers.remove(option);
-                              } else {
-                                selectedAnswers.add(option);
-                              }
-                            } else {
-                              // Single selection for other types
-                              selectedAnswers = {option};
-                            }
-                          });
-                        },
-                  child: Container(
-                    margin: EdgeInsets.only(bottom: 12),
-                    padding: EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: cardGradient,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.2),
-                          spreadRadius: 0,
-                          blurRadius: 6,
-                          offset: Offset(0, 3),
+              child: Column(
+                children: [
+                  // Answer options
+                  ...question.options.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final option = entry.value;
+                    bool isSelected = selectedAnswers.contains(option);
+                    bool showResult = isAnswerChecked;
+                    bool isCorrectOption = false;
+                    
+                    // Check if this option is a correct answer
+                    if (question.correctAnswer is List<String>) {
+                      isCorrectOption = (question.correctAnswer as List<String>).contains(option);
+                    } else {
+                      isCorrectOption = option == question.correctAnswer.toString();
+                    }
+                    
+                    // Get gradient for answer card
+                    LinearGradient cardGradient = _getGradientForAnswerCard(isSelected, showResult, isCorrectOption, index);
+                    
+                    // Use circular indicators
+                    Widget selectionIndicator = Container(
+                      width: 24,
+                      height: 24,
+                      margin: EdgeInsets.only(right: 12),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.grey),
+                      ),
+                      child: isSelected
+                          ? Container(
+                              margin: EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.blue,
+                              ),
+                            )
+                          : null,
+                    );
+                    
+                    return GestureDetector(
+                      onTap: isAnswerChecked 
+                          ? null 
+                          : () {
+                              setState(() {
+                                if (question.type == QuestionType.multipleChoice) {
+                                  // Toggle selection for multiple choice
+                                  if (isSelected) {
+                                    selectedAnswers.remove(option);
+                                  } else {
+                                    selectedAnswers.add(option);
+                                  }
+                                } else {
+                                  // Single selection for other types
+                                  selectedAnswers = {option};
+                                }
+                              });
+                            },
+                      child: Container(
+                        margin: EdgeInsets.only(bottom: 12),
+                        padding: EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: cardGradient,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.2),
+                              spreadRadius: 0,
+                              blurRadius: 6,
+                              offset: Offset(0, 3),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        selectionIndicator,
-                        Expanded(
-                          child: Text(
-                            option,
+                        child: Row(
+                          children: [
+                            selectionIndicator,
+                            Expanded(
+                              child: Text(
+                                option,
+                                style: TextStyle(
+                                  color: showResult && (isSelected || isCorrectOption)
+                                      ? (isSelected && !isCorrectOption) ? Colors.red.shade900 : Colors.green.shade900
+                                      : Colors.black,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                  
+                  // Enhanced explanation panel with improved spacing
+                  if (isAnswerChecked && question.explanation != null) ...[
+                    SizedBox(height: 20), // Space between answers and explanation
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Colors.white, Colors.indigo.shade50.withOpacity(0.3)],
+                          stops: [0.0, 1.0],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.2),
+                            spreadRadius: 0,
+                            blurRadius: 6,
+                            offset: Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.lightbulb_outline,
+                                size: 20,
+                                color: Colors.indigo.shade700,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                "Пояснення",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.indigo.shade700,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (question.ruleReference != null) ...[
+                            SizedBox(height: 12),
+                            Container(
+                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.indigo.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                question.ruleReference!,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.indigo.shade800,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                          SizedBox(height: 12),
+                          Text(
+                            question.explanation!,
                             style: TextStyle(
-                              color: showResult && (isSelected || isCorrectOption)
-                                  ? (isSelected && !isCorrectOption) ? Colors.red.shade900 : Colors.green.shade900
-                                  : Colors.black,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              fontSize: 14,
+                              height: 1.4,
+                              color: Colors.black87,
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              },
+                    SizedBox(height: 20), // Extra space at the bottom for better scrolling
+                  ],
+                ],
+              ),
             ),
           ),
-          
-          // Enhanced explanation panel
-          _buildEnhancedExplanationPanel(question),
           
           // Enhanced action buttons with REACTIVE TRANSLATION
           Padding(
