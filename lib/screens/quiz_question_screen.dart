@@ -1036,46 +1036,6 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
                   child: Container(
                     height: 56,
                     decoration: BoxDecoration(
-                      gradient: _getGradientForButton(0), // Skip/Next button
-                      borderRadius: BorderRadius.circular(30),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.2),
-                          spreadRadius: 0,
-                          blurRadius: 6,
-                          offset: Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: isAnswerChecked ? goToNextQuestion : skipQuestion,
-                        borderRadius: BorderRadius.circular(30),
-                        child: Center(
-                          child: Consumer<LanguageProvider>(
-                            builder: (context, languageProvider, _) {
-                              return Text(
-                                isAnswerChecked 
-                                  ? _translate('next', languageProvider)
-                                  : _translate('skip', languageProvider),
-                                style: TextStyle(
-                                  color: Colors.black,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: Container(
-                    height: 56,
-                    decoration: BoxDecoration(
                       gradient: selectedAnswers.isEmpty || isAnswerChecked
                           ? LinearGradient(
                               begin: Alignment.topLeft,
@@ -1107,6 +1067,46 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
                                 _translate('check', languageProvider),
                                 style: TextStyle(
                                   color: selectedAnswers.isEmpty || isAnswerChecked ? Colors.grey.shade600 : Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 16),
+                Expanded(
+                  child: Container(
+                    height: 56,
+                    decoration: BoxDecoration(
+                      gradient: _getGradientForButton(0), // Skip/Next button
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.2),
+                          spreadRadius: 0,
+                          blurRadius: 6,
+                          offset: Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: isAnswerChecked ? goToNextQuestion : skipQuestion,
+                        borderRadius: BorderRadius.circular(30),
+                        child: Center(
+                          child: Consumer<LanguageProvider>(
+                            builder: (context, languageProvider, _) {
+                              return Text(
+                                isAnswerChecked 
+                                  ? _translate('next', languageProvider)
+                                  : _translate('skip', languageProvider),
+                                style: TextStyle(
+                                  color: Colors.black,
                                   fontWeight: FontWeight.bold,
                                 ),
                               );
