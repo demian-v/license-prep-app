@@ -11,7 +11,7 @@ class PersonalInfoScreen extends StatefulWidget {
   _PersonalInfoScreenState createState() => _PersonalInfoScreenState();
 }
 
-class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
+class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _emailController;
@@ -21,6 +21,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   String? _initialName;
   String? _initialEmail;
   String? _passwordError; // Added variable to track password error
+  late AnimationController _titleAnimationController;
+  late Animation<double> _titlePulseAnimation;
 
   // Helper method to get correct translations
   String _translate(String key, LanguageProvider languageProvider) {
@@ -37,6 +39,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             'email': 'Correo electrónico',
             'password': 'Contraseña',
             'password_required': 'La contraseña es obligatoria',
+            'wrong_password': 'Contraseña incorrecta. Verifique su contraseña e inténtelo de nuevo.',
             'password_needed_for_email': 'Se requiere su contraseña para cambiar su dirección de correo electrónico',
             'delete_account': 'Eliminar cuenta',
             'delete_account_desc': 'La eliminación será permanente, sin posibilidad de recuperar la cuenta',
@@ -59,6 +62,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             'email': 'E-mail',
             'password': 'Пароль',
             'password_required': 'Пароль обов\'язковий',
+            'wrong_password': 'Невірний пароль. Перевірте пароль та спробуйте ще раз.',
             'password_needed_for_email': 'Для зміни електронної адреси потрібен ваш пароль',
             'delete_account': 'Видалити аккаунт',
             'delete_account_desc': 'Видалення буде остаточним, без можливості відновити аккаунт',
@@ -81,6 +85,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             'email': 'Электронная почта',
             'password': 'Пароль',
             'password_required': 'Пароль обязателен',
+            'wrong_password': 'Неверный пароль. Проверьте пароль и попробуйте еще раз.',
             'password_needed_for_email': 'Для изменения адреса электронной почты требуется ваш пароль',
             'delete_account': 'Удалить аккаунт',
             'delete_account_desc': 'Удаление будет окончательным, без возможности восстановить аккаунт',
@@ -103,6 +108,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             'email': 'E-mail',
             'password': 'Hasło',
             'password_required': 'Hasło jest wymagane',
+            'wrong_password': 'Nieprawidłowe hasło. Sprawdź hasło i spróbuj ponownie.',
             'password_needed_for_email': 'Twoje hasło jest wymagane do zmiany adresu e-mail',
             'delete_account': 'Usuń konto',
             'delete_account_desc': 'Usunięcie będzie trwałe, bez możliwości odzyskania konta',
@@ -126,6 +132,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             'email': 'Email',
             'password': 'Password',
             'password_required': 'Password is required',
+            'wrong_password': 'Incorrect password. Please check your password and try again.',
             'password_needed_for_email': 'Your password is required to change your email address',
             'delete_account': 'Delete account',
             'delete_account_desc': 'Deletion will be permanent, without the possibility to restore the account',
@@ -161,6 +168,24 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   @override
   void initState() {
     super.initState();
+    
+    // Initialize animation controller
+    _titleAnimationController = AnimationController(
+      duration: Duration(seconds: 3),
+      vsync: this,
+    );
+    
+    _titlePulseAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.03,
+    ).animate(CurvedAnimation(
+      parent: _titleAnimationController,
+      curve: Curves.easeInOut,
+    ));
+    
+    // Start the animation
+    _titleAnimationController.repeat(reverse: true);
+    
     // Initialize with current user data
     final user = Provider.of<AuthProvider>(context, listen: false).user;
     _initialName = user?.name ?? '';
@@ -232,6 +257,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
 
   @override
   void dispose() {
+    _titleAnimationController.dispose();
     _nameController.removeListener(() { setState(() {}); });
     _emailController.removeListener(() { setState(() {}); });
     _nameController.dispose();
@@ -303,12 +329,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 errorMessage.contains('auth/invalid-credential') ||
                 errorMessage.contains('Reauthentication failed')) {
               
-              // Use a more specific error message for incorrect password
-              String errorText = 'Невірний пароль. Перевірте пароль та спробуйте ще раз.';
-              if (languageProvider.language != 'uk') {
-                // Get translation if available, or use a generic authentication error message
-                errorText = _translate('password_required', languageProvider);
-              }
+              // Use the correct translation for wrong password
+              String errorText = _translate('wrong_password', languageProvider);
               
               setState(() {
                 _passwordError = errorText;
@@ -441,6 +463,219 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
            _emailController.text != _initialEmail;
   }
 
+  // Helper methods for gradients and shadows
+  LinearGradient _getSectionCardGradient(int sectionIndex) {
+    Color startColor = Colors.white;
+    Color endColor;
+    
+    switch (sectionIndex % 4) {
+      case 0:
+        endColor = Colors.blue.shade50.withOpacity(0.4);
+        break;
+      case 1:
+        endColor = Colors.green.shade50.withOpacity(0.4);
+        break;
+      case 2:
+        endColor = Colors.orange.shade50.withOpacity(0.4);
+        break;
+      case 3:
+        endColor = Colors.purple.shade50.withOpacity(0.4);
+        break;
+      default:
+        endColor = Colors.blue.shade50.withOpacity(0.4);
+    }
+    
+    return LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [startColor, endColor],
+      stops: [0.0, 1.0],
+    );
+  }
+
+  LinearGradient _getFormFieldGradient(int fieldIndex) {
+    Color startColor = Colors.white;
+    Color endColor;
+    
+    switch (fieldIndex % 3) {
+      case 0:
+        endColor = Colors.green.shade50.withOpacity(0.3);
+        break;
+      case 1:
+        endColor = Colors.blue.shade50.withOpacity(0.3);
+        break;
+      case 2:
+        endColor = Colors.purple.shade50.withOpacity(0.3);
+        break;
+      default:
+        endColor = Colors.blue.shade50.withOpacity(0.3);
+    }
+    
+    return LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [startColor, endColor],
+      stops: [0.0, 1.0],
+    );
+  }
+
+  LinearGradient _getButtonGradient(String buttonType) {
+    Color startColor = Colors.white;
+    Color endColor;
+    
+    switch (buttonType) {
+      case 'save':
+        endColor = Colors.blue.shade50.withOpacity(0.4);
+        break;
+      case 'delete':
+        endColor = Colors.red.shade50.withOpacity(0.4);
+        break;
+      default:
+        endColor = Colors.grey.shade50.withOpacity(0.4);
+    }
+    
+    return LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [startColor, endColor],
+      stops: [0.0, 1.0],
+    );
+  }
+
+  List<BoxShadow> _getStandardShadow() {
+    return [
+      BoxShadow(
+        color: Colors.grey.withOpacity(0.2),
+        spreadRadius: 0,
+        blurRadius: 6,
+        offset: Offset(0, 3),
+      ),
+    ];
+  }
+
+  Widget _buildEnhancedTitle(String title, LanguageProvider languageProvider) {
+    return AnimatedBuilder(
+      animation: _titlePulseAnimation,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _titlePulseAnimation.value,
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Colors.white, Colors.blue.shade50.withOpacity(0.6)],
+                stops: [0.0, 1.0],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: _getStandardShadow(),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.person_outline,
+                  size: 16,
+                  color: Colors.black,
+                ),
+                SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEnhancedSectionCard({
+    required String title,
+    required List<Widget> children,
+    required int sectionIndex,
+  }) {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: _getSectionCardGradient(sectionIndex),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: _getStandardShadow(),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+          SizedBox(height: 16),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEnhancedButton({
+    required String text,
+    required VoidCallback? onPressed,
+    required String buttonType,
+    bool isFullWidth = true,
+    double height = 48,
+  }) {
+    return Container(
+      width: isFullWidth ? double.infinity : null,
+      height: height,
+      decoration: BoxDecoration(
+        gradient: onPressed != null 
+          ? _getButtonGradient(buttonType)
+          : LinearGradient(
+              colors: [Colors.grey.shade300, Colors.grey.shade200],
+            ),
+        borderRadius: BorderRadius.circular(height / 2),
+        boxShadow: onPressed != null ? _getStandardShadow() : [],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(height / 2),
+          child: Center(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: onPressed != null ? Colors.black : Colors.grey.shade600,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<LanguageProvider>(
@@ -454,12 +689,12 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            title: Text(
+            title: _buildEnhancedTitle(
               _translate('personal_info', languageProvider),
-              style: TextStyle(fontWeight: FontWeight.bold),
+              languageProvider,
             ),
             elevation: 0,
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            backgroundColor: Colors.white,
             foregroundColor: Colors.black,
             centerTitle: true,
             leading: IconButton(
@@ -490,152 +725,177 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                   children: [
                     Expanded(
                       child: SingleChildScrollView(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Form(
-                            key: _formKey,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _translate('change_personal_data', languageProvider),
-                                  style: titleStyle,
-                                ),
-                                SizedBox(height: 24),
-                                
-                                // Name field
-                                _buildFormField(
-                                  context,
-                                  _translate('name', languageProvider),
-                                  Icons.person_outline,
-                                  Colors.green,
-                                  _nameController,
-                                  (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return _translate('name_required', languageProvider);
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                SizedBox(height: 16),
-                                
-                                // Email field
-                                _buildFormField(
-                                  context,
-                                  _translate('email', languageProvider),
-                                  Icons.email_outlined,
-                                  Colors.blue,
-                                  _emailController,
-                                  (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return _translate('email_required', languageProvider);
-                                    }
-                                    if (!_isValidEmail(value)) {
-                                      return _translate('invalid_email', languageProvider);
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                
-                                    // Password field (only shown when changing email)
-                                if (_showPasswordField)
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      SizedBox(height: 16),
-                                      // Password description is now above the password field
-                                      Padding(
-                                        padding: const EdgeInsets.only(left: 16.0, bottom: 8.0, right: 16.0),
-                                        child: Text(
-                                          _translate('password_needed_for_email', languageProvider),
-                                          style: TextStyle(
-                                            color: Colors.grey[600],
-                                            fontSize: 12,
-                                          ),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            children: [
+                              SizedBox(height: 8),
+                              // Personal Data Section
+                              _buildEnhancedSectionCard(
+                                title: _translate('change_personal_data', languageProvider),
+                                sectionIndex: 0,
+                                children: [
+                                  // Name field
+                                  _buildFormField(
+                                    context,
+                                    _translate('name', languageProvider),
+                                    Icons.person_outline,
+                                    Colors.green,
+                                    _nameController,
+                                    (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return _translate('name_required', languageProvider);
+                                      }
+                                      return null;
+                                    },
+                                    fieldIndex: 0,
+                                  ),
+                                  SizedBox(height: 16),
+                                  
+                                  // Email field
+                                  _buildFormField(
+                                    context,
+                                    _translate('email', languageProvider),
+                                    Icons.email_outlined,
+                                    Colors.blue,
+                                    _emailController,
+                                    (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return _translate('email_required', languageProvider);
+                                      }
+                                      if (!_isValidEmail(value)) {
+                                        return _translate('invalid_email', languageProvider);
+                                      }
+                                      return null;
+                                    },
+                                    fieldIndex: 1,
+                                  ),
+                                  
+                                  // Password field (conditional)
+                                  if (_showPasswordField) ...[
+                                    SizedBox(height: 16),
+                                    Container(
+                                      padding: EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                          colors: [Colors.white, Colors.purple.shade50.withOpacity(0.2)],
+                                        ),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: Colors.purple.withOpacity(0.2),
+                                          width: 1,
                                         ),
                                       ),
-                                      // Password field
-                                      _buildFormField(
-                                        context,
-                                        _translate('password', languageProvider),
-                                        Icons.lock_outline,
-                                        Colors.purple,
-                                        _passwordController,
-                                        (value) {
-                                          if (value == null || value.isEmpty) {
-                                            return _translate('password_required', languageProvider);
-                                          }
-                                          return null;
-                                        },
-                                        isPassword: true,
-                                        errorText: _passwordError,
-                                      ),
-                                    ],
-                                  ),
-                                
-                                SizedBox(height: 32),
-                                
-                                // Delete account section title
-                                Text(
-                                  _translate('delete_account_section', languageProvider),
-                                  style: titleStyle,
-                                ),
-                                SizedBox(height: 16),
-                                
-                                // Delete account button
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      _translate('delete_account_desc', languageProvider),
-                                      style: TextStyle(
-                                        color: Colors.grey[600],
-                                        fontSize: 12,
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.info_outline,
+                                            size: 16,
+                                            color: Colors.purple.shade700,
+                                          ),
+                                          SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              _translate('password_needed_for_email', languageProvider),
+                                              style: TextStyle(
+                                                color: Colors.purple.shade700,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    SizedBox(height: 8),
-                                    ElevatedButton(
-                                      onPressed: () => _showDeleteConfirmation(context, languageProvider),
-                                      child: Text(_translate('delete_account', languageProvider)),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.red,
-                                        foregroundColor: Colors.white,
-                                        minimumSize: Size(double.infinity, 48),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                      ),
+                                    SizedBox(height: 12),
+                                    _buildFormField(
+                                      context,
+                                      _translate('password', languageProvider),
+                                      Icons.lock_outline,
+                                      Colors.purple,
+                                      _passwordController,
+                                      (value) {
+                                        if (value == null || value.isEmpty) {
+                                          return _translate('password_required', languageProvider);
+                                        }
+                                        return null;
+                                      },
+                                      isPassword: true,
+                                      errorText: _passwordError,
+                                      fieldIndex: 2,
                                     ),
                                   ],
-                                ),
-                              ],
-                            ),
+                                ],
+                              ),
+                              
+                              SizedBox(height: 16),
+                              
+                              // Delete Account Section
+                              _buildEnhancedSectionCard(
+                                title: _translate('delete_account_section', languageProvider),
+                                sectionIndex: 1,
+                                children: [
+                                  Container(
+                                    padding: EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [Colors.white, Colors.red.shade50.withOpacity(0.2)],
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: Colors.red.withOpacity(0.2),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.warning_outlined,
+                                          size: 16,
+                                          color: Colors.red.shade700,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            _translate('delete_account_desc', languageProvider),
+                                            style: TextStyle(
+                                              color: Colors.red.shade700,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  SizedBox(height: 16),
+                                  _buildEnhancedButton(
+                                    text: _translate('delete_account', languageProvider),
+                                    onPressed: () => _showDeleteConfirmation(context, languageProvider),
+                                    buttonType: 'delete',
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
                       ),
                     ),
+                    
+                    // Bottom Save Button
                     Padding(
                       padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        children: [
-                          ElevatedButton(
-                            onPressed: _isFormModified() 
-                              ? () => _saveChanges(context, languageProvider)
-                              : null,
-                            child: Text(_translate('save', languageProvider)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue,
-                              foregroundColor: Colors.white,
-                              minimumSize: Size(double.infinity, 48),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              // Add disabled color
-                              disabledBackgroundColor: Colors.blue.withOpacity(0.3),
-                              disabledForegroundColor: Colors.white,
-                            ),
-                          ),
-                        ],
+                      child: _buildEnhancedButton(
+                        text: _translate('save', languageProvider),
+                        onPressed: _isFormModified() 
+                          ? () => _saveChanges(context, languageProvider)
+                          : null,
+                        buttonType: 'save',
+                        height: 56,
                       ),
                     ),
                   ],
@@ -653,23 +913,16 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     Color iconColor,
     TextEditingController controller,
     String? Function(String?) validator,
-    {bool isPassword = false, String? errorText}
+    {bool isPassword = false, String? errorText, int fieldIndex = 0}
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            gradient: _getFormFieldGradient(fieldIndex),
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.1),
-                spreadRadius: 1,
-                blurRadius: 2,
-                offset: Offset(0, 1),
-              ),
-            ],
+            boxShadow: _getStandardShadow(),
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -679,8 +932,20 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: iconColor.withOpacity(0.1),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [iconColor.withOpacity(0.1), iconColor.withOpacity(0.2)],
+                    ),
                     shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: iconColor.withOpacity(0.1),
+                        spreadRadius: 0,
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Icon(
                     icon,
@@ -695,25 +960,63 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                     decoration: InputDecoration(
                       labelText: label,
                       border: InputBorder.none,
+                      labelStyle: TextStyle(
+                        color: Colors.black.withOpacity(0.7),
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     obscureText: isPassword,
                     validator: validator,
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
         ),
-        // Error text display
+        // Enhanced error text display
         if (errorText != null)
-          Padding(
-            padding: const EdgeInsets.only(left: 16.0, top: 8.0, right: 16.0),
-            child: Text(
-              errorText,
-              style: TextStyle(
-                color: Colors.red,
-                fontSize: 12,
+          Container(
+            margin: EdgeInsets.only(left: 16.0, top: 8.0, right: 16.0),
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Colors.white, Colors.red.shade50.withOpacity(0.3)],
               ),
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.red.withOpacity(0.1),
+                  spreadRadius: 0,
+                  blurRadius: 4,
+                  offset: Offset(0, 1),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 16,
+                  color: Colors.red.shade700,
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    errorText,
+                    style: TextStyle(
+                      color: Colors.red.shade700,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
       ],
