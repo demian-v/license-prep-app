@@ -122,7 +122,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
     return LinearGradient(
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
-      colors: [Colors.white, Colors.purple.shade50.withOpacity(0.3)],
+      colors: [Colors.white, Colors.blue.shade50.withOpacity(0.3)],
       stops: [0.0, 1.0],
     );
   }
@@ -132,7 +132,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
     return LinearGradient(
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
-      colors: [Colors.purple.shade50, Colors.blue.shade50.withOpacity(0.5)],
+      colors: [Colors.white, Colors.green.shade50.withOpacity(0.4)],
       stops: [0.0, 1.0],
     );
   }
@@ -143,14 +143,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
       return LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [Colors.green.shade400, Colors.green.shade600],
+        colors: [Colors.white, Colors.green.shade50.withOpacity(0.4)],
         stops: [0.0, 1.0],
       );
     } else {
       return LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [Colors.purple.shade400, Colors.blue.shade500],
+        colors: [Colors.white, Colors.orange.shade50.withOpacity(0.4)],
         stops: [0.0, 1.0],
       );
     }
@@ -177,11 +177,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
             colors: [
               Colors.white,
-              Colors.grey.shade50.withOpacity(0.3),
+              Colors.grey.shade50.withOpacity(0.2),
             ],
           ),
         ),
@@ -236,7 +236,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
-                        color: Colors.purple.shade700,
+                        color: Colors.black,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -306,7 +306,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.purple.withOpacity(0.1),
+            color: Colors.grey.withOpacity(0.2),
             spreadRadius: 0,
             blurRadius: 4,
             offset: Offset(0, 2),
@@ -323,7 +323,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
                 style: TextStyle(
                   fontSize: 36,
                   fontWeight: FontWeight.bold,
-                  color: Colors.purple.shade700,
+                  color: Colors.black,
                 ),
               ),
               Text(
@@ -390,13 +390,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
             height: 24,
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [Colors.green.shade400, Colors.green.shade600],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Colors.white, Colors.green.shade50.withOpacity(0.6)],
               ),
               shape: BoxShape.circle,
+              border: Border.all(color: Colors.green.shade200, width: 1),
             ),
             child: Icon(
               Icons.check,
-              color: Colors.white,
+              color: Colors.green.shade700,
               size: 16,
             ),
           ),
@@ -420,7 +423,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
       padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.red.shade50, Colors.red.shade100.withOpacity(0.5)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.white, Colors.red.shade50.withOpacity(0.6)],
         ),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.red.shade200),
@@ -462,12 +467,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.green.shade100, Colors.green.shade50],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.white, Colors.green.shade50.withOpacity(0.6)],
         ),
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.green.withOpacity(0.2),
+            color: Colors.grey.withOpacity(0.2),
             spreadRadius: 0,
             blurRadius: 6,
             offset: Offset(0, 3),
@@ -481,18 +488,21 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
             height: 40,
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [Colors.green.shade400, Colors.green.shade600],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Colors.white, Colors.green.shade100],
               ),
               shape: BoxShape.circle,
+              border: Border.all(color: Colors.green.shade300, width: 2),
             ),
-            child: Icon(Icons.check_circle, color: Colors.white, size: 24),
+            child: Icon(Icons.check_circle, color: Colors.green.shade700, size: 24),
           ),
           SizedBox(width: 12),
           Expanded(
             child: Text(
               'You\'re subscribed! Enjoy full access to all content.',
               style: TextStyle(
-                color: Colors.green.shade800,
+                color: Colors.black,
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
               ),
@@ -556,10 +566,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: Colors.purple.withOpacity(0.3),
+                color: Colors.grey.withOpacity(0.2),
                 spreadRadius: 0,
-                blurRadius: 8,
-                offset: Offset(0, 4),
+                blurRadius: 6,
+                offset: Offset(0, 3),
               ),
             ],
           ),
@@ -587,7 +597,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            color: Colors.black,
                           ),
                         ),
                 ),
