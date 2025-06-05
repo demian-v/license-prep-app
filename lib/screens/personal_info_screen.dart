@@ -749,6 +749,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
                                       return null;
                                     },
                                     fieldIndex: 0,
+                                    showEditIcon: true,
                                   ),
                                   SizedBox(height: 16),
                                   
@@ -769,6 +770,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
                                       return null;
                                     },
                                     fieldIndex: 1,
+                                    showEditIcon: true,
                                   ),
                                   
                                   // Password field (conditional)
@@ -913,7 +915,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
     Color iconColor,
     TextEditingController controller,
     String? Function(String?) validator,
-    {bool isPassword = false, String? errorText, int fieldIndex = 0}
+    {bool isPassword = false, String? errorText, int fieldIndex = 0, bool showEditIcon = false}
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -973,6 +975,12 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
                     ),
                   ),
                 ),
+                if (showEditIcon)
+                  Icon(
+                    Icons.edit_outlined,
+                    size: 16,
+                    color: Colors.grey.shade600,
+                  ),
               ],
             ),
           ),
