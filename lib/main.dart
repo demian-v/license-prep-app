@@ -212,19 +212,25 @@ void main() async {
   final subscriptionProvider = SubscriptionProvider(subscription);
   final progressProvider = ProgressProvider(progress);
   
-  // Create language provider with option to force English if needed
-  // Set forceEnglish to true to reset language to English regardless of saved preferences
-  final languageProvider = LanguageProvider(forceEnglish: true);  // Force reset to English by default
+  // Create language provider - only force English for non-registered users
+  // For registered users, load their saved language preference
+  final languageProvider = LanguageProvider(forceEnglish: user == null);
   // Wait for language to load properly from SharedPreferences
   await languageProvider.waitForLoad();
   print('Language provider loaded with language: ${languageProvider.language}');
   
-  // Make sure English is the default. If something was wrong with preferences,
-  // explicitly set language to English.
-  if (languageProvider.language != 'en') {
-    print('Detected non-English default language: ${languageProvider.language}, resetting to English');
-    await languageProvider.resetToEnglish();
+  // For logged-in users, apply their saved language preference
+  if (user != null && user.language != null && user.language!.isNotEmpty) {
+    await languageProvider.setLanguage(user.language!);
+    print('Applied user language preference: ${user.language}');
+  } else if (user == null) {
+    print('No user logged in, using English default');
+  } else {
+    print('User logged in but no language preference set, using English default');
   }
+  
+  // Connect AuthProvider and LanguageProvider for synchronization
+  authProvider.setLanguageProvider(languageProvider);
   
   final stateProvider = StateProvider();
   

@@ -7,13 +7,20 @@ import '../services/service_locator.dart';
 import '../services/email_sync_service.dart';
 import '../data/state_data.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'language_provider.dart';
 
 class AuthProvider extends ChangeNotifier {
   User? user;
   final firebase_auth.FirebaseAuth _firebaseAuth = firebase_auth.FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  LanguageProvider? _languageProvider;
 
   AuthProvider(this.user);
+
+  // Set the language provider for synchronization
+  void setLanguageProvider(LanguageProvider languageProvider) {
+    _languageProvider = languageProvider;
+  }
 
   Future<bool> login(String email, String password) async {
     try {
@@ -98,6 +105,9 @@ class AuthProvider extends ChangeNotifier {
         
         // Sync emails between Auth and Firestore
         await emailSyncService.syncEmailWithFirestore();
+        
+        // Sync user's language preference to LanguageProvider
+        await _syncUserLanguageToProvider();
         
         // Persist to shared preferences
         await prefs.setString('user', jsonEncode(user!.toJson()));
@@ -535,6 +545,9 @@ class AuthProvider extends ChangeNotifier {
       // Sign out using the API
       await serviceLocator.auth.logout();
       
+      // Reset language to English when user logs out
+      await _resetLanguageToEnglish();
+      
       // Clear local user data
       user = null;
       
@@ -547,6 +560,10 @@ class AuthProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('⚠️ AuthProvider: Logout error: $e');
       // Still clear local data even if API logout fails
+      
+      // Reset language to English when user logs out
+      await _resetLanguageToEnglish();
+      
       user = null;
       
       final prefs = await SharedPreferences.getInstance();
@@ -554,6 +571,30 @@ class AuthProvider extends ChangeNotifier {
       
       notifyListeners();
       debugPrint('🚪 AuthProvider: User logged out locally due to API error');
+    }
+  }
+
+  // Private method to sync user's language preference to LanguageProvider
+  Future<void> _syncUserLanguageToProvider() async {
+    if (_languageProvider != null && user != null && user!.language != null && user!.language!.isNotEmpty) {
+      try {
+        await _languageProvider!.setLanguage(user!.language!);
+        debugPrint('🔄 AuthProvider: Synced user language ${user!.language} to LanguageProvider');
+      } catch (e) {
+        debugPrint('⚠️ AuthProvider: Error syncing language to provider: $e');
+      }
+    }
+  }
+
+  // Private method to reset language to English (for logout)
+  Future<void> _resetLanguageToEnglish() async {
+    if (_languageProvider != null) {
+      try {
+        await _languageProvider!.setLanguage('en');
+        debugPrint('🔄 AuthProvider: Reset LanguageProvider to English on logout');
+      } catch (e) {
+        debugPrint('⚠️ AuthProvider: Error resetting language to English: $e');
+      }
     }
   }
   
