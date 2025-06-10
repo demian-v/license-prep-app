@@ -54,5 +54,6 @@
   "check": "Проверить",
   "finish_topic": "Завершить тему",
   "traffic_rules": "Правила дорожного движения",
-  "modules_count": "модулей"
+  "modules_count": "модулей",
+  "back_to_tests": "Назад к Тестам"
 }

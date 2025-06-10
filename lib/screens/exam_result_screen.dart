@@ -13,15 +13,10 @@ class ExamResultScreen extends StatefulWidget {
 class _ExamResultScreenState extends State<ExamResultScreen> with TickerProviderStateMixin {
   late AnimationController _iconAnimationController;
   late AnimationController _cardAnimationController;
-  late AnimationController _buttonsAnimationController;
-  late AnimationController _scaleController;
 
   late Animation<double> _iconScaleAnimation;
   late Animation<double> _cardSlideAnimation;
   late Animation<double> _cardFadeAnimation;
-  late Animation<double> _buttonsSlideAnimation;
-  late Animation<double> _buttonsFadeAnimation;
-  late Animation<double> _buttonScaleAnimation;
 
   @override
   void initState() {
@@ -34,14 +29,6 @@ class _ExamResultScreenState extends State<ExamResultScreen> with TickerProvider
     );
     _cardAnimationController = AnimationController(
       duration: Duration(milliseconds: 400),
-      vsync: this,
-    );
-    _buttonsAnimationController = AnimationController(
-      duration: Duration(milliseconds: 300),
-      vsync: this,
-    );
-    _scaleController = AnimationController(
-      duration: Duration(milliseconds: 100),
       vsync: this,
     );
 
@@ -70,30 +57,6 @@ class _ExamResultScreenState extends State<ExamResultScreen> with TickerProvider
       curve: Curves.easeIn,
     ));
 
-    _buttonsSlideAnimation = Tween<double>(
-      begin: 30.0,
-      end: 0.0,
-    ).animate(CurvedAnimation(
-      parent: _buttonsAnimationController,
-      curve: Curves.easeOut,
-    ));
-
-    _buttonsFadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _buttonsAnimationController,
-      curve: Curves.easeIn,
-    ));
-
-    _buttonScaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.98,
-    ).animate(CurvedAnimation(
-      parent: _scaleController,
-      curve: Curves.easeInOut,
-    ));
-
     // Start animations with delays
     _startAnimations();
   }
@@ -105,18 +68,48 @@ class _ExamResultScreenState extends State<ExamResultScreen> with TickerProvider
     Future.delayed(Duration(milliseconds: 300), () {
       if (mounted) _cardAnimationController.forward();
     });
-    Future.delayed(Duration(milliseconds: 500), () {
-      if (mounted) _buttonsAnimationController.forward();
-    });
   }
 
   @override
   void dispose() {
     _iconAnimationController.dispose();
     _cardAnimationController.dispose();
-    _buttonsAnimationController.dispose();
-    _scaleController.dispose();
     super.dispose();
+  }
+
+  // Helper method to get correct translations
+  String _translate(String key, LanguageProvider languageProvider) {
+    // Create a direct translation based on the selected language
+    try {
+      // Get the appropriate language based on the language provider
+      switch (languageProvider.language) {
+        case 'es':
+          return {
+            'back_to_tests': 'Volver a Pruebas',
+          }[key] ?? key;
+        case 'uk':
+          return {
+            'back_to_tests': 'Назад до Тестів',
+          }[key] ?? key;
+        case 'ru':
+          return {
+            'back_to_tests': 'Назад к Тестам',
+          }[key] ?? key;
+        case 'pl':
+          return {
+            'back_to_tests': 'Powrót do Testów',
+          }[key] ?? key;
+        case 'en':
+        default:
+          return {
+            'back_to_tests': 'Back to Tests',
+          }[key] ?? key;
+      }
+    } catch (e) {
+      print('🚨 [EXAM RESULT] Error getting translation: $e');
+      // Default fallback
+      return key;
+    }
   }
 
   // Helper method to get gradient for result
@@ -159,6 +152,13 @@ class _ExamResultScreenState extends State<ExamResultScreen> with TickerProvider
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [Colors.white, Colors.red.shade50.withOpacity(0.4)],
+          stops: [0.0, 1.0],
+        );
+      case 5: // Back to tests - green
+        return LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.white, Colors.green.shade50.withOpacity(0.4)],
           stops: [0.0, 1.0],
         );
       default:
@@ -221,48 +221,106 @@ class _ExamResultScreenState extends State<ExamResultScreen> with TickerProvider
           },
         ),
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.white,
-              Colors.grey.shade50.withOpacity(0.3),
-            ],
-          ),
-        ),
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(height: 20),
-                
-                // Animated result icon
-                _buildAnimatedResultIcon(isPassed),
-                
-                SizedBox(height: 32),
-                
-                // Enhanced stats card
-                _buildEnhancedStatsCard(
-                  correctAnswers,
-                  incorrectAnswers,
-                  timeText,
-                  isPassed,
+      body: Column(
+        children: [
+          // Main content area
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.white,
+                    Colors.grey.shade50.withOpacity(0.3),
+                  ],
                 ),
-                
-                SizedBox(height: 40),
-                
-                // Enhanced action buttons
-                _buildAnimatedActionButtons(examProvider),
-                
-                SizedBox(height: 20),
-              ],
+              ),
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SizedBox(height: 20),
+                      
+                      // Animated result icon
+                      _buildAnimatedResultIcon(isPassed),
+                      
+                      SizedBox(height: 32),
+                      
+                      // Enhanced stats card
+                      _buildEnhancedStatsCard(
+                        correctAnswers,
+                        incorrectAnswers,
+                        timeText,
+                        isPassed,
+                      ),
+                      
+                      SizedBox(height: 40),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
+          
+          // Bottom button area - same size as Skip button, centered
+          Consumer<LanguageProvider>(
+            builder: (context, languageProvider, _) {
+              return Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(
+                  child: SizedBox(
+                    width: MediaQuery.of(context).size.width * 0.6, // Same width as Skip button
+                    child: Container(
+                      height: 56,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Colors.white, Colors.blue.shade50.withOpacity(0.4)], // Same blue as Skip button
+                        ),
+                        borderRadius: BorderRadius.circular(30),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.2),
+                            spreadRadius: 0,
+                            blurRadius: 6,
+                            offset: Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            // Cancel current exam
+                            examProvider.cancelExam();
+                            
+                            // Navigate back to test screen (home)
+                            Navigator.of(context).popUntil((route) => route.isFirst);
+                          },
+                          borderRadius: BorderRadius.circular(30),
+                          child: Center(
+                            child: Text(
+                              _translate('back_to_tests', languageProvider),
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -415,132 +473,5 @@ class _ExamResultScreenState extends State<ExamResultScreen> with TickerProvider
     );
   }
 
-  Widget _buildAnimatedActionButtons(ExamProvider examProvider) {
-    return AnimatedBuilder(
-      animation: _buttonsAnimationController,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(0, _buttonsSlideAnimation.value),
-          child: Opacity(
-            opacity: _buttonsFadeAnimation.value,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildEnhancedActionButton(
-                  icon: Icons.error_outline,
-                  title: 'Мої помилки',
-                  onTap: () {
-                    // Show mistakes (could navigate to a dedicated screen)
-                  },
-                  cardType: 4, // Red gradient
-                ),
-                
-                SizedBox(height: 8),
-                
-                _buildEnhancedActionButton(
-                  icon: Icons.assignment,
-                  title: 'Наступний білет',
-                  onTap: () {
-                    // Reset and start a new exam
-                    examProvider.cancelExam();
 
-                    // Get language from provider
-                    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
-                    final language = languageProvider.language;
-                    
-                    // Get license type from provider, default to 'driver'
-                    final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
-                    final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
-                    
-                    // Start new exam with required parameters
-                    examProvider.startNewExam(
-                      language: language,
-                      state: 'all', // Default state
-                      licenseType: licenseType,
-                    );
-                    
-                    // Navigate to exam screen
-                    Navigator.of(context).popUntil((route) => route.isFirst);
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => ExamQuestionScreen(),
-                      ),
-                    );
-                  },
-                  cardType: 0, // Blue gradient
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildEnhancedActionButton({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-    required int cardType,
-  }) {
-    return GestureDetector(
-      onTapDown: (_) => _scaleController.forward(),
-      onTapUp: (_) => _scaleController.reverse(),
-      onTapCancel: () => _scaleController.reverse(),
-      child: ScaleTransition(
-        scale: _buttonScaleAnimation,
-        child: Container(
-          margin: EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            gradient: _getActionButtonGradient(cardType),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.2),
-                spreadRadius: 0,
-                blurRadius: 6,
-                offset: Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(12),
-              splashColor: Colors.white.withOpacity(0.3),
-              highlightColor: Colors.white.withOpacity(0.2),
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: (cardType == 0 ? Colors.blue : Colors.red).shade50,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        icon,
-                        color: cardType == 0 ? Colors.blue : Colors.red,
-                      ),
-                    ),
-                    SizedBox(width: 16),
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }

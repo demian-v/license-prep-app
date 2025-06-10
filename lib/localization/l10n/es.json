@@ -54,5 +54,6 @@
   "check": "Comprobar",
   "finish_topic": "Finalizar tema",
   "traffic_rules": "Reglas de tráfico",
-  "modules_count": "módulos"
+  "modules_count": "módulos",
+  "back_to_tests": "Volver a Pruebas"
 }
