@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/quiz_topic.dart';
 import '../providers/progress_provider.dart';
+import '../providers/language_provider.dart';
 
 class QuizResultScreen extends StatefulWidget {
   final QuizTopic topic;
@@ -21,16 +22,11 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
   late AnimationController _headerAnimationController;
   late AnimationController _iconAnimationController;
   late AnimationController _cardAnimationController;
-  late AnimationController _buttonsAnimationController;
-  late AnimationController _scaleController;
 
   late Animation<double> _headerFadeAnimation;
   late Animation<double> _iconScaleAnimation;
   late Animation<double> _cardSlideAnimation;
   late Animation<double> _cardFadeAnimation;
-  late Animation<double> _buttonsSlideAnimation;
-  late Animation<double> _buttonsFadeAnimation;
-  late Animation<double> _buttonScaleAnimation;
 
   @override
   void initState() {
@@ -47,14 +43,6 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
     );
     _cardAnimationController = AnimationController(
       duration: Duration(milliseconds: 400),
-      vsync: this,
-    );
-    _buttonsAnimationController = AnimationController(
-      duration: Duration(milliseconds: 300),
-      vsync: this,
-    );
-    _scaleController = AnimationController(
-      duration: Duration(milliseconds: 100),
       vsync: this,
     );
 
@@ -91,30 +79,6 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
       curve: Curves.easeIn,
     ));
 
-    _buttonsSlideAnimation = Tween<double>(
-      begin: 30.0,
-      end: 0.0,
-    ).animate(CurvedAnimation(
-      parent: _buttonsAnimationController,
-      curve: Curves.easeOut,
-    ));
-
-    _buttonsFadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _buttonsAnimationController,
-      curve: Curves.easeIn,
-    ));
-
-    _buttonScaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.98,
-    ).animate(CurvedAnimation(
-      parent: _scaleController,
-      curve: Curves.easeInOut,
-    ));
-
     // Start animations with delays and update progress
     _startAnimationsAndUpdateProgress();
   }
@@ -140,9 +104,6 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
     Future.delayed(Duration(milliseconds: 400), () {
       if (mounted) _cardAnimationController.forward();
     });
-    Future.delayed(Duration(milliseconds: 600), () {
-      if (mounted) _buttonsAnimationController.forward();
-    });
   }
 
   @override
@@ -150,9 +111,47 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
     _headerAnimationController.dispose();
     _iconAnimationController.dispose();
     _cardAnimationController.dispose();
-    _buttonsAnimationController.dispose();
-    _scaleController.dispose();
     super.dispose();
+  }
+
+  // Helper method to get correct translations
+  String _translate(String key, LanguageProvider languageProvider) {
+    // Create a direct translation based on the selected language
+    try {
+      // Get the appropriate language based on the language provider
+      switch (languageProvider.language) {
+        case 'es':
+          return {
+            'back_to_tests': 'Volver a Pruebas',
+            'back_to_topics': 'Volver a Temas',
+          }[key] ?? key;
+        case 'uk':
+          return {
+            'back_to_tests': 'Назад до Тестів',
+            'back_to_topics': 'Назад до Тем',
+          }[key] ?? key;
+        case 'ru':
+          return {
+            'back_to_tests': 'Назад к Тестам',
+            'back_to_topics': 'Назад к Темам',
+          }[key] ?? key;
+        case 'pl':
+          return {
+            'back_to_tests': 'Powrót do Testów',
+            'back_to_topics': 'Powrót do Tematów',
+          }[key] ?? key;
+        case 'en':
+        default:
+          return {
+            'back_to_tests': 'Back to Tests',
+            'back_to_topics': 'Back to Topics',
+          }[key] ?? key;
+      }
+    } catch (e) {
+      print('🚨 [QUIZ RESULT] Error getting translation: $e');
+      // Default fallback
+      return key;
+    }
   }
 
   // Helper method to get gradient for result (always green for quiz success)
@@ -216,52 +215,89 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.white,
-              Colors.grey.shade50.withOpacity(0.3),
-            ],
-          ),
-        ),
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(height: 8),
-                
-                // Enhanced topic header
-                _buildEnhancedTopicHeader(),
-                
-                SizedBox(height: 24),
-                
-                // Animated result icon
-                _buildAnimatedResultIcon(),
-                
-                SizedBox(height: 32),
-                
-                // Enhanced stats card
-                _buildEnhancedStatsCard(
-                  correctAnswers,
-                  incorrectAnswers,
-                  totalAnswered,
+      body: Column(
+        children: [
+          // Main content area
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.white,
+                    Colors.grey.shade50.withOpacity(0.3),
+                  ],
                 ),
-                
-                SizedBox(height: 40),
-                
-                // Enhanced action buttons
-                _buildAnimatedActionButtons(),
-                
-                SizedBox(height: 20),
-              ],
+              ),
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SizedBox(height: 8),
+                      
+                      // Enhanced topic header
+                      _buildEnhancedTopicHeader(),
+                      
+                      SizedBox(height: 24),
+                      
+                      // Animated result icon
+                      _buildAnimatedResultIcon(),
+                      
+                      SizedBox(height: 32),
+                      
+                      // Enhanced stats card
+                      _buildEnhancedStatsCard(
+                        correctAnswers,
+                        incorrectAnswers,
+                        totalAnswered,
+                      ),
+                      
+                      SizedBox(height: 40),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
+          
+          // Bottom button area - two buttons side by side
+          Consumer<LanguageProvider>(
+            builder: (context, languageProvider, _) {
+              return Padding(
+                padding: EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    // Left button - Back to Tests
+                    Expanded(
+                      child: _buildActionButton(
+                        text: _translate('back_to_tests', languageProvider),
+                        onTap: () {
+                          // Navigate back to test screen (home)
+                          Navigator.of(context).popUntil((route) => route.isFirst);
+                        },
+                      ),
+                    ),
+                    SizedBox(width: 16),
+                    // Right button - Back to Topics
+                    Expanded(
+                      child: _buildActionButton(
+                        text: _translate('back_to_topics', languageProvider),
+                        onTap: () {
+                          // Navigate back to topic selection screen (skip the question screen)
+                          Navigator.pop(context); // Pop quiz result screen
+                          Navigator.pop(context); // Pop quiz question screen to reach topic selection
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -443,105 +479,40 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
     );
   }
 
-  Widget _buildAnimatedActionButtons() {
-    return AnimatedBuilder(
-      animation: _buttonsAnimationController,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(0, _buttonsSlideAnimation.value),
-          child: Opacity(
-            opacity: _buttonsFadeAnimation.value,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildEnhancedActionButton(
-                  icon: Icons.error_outline,
-                  title: 'Мої помилки',
-                  onTap: () {
-                    // Navigate to mistakes review
-                  },
-                  cardType: 4, // Red gradient
-                ),
-                
-                SizedBox(height: 8),
-                
-                _buildEnhancedActionButton(
-                  icon: Icons.description,
-                  title: 'Наступна тема',
-                  onTap: () {
-                    // Navigate to next topic
-                    Navigator.pop(context);
-                    Navigator.pop(context);
-                  },
-                  cardType: 0, // Blue gradient
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildEnhancedActionButton({
-    required IconData icon,
-    required String title,
+  Widget _buildActionButton({
+    required String text,
     required VoidCallback onTap,
-    required int cardType,
   }) {
-    return GestureDetector(
-      onTapDown: (_) => _scaleController.forward(),
-      onTapUp: (_) => _scaleController.reverse(),
-      onTapCancel: () => _scaleController.reverse(),
-      child: ScaleTransition(
-        scale: _buttonScaleAnimation,
-        child: Container(
-          margin: EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            gradient: _getActionButtonGradient(cardType),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.2),
-                spreadRadius: 0,
-                blurRadius: 6,
-                offset: Offset(0, 3),
-              ),
-            ],
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.white, Colors.blue.shade50.withOpacity(0.4)],
+        ),
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            spreadRadius: 0,
+            blurRadius: 6,
+            offset: Offset(0, 3),
           ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(12),
-              splashColor: Colors.white.withOpacity(0.3),
-              highlightColor: Colors.white.withOpacity(0.2),
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: (cardType == 0 ? Colors.blue : Colors.red).shade50,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        icon,
-                        color: cardType == 0 ? Colors.blue : Colors.red,
-                      ),
-                    ),
-                    SizedBox(width: 16),
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(30),
+          child: Center(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
               ),
             ),
           ),
@@ -549,4 +520,5 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
       ),
     );
   }
+
 }
