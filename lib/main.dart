@@ -46,61 +46,69 @@ void setupAuthListener() {
   // Store last known email to detect changes
   String? lastKnownEmail;
   
-  // Check auth state changes
+  debugPrint('🔧 EmailSyncService: Setting up optimized auth listeners');
+  
+  // Auth state changes listener
   firebase_auth.FirebaseAuth.instance.authStateChanges().listen((firebase_auth.User? user) {
-    if (user != null) {
-      final currentEmail = user.email;
-      if (currentEmail != null) {
-        debugPrint('👉 Auth state changed: user email = $currentEmail');
-        if (lastKnownEmail != currentEmail) {
-          debugPrint('📧 Email changed from $lastKnownEmail to $currentEmail, forcing sync');
-          lastKnownEmail = currentEmail;
-        }
+    if (user?.email != null) {
+      final currentEmail = user!.email!;
+      debugPrint('👉 Auth state changed: user email = $currentEmail');
+      if (lastKnownEmail != currentEmail) {
+        debugPrint('📧 Email changed: $lastKnownEmail → $currentEmail');
+        lastKnownEmail = currentEmail;
+        emailSyncService.smartSync(force: true);
+      } else {
+        emailSyncService.smartSync();
       }
-      // Always sync emails regardless of whether we detected a change
-      emailSyncService.syncEmailWithFirestore();
     }
   });
 
-  // Listen for user changes (like email updates)
+  // User changes listener (for email updates)
   firebase_auth.FirebaseAuth.instance.userChanges().listen((firebase_auth.User? user) {
-    if (user != null) {
-      final currentEmail = user.email;
-      if (currentEmail != null) {
-        debugPrint('👤 User details changed: user email = $currentEmail');
-        if (lastKnownEmail != currentEmail) {
-          debugPrint('📧 Email changed from $lastKnownEmail to $currentEmail, forcing sync');
-          lastKnownEmail = currentEmail;
-        }
+    if (user?.email != null) {
+      final currentEmail = user!.email!;
+      debugPrint('👤 User details changed: user email = $currentEmail');
+      if (lastKnownEmail != currentEmail) {
+        debugPrint('📧 Email changed: $lastKnownEmail → $currentEmail');
+        lastKnownEmail = currentEmail;
+        emailSyncService.smartSync(force: true);
+      } else {
+        emailSyncService.smartSync();
       }
-      // Always sync emails on user changes
-      emailSyncService.syncEmailWithFirestore();
     }
   });
   
-  // Add an interval timer to periodically check and sync emails (backup mechanism)
-  Future.delayed(Duration(seconds: 5), () async {
-    debugPrint('⏰ Running periodic email sync check');
-    final currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
-    if (currentUser != null && currentUser.email != null) {
-      await emailSyncService.syncEmailWithFirestore();
-    }
-    
-    // Schedule next sync (run every 30 seconds as long as the app is open)
-    Future.delayed(Duration(seconds: 30), () {
-      setupAuthListener(); // Re-run the setup which will schedule another check
-    });
-  });
+  // Start managed periodic sync (replaces the recursive timer)
+  emailSyncService.startPeriodicSync();
 }
 
 class AppLifecycleObserver extends WidgetsBindingObserver {
+  DateTime? _lastResumeSync;
+  
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // When app resumes from background (like when coming back from browser verification)
     if (state == AppLifecycleState.resumed) {
-      debugPrint('🔄 App resumed from background - checking for email verification');
-      // Handle post-verification flow when app comes back to foreground
-      emailSyncService.handlePostEmailVerification(null);
+      // Only sync if app was backgrounded for more than 30 seconds
+      if (_lastResumeSync == null || 
+          DateTime.now().difference(_lastResumeSync!) > Duration(seconds: 30)) {
+        debugPrint('🔄 App resumed from background - running smart sync check');
+        _lastResumeSync = DateTime.now();
+        emailSyncService.smartSync();
+        emailSyncService.handlePostEmailVerification(null);
+      } else {
+        debugPrint('⏭️ App resume sync skipped - too recent');
+      }
+    }
+  }
+}
+
+class _AppCleanupObserver extends WidgetsBindingObserver {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.detached) {
+      debugPrint('🧹 App terminating - cleaning up EmailSyncService');
+      emailSyncService.dispose();
     }
   }
 }
@@ -112,6 +120,9 @@ void main() async {
   final lifecycleObserver = AppLifecycleObserver();
   WidgetsBinding.instance.addObserver(lifecycleObserver);
   
+  // Ensure cleanup when app terminates
+  WidgetsBinding.instance.addObserver(_AppCleanupObserver());
+  
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -122,26 +133,18 @@ void main() async {
   // Handle email verification immediately on startup
   final currentAuthUser = firebase_auth.FirebaseAuth.instance.currentUser;
   if (currentAuthUser != null) {
-    // Force reload user first to get latest email from Firebase Auth
     try {
       // Reload user data to get latest email from Firebase Auth
       await currentAuthUser.reload();
       debugPrint('✅ User data reloaded on app start');
       
-      // Force sync Firestore with current Auth user
-      await emailSyncService.syncEmailWithFirestore();
+      // Use smart sync with force flag for startup
+      await emailSyncService.smartSync(force: true);
       
       // Handle post-verification flow
       await emailSyncService.handlePostEmailVerification(null);
     } catch (e) {
-      debugPrint('⚠️ Error reloading user data: $e');
-      
-      // Try to sync anyway in case there was just an issue with reload
-      try {
-        await emailSyncService.syncEmailWithFirestore();
-      } catch (syncError) {
-        debugPrint('⚠️ Error syncing after reload error: $syncError');
-      }
+      debugPrint('⚠️ Startup sync error: $e');
     }
   }
   

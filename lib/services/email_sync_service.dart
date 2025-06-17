@@ -6,10 +6,126 @@ import '../providers/auth_provider.dart';
 import '../models/user.dart' as app_models;
 import '../data/state_data.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
 
 class EmailSyncService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
+  
+  // Debouncing and tracking properties
+  DateTime? _lastSyncTime;
+  bool _syncInProgress = false;
+  Timer? _periodicTimer;
+  String? _lastKnownAuthEmail;
+  String? _lastKnownFirestoreEmail;
+  DateTime? _lastStatusCheck;
+  
+  // Sync intervals
+  static const Duration _minSyncInterval = Duration(minutes: 2);
+  static const Duration _periodicSyncInterval = Duration(minutes: 10);
+  
+  // Smart sync with debouncing
+  Future<void> smartSync({bool force = false}) async {
+    // Skip if sync in progress
+    if (_syncInProgress && !force) {
+      debugPrint('⏭️ EmailSyncService: Skipping sync - sync already in progress');
+      return;
+    }
+    
+    // Skip if synced recently (unless forced)
+    if (!force && _lastSyncTime != null && 
+        DateTime.now().difference(_lastSyncTime!) < _minSyncInterval) {
+      debugPrint('⏭️ EmailSyncService: Skipping sync - synced ${DateTime.now().difference(_lastSyncTime!).inSeconds}s ago');
+      return;
+    }
+    
+    // Check if sync is actually needed
+    if (!force && !_needsSync()) {
+      debugPrint('⏭️ EmailSyncService: Skipping sync - emails already in sync');
+      return;
+    }
+    
+    _syncInProgress = true;
+    _lastSyncTime = DateTime.now();
+    
+    try {
+      debugPrint('🚀 EmailSyncService: Starting smart sync (force: $force)');
+      await syncEmailWithFirestore();
+      _logSyncStats();
+    } finally {
+      _syncInProgress = false;
+    }
+  }
+  
+  // Quick email status check without Firestore read
+  bool _needsSync() {
+    final user = _auth.currentUser;
+    if (user?.email == null) return false;
+    
+    final currentAuthEmail = user!.email!;
+    
+    // If auth email changed, definitely need sync
+    if (_lastKnownAuthEmail != currentAuthEmail) {
+      debugPrint('📧 EmailSyncService: Auth email changed: $_lastKnownAuthEmail → $currentAuthEmail');
+      _lastKnownAuthEmail = currentAuthEmail;
+      return true;
+    }
+    
+    // If we haven't checked Firestore recently, need to check
+    if (_lastStatusCheck == null || 
+        DateTime.now().difference(_lastStatusCheck!) > Duration(minutes: 5)) {
+      debugPrint('🔍 EmailSyncService: Status check needed - last check: $_lastStatusCheck');
+      return true;
+    }
+    
+    return false;
+  }
+  
+  // Start periodic sync with proper timer management
+  void startPeriodicSync() {
+    stopPeriodicSync(); // Ensure no duplicate timers
+    
+    debugPrint('⏰ EmailSyncService: Starting periodic sync timer (every ${_periodicSyncInterval.inMinutes} minutes)');
+    _periodicTimer = Timer.periodic(_periodicSyncInterval, (timer) async {
+      final user = _auth.currentUser;
+      if (user != null && user.email != null) {
+        debugPrint('⏰ EmailSyncService: Running periodic sync check');
+        await smartSync();
+      } else {
+        debugPrint('⏰ EmailSyncService: Skipping periodic sync - no authenticated user');
+      }
+    });
+  }
+  
+  // Stop periodic sync
+  void stopPeriodicSync() {
+    if (_periodicTimer != null) {
+      debugPrint('🛑 EmailSyncService: Stopping periodic sync timer');
+      _periodicTimer!.cancel();
+      _periodicTimer = null;
+    }
+  }
+  
+  // Log sync statistics for debugging
+  void _logSyncStats() {
+    debugPrint('📊 EmailSyncService Stats:');
+    debugPrint('   Last sync: ${_lastSyncTime?.toString() ?? 'Never'}');
+    debugPrint('   Sync in progress: $_syncInProgress');
+    debugPrint('   Active periodic timer: ${_periodicTimer?.isActive ?? false}');
+    debugPrint('   Last known auth email: $_lastKnownAuthEmail');
+    debugPrint('   Last status check: $_lastStatusCheck');
+  }
+  
+  // Dispose method for cleanup
+  void dispose() {
+    debugPrint('🧹 EmailSyncService: Disposing and cleaning up resources');
+    stopPeriodicSync();
+    _syncInProgress = false;
+    _lastSyncTime = null;
+    _lastKnownAuthEmail = null;
+    _lastKnownFirestoreEmail = null;
+    _lastStatusCheck = null;
+  }
   
   // Sync emails if there's a mismatch - with improved debugging and forced updates
   // While preserving user state information and fixing incorrect default values
@@ -41,6 +157,10 @@ class EmailSyncService {
       
       debugPrint('📧 EmailSyncService: Firestore email: $firestoreEmail, Auth email: $authEmail');
       debugPrint('🌍 EmailSyncService: User state: $state, language: $language');
+      
+      // Update status tracking
+      _lastStatusCheck = DateTime.now();
+      _lastKnownFirestoreEmail = firestoreEmail;
       
       // For new users, we should NOT set any default values
       // The language and state selection will be handled by the proper onboarding flow

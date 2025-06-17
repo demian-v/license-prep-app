@@ -349,7 +349,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
   void _syncEmailOnScreenLoad() {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       // Force sync the email in Firebase with Firestore
-      await emailSyncService.syncEmailWithFirestore();
+      await emailSyncService.smartSync();
       
       // Check for and handle email verification with context for dialog display
       bool emailChanged = await emailSyncService.handlePostEmailVerification(context);

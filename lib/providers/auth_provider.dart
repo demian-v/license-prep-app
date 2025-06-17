@@ -104,7 +104,7 @@ class AuthProvider extends ChangeNotifier {
         }
         
         // Sync emails between Auth and Firestore
-        await emailSyncService.syncEmailWithFirestore();
+        await emailSyncService.smartSync();
         
         // Sync user's language preference to LanguageProvider
         await _syncUserLanguageToProvider();
@@ -170,7 +170,7 @@ class AuthProvider extends ChangeNotifier {
         
         // Run email sync immediately to ensure consistency and fix any potential issues
         debugPrint('🔄 [AuthProvider] Running email sync to ensure data consistency');
-        await emailSyncService.syncEmailWithFirestore();
+        await emailSyncService.smartSync();
         
         // Save user to local storage
         final prefs = await SharedPreferences.getInstance();
