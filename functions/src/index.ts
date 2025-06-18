@@ -150,36 +150,72 @@ export const getQuizQuestions = functions.https.onCall(async (data, context) => 
 
     console.log(`Fetching quiz questions for topicId: ${topicId}, language: ${language}, state: ${state}`);
 
-    // Query Firestore for quiz questions
-    const snapshot = await db.collection('quizQuestions')
-      .where('topicId', '==', topicId)
-      .where('language', '==', language)
-      .where('state', '==', state)
-      .orderBy('order')
-      .get();
+    // First try with all filters, then fall back if composite index is missing
+    let snapshot;
+    try {
+      // Try the most specific query first
+      snapshot = await db.collection('quizQuestions')
+        .where('topicId', '==', topicId)
+        .where('language', '==', language)
+        .where('state', '==', state)
+        .get();
+    } catch (indexError) {
+      console.log('Trying fallback query strategy due to index error:', indexError);
+      
+      // Fallback: query by topicId only, then filter manually
+      snapshot = await db.collection('quizQuestions')
+        .where('topicId', '==', topicId)
+        .get();
+    }
     
-    console.log(`Found ${snapshot.docs.length} quiz questions`);
+    console.log(`Found ${snapshot.docs.length} quiz questions before filtering`);
 
-    // Process results
-    const questions = snapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: data.id || doc.id,
-        topicId: data.topicId,
-        questionText: data.questionText || '',
-        options: data.options || [],
-        correctAnswer: data.correctAnswer,
-        explanation: data.explanation || '',
-        ruleReference: data.ruleReference || '',
-        imagePath: data.imagePath || '',
-        type: data.type || 'singleChoice',
-        language: data.language,
-        state: data.state,
-        order: data.order || 0
-      };
-    });
+    // Process and filter results
+    const questions = snapshot.docs
+      .map(doc => {
+        const data = doc.data();
+        
+        // Handle different correct answer field names in Firestore
+        let correctAnswer = data.correctAnswer;
+        if (!correctAnswer && data.correctAnswerString) {
+          correctAnswer = data.correctAnswerString;
+        }
+        if (!correctAnswer && data.correctAnswers) {
+          correctAnswer = data.correctAnswers;
+        }
+        
+        // Ensure we have a valid correct answer
+        if (!correctAnswer) {
+          console.warn(`Question ${data.id || doc.id} has no correct answer!`);
+        }
+        
+        console.log(`Processing question ${data.id || doc.id}: correctAnswer = ${correctAnswer}`);
+        
+        return {
+          id: data.id || doc.id,
+          topicId: data.topicId,
+          questionText: data.questionText || '',
+          options: data.options || [],
+          correctAnswer: correctAnswer,
+          explanation: data.explanation || '',
+          ruleReference: data.ruleReference || '',
+          imagePath: data.imagePath || null, // Allow null for missing images
+          type: data.type || 'singleChoice',
+          language: data.language,
+          state: data.state,
+          order: data.order || 0
+        };
+      })
+      .filter(question => {
+        // Manual filtering to ensure exact matches
+        const languageMatch = question.language === language;
+        const stateMatch = question.state === state || question.state === 'ALL';
+        console.log(`Question ${question.id}: language=${question.language} (${languageMatch}), state=${question.state} (${stateMatch})`);
+        return languageMatch && stateMatch;
+      })
+      .sort((a, b) => (a.order || 0) - (b.order || 0)); // Sort by order manually
 
-    console.log(`Returning ${questions.length} processed questions`);
+    console.log(`Returning ${questions.length} processed and filtered questions`);
     return questions;
 
   } catch (error) {
