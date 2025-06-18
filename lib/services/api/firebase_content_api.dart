@@ -567,13 +567,13 @@ class FirebaseContentApi implements ContentApiInterface {
       // Ensure language code is correct (use 'uk' for Ukrainian)
       if (language == 'ua') {
         language = 'uk';
-        print('Corrected language code from ua to uk');
+        print('🔧 Corrected language code from ua to uk');
       }
       
       // If state is null or empty, we'll query without state filtering
       // This allows us to show the empty state UI when no state is selected
       var stateValue = (state == null || state.isEmpty) ? 'ALL' : state;
-      print('State value for Firebase query: $stateValue (original value: $state)');
+      print('🏢 State value for Firebase query: $stateValue (original value: $state)');
       
       // First try to get the user's state from Firestore to ensure we're using the most up-to-date value
       try {
@@ -586,71 +586,26 @@ class FirebaseContentApi implements ContentApiInterface {
             
             // If the user has a state in Firestore, use that instead of the parameter
             if (userState != null && userState.isNotEmpty) {
-              print('IMPORTANT - Overriding theory modules state parameter from "$stateValue" to Firestore user state: "$userState"');
+              print('⚠️ IMPORTANT - Overriding theory modules state parameter from "$stateValue" to Firestore user state: "$userState"');
               stateValue = userState;
             }
             
-            print('DEBUG - User document state: ${userData['state']}, Final state for theory modules query: $stateValue');
+            print('🔍 DEBUG - User document state: ${userData['state']}, Final state for theory modules query: $stateValue');
           }
         }
       } catch (e) {
-        print('Error checking user state for theory modules: $e');
+        print('❌ Error checking user state for theory modules: $e');
       }
       
-      print('Attempting to fetch theory modules with state=$stateValue, language=$language');
+      print('🎯 Attempting to fetch theory modules with state=$stateValue, language=$language, licenseType=$licenseType');
       
-      List<TheoryModule> modules = [];
+      // First attempt: Try Firebase Functions (PRIMARY METHOD)
+      List<TheoryModule> processedModules = [];
       
-      // Try to get from Firestore directly first
       try {
-        // Query Firestore collection
-        print('Querying Firestore collection: theoryModules');
-        print('Query parameters: language=$language, state=[${stateValue}, ALL], licenseId=$licenseType');
+        print('📞 Attempting Firebase Functions: getTheoryModules with: licenseType=$licenseType, language=$language, state=$stateValue');
         
-        QuerySnapshot querySnapshot = await _firestore
-            .collection('theoryModules')
-            .where('language', isEqualTo: language)
-            .where('state', whereIn: [stateValue, 'ALL'])
-            .where('licenseId', isEqualTo: licenseType)
-            .orderBy('order')
-            .get();
-        
-        print('Got ${querySnapshot.docs.length} theory modules from Firestore');
-        
-        // Process results
-        if (querySnapshot.docs.isNotEmpty) {
-          modules = querySnapshot.docs.map((doc) {
-            try {
-              final data = doc.data() as Map<String, dynamic>;
-              print('Processing module: ${data['id'] ?? doc.id} - ${data['title'] ?? 'No title'}');
-              return TheoryModule.fromFirestore(data, doc.id);
-            } catch (e) {
-              print('Error processing module doc: $e');
-              return null;
-            }
-          })
-          .where((module) => module != null)
-          .cast<TheoryModule>()
-          .toList();
-          
-          if (modules.isNotEmpty) {
-            print('Successfully processed ${modules.length} modules from Firestore');
-            return modules;
-          } else {
-            print('No valid modules found in Firestore results');
-          }
-        } else {
-          print('No theory modules found in Firestore');
-        }
-      } catch (e) {
-        print('Error fetching theory modules from Firestore: $e');
-        print('Will try Firebase Functions');
-      }
-      
-      // Try to use Firebase Functions API as a fallback
-      try {
-        print('Attempting to use Firebase Functions API');
-        final functionsResponse = await _functionsClient.callFunction<List<dynamic>>(
+        final response = await _functionsClient.callFunction<List<dynamic>>(
           'getTheoryModules',
           data: {
             'licenseType': licenseType,
@@ -659,64 +614,161 @@ class FirebaseContentApi implements ContentApiInterface {
           },
         );
         
-        if (functionsResponse != null && functionsResponse.isNotEmpty) {
-          print('Received response from Firebase Functions');
-          modules = functionsResponse.map((item) {
+        // Enhanced debug output
+        print('📋 Raw Firebase Function Response:');
+        print('   - Response type: ${response.runtimeType}');
+        print('   - Response length: ${response?.length ?? 0}');
+        
+        if (response != null && response.isNotEmpty) {
+          // Log each module ID before filtering
+          print('📝 Modules received from Firebase Function:');
+          for (int i = 0; i < response.length; i++) {
             try {
-              if (item is Map) {
-                // Convert to Map<String, dynamic> safely
-                final Map<String, dynamic> data = Map<String, dynamic>.from(
-                  (item as Map).map((key, value) => MapEntry(key.toString(), value))
-                );
-                
-                return TheoryModule(
-                  id: data['id'].toString(),
-                  licenseId: data['licenseId'].toString(),
-                  title: data['title'].toString(),
-                  description: data['description'].toString(),
-                  estimatedTime: (data['estimatedTime'] is int) 
-                    ? data['estimatedTime'] as int 
-                    : int.tryParse(data['estimatedTime'].toString()) ?? 30,
-                  topics: data['topics'] is List 
-                    ? List<String>.from(data['topics']) 
-                    : <String>[],
-                  language: data['language']?.toString() ?? language,
-                  state: data['state']?.toString() ?? stateValue,
-                  icon: data['icon']?.toString() ?? 'menu_book',
-                  type: data['type']?.toString() ?? 'module',
-                  order: (data['order'] is int) 
-                    ? data['order'] as int 
-                    : int.tryParse(data['order'].toString()) ?? 0,
-                );
-              }
-              return null;
+              final item = response[i];
+              final Map<dynamic, dynamic> rawData = item as Map<dynamic, dynamic>;
+              final Map<String, dynamic> data = Map<String, dynamic>.from(rawData.map(
+                (key, value) => MapEntry(key.toString(), value),
+              ));
+              print('   ${i + 1}. ${data['id']} - ${data['title']} (lang: ${data['language']}, state: ${data['state']})');
             } catch (e) {
-              print('Error processing module from functions: $e');
-              return null;
+              print('   ${i + 1}. ❌ Error reading module: $e');
             }
-          })
-          .where((module) => module != null)
-          .cast<TheoryModule>()
-          .toList();
-          
-          if (modules.isNotEmpty) {
-            print('Successfully processed ${modules.length} modules from Firebase Functions');
-            return modules;
-          } else {
-            print('No valid modules found in Firebase Functions results');
           }
+          
+          // Enhanced processing with better error handling
+          for (int i = 0; i < response.length; i++) {
+            try {
+              final item = response[i];
+              final Map<dynamic, dynamic> rawData = item as Map<dynamic, dynamic>;
+              final Map<String, dynamic> data = Map<String, dynamic>.from(rawData.map(
+                (key, value) => MapEntry(key.toString(), value),
+              ));
+              
+              final moduleId = data['id']?.toString() ?? 'unknown';
+              
+              print('🔨 Processing module $moduleId:');
+              
+              // More robust data extraction
+              final title = data['title']?.toString() ?? 'Untitled Module';
+              final description = data['description']?.toString() ?? '';
+              final estimatedTime = data['estimatedTime'] is int 
+                ? data['estimatedTime'] as int 
+                : int.tryParse(data['estimatedTime']?.toString() ?? '30') ?? 30;
+              
+              // Safe extraction of topics
+              List<String> topics = [];
+              if (data['topics'] != null) {
+                if (data['topics'] is List) {
+                  topics = (data['topics'] as List)
+                      .map((item) => item?.toString() ?? "")
+                      .where((item) => item.trim().isNotEmpty)
+                      .toList();
+                }
+              }
+              
+              print('   - Title: $title');
+              print('   - Description: $description');
+              print('   - Estimated Time: $estimatedTime');
+              print('   - Topics: ${topics.length} items');
+              
+              final module = TheoryModule(
+                id: moduleId,
+                licenseId: data['licenseId']?.toString() ?? licenseType,
+                title: title,
+                description: description,
+                estimatedTime: estimatedTime,
+                topics: topics,
+                language: data['language']?.toString() ?? language,
+                state: data['state']?.toString() ?? stateValue,
+                icon: data['icon']?.toString() ?? 'menu_book',
+                type: data['type']?.toString() ?? 'module',
+                order: data['order'] is int 
+                  ? data['order'] as int 
+                  : int.tryParse(data['order']?.toString() ?? '0') ?? 0,
+                theoryModulesCount: data['theory_modules_count']?.toString() ?? '0', // Map module count from Firebase Functions
+              );
+              
+              processedModules.add(module);
+              print('   ✅ Successfully processed module $moduleId');
+              
+            } catch (e) {
+              print('   ❌ Error processing module ${i + 1}: $e');
+              print('   Raw data: ${response[i]}');
+              // Continue processing other modules instead of failing completely
+            }
+          }
+          
+          print('📊 Firebase Functions result: ${processedModules.length} modules processed');
         } else {
-          print('No results from Firebase Functions');
+          print('❌ Firebase Functions returned empty response');
         }
       } catch (e) {
-        print('Error fetching theory modules from Firebase Functions: $e');
+        print('❌ Error with Firebase Functions: $e');
       }
       
-      // If we got here, return an empty list
-      print('No theory modules found through any method, returning empty list');
-      return [];
+      // Second attempt: Direct Firestore query (FALLBACK METHOD)
+      if (processedModules.length == 0) {
+        print('🚨 Got only ${processedModules.length} modules from Firebase Functions, trying direct Firestore query...');
+        
+        try {
+          print('📞 Attempting direct Firestore query: theoryModules collection');
+          print('Query parameters: language=$language, state=[${stateValue}, ALL], licenseId=$licenseType');
+          
+          QuerySnapshot querySnapshot = await _firestore
+              .collection('theoryModules')
+              .where('language', isEqualTo: language)
+              .where('state', whereIn: [stateValue, 'ALL'])
+              .where('licenseId', isEqualTo: licenseType)
+              .orderBy('order')
+              .get();
+          
+          print('📋 Direct Firestore result: ${querySnapshot.docs.length} documents found');
+          
+          if (querySnapshot.docs.isNotEmpty) {
+            final List<TheoryModule> firestoreModules = [];
+            
+            for (var doc in querySnapshot.docs) {
+              try {
+                final data = doc.data() as Map<String, dynamic>;
+                final moduleId = data['id']?.toString() ?? doc.id;
+                
+                print('🔨 Processing Firestore module: $moduleId - ${data['title']} (state: ${data['state']})');
+                
+                final module = TheoryModule.fromFirestore(data, doc.id);
+                firestoreModules.add(module);
+                print('   ✅ Successfully processed Firestore module: $moduleId');
+                
+              } catch (e) {
+                print('   ❌ Error processing Firestore module: $e');
+              }
+            }
+            
+            if (firestoreModules.length > processedModules.length) {
+              print('🎉 Firestore provided more modules (${firestoreModules.length}) than Firebase Functions (${processedModules.length}), using Firestore result');
+              processedModules = firestoreModules;
+            } else {
+              print('📊 Firebase Functions result was better, keeping it');
+            }
+          } else {
+            print('❌ No modules found in Firestore either');
+          }
+        } catch (e) {
+          print('❌ Error querying Firestore directly: $e');
+        }
+      }
+      
+      print('🎉 Final result: ${processedModules.length} theory modules successfully processed');
+      for (int i = 0; i < processedModules.length; i++) {
+        print('   ${i + 1}. ${processedModules[i].id} - ${processedModules[i].title}');
+      }
+      
+      return processedModules;
     } catch (e) {
-      throw 'Failed to fetch theory modules: $e';
+      print('💥 Critical error fetching theory modules: $e');
+      print('📍 Stack trace: ${StackTrace.current}');
+      
+      // Return empty list instead of throwing
+      return [];
     }
   }
   

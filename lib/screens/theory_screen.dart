@@ -209,15 +209,16 @@ class _TheoryScreenState extends State<TheoryScreen> {
                   onSelect: () async {
                     final contentProvider = Provider.of<ContentProvider>(context, listen: false);
                     
-                    // Get the topic ID from the module
-                    final topicId = module.getTopicId();
+                    // Get the topics list from the module
+                    final topicsList = module.getTopicsList();
                     
-                    if (topicId.isNotEmpty) {
-                      // Try to get the topic directly
+                    // If there's only one topic, navigate directly to content
+                    if (topicsList.length == 1) {
+                      final topicId = topicsList[0];
                       final topic = await contentProvider.getTopicById(topicId);
                       
                       if (topic != null) {
-                        // Navigate directly to content screen
+                        // Navigate directly to content screen for single topic
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -228,7 +229,8 @@ class _TheoryScreenState extends State<TheoryScreen> {
                       }
                     }
                     
-                    // Fallback to the module screen if topic couldn't be loaded or no topic ID
+                    // For modules with multiple topics, navigate directly to the module screen
+                    // This will show the numbered topics list
                     Navigator.push(
                       context,
                       MaterialPageRoute(

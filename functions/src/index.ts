@@ -299,7 +299,7 @@ export const getTheoryModules = functions.https.onCall(async (data, context) => 
     console.log('getTheoryModules called with data:', data);
     
     // Validate required parameters
-    const { licenseType, language, state, limit = 10 } = data;
+    const { licenseType, language, state } = data;
     
     if (!licenseType || !language || !state) {
       throw new functions.https.HttpsError(
@@ -310,40 +310,59 @@ export const getTheoryModules = functions.https.onCall(async (data, context) => 
 
     console.log(`Fetching theory modules for licenseType: ${licenseType}, language: ${language}, state: ${state}`);
 
-    // Query Firestore for theory modules
-    let query = db.collection('theoryModules')
-      .where('licenseId', '==', licenseType)
-      .where('language', '==', language)
-      .where('state', 'in', [state, 'ALL'])
-      .orderBy('order');
-
-    if (limit && limit > 0) {
-      query = query.limit(limit);
+    // First try with all filters, then fall back if composite index is missing
+    let snapshot;
+    try {
+      // Try the most specific query first
+      snapshot = await db.collection('theoryModules')
+        .where('licenseId', '==', licenseType)
+        .where('language', '==', language)
+        .where('state', 'in', [state, 'ALL'])
+        .get();
+    } catch (indexError) {
+      console.log('Trying fallback query strategy due to index error:', indexError);
+      
+      // Fallback: query by licenseId and language only, then filter manually
+      snapshot = await db.collection('theoryModules')
+        .where('licenseId', '==', licenseType)
+        .where('language', '==', language)
+        .get();
     }
-
-    const snapshot = await query.get();
     
-    console.log(`Found ${snapshot.docs.length} theory modules`);
+    console.log(`Found ${snapshot.docs.length} theory modules before filtering`);
 
-    // Process results
-    const modules = snapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: data.id || doc.id,
-        licenseId: data.licenseId,
-        title: data.title || 'Untitled Module',
-        description: data.description || '',
-        estimatedTime: data.estimatedTime || 30,
-        topics: data.topics || [],
-        language: data.language,
-        state: data.state,
-        icon: data.icon || 'menu_book',
-        type: data.type || 'module',
-        order: data.order || 0
-      };
-    });
+    // Process and filter results
+    const modules = snapshot.docs
+      .map(doc => {
+        const data = doc.data();
+        
+        console.log(`Processing module ${data.id || doc.id}: state=${data.state}, language=${data.language}`);
+        
+        return {
+          id: data.id || doc.id,
+          licenseId: data.licenseId,
+          title: data.title || 'Untitled Module',
+          description: data.description || '',
+          estimatedTime: data.estimatedTime || 30,
+          topics: data.topics || [],
+          language: data.language,
+          state: data.state,
+          icon: data.icon || 'menu_book',
+          type: data.type || 'module',
+          order: data.order || 0,
+          theory_modules_count: data.theory_modules_count || '0' // Add module count from database
+        };
+      })
+      .filter(module => {
+        // Manual filtering to ensure exact matches
+        const languageMatch = module.language === language;
+        const stateMatch = module.state === state || module.state === 'ALL';
+        console.log(`Module ${module.id}: language=${module.language} (${languageMatch}), state=${module.state} (${stateMatch})`);
+        return languageMatch && stateMatch;
+      })
+      .sort((a, b) => (a.order || 0) - (b.order || 0)); // Sort by order manually
 
-    console.log(`Returning ${modules.length} processed theory modules`);
+    console.log(`Returning ${modules.length} processed and filtered theory modules`);
     return modules;
 
   } catch (error) {
@@ -421,6 +440,259 @@ export const getPracticeTests = functions.https.onCall(async (data, context) => 
     throw new functions.https.HttpsError(
       'internal',
       'Failed to fetch practice tests: ' + (error instanceof Error ? error.message : String(error))
+    );
+  }
+});
+
+// User Management Functions
+
+// Update user language preference
+export const updateUserLanguage = functions.https.onCall(async (data, context) => {
+  try {
+    console.log('updateUserLanguage called with data:', data);
+    
+    // Validate authentication
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        'unauthenticated',
+        'User must be authenticated to update language'
+      );
+    }
+    
+    const userId = context.auth.uid;
+    const { language } = data;
+    
+    // Validate language parameter
+    if (!language) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'Language is required'
+      );
+    }
+    
+    // Validate language code
+    const validLanguages = ['en', 'uk', 'ru', 'es', 'pl'];
+    if (!validLanguages.includes(language)) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        `Invalid language code. Must be one of: ${validLanguages.join(', ')}`
+      );
+    }
+    
+    console.log(`Updating language for user ${userId} to: ${language}`);
+    
+    // Update user document in Firestore
+    await db.collection('users').doc(userId).update({
+      language: language,
+      lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    
+    console.log(`Successfully updated language for user ${userId} to: ${language}`);
+    
+    return { 
+      success: true, 
+      message: 'Language updated successfully',
+      language: language 
+    };
+    
+  } catch (error) {
+    console.error('Error in updateUserLanguage:', error);
+    
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    
+    throw new functions.https.HttpsError(
+      'internal',
+      'Failed to update language: ' + (error instanceof Error ? error.message : String(error))
+    );
+  }
+});
+
+// Update user state preference
+export const updateUserState = functions.https.onCall(async (data, context) => {
+  try {
+    console.log('updateUserState called with data:', data);
+    
+    // Validate authentication
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        'unauthenticated',
+        'User must be authenticated to update state'
+      );
+    }
+    
+    const userId = context.auth.uid;
+    const { state } = data;
+    
+    console.log(`Updating state for user ${userId} to: ${state || 'null'}`);
+    
+    // Update user document in Firestore (state can be null)
+    await db.collection('users').doc(userId).update({
+      state: state || null,
+      lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    
+    console.log(`Successfully updated state for user ${userId} to: ${state || 'null'}`);
+    
+    return { 
+      success: true, 
+      message: 'State updated successfully',
+      state: state || null
+    };
+    
+  } catch (error) {
+    console.error('Error in updateUserState:', error);
+    
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    
+    throw new functions.https.HttpsError(
+      'internal',
+      'Failed to update state: ' + (error instanceof Error ? error.message : String(error))
+    );
+  }
+});
+
+// Get current user data
+export const getUserData = functions.https.onCall(async (data, context) => {
+  try {
+    console.log('getUserData called');
+    
+    // Validate authentication
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        'unauthenticated',
+        'User must be authenticated to get user data'
+      );
+    }
+    
+    const userId = context.auth.uid;
+    console.log(`Getting user data for user: ${userId}`);
+    
+    // Get user document from Firestore
+    const userDoc = await db.collection('users').doc(userId).get();
+    
+    if (!userDoc.exists) {
+      throw new functions.https.HttpsError(
+        'not-found',
+        'User document not found'
+      );
+    }
+    
+    const userData = userDoc.data();
+    if (!userData) {
+      throw new functions.https.HttpsError(
+        'not-found',
+        'User data is empty'
+      );
+    }
+    
+    // Return user data with proper field mapping
+    const result = {
+      id: userId,
+      name: userData.name || '',
+      email: userData.email || context.auth.token.email || '',
+      language: userData.language || 'en',
+      state: userData.state || null,
+    };
+    
+    console.log(`Successfully retrieved user data for user: ${userId}`);
+    return result;
+    
+  } catch (error) {
+    console.error('Error in getUserData:', error);
+    
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    
+    throw new functions.https.HttpsError(
+      'internal',
+      'Failed to get user data: ' + (error instanceof Error ? error.message : String(error))
+    );
+  }
+});
+
+// Create or update user document
+export const createOrUpdateUserDocument = functions.https.onCall(async (data, context) => {
+  try {
+    console.log('createOrUpdateUserDocument called with data:', data);
+    
+    // Validate authentication
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        'unauthenticated',
+        'User must be authenticated to create/update user document'
+      );
+    }
+    
+    const userId = context.auth.uid;
+    const { name, email, language, state, userId: providedUserId } = data;
+    
+    // Ensure user can only update their own document
+    if (providedUserId && providedUserId !== userId) {
+      throw new functions.https.HttpsError(
+        'permission-denied',
+        'Users can only update their own documents'
+      );
+    }
+    
+    // Validate required fields
+    if (!name || !email) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'Name and email are required'
+      );
+    }
+    
+    console.log(`Creating/updating user document for user: ${userId}`);
+    
+    // Check if document exists
+    const userDoc = await db.collection('users').doc(userId).get();
+    
+    if (userDoc.exists) {
+      // Update existing document
+      const updateData = {
+        name: name,
+        email: email,
+        language: language || 'en',
+        state: state || null,
+        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      await db.collection('users').doc(userId).update(updateData);
+      console.log(`Successfully updated user document for user: ${userId}`);
+    } else {
+      // Create new document
+      const createData = {
+        name: name,
+        email: email,
+        language: language || 'en',
+        state: state || null,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      await db.collection('users').doc(userId).set(createData);
+      console.log(`Successfully created user document for user: ${userId}`);
+    }
+    
+    return { 
+      success: true, 
+      message: 'User document created/updated successfully',
+      userId: userId
+    };
+    
+  } catch (error) {
+    console.error('Error in createOrUpdateUserDocument:', error);
+    
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    
+    throw new functions.https.HttpsError(
+      'internal',
+      'Failed to create/update user document: ' + (error instanceof Error ? error.message : String(error))
     );
   }
 });
