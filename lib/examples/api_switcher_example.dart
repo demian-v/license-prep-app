@@ -186,7 +186,7 @@ class _ApiSwitcherExampleState extends State<ApiSwitcherExample> {
     try {
       if (_currentImplementation == ApiImplementation.firebase) {
         // Use Firebase Functions API
-        final topics = await _firebaseContentApi.getQuizTopics('drivers', 'en', 'IL');
+        final topics = await _firebaseContentApi.getQuizTopics('en', 'IL');
         setState(() {
           _result = 'Firebase API Result:\n${topics.length} topics found\n\n';
           for (final topic in topics) {

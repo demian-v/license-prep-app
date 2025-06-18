@@ -26,20 +26,34 @@ class FirebaseContentApi implements ContentApiInterface {
   
   FirebaseContentApi(this._functionsClient);
   
-  /// Get quiz topics based on license type, language, and state
+  /// Helper method to extract order from topic ID for sorting
+  int _extractOrderFromId(String id) {
+    // Extract numeric part from IDs like "q_topic_il_ua_01" -> 1
+    final regex = RegExp(r'_(\d+)$');
+    final match = regex.firstMatch(id);
+    if (match != null) {
+      return int.tryParse(match.group(1) ?? '0') ?? 0;
+    }
+    return 0;
+  }
+  
+  /// Get quiz topics based on language and state
   @override
-  Future<List<QuizTopic>> getQuizTopics(String licenseType, String language, String state) async {
+  Future<List<QuizTopic>> getQuizTopics(String language, String state) async {
     try {
       // Ensure language code is correct (use 'uk' for Ukrainian)
       if (language == 'ua') {
         language = 'uk';
-        print('Corrected language code from ua to uk');
+        print('🔧 Corrected language code from ua to uk');
       }
       
-      // If state is null or empty, we'll query without state filtering
-      // This allows us to show the empty state UI when no state is selected
-      var stateValue = (state == null || state.isEmpty) ? 'ALL' : state;
-      print('State value for Firebase query: $stateValue (original value: $state)');
+      // Require specific state - no "ALL" fallback
+      if (state == null || state.isEmpty) {
+        print('🚫 State is required for quiz topics query');
+        return [];
+      }
+      var stateValue = state;
+      print('🏢 State value for Firebase query: $stateValue');
       
       // First try to get the user's state from Firestore to ensure we're using the most up-to-date value
       try {
@@ -52,124 +66,275 @@ class FirebaseContentApi implements ContentApiInterface {
             
             // If the user has a state in Firestore, use that instead of the parameter
             if (userState != null && userState.isNotEmpty) {
-              print('IMPORTANT - Overriding topic state parameter from "$stateValue" to Firestore user state: "$userState"');
+              print('⚠️ IMPORTANT - Overriding topic state parameter from "$stateValue" to Firestore user state: "$userState"');
               stateValue = userState;
             }
             
-            print('DEBUG - User document state: ${userData['state']}, Final state for topics query: $stateValue');
+            print('🔍 DEBUG - User document state: ${userData['state']}, Final state for topics query: $stateValue');
           }
         }
       } catch (e) {
-        print('Error checking user state for topics: $e');
+        print('❌ Error checking user state for topics: $e');
       }
       
-      print('Fetching quiz topics with: licenseType=$licenseType, language=$language, state=$stateValue');
+      // First attempt: Try Firebase Functions
+      List<QuizTopic> processedTopics = [];
       
-      final response = await _functionsClient.callFunction<List<dynamic>>(
-        'getQuizTopics',
-        data: {
-          'licenseType': licenseType,
-          'language': language,
-          'state': stateValue,
-        },
-      );
-      
-      // Debug output
-      print('Received response: $response');
-      
-      if (response == null || response.isEmpty) {
-        print('Response was empty, returning empty list');
-        // Return empty list instead of fallback data to ensure we only use Firebase data
-        return [];
-      }
-      
-      // Filter to ensure we only show topics matching the user's language
-      // AND if state is "ALL", only show for appropriate language
-      print('Filtering topics based on language: $language');
-      final filteredResponse = response.where((item) {
-        try {
-          final Map<dynamic, dynamic> rawData = item as Map<dynamic, dynamic>;
-          // Convert to Map<String, dynamic>
-          final Map<String, dynamic> data = Map<String, dynamic>.from(rawData.map(
-            (key, value) => MapEntry(key.toString(), value),
-          ));
-          
-          // First, ensure the topic matches the user's language
-          final topicLanguage = data['language']?.toString() ?? '';
-          final languageMatches = (topicLanguage == language);
-          
-          if (!languageMatches) {
-            return false;  // Skip if language doesn't match
-          }
-          
-          // Then check state condition:
-          // If ALL state, only show if language is "uk"
-          final topicState = data['state']?.toString() ?? '';
-          if (topicState == 'ALL') {
-            return language == 'uk';  // Only show ALL state topics for Ukrainian
-          }
-          
-          // For specific state topics, we've already confirmed language match above
-          return true;
-        } catch (e) {
-          print('Error filtering topic: $e');
-          return false;
-        }
-      }).toList();
-      
-      if (filteredResponse.isEmpty) {
-        print('No topics match the language ($language) filter, returning empty list');
-        return [];
-      }
-      
-      return filteredResponse.map((item) {
-        try {
-          // Handle different possible types coming from Firebase Functions
-          final Map<dynamic, dynamic> rawData = item as Map<dynamic, dynamic>;
-          // Convert to Map<String, dynamic>
-          final Map<String, dynamic> data = Map<String, dynamic>.from(rawData.map(
-            (key, value) => MapEntry(key.toString(), value),
-          ));
-          
-          print('Processing topic: ${data['id']} - ${data['title']}');
-          
-          // Safe extraction of questionIds
-          List<String> questionIds = [];
-          if (data['questionIds'] != null) {
-            if (data['questionIds'] is List) {
-              questionIds = (data['questionIds'] as List)
-                  .map((item) => item?.toString() ?? "")
-                  .where((item) => item.trim().isNotEmpty)
-                  .toList();
+      try {
+        print('📞 Attempting Firebase Functions: getQuizTopics with: language=$language, state=$stateValue');
+        
+        final response = await _functionsClient.callFunction<List<dynamic>>(
+          'getQuizTopics',
+          data: {
+            'language': language,
+            'state': stateValue,
+            'limit': 10,
+          },
+        );
+        
+        // Enhanced debug output
+        print('📋 Raw Firebase Function Response:');
+        print('   - Response type: ${response.runtimeType}');
+        print('   - Response length: ${response?.length ?? 0}');
+        
+        if (response != null && response.isNotEmpty) {
+          // Log each topic ID before filtering
+          print('📝 Topics received from Firebase Function:');
+          for (int i = 0; i < response.length; i++) {
+            try {
+              final item = response[i];
+              final Map<dynamic, dynamic> rawData = item as Map<dynamic, dynamic>;
+              final Map<String, dynamic> data = Map<String, dynamic>.from(rawData.map(
+                (key, value) => MapEntry(key.toString(), value),
+              ));
+              print('   ${i + 1}. ${data['id']} - ${data['title']} (lang: ${data['language']}, state: ${data['state']})');
+            } catch (e) {
+              print('   ${i + 1}. ❌ Error reading topic: $e');
             }
           }
           
-          return QuizTopic(
-            id: data['id'].toString(),
-            title: data['title'].toString(),
-            questionCount: data['questionCount'] is int 
-              ? data['questionCount'] as int 
-              : int.tryParse(data['questionCount'].toString()) ?? 0,
-            progress: data['progress'] != null ? 
-              (data['progress'] is num ? 
-                (data['progress'] as num).toDouble() : 
-                double.tryParse(data['progress'].toString()) ?? 0.0) : 
-              0.0,
-            questionIds: questionIds,
-          );
-        } catch (e) {
-          print('Error processing topic: $e');
-          print('Raw item: $item');
-          // Return null and filter out later
-          return null;
+          // Enhanced filtering with detailed logging
+          print('🔍 Starting filtering process for language: $language');
+          final List<Map<String, dynamic>> filteredResponse = [];
+          
+          for (int i = 0; i < response.length; i++) {
+            try {
+              final item = response[i];
+              final Map<dynamic, dynamic> rawData = item as Map<dynamic, dynamic>;
+              final Map<String, dynamic> data = Map<String, dynamic>.from(rawData.map(
+                (key, value) => MapEntry(key.toString(), value),
+              ));
+              
+              final topicId = data['id']?.toString() ?? 'unknown';
+              final topicLanguage = data['language']?.toString() ?? '';
+              final topicState = data['state']?.toString() ?? '';
+              
+              print('   🔍 Checking topic $topicId:');
+              print('     - Topic language: "$topicLanguage" vs Required: "$language"');
+              print('     - Topic state: "$topicState"');
+              
+              // First, ensure the topic matches the user's language
+              final languageMatches = (topicLanguage == language);
+              
+              if (!languageMatches) {
+                print('     ❌ FILTERED OUT: Language mismatch');
+                continue;
+              }
+              
+              // Simplified state logic - let's be more permissive
+              bool stateMatches = true;
+              
+              // Only filter out if there's a clear state mismatch
+              if (topicState.isNotEmpty && stateValue != 'ALL' && topicState != 'ALL' && topicState != stateValue) {
+                stateMatches = false;
+              }
+              
+              if (!stateMatches) {
+                print('     ❌ FILTERED OUT: State mismatch');
+                continue;
+              }
+              
+              print('     ✅ PASSED FILTERING');
+              filteredResponse.add(data);
+            } catch (e) {
+              print('     ❌ Error filtering topic ${i + 1}: $e');
+            }
+          }
+          
+          print('✅ After filtering: ${filteredResponse.length} topics remain');
+          
+          // Enhanced processing with better error handling
+          for (int i = 0; i < filteredResponse.length; i++) {
+            try {
+              final data = filteredResponse[i];
+              final topicId = data['id']?.toString() ?? 'unknown';
+              
+              print('🔨 Processing topic $topicId:');
+              
+              // Safe extraction of questionIds
+              List<String> questionIds = [];
+              if (data['questionIds'] != null) {
+                if (data['questionIds'] is List) {
+                  questionIds = (data['questionIds'] as List)
+                      .map((item) => item?.toString() ?? "")
+                      .where((item) => item.trim().isNotEmpty)
+                      .toList();
+                }
+              }
+              
+              // More robust data extraction
+              final title = data['title']?.toString() ?? 'Untitled Topic';
+              final questionCount = data['questionCount'] is int 
+                ? data['questionCount'] as int 
+                : int.tryParse(data['questionCount']?.toString() ?? '0') ?? 0;
+              final progress = data['progress'] != null ? 
+                (data['progress'] is num ? 
+                  (data['progress'] as num).toDouble() : 
+                  double.tryParse(data['progress'].toString()) ?? 0.0) : 
+                0.0;
+              
+              print('   - Title: $title');
+              print('   - Question Count: $questionCount');
+              print('   - Question IDs: ${questionIds.length} items');
+              
+              final topic = QuizTopic(
+                id: topicId,
+                title: title,
+                questionCount: questionCount,
+                progress: progress,
+                questionIds: questionIds,
+              );
+              
+              processedTopics.add(topic);
+              print('   ✅ Successfully processed topic $topicId');
+              
+            } catch (e) {
+              print('   ❌ Error processing topic ${i + 1}: $e');
+              print('   Raw data: ${filteredResponse[i]}');
+              // Continue processing other topics instead of filtering out
+            }
+          }
+          
+          print('📊 Firebase Functions result: ${processedTopics.length} topics processed');
+        } else {
+          print('❌ Firebase Functions returned empty response');
         }
-      })
-      .where((topic) => topic != null) // Filter out null topics
-      .cast<QuizTopic>() // Cast non-null topics
-      .toList();
+      } catch (e) {
+        print('❌ Error with Firebase Functions: $e');
+      }
+      
+      // Second attempt: Direct Firestore query (especially if we got less than expected)
+      // Try direct Firestore query for any language if Firebase Functions didn't work
+      if (processedTopics.length == 0) {
+        print('🚨 Got only ${processedTopics.length} topics from Firebase Functions, trying direct Firestore query...');
+        
+        try {
+          print('📞 Attempting direct Firestore query: quizTopics collection');
+          
+          // Simplified query to avoid composite index requirement
+          // We'll sort manually after fetching
+          QuerySnapshot querySnapshot = await _firestore
+              .collection('quizTopics')
+              .where('language', isEqualTo: language)
+              .where('state', isEqualTo: stateValue)
+              .orderBy('order')
+              .limit(10)
+              .get();
+          
+          print('📋 Direct Firestore result: ${querySnapshot.docs.length} documents found (before state filtering)');
+          
+          if (querySnapshot.docs.isNotEmpty) {
+            final List<QuizTopic> firestoreTopics = [];
+            
+            for (var doc in querySnapshot.docs) {
+              try {
+                final data = doc.data() as Map<String, dynamic>;
+                final topicId = data['id']?.toString() ?? doc.id;
+                final topicState = data['state']?.toString() ?? '';
+                
+                // Manual state filtering since we couldn't use it in the query
+                bool includeThisTopic = false;
+                if (topicState == 'ALL' || topicState == stateValue) {
+                  includeThisTopic = true;
+                } else if (stateValue == 'ALL') {
+                  includeThisTopic = true;
+                }
+                
+                if (!includeThisTopic) {
+                  print('🔨 Skipping Firestore topic: $topicId - state mismatch ($topicState vs $stateValue)');
+                  continue;
+                }
+                
+                print('🔨 Processing Firestore topic: $topicId - ${data['title']} (state: $topicState)');
+                
+                // Safe extraction of questionIds
+                List<String> questionIds = [];
+                if (data['questionIds'] != null) {
+                  if (data['questionIds'] is List) {
+                    questionIds = (data['questionIds'] as List)
+                        .map((item) => item?.toString() ?? "")
+                        .where((item) => item.trim().isNotEmpty)
+                        .toList();
+                  }
+                }
+                
+                final title = data['title']?.toString() ?? 'Untitled Topic';
+                final questionCount = data['questionCount'] is int 
+                  ? data['questionCount'] as int 
+                  : int.tryParse(data['questionCount']?.toString() ?? '0') ?? 0;
+                final progress = data['progress'] != null ? 
+                  (data['progress'] is num ? 
+                    (data['progress'] as num).toDouble() : 
+                    double.tryParse(data['progress'].toString()) ?? 0.0) : 
+                  0.0;
+                
+                final topic = QuizTopic(
+                  id: topicId,
+                  title: title,
+                  questionCount: questionCount,
+                  progress: progress,
+                  questionIds: questionIds,
+                );
+                
+                firestoreTopics.add(topic);
+                print('   ✅ Successfully processed Firestore topic: $topicId');
+                
+              } catch (e) {
+                print('   ❌ Error processing Firestore topic: $e');
+              }
+            }
+            
+            // Sort manually since we couldn't sort in the query
+            firestoreTopics.sort((a, b) {
+              // Extract order from ID if available, otherwise use title
+              final aOrder = _extractOrderFromId(a.id);
+              final bOrder = _extractOrderFromId(b.id);
+              return aOrder.compareTo(bOrder);
+            });
+            
+            if (firestoreTopics.length > processedTopics.length) {
+              print('🎉 Firestore provided more topics (${firestoreTopics.length}) than Firebase Functions (${processedTopics.length}), using Firestore result');
+              processedTopics = firestoreTopics;
+            } else {
+              print('📊 Firebase Functions result was better, keeping it');
+            }
+          } else {
+            print('❌ No topics found in Firestore either');
+          }
+        } catch (e) {
+          print('❌ Error querying Firestore directly: $e');
+        }
+      }
+      
+      print('🎉 Final result: ${processedTopics.length} topics successfully processed');
+      for (int i = 0; i < processedTopics.length; i++) {
+        print('   ${i + 1}. ${processedTopics[i].id} - ${processedTopics[i].title}');
+      }
+      
+      return processedTopics;
     } catch (e) {
-      print('Error fetching quiz topics: $e');
-      print('Returning empty list');
+      print('💥 Critical error fetching quiz topics: $e');
+      print('📍 Stack trace: ${StackTrace.current}');
       
       // Return empty list instead of fallback data
       return [];
@@ -315,7 +480,7 @@ class FirebaseContentApi implements ContentApiInterface {
   /// Get traffic rule topics from Firestore
   /// This is used for the direct Firestore approach
   @override
-  Future<List<TrafficRuleTopic>> getTrafficRuleTopics(String language, String state, String licenseId) async {
+  Future<List<TrafficRuleTopic>> getTrafficRuleTopics(String language, String state) async {
     try {
       // If state is null or empty, we'll query without state filtering
       // This allows us to show the empty state UI when no state is selected
@@ -344,7 +509,7 @@ class FirebaseContentApi implements ContentApiInterface {
         print('Error checking user state for traffic topics: $e');
       }
       
-      print('Fetching traffic rule topics from Firestore with: language=$language, state=$stateValue, licenseId=$licenseId');
+      print('Fetching traffic rule topics from Firestore with: language=$language, state=$stateValue');
       
       // Query Firestore collection
       QuerySnapshot querySnapshot;
@@ -352,8 +517,7 @@ class FirebaseContentApi implements ContentApiInterface {
       querySnapshot = await _firestore
           .collection('trafficRuleTopics')
           .where('language', isEqualTo: language)
-          .where('state', whereIn: [stateValue, 'ALL'])
-          .where('licenseId', isEqualTo: licenseId)
+          .where('state', isEqualTo: stateValue)
           .orderBy('order')
           .get();
       

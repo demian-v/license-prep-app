@@ -79,7 +79,7 @@ class FirebaseFunctionsExample extends StatelessWidget {
   Future<void> _getQuizTopics() async {
     try {
       final List<QuizTopic> topics = await serviceLocator.firebaseContentApi
-          .getQuizTopics('drivers', 'en', 'IL');
+          .getQuizTopics('en', 'IL');
       
       debugPrint('Loaded ${topics.length} quiz topics');
       for (final topic in topics) {

@@ -12,12 +12,12 @@ class FunctionNameMapper {
     'createOrUpdateUserDocument': 'createOrUpdateUserDocument',
     
     // Content functions
-    'getQuizTopics': 'content-getQuizTopics',
-    'getQuizQuestions': 'content-getQuizQuestions',
-    'getRoadSignCategories': 'content-getRoadSignCategories',
-    'getRoadSigns': 'content-getRoadSigns',
-    'getTheoryModules': 'content-getTheoryModules',
-    'getPracticeTests': 'content-getPracticeTests',
+    'getQuizTopics': 'getQuizTopics',
+    'getQuizQuestions': 'getQuizQuestions',
+    'getRoadSignCategories': 'getRoadSignCategories',
+    'getRoadSigns': 'getRoadSigns',
+    'getTheoryModules': 'getTheoryModules',
+    'getPracticeTests': 'getPracticeTests',
     
     // Progress functions
     'getUserProgress': 'progress-getUserProgress',

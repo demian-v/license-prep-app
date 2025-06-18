@@ -204,8 +204,14 @@ class ContentProvider extends ChangeNotifier {
       final contentService = serviceLocator.content;
       
       // Fetch theory modules using the updated API
-      // Use 'ALL' as default if state is null
-      final stateValue = _currentState ?? 'ALL';
+      // Require specific state
+      if (_currentState == null || _currentState!.isEmpty) {
+        _lastError = 'State is required to fetch content';
+        _isLoading = false;
+        notifyListeners();
+        return;
+      }
+      final stateValue = _currentState!;
       
       print('Fetching theory modules with: licenseId=$_currentLicenseId, language=$_currentLanguage, state=$stateValue');
       
@@ -219,7 +225,6 @@ class ContentProvider extends ChangeNotifier {
       // If no modules found and language isn't English, try English as fallback
       if (_modules.isEmpty && _currentLanguage != 'en') {
         print('No modules found in $_currentLanguage, trying English fallback');
-        final stateValue = _currentState ?? 'ALL';
         
         // Also fix the parameter order here
         _modules = await contentService.getTheoryModules(
@@ -245,29 +250,23 @@ class ContentProvider extends ChangeNotifier {
       
       // If we found the traffic rules module, fetch its topics
       if (trafficRulesModule != null) {
-        // Fetch topics using the API
-        // Use 'ALL' as default if state is null
-        final stateValue = _currentState ?? 'ALL';
-        
-        print('Fetching traffic rule topics with: language=$_currentLanguage, state=$stateValue, licenseId=$_currentLicenseId');
+        // Fetch topics using the API with specific state
+        print('Fetching traffic rule topics with: language=$_currentLanguage, state=$stateValue');
         
         _topics = await contentService.getTrafficRuleTopics(
           _currentLanguage, 
-          stateValue, 
-          _currentLicenseId
+          stateValue
         );
         
         // If no topics found and language isn't English, try English as fallback
         if (_topics.isEmpty && _currentLanguage != 'en') {
           print('No topics found in $_currentLanguage, trying English fallback');
-          final stateValue = _currentState ?? 'ALL';
           
-          print('Trying English fallback for topics: language=en, state=$stateValue, licenseId=$_currentLicenseId');
+          print('Trying English fallback for topics: language=en, state=$stateValue');
           
           _topics = await contentService.getTrafficRuleTopics(
             'en', 
-            stateValue, 
-            _currentLicenseId
+            stateValue
           );
         }
         

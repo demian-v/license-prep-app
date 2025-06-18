@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/traffic_rule_topic.dart';
 import '../providers/content_provider.dart';
 import '../providers/language_provider.dart';
+import '../localization/app_localizations.dart';
 import 'traffic_rule_content_screen.dart';
 
 class TrafficRulesTopicsScreen extends StatefulWidget {
@@ -103,7 +104,38 @@ class _TrafficRulesTopicsScreenState extends State<TrafficRulesTopicsScreen> {
           
           if (topics.isEmpty) {
             return Center(
-              child: Text('No topics available'),
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.hourglass_empty,
+                      size: 64,
+                      color: Colors.grey[400],
+                    ),
+                    SizedBox(height: 24),
+                    Text(
+                      AppLocalizations.of(context)?.translate('content_coming_soon') ?? 'Content will be added soon',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[700],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      AppLocalizations.of(context)?.translate('new_content_being_prepared') ?? 'New topics are being prepared for your region',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[500],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
             );
           }
           

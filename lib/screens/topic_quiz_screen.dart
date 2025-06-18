@@ -535,9 +535,8 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> with TickerProviderSt
       
       // Fetch topics from Firebase
       final fetchedTopics = await serviceLocator.content.getQuizTopics(
-        licenseType,
         language,
-        state
+        state,
       );
       
       if (mounted) {

@@ -152,9 +152,8 @@ class ExamProvider extends ChangeNotifier {
       
       // Get topics for the license type - Use 'IL' for state matching Firebase data
       final topics = await serviceLocator.content.getQuizTopics(
-        licenseType,
         language,
-        'IL' // Use 'IL' instead of lowercase 'all' to match Firebase data
+        state,
       );
       
       print('Fetched ${topics.length} topics for exam');

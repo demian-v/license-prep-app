@@ -39,7 +39,7 @@ class ContentApi implements ContentApiInterface {
   
   // Quiz Topics
   @override
-  Future<List<QuizTopic>> getQuizTopics(String licenseType, String language, String state) async {
+  Future<List<QuizTopic>> getQuizTopics(String language, String state) async {
     try {
       // Use 'ALL' as default if state is empty
       final stateValue = state.isEmpty ? 'ALL' : state;
@@ -47,7 +47,6 @@ class ContentApi implements ContentApiInterface {
       final response = await _apiClient.get(
         '/content/quiz-topics',
         queryParameters: {
-          'licenseType': licenseType,
           'language': language,
           'state': stateValue,
         },
@@ -103,7 +102,7 @@ class ContentApi implements ContentApiInterface {
   
   // Traffic Rule Topics
   @override
-  Future<List<TrafficRuleTopic>> getTrafficRuleTopics(String language, String state, String licenseId) async {
+  Future<List<TrafficRuleTopic>> getTrafficRuleTopics(String language, String state) async {
     try {
       // Use 'ALL' as default if state is empty
       final stateValue = state.isEmpty ? 'ALL' : state;
@@ -113,7 +112,6 @@ class ContentApi implements ContentApiInterface {
         queryParameters: {
           'language': language,
           'state': stateValue,
-          'licenseId': licenseId,
         },
       );
       

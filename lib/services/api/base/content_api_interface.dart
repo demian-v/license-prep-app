@@ -6,8 +6,8 @@ import '../../../models/traffic_rule_topic.dart';
 
 /// Base interface for content API
 abstract class ContentApiInterface {
-  /// Get quiz topics based on license type, language, and state
-  Future<List<QuizTopic>> getQuizTopics(String licenseType, String language, String state);
+  /// Get quiz topics based on language and state
+  Future<List<QuizTopic>> getQuizTopics(String language, String state);
   
   /// Get quiz questions based on topic ID, language, and state
   Future<List<QuizQuestion>> getQuizQuestions(String topicId, String language, String state);
@@ -20,7 +20,7 @@ abstract class ContentApiInterface {
   
   /// Get traffic rule topics from Firestore
   /// This method is only used by the FirebaseContentApi implementation
-  Future<List<TrafficRuleTopic>> getTrafficRuleTopics(String language, String state, String licenseId);
+  Future<List<TrafficRuleTopic>> getTrafficRuleTopics(String language, String state);
   
   /// Get a specific traffic rule topic by ID
   /// This method is only used by the FirebaseContentApi implementation
