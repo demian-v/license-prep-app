@@ -32,6 +32,10 @@ class TestScreen extends StatelessWidget {
             'questions_by_topics': 'Preguntas por Temas',
             'practice_tickets': 'Boletos de Práctica',
             'random_questions_no_limit': 'Preguntas aleatorias, sin límite',
+            'time_60_minutes': '60 minutos',
+            'questions_40': '40 preguntas',
+            'time_unlimited': 'Tiempo ilimitado',
+            'questions_100_sorted': '100+ preguntas por temas',
           }[key] ?? key;
         case 'uk':
           return {
@@ -46,6 +50,10 @@ class TestScreen extends StatelessWidget {
             'questions_by_topics': 'Питання за темами',
             'practice_tickets': 'Практичні білети',
             'random_questions_no_limit': 'Випадкові питання, без обмежень',
+            'time_60_minutes': '60 хвилин',
+            'questions_40': '40 запитань',
+            'time_unlimited': 'Необмежений час',
+            'questions_100_sorted': '100+ запитань за темами',
           }[key] ?? key;
         case 'ru':
           return {
@@ -60,6 +68,10 @@ class TestScreen extends StatelessWidget {
             'questions_by_topics': 'Вопросы по темам',
             'practice_tickets': 'Практические билеты',
             'random_questions_no_limit': 'Случайные вопросы, без ограничений',
+            'time_60_minutes': '60 минут',
+            'questions_40': '40 вопросов',
+            'time_unlimited': 'Неограниченное время',
+            'questions_100_sorted': '100+ вопросов по темам',
           }[key] ?? key;
         case 'pl':
           return {
@@ -74,6 +86,10 @@ class TestScreen extends StatelessWidget {
             'questions_by_topics': 'Pytania według tematów',
             'practice_tickets': 'Bilety praktyczne',
             'random_questions_no_limit': 'Losowe pytania, bez limitu',
+            'time_60_minutes': '60 minut',
+            'questions_40': '40 pytań',
+            'time_unlimited': 'Nieograniczony czas',
+            'questions_100_sorted': '100+ pytań według tematów',
           }[key] ?? key;
         case 'en':
         default:
@@ -89,6 +105,10 @@ class TestScreen extends StatelessWidget {
             'questions_by_topics': 'Questions by Topics',
             'practice_tickets': 'Practice Tickets',
             'random_questions_no_limit': 'Random questions, no limit',
+            'time_60_minutes': '60 minutes',
+            'questions_40': '40 questions',
+            'time_unlimited': 'Unlimited time',
+            'questions_100_sorted': '100+ questions sorted by topics',
           }[key] ?? key;
       }
     } catch (e) {
@@ -154,8 +174,8 @@ class TestScreen extends StatelessWidget {
                         ),
                       );
                     },
-                    leftInfoText: "60 minutes",
-                    rightInfoText: "40 questions",
+                    leftInfoText: _translate('time_60_minutes', languageProvider),
+                    rightInfoText: _translate('questions_40', languageProvider),
                     cardType: 0,
                   ),
                   // Learn by Topics card with left and right info
@@ -173,8 +193,8 @@ class TestScreen extends StatelessWidget {
                         ),
                       );
                     },
-                    leftInfoText: "Unlimited time",
-                    rightInfoText: "100+ questions sorted by topics",
+                    leftInfoText: _translate('time_unlimited', languageProvider),
+                    rightInfoText: _translate('questions_100_sorted', languageProvider),
                     cardType: 1,
                   ),
                   // Practice Tickets card with left and right info
@@ -206,8 +226,8 @@ class TestScreen extends StatelessWidget {
                         );
                       });
                     },
-                    leftInfoText: "Unlimited time",
-                    rightInfoText: "40 questions",
+                    leftInfoText: _translate('time_unlimited', languageProvider),
+                    rightInfoText: _translate('questions_40', languageProvider),
                     cardType: 2,
                   ),
                   SizedBox(height: 16),

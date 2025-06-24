@@ -55,5 +55,10 @@
   "finish_topic": "Завершить тему",
   "traffic_rules": "Правила дорожного движения",
   "modules_count": "модулей",
-  "back_to_tests": "Назад к Тестам"
+  "back_to_tests": "Назад к Тестам",
+  
+  "time_60_minutes": "60 минут",
+  "questions_40": "40 вопросов",
+  "time_unlimited": "Неограниченное время",
+  "questions_100_sorted": "100+ вопросов по темам"
 }

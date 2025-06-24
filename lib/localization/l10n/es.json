@@ -55,5 +55,10 @@
   "finish_topic": "Finalizar tema",
   "traffic_rules": "Reglas de tráfico",
   "modules_count": "módulos",
-  "back_to_tests": "Volver a Pruebas"
+  "back_to_tests": "Volver a Pruebas",
+  
+  "time_60_minutes": "60 minutos",
+  "questions_40": "40 preguntas",
+  "time_unlimited": "Tiempo ilimitado",
+  "questions_100_sorted": "100+ preguntas por temas"
 }

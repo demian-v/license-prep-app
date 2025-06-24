@@ -57,5 +57,10 @@
   "modules_count": "модулів",
   "back_to_tests": "Назад до Тестів",
   "content_coming_soon": "Контент буде додано незабаром",
-  "new_content_being_prepared": "Нові теми готуються для вашого регіону"
+  "new_content_being_prepared": "Нові теми готуються для вашого регіону",
+  
+  "time_60_minutes": "60 хвилин",
+  "questions_40": "40 запитань",
+  "time_unlimited": "Необмежений час",
+  "questions_100_sorted": "100+ запитань за темами"
 }

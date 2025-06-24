@@ -55,5 +55,10 @@
   "finish_topic": "End Topic",
   "traffic_rules": "Traffic Rules",
   "modules_count": "modules",
-  "back_to_tests": "Back to Tests"
+  "back_to_tests": "Back to Tests",
+  
+  "time_60_minutes": "60 minutes",
+  "questions_40": "40 questions",
+  "time_unlimited": "Unlimited time",
+  "questions_100_sorted": "100+ questions sorted by topics"
 }
