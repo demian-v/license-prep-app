@@ -348,13 +348,13 @@ class FirebaseContentApi implements ContentApiInterface {
       // Ensure language code is correct (use 'uk' for Ukrainian)
       if (language == 'ua') {
         language = 'uk';
-        print('Corrected language code from ua to uk');
+        print('🔧 Corrected language code from ua to uk');
       }
       
       // If state is null or empty, we'll query without state filtering
       // This allows us to show the empty state UI when no state is selected
       var stateValue = (state == null || state.isEmpty) ? 'ALL' : state;
-      print('State value for Firebase query: $stateValue (original value: $state)');
+      print('🏢 State value for Firebase query: $stateValue (original value: $state)');
       
       // First try to get the user's state from Firestore to ensure we're using the most up-to-date value
       try {
@@ -367,111 +367,249 @@ class FirebaseContentApi implements ContentApiInterface {
             
             // If the user has a state in Firestore, use that instead of the parameter
             if (userState != null && userState.isNotEmpty) {
-              print('IMPORTANT - Overriding state parameter from "$stateValue" to Firestore user state: "$userState"');
+              print('⚠️ IMPORTANT - Overriding questions state parameter from "$stateValue" to Firestore user state: "$userState"');
               stateValue = userState;
             }
             
-            print('DEBUG - User document state: ${userData['state']}, Final state for query: $stateValue');
+            print('🔍 DEBUG - User document state: ${userData['state']}, Final state for questions query: $stateValue');
           }
         }
       } catch (e) {
-        print('Error checking user state: $e');
+        print('❌ Error checking user state for questions: $e');
       }
       
-      print('Fetching quiz questions with: topicId=$topicId, language=$language, state=$stateValue');
+      print('🎯 Fetching quiz questions with: topicId=$topicId, language=$language, state=$stateValue');
       
-      final response = await _functionsClient.callFunction<List<dynamic>>(
-        'getQuizQuestions',
-        data: {
-          'topicId': topicId,
-          'language': language,
-          'state': stateValue,
-        },
-      );
+      // First attempt: Try Firebase Functions (PRIMARY METHOD)
+      List<QuizQuestion> processedQuestions = [];
       
-      // Debug output
-      print('Received questions response: $response');
-      
-      if (response == null || response.isEmpty) {
-        print('Questions response was empty, returning empty list');
-        // Return empty list instead of fallback data
-        return [];
-      }
-      
-      return response.map((item) {
-        try {
-          // Handle different possible types coming from Firebase Functions
-          final Map<dynamic, dynamic> rawData = item as Map<dynamic, dynamic>;
-          // Convert to Map<String, dynamic>
-          final Map<String, dynamic> data = Map<String, dynamic>.from(rawData.map(
-            (key, value) => MapEntry(key.toString(), value),
-          ));
-          
-          print('Processing question: ${data['id']}');
-          
-          // Safe extraction of options
-          List<String> options = [];
-          if (data['options'] != null) {
-            if (data['options'] is List) {
-              options = (data['options'] as List)
-                  .map((item) => item?.toString() ?? "")
-                  .where((item) => item.isNotEmpty)
-                  .toList();
+      try {
+        print('📞 Attempting Firebase Functions: getQuizQuestions with: topicId=$topicId, language=$language, state=$stateValue');
+        
+        final response = await _functionsClient.callFunction<List<dynamic>>(
+          'getQuizQuestions',
+          data: {
+            'topicId': topicId,
+            'language': language,
+            'state': stateValue,
+          },
+        );
+        
+        // Enhanced debug output
+        print('📋 Raw Firebase Function Response:');
+        print('   - Response type: ${response.runtimeType}');
+        print('   - Response length: ${response?.length ?? 0}');
+        
+        if (response != null && response.isNotEmpty) {
+          // Log each question ID before filtering
+          print('📝 Questions received from Firebase Function:');
+          for (int i = 0; i < response.length; i++) {
+            try {
+              final item = response[i];
+              final Map<dynamic, dynamic> rawData = item as Map<dynamic, dynamic>;
+              final Map<String, dynamic> data = Map<String, dynamic>.from(rawData.map(
+                (key, value) => MapEntry(key.toString(), value),
+              ));
+              print('   ${i + 1}. ${data['id']} - Topic: ${data['topicId']} (lang: ${data['language']}, state: ${data['state']})');
+            } catch (e) {
+              print('   ${i + 1}. ❌ Error reading question: $e');
             }
           }
           
-          // Extract the correct answer value - checking multiple possible field names
-          // Handle different formats (array or string)
-          dynamic correctAnswer;
-          if (data.containsKey('correctAnswers') && data['correctAnswers'] != null) {
-            // If it's stored as an array in Firestore
-            if (data['correctAnswers'] is List) {
-              correctAnswer = (data['correctAnswers'] as List)
-                  .map((item) => item.toString())
-                  .toList();
-            }
-          } else if (data.containsKey('correctAnswer') && data['correctAnswer'] != null) {
-            correctAnswer = data['correctAnswer'].toString();
-          } else if (data.containsKey('correctAnswerString') && data['correctAnswerString'] != null) {
-            // For backward compatibility, split comma-separated values
-            String answerStr = data['correctAnswerString'].toString();
-            if (data['type']?.toString()?.toLowerCase() == 'multiplechoice') {
-              correctAnswer = answerStr.split(', ').map((s) => s.trim()).toList();
-            } else {
-              correctAnswer = answerStr;
+          // Enhanced processing with better error handling
+          for (int i = 0; i < response.length; i++) {
+            try {
+              final item = response[i];
+              final Map<dynamic, dynamic> rawData = item as Map<dynamic, dynamic>;
+              final Map<String, dynamic> data = Map<String, dynamic>.from(rawData.map(
+                (key, value) => MapEntry(key.toString(), value),
+              ));
+              
+              final questionId = data['id']?.toString() ?? 'unknown';
+              
+              print('🔨 Processing question $questionId:');
+              
+              // Safe extraction of options
+              List<String> options = [];
+              if (data['options'] != null) {
+                if (data['options'] is List) {
+                  options = (data['options'] as List)
+                      .map((item) => item?.toString() ?? "")
+                      .where((item) => item.isNotEmpty)
+                      .toList();
+                }
+              }
+              
+              // Extract the correct answer value - checking multiple possible field names
+              // Handle different formats (array or string)
+              dynamic correctAnswer;
+              if (data.containsKey('correctAnswers') && data['correctAnswers'] != null) {
+                // If it's stored as an array in Firestore
+                if (data['correctAnswers'] is List) {
+                  correctAnswer = (data['correctAnswers'] as List)
+                      .map((item) => item.toString())
+                      .toList();
+                }
+              } else if (data.containsKey('correctAnswer') && data['correctAnswer'] != null) {
+                correctAnswer = data['correctAnswer'].toString();
+              } else if (data.containsKey('correctAnswerString') && data['correctAnswerString'] != null) {
+                // For backward compatibility, split comma-separated values
+                String answerStr = data['correctAnswerString'].toString();
+                if (data['type']?.toString()?.toLowerCase() == 'multiplechoice') {
+                  correctAnswer = answerStr.split(', ').map((s) => s.trim()).toList();
+                } else {
+                  correctAnswer = answerStr;
+                }
+              }
+              
+              // Safe text preview to avoid RangeError
+              final questionText = data['questionText']?.toString() ?? 'No text';
+              final preview = questionText.length > 50 ? questionText.substring(0, 50) + '...' : questionText;
+              print('   - Question Text: $preview');
+              print('   - Options: ${options.length} items');
+              print('   - Correct Answer: $correctAnswer');
+              
+              final question = QuizQuestion(
+                id: questionId,
+                topicId: data['topicId']?.toString() ?? topicId,
+                questionText: data['questionText']?.toString() ?? 'No question text',
+                options: options,
+                correctAnswer: correctAnswer,
+                explanation: data['explanation']?.toString(),
+                ruleReference: data['ruleReference']?.toString(),
+                imagePath: data['imagePath']?.toString(),
+                type: data['type'] != null ? 
+                  _parseQuestionType(data['type'].toString()) : 
+                  QuestionType.singleChoice,
+              );
+              
+              processedQuestions.add(question);
+              print('   ✅ Successfully processed question $questionId');
+              
+            } catch (e) {
+              print('   ❌ Error processing question ${i + 1}: $e');
+              print('   Raw data: ${response[i]}');
+              // Continue processing other questions instead of failing completely
             }
           }
           
-          print('Question ID: ${data['id']}, Correct Answer: $correctAnswer');
-          
-          return QuizQuestion(
-            id: data['id'].toString(),
-            topicId: data['topicId'].toString(),
-            questionText: data['questionText'].toString(),
-            options: options,
-            correctAnswer: correctAnswer,
-            explanation: data['explanation']?.toString(),
-            ruleReference: data['ruleReference']?.toString(),
-            imagePath: data['imagePath']?.toString(),
-            type: data['type'] != null ? 
-              _parseQuestionType(data['type'].toString()) : 
-              QuestionType.singleChoice,
-          );
-        } catch (e) {
-          print('Error processing question: $e');
-          print('Raw item: $item');
-          // Return null and filter out later
-          return null;
+          print('📊 Firebase Functions result: ${processedQuestions.length} questions processed');
+        } else {
+          print('❌ Firebase Functions returned empty response');
         }
-      })
-      .where((question) => question != null) // Filter out null questions
-      .cast<QuizQuestion>() // Cast non-null questions
-      .toList();
-    } catch (e) {
-      print('Error fetching quiz questions: $e');
-      print('Returning empty list');
+      } catch (e) {
+        print('❌ Error with Firebase Functions: $e');
+      }
       
-      // Return empty list instead of fallback data
+      // Second attempt: Direct Firestore query (FALLBACK METHOD)
+      if (processedQuestions.length == 0) {
+        print('🚨 Got only ${processedQuestions.length} questions from Firebase Functions, trying direct Firestore query...');
+        
+        try {
+          print('📞 Attempting direct Firestore query: quizQuestions collection');
+          print('Query parameters: topicId=$topicId, language=$language, state=[${stateValue}, ALL]');
+          
+          QuerySnapshot querySnapshot = await _firestore
+              .collection('quizQuestions')
+              .where('topicId', isEqualTo: topicId)
+              .where('language', isEqualTo: language)
+              .where('state', whereIn: [stateValue, 'ALL'])
+              .get();
+          
+          print('📋 Direct Firestore result: ${querySnapshot.docs.length} documents found');
+          
+          if (querySnapshot.docs.isNotEmpty) {
+            final List<QuizQuestion> firestoreQuestions = [];
+            
+            for (var doc in querySnapshot.docs) {
+              try {
+                final data = doc.data() as Map<String, dynamic>;
+                final questionId = data['id']?.toString() ?? doc.id;
+                
+                print('🔨 Processing Firestore question: $questionId - Topic: ${data['topicId']} (state: ${data['state']})');
+                
+                // Safe extraction of options
+                List<String> options = [];
+                if (data['options'] != null) {
+                  if (data['options'] is List) {
+                    options = (data['options'] as List)
+                        .map((item) => item?.toString() ?? "")
+                        .where((item) => item.isNotEmpty)
+                        .toList();
+                  }
+                }
+                
+                // Extract the correct answer value - checking multiple possible field names
+                dynamic correctAnswer;
+                if (data.containsKey('correctAnswers') && data['correctAnswers'] != null) {
+                  if (data['correctAnswers'] is List) {
+                    correctAnswer = (data['correctAnswers'] as List)
+                        .map((item) => item.toString())
+                        .toList();
+                  }
+                } else if (data.containsKey('correctAnswer') && data['correctAnswer'] != null) {
+                  correctAnswer = data['correctAnswer'].toString();
+                } else if (data.containsKey('correctAnswerString') && data['correctAnswerString'] != null) {
+                  String answerStr = data['correctAnswerString'].toString();
+                  if (data['type']?.toString()?.toLowerCase() == 'multiplechoice') {
+                    correctAnswer = answerStr.split(', ').map((s) => s.trim()).toList();
+                  } else {
+                    correctAnswer = answerStr;
+                  }
+                }
+                
+                final question = QuizQuestion(
+                  id: questionId,
+                  topicId: data['topicId']?.toString() ?? topicId,
+                  questionText: data['questionText']?.toString() ?? 'No question text',
+                  options: options,
+                  correctAnswer: correctAnswer,
+                  explanation: data['explanation']?.toString(),
+                  ruleReference: data['ruleReference']?.toString(),
+                  imagePath: data['imagePath']?.toString(),
+                  type: data['type'] != null ? 
+                    _parseQuestionType(data['type'].toString()) : 
+                    QuestionType.singleChoice,
+                );
+                
+                firestoreQuestions.add(question);
+                print('   ✅ Successfully processed Firestore question: $questionId');
+                
+              } catch (e) {
+                print('   ❌ Error processing Firestore question: $e');
+              }
+            }
+            
+            if (firestoreQuestions.length > processedQuestions.length) {
+              print('🎉 Firestore provided more questions (${firestoreQuestions.length}) than Firebase Functions (${processedQuestions.length}), using Firestore result');
+              processedQuestions = firestoreQuestions;
+            } else {
+              print('📊 Firebase Functions result was better, keeping it');
+            }
+          } else {
+            print('❌ No questions found in Firestore either');
+          }
+        } catch (e) {
+          print('❌ Error querying Firestore directly: $e');
+        }
+      }
+      
+      print('🎉 Final result: ${processedQuestions.length} questions successfully processed');
+      for (int i = 0; i < processedQuestions.length && i < 5; i++) {
+        final questionText = processedQuestions[i].questionText;
+        final preview = questionText.length > 50 ? questionText.substring(0, 50) + '...' : questionText;
+        print('   ${i + 1}. ${processedQuestions[i].id} - $preview');
+      }
+      if (processedQuestions.length > 5) {
+        print('   ... and ${processedQuestions.length - 5} more questions');
+      }
+      
+      return processedQuestions;
+    } catch (e) {
+      print('💥 Critical error fetching quiz questions: $e');
+      print('📍 Stack trace: ${StackTrace.current}');
+      
+      // Return empty list instead of throwing
       return [];
     }
   }
