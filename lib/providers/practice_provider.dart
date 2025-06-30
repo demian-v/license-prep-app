@@ -2,6 +2,8 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math' show min;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/exam.dart';
 import '../models/quiz_question.dart';
 import '../services/service_locator.dart';
@@ -28,8 +30,8 @@ class PracticeProvider extends ChangeNotifier {
       _errorMessage = null;
       notifyListeners();
       
-      // Fetch random questions from Firebase
-      final practiceQuestions = await _fetchRandomQuestions(
+      // NEW: Fetch random questions directly from Firestore (simplified approach)
+      final practiceQuestions = await _fetchDirectRandomQuestions(
         language: language,
         state: state,
         licenseType: licenseType,
@@ -37,7 +39,7 @@ class PracticeProvider extends ChangeNotifier {
       );
       
       if (practiceQuestions.isEmpty) {
-        _errorMessage = 'Failed to load practice questions';
+        _errorMessage = 'No questions found for your state and language. Please check your settings.';
         _isLoading = false;
         notifyListeners();
         return;
@@ -131,8 +133,133 @@ class PracticeProvider extends ChangeNotifier {
     return _loadedQuestions[questionId];
   }
   
-  // Helper method to fetch random questions
-  Future<List<QuizQuestion>> _fetchRandomQuestions({
+  // Helper method to parse question type from string
+  QuestionType _parseQuestionType(String type) {
+    switch (type.toLowerCase()) {
+      case 'truefalse':
+        return QuestionType.trueFalse;
+      case 'multiplechoice':
+        return QuestionType.multipleChoice;
+      default:
+        return QuestionType.singleChoice;
+    }
+  }
+  
+  // NEW: Direct method to fetch random questions from Firestore (for Practice Tickets only)
+  Future<List<QuizQuestion>> _fetchDirectRandomQuestions({
+    required String language,
+    required String state,
+    required String licenseType,
+    required int count,
+  }) async {
+    try {
+      print('🎯 Direct fetch: language=$language, state=$state, count=$count');
+      
+      // Check user's state from Firestore for consistency (like other methods)
+      var stateValue = state;
+      try {
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
+          if (userDoc.exists) {
+            final userData = userDoc.data() as Map<String, dynamic>;
+            final userState = userData['state'] as String?;
+            
+            if (userState != null && userState.isNotEmpty) {
+              print('🔧 Using user state from Firestore: $userState (overriding $stateValue)');
+              stateValue = userState;
+            }
+          }
+        }
+      } catch (e) {
+        print('⚠️ Could not check user state: $e, using provided state: $stateValue');
+      }
+      
+      // Single Firestore query - no complex topic fetching
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('quizQuestions')
+          .where('language', isEqualTo: language)
+          .where('state', whereIn: [stateValue, 'ALL'])
+          .get();
+      
+      print('📋 Direct query found ${querySnapshot.docs.length} questions');
+      
+      if (querySnapshot.docs.isEmpty) {
+        print('❌ No questions found in direct query');
+        return [];
+      }
+      
+      // Convert to QuizQuestion objects
+      final allQuestions = <QuizQuestion>[];
+      
+      for (var doc in querySnapshot.docs) {
+        try {
+          final data = doc.data();
+          
+          // Safe extraction of options
+          List<String> options = [];
+          if (data['options'] != null && data['options'] is List) {
+            options = (data['options'] as List)
+                .map((item) => item?.toString() ?? "")
+                .where((item) => item.isNotEmpty)
+                .toList();
+          }
+          
+          // Extract the correct answer value
+          dynamic correctAnswer;
+          if (data['correctAnswers'] != null && data['correctAnswers'] is List) {
+            correctAnswer = (data['correctAnswers'] as List)
+                .map((item) => item.toString())
+                .toList();
+          } else if (data['correctAnswer'] != null) {
+            correctAnswer = data['correctAnswer'].toString();
+          } else if (data['correctAnswerString'] != null) {
+            String answerStr = data['correctAnswerString'].toString();
+            if (data['type']?.toString()?.toLowerCase() == 'multiplechoice') {
+              correctAnswer = answerStr.split(', ').map((s) => s.trim()).toList();
+            } else {
+              correctAnswer = answerStr;
+            }
+          }
+          
+          final question = QuizQuestion(
+            id: data['id'] ?? doc.id,
+            topicId: data['topicId'] ?? '',
+            questionText: data['questionText'] ?? 'No question text',
+            options: options,
+            correctAnswer: correctAnswer,
+            explanation: data['explanation']?.toString(),
+            ruleReference: data['ruleReference']?.toString(),
+            imagePath: data['imagePath']?.toString(),
+            type: _parseQuestionType(data['type'] ?? 'singleChoice'),
+          );
+          
+          allQuestions.add(question);
+        } catch (e) {
+          print('❌ Error processing question ${doc.id}: $e');
+        }
+      }
+      
+      print('✅ Processed ${allQuestions.length} questions successfully');
+      
+      // Shuffle and take requested count
+      if (allQuestions.isNotEmpty) {
+        allQuestions.shuffle(Random());
+        final selectedQuestions = allQuestions.take(min(count, allQuestions.length)).toList();
+        print('🎲 Selected ${selectedQuestions.length} random questions for practice');
+        return selectedQuestions;
+      }
+      
+      return [];
+      
+    } catch (e) {
+      print('❌ Direct fetch error: $e');
+      return [];
+    }
+  }
+  
+  // OLD: Complex method (kept as backup) - fetches questions by topics first
+  Future<List<QuizQuestion>> _fetchRandomQuestions_OLD({
     required String language,
     required String state,
     required String licenseType,
