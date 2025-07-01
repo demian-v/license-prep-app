@@ -5,6 +5,7 @@ import '../providers/exam_provider.dart';
 import '../providers/progress_provider.dart';
 import '../models/quiz_question.dart';
 import '../services/service_locator.dart';
+import '../localization/app_localizations.dart';
 import 'exam_result_screen.dart';
 
 class ExamQuestionScreen extends StatefulWidget {
@@ -166,7 +167,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> with TickerProv
     if (currentQuestion == null) {
       return Scaffold(
         body: Center(
-          child: Text("Питання не знайдено"),
+          child: Text(AppLocalizations.of(context).translate('question_not_found')),
         ),
       );
     }
@@ -496,7 +497,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> with TickerProv
                           borderRadius: BorderRadius.circular(30),
                           child: Center(
                             child: Text(
-                              "Наступне",
+                              AppLocalizations.of(context).translate('next'),
                               style: TextStyle(
                                 color: Colors.black,
                                 fontWeight: FontWeight.bold,
@@ -539,7 +540,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> with TickerProv
                                 borderRadius: BorderRadius.circular(30),
                                 child: Center(
                                   child: Text(
-                                    "Пропустити",
+                                    AppLocalizations.of(context).translate('skip'),
                                     style: TextStyle(
                                       color: Colors.black,
                                       fontWeight: FontWeight.bold,
@@ -594,7 +595,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> with TickerProv
                                 borderRadius: BorderRadius.circular(30),
                                 child: Center(
                                   child: Text(
-                                    "Обрати",
+                                    AppLocalizations.of(context).translate('choose'),
                                     style: TextStyle(
                                       color: selectedAnswer == null ? Colors.grey.shade600 : Colors.black,
                                       fontWeight: FontWeight.bold,
@@ -675,7 +676,9 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> with TickerProv
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  "Питання ${currentQuestionNumber} з ${totalQuestions}",
+                  AppLocalizations.of(context).translate('question_x_of_y')
+                      .replaceAll('{0}', currentQuestionNumber.toString())
+                      .replaceAll('{1}', totalQuestions.toString()),
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -692,7 +695,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> with TickerProv
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    "Декілька відповідей",
+                    AppLocalizations.of(context).translate('multiple_answers'),
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w500,
@@ -737,7 +740,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> with TickerProv
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        "Оберіть всі правильні відповіді",
+                        AppLocalizations.of(context).translate('select_all_correct_answers'),
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.blue.shade700,
@@ -838,9 +841,9 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> with TickerProv
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text("Вийти з тесту?"),
+        title: Text(AppLocalizations.of(context).translate('exit_test_title')),
         content: Text(
-          "Якщо ви вийдете з тесту, результат вашого проходження не збережеться",
+          AppLocalizations.of(context).translate('exit_test_message'),
         ),
         actions: [
           // Exit button with gradient
@@ -868,7 +871,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> with TickerProv
                   padding: EdgeInsets.symmetric(horizontal: 16),
                   child: Center(
                     child: Text(
-                      "Вийти",
+                      AppLocalizations.of(context).translate('exit'),
                       style: TextStyle(
                         color: Colors.black,
                         fontWeight: FontWeight.bold,
@@ -909,7 +912,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> with TickerProv
                   padding: EdgeInsets.symmetric(horizontal: 16),
                   child: Center(
                     child: Text(
-                      "Залишитися",
+                      AppLocalizations.of(context).translate('stay'),
                       style: TextStyle(
                         color: Colors.black,
                         fontWeight: FontWeight.bold,

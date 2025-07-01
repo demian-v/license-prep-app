@@ -374,15 +374,8 @@ class ExamProvider extends ChangeNotifier {
       completeExam();
     }
     
-    // Calculate time remaining manually
-    final elapsed = DateTime.now().difference(_currentExam!.startTime).inSeconds;
-    final totalTime = _currentExam!.timeLimit * 60; // Convert minutes to seconds
-    final timeRemaining = totalTime - elapsed;
-    
-    // Only notify listeners if we're close to time limit or every 30 seconds
-    if (timeRemaining <= 60 || elapsed % 30 == 0) {
-      notifyListeners();
-    }
+    // Always notify listeners every second so timer display updates in real-time
+    notifyListeners();
   }
   
   // Start a timer for UI updates

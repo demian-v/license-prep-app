@@ -60,5 +60,15 @@
   "time_60_minutes": "60 minutes",
   "questions_40": "40 questions",
   "time_unlimited": "Unlimited time",
-  "questions_100_sorted": "100+ questions sorted by topics"
+  "questions_100_sorted": "100+ questions sorted by topics",
+  
+  "exit_test_title": "Exit test?",
+  "exit_test_message": "If you exit the test, your progress will not be saved",
+  "exit": "Exit",
+  "stay": "Stay",
+  "choose": "Choose",
+  "question_not_found": "Question not found",
+  "question_x_of_y": "Question {0} of {1}",
+  "multiple_answers": "Multiple answers",
+  "select_all_correct_answers": "Select all correct answers"
 }

@@ -60,5 +60,15 @@
   "time_60_minutes": "60 minut",
   "questions_40": "40 pytań",
   "time_unlimited": "Nieograniczony czas",
-  "questions_100_sorted": "100+ pytań według tematów"
+  "questions_100_sorted": "100+ pytań posortowanych według tematów",
+  
+  "exit_test_title": "Wyjść z testu?",
+  "exit_test_message": "Jeśli wyjdziesz z testu, twój postęp nie zostanie zapisany",
+  "exit": "Wyjdź",
+  "stay": "Zostań",
+  "choose": "Wybierz",
+  "question_not_found": "Pytanie nie zostało znalezione",
+  "question_x_of_y": "Pytanie {0} z {1}",
+  "multiple_answers": "Wiele odpowiedzi",
+  "select_all_correct_answers": "Wybierz wszystkie prawidłowe odpowiedzi"
 }

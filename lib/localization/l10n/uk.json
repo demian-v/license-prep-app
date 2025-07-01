@@ -62,5 +62,15 @@
   "time_60_minutes": "60 хвилин",
   "questions_40": "40 запитань",
   "time_unlimited": "Необмежений час",
-  "questions_100_sorted": "100+ запитань за темами"
+  "questions_100_sorted": "100+ запитань за темами",
+  
+  "exit_test_title": "Вийти з тесту?",
+  "exit_test_message": "Якщо ви вийдете з тесту, результат вашого проходження не збережеться",
+  "exit": "Вийти",
+  "stay": "Залишитися",
+  "choose": "Обрати",
+  "question_not_found": "Питання не знайдено",
+  "question_x_of_y": "Питання {0} з {1}",
+  "multiple_answers": "Декілька відповідей",
+  "select_all_correct_answers": "Оберіть всі правильні відповіді"
 }
