@@ -14,6 +14,7 @@ class FunctionNameMapper {
     // Content functions
     'getQuizTopics': 'getQuizTopics',
     'getQuizQuestions': 'getQuizQuestions',
+    'getPracticeQuestions': 'getPracticeQuestions',
     'getRoadSignCategories': 'getRoadSignCategories',
     'getRoadSigns': 'getRoadSigns',
     'getTheoryModules': 'getTheoryModules',

@@ -30,14 +30,35 @@ class PracticeProvider extends ChangeNotifier {
       _errorMessage = null;
       notifyListeners();
       
-      // NEW: Fetch random questions directly from Firestore (simplified approach)
-      final practiceQuestions = await _fetchDirectRandomQuestions(
+      // STEP 1: Try Firebase Functions (PRIMARY METHOD)
+      print('🚀 Starting two-tier practice question fetch...');
+      List<QuizQuestion> practiceQuestions = await _fetchRandomQuestions_PRIMARY(
         language: language,
         state: state,
         licenseType: licenseType,
-        count: 40 // Number of questions for the practice test
+        count: 40,
       );
       
+      // STEP 2: Fallback to direct Firestore if needed
+      if (practiceQuestions.length < 40) {
+        print('🚨 Got only ${practiceQuestions.length} questions from Firebase Functions, trying direct Firestore fallback...');
+        
+        final fallbackQuestions = await _fetchDirectRandomQuestions_FALLBACK(
+          language: language,
+          state: state,
+          licenseType: licenseType,
+          count: 40,
+        );
+        
+        if (fallbackQuestions.length > practiceQuestions.length) {
+          print('🎉 Fallback provided more questions (${fallbackQuestions.length}) than primary (${practiceQuestions.length}), using fallback result');
+          practiceQuestions = fallbackQuestions;
+        } else {
+          print('📊 Primary method result was better, keeping it');
+        }
+      }
+      
+      // STEP 3: Validate results
       if (practiceQuestions.isEmpty) {
         _errorMessage = 'No questions found for your state and language. Please check your settings.';
         _isLoading = false;
@@ -45,7 +66,7 @@ class PracticeProvider extends ChangeNotifier {
         return;
       }
       
-      // Store questions locally
+      // STEP 4: Store questions locally and create practice test
       _loadedQuestions = {};
       final questionIds = <String>[];
       
@@ -61,8 +82,10 @@ class PracticeProvider extends ChangeNotifier {
         timeLimit: 0, // No time limit
       );
       
+      print('🎉 Practice test created successfully with ${questionIds.length} questions');
       _isLoading = false;
       notifyListeners();
+      
     } catch (e) {
       print('Error starting practice test: $e');
       _errorMessage = 'Failed to start practice test: $e';
@@ -145,8 +168,33 @@ class PracticeProvider extends ChangeNotifier {
     }
   }
   
-  // NEW: Direct method to fetch random questions from Firestore (for Practice Tickets only)
-  Future<List<QuizQuestion>> _fetchDirectRandomQuestions({
+  // PRIMARY: Firebase Functions method to fetch random questions (for Practice Tickets)
+  Future<List<QuizQuestion>> _fetchRandomQuestions_PRIMARY({
+    required String language,
+    required String state,
+    required String licenseType,
+    required int count,
+  }) async {
+    try {
+      print('🎯 Primary fetch: language=$language, state=$state, count=$count');
+      
+      // Use Firebase Functions via service locator
+      final practiceQuestions = await serviceLocator.content.getPracticeQuestions(
+        language: language,
+        state: state,
+        count: count,
+      );
+      
+      print('✅ Primary method result: ${practiceQuestions.length} questions');
+      return practiceQuestions;
+    } catch (e) {
+      print('❌ Primary method error: $e');
+      return [];
+    }
+  }
+  
+  // FALLBACK: Direct method to fetch random questions from Firestore (for Practice Tickets only)
+  Future<List<QuizQuestion>> _fetchDirectRandomQuestions_FALLBACK({
     required String language,
     required String state,
     required String licenseType,

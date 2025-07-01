@@ -910,6 +910,119 @@ class FirebaseContentApi implements ContentApiInterface {
     }
   }
   
+  /// Get practice questions for random practice tests
+  @override
+  Future<List<QuizQuestion>> getPracticeQuestions({
+    required String language,
+    required String state,
+    required int count,
+  }) async {
+    try {
+      // Ensure language code is correct (use 'uk' for Ukrainian)
+      if (language == 'ua') {
+        language = 'uk';
+        print('🔧 Corrected language code from ua to uk');
+      }
+      
+      // Get user's state from Firestore for consistency
+      var stateValue = state;
+      try {
+        final currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
+          if (userDoc.exists) {
+            final userData = userDoc.data() as Map<String, dynamic>;
+            final userState = userData['state'] as String?;
+            
+            if (userState != null && userState.isNotEmpty) {
+              print('⚠️ IMPORTANT - Overriding practice questions state parameter from "$stateValue" to Firestore user state: "$userState"');
+              stateValue = userState;
+            }
+          }
+        }
+      } catch (e) {
+        print('❌ Error checking user state for practice questions: $e');
+      }
+      
+      print('🎯 Fetching practice questions with Firebase Functions: language=$language, state=$stateValue, count=$count');
+      
+      final response = await _functionsClient.callFunction<List<dynamic>>(
+        'getPracticeQuestions',
+        data: {
+          'language': language,
+          'state': stateValue,
+          'count': count,
+        },
+      );
+      
+      print('📋 Firebase Functions response: ${response?.length ?? 0} questions');
+      
+      if (response != null && response.isNotEmpty) {
+        final List<QuizQuestion> processedQuestions = [];
+        
+        for (int i = 0; i < response.length; i++) {
+          try {
+            final item = response[i];
+            final Map<dynamic, dynamic> rawData = item as Map<dynamic, dynamic>;
+            final Map<String, dynamic> data = Map<String, dynamic>.from(rawData.map(
+              (key, value) => MapEntry(key.toString(), value),
+            ));
+            
+            // Safe extraction of options
+            List<String> options = [];
+            if (data['options'] != null && data['options'] is List) {
+              options = (data['options'] as List)
+                  .map((item) => item?.toString() ?? "")
+                  .where((item) => item.isNotEmpty)
+                  .toList();
+            }
+            
+            // Extract correct answer
+            dynamic correctAnswer;
+            if (data['correctAnswers'] != null && data['correctAnswers'] is List) {
+              correctAnswer = (data['correctAnswers'] as List)
+                  .map((item) => item.toString())
+                  .toList();
+            } else if (data['correctAnswer'] != null) {
+              correctAnswer = data['correctAnswer'].toString();
+            } else if (data['correctAnswerString'] != null) {
+              String answerStr = data['correctAnswerString'].toString();
+              if (data['type']?.toString()?.toLowerCase() == 'multiplechoice') {
+                correctAnswer = answerStr.split(', ').map((s) => s.trim()).toList();
+              } else {
+                correctAnswer = answerStr;
+              }
+            }
+            
+            final question = QuizQuestion(
+              id: data['id'] ?? 'unknown',
+              topicId: data['topicId'] ?? '',
+              questionText: data['questionText'] ?? 'No question text',
+              options: options,
+              correctAnswer: correctAnswer,
+              explanation: data['explanation']?.toString(),
+              ruleReference: data['ruleReference']?.toString(),
+              imagePath: data['imagePath']?.toString(),
+              type: _parseQuestionType(data['type'] ?? 'singleChoice'),
+            );
+            
+            processedQuestions.add(question);
+          } catch (e) {
+            print('❌ Error processing practice question ${i + 1}: $e');
+          }
+        }
+        
+        print('✅ Processed ${processedQuestions.length} practice questions from Firebase Functions');
+        return processedQuestions;
+      }
+      
+      return [];
+    } catch (e) {
+      print('💥 Error fetching practice questions from Firebase Functions: $e');
+      throw 'Failed to fetch practice questions: $e';
+    }
+  }
+  
   /// Get practice tests based on license type, language, and state
   @override
   Future<List<PracticeTest>> getPracticeTests(String licenseType, String language, String state) async {

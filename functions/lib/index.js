@@ -23,7 +23,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createOrUpdateUserDocument = exports.getUserData = exports.updateUserState = exports.updateUserLanguage = exports.getPracticeTests = exports.getTheoryModules = exports.getTrafficRuleTopics = exports.getQuizQuestions = exports.contentGetQuizTopics = exports.getQuizTopics = void 0;
+exports.createOrUpdateUserDocument = exports.getUserData = exports.updateUserState = exports.updateUserLanguage = exports.getPracticeTests = exports.getPracticeQuestions = exports.getTheoryModules = exports.getTrafficRuleTopics = exports.getQuizQuestions = exports.contentGetQuizTopics = exports.getQuizTopics = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 // Initialize Firebase Admin
@@ -308,6 +308,86 @@ exports.getTheoryModules = functions.https.onCall(async (data, context) => {
             throw error;
         }
         throw new functions.https.HttpsError('internal', 'Failed to fetch theory modules: ' + (error instanceof Error ? error.message : String(error)));
+    }
+});
+// Practice Questions function
+exports.getPracticeQuestions = functions.https.onCall(async (data, context) => {
+    try {
+        console.log('getPracticeQuestions called with data:', data);
+        // Validate required parameters
+        const { language, state, count = 40 } = data;
+        if (!language || !state) {
+            throw new functions.https.HttpsError('invalid-argument', 'Missing required parameters: language and state are required');
+        }
+        console.log(`Fetching practice questions for language: ${language}, state: ${state}, count: ${count}`);
+        // Query Firestore for practice questions
+        let snapshot;
+        try {
+            // Try the most specific query first
+            snapshot = await db.collection('quizQuestions')
+                .where('language', '==', language)
+                .where('state', 'in', [state, 'ALL'])
+                .get();
+        }
+        catch (indexError) {
+            console.log('Trying fallback query strategy due to index error:', indexError);
+            // Fallback: query by language only, then filter manually
+            snapshot = await db.collection('quizQuestions')
+                .where('language', '==', language)
+                .get();
+        }
+        console.log(`Found ${snapshot.docs.length} questions before filtering and shuffling`);
+        // Process and filter results
+        const allQuestions = snapshot.docs
+            .map(doc => {
+            const data = doc.data();
+            // Handle different correct answer field names in Firestore
+            let correctAnswer = data.correctAnswer;
+            if (!correctAnswer && data.correctAnswerString) {
+                correctAnswer = data.correctAnswerString;
+            }
+            if (!correctAnswer && data.correctAnswers) {
+                correctAnswer = data.correctAnswers;
+            }
+            // Ensure we have a valid correct answer
+            if (!correctAnswer) {
+                console.warn(`Question ${data.id || doc.id} has no correct answer!`);
+            }
+            return {
+                id: data.id || doc.id,
+                topicId: data.topicId || '',
+                questionText: data.questionText || '',
+                options: data.options || [],
+                correctAnswer: correctAnswer,
+                correctAnswerString: data.correctAnswerString,
+                explanation: data.explanation || '',
+                ruleReference: data.ruleReference || '',
+                imagePath: data.imagePath || null,
+                type: data.type || 'singleChoice',
+                language: data.language,
+                state: data.state
+            };
+        })
+            .filter(question => {
+            // Manual filtering to ensure exact matches
+            const languageMatch = question.language === language;
+            const stateMatch = question.state === state || question.state === 'ALL';
+            return languageMatch && stateMatch;
+        });
+        console.log(`After filtering: ${allQuestions.length} questions available`);
+        // Server-side shuffle for better randomization
+        const shuffled = allQuestions.sort(() => 0.5 - Math.random());
+        // Limit to requested count
+        const limited = shuffled.slice(0, Math.min(count, shuffled.length));
+        console.log(`Returning ${limited.length} questions after shuffle and limit`);
+        return limited;
+    }
+    catch (error) {
+        console.error('Error in getPracticeQuestions:', error);
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
+        throw new functions.https.HttpsError('internal', 'Failed to fetch practice questions: ' + (error instanceof Error ? error.message : String(error)));
     }
 });
 // Practice Tests function

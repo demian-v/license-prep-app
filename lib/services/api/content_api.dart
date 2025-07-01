@@ -64,6 +64,42 @@ class ContentApi implements ContentApiInterface {
     }
   }
   
+  // Practice Questions
+  @override
+  Future<List<QuizQuestion>> getPracticeQuestions({
+    required String language,
+    required String state,
+    required int count,
+  }) async {
+    try {
+      // Use 'ALL' as default if state is empty
+      final stateValue = state.isEmpty ? 'ALL' : state;
+      
+      final response = await _apiClient.get(
+        '/content/practice-questions',
+        queryParameters: {
+          'language': language,
+          'state': stateValue,
+          'count': count,
+        },
+      );
+      
+      return (response.data as List).map((data) => QuizQuestion(
+        id: data['id'],
+        topicId: data['topicId'] ?? '',
+        questionText: data['questionText'],
+        options: List<String>.from(data['options'] ?? []),
+        correctAnswer: data['correctAnswer'],
+        explanation: data['explanation'],
+        ruleReference: data['ruleReference'],
+        imagePath: data['imagePath'],
+        type: _parseQuestionType(data['type']),
+      )).toList();
+    } catch (e) {
+      throw 'Failed to load practice questions: ${e.toString()}';
+    }
+  }
+  
   // Quiz Questions
   @override
   Future<List<QuizQuestion>> getQuizQuestions(String topicId, String language, String state) async {
