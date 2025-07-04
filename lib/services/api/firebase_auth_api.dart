@@ -341,6 +341,22 @@ class FirebaseAuthApi implements AuthApiInterface {
     throw 'No authenticated user found';
   }
 
+  /// Helper method to create user object with updated state
+  /// Tries to preserve current language when updating state
+  User _createUserWithState(String userId, String? stateId) {
+    final currentAuth = FirebaseAuth.instance.currentUser;
+    if (currentAuth != null) {
+      return User(
+        id: userId,
+        name: currentAuth.displayName ?? "User",
+        email: currentAuth.email ?? "",
+        language: 'en', // Default language - will be preserved by calling method
+        state: stateId,
+      );
+    }
+    throw 'No authenticated user found';
+  }
+
   /// Updates user language preference
   @override
   Future<User> updateUserLanguage(String userId, String language) async {
@@ -400,8 +416,6 @@ class FirebaseAuthApi implements AuthApiInterface {
   @override
   Future<User> updateUserState(String userId, String? state) async {
     try {
-      debugPrint('🗺️ [API] Updating user state to ${state ?? "null"} via Firebase function');
-      
       // Ensure we're using the state ID and not a full state name or "null" string
       String? stateId = state;
       
@@ -425,66 +439,90 @@ class FirebaseAuthApi implements AuthApiInterface {
         }
       }
       
-      // Update Firestore directly for more reliable state updates
-      await _firestore.collection('users').doc(userId).update({
-        'state': stateId,
-        'lastUpdated': FieldValue.serverTimestamp(),
-      });
+      // STEP 1: Try Firebase Functions (PRIMARY METHOD)
+      debugPrint('🗺️ [API] Updating user state to ${stateId ?? "null"} via Firebase function');
       
-      debugPrint('✅ [API] User state updated successfully to: $stateId in Firestore');
-      
-      // Also try using the Firebase function for legacy compatibility
       try {
         final result = await _functionsClient.callFunction<Map<String, dynamic>>(
           'updateUserState',
           data: {'state': stateId},
         );
         
+        // Check if we got a proper success response
         if (result != null && result['success'] == true) {
-          debugPrint('✅ [API] State update also confirmed via Firebase function');
+          debugPrint('✅ [API] State updated successfully via Firebase function');
+          
+          // Try to get current language to preserve it
+          String currentLanguage = 'en'; // Default to English
+          try {
+            final currentUser = await getCurrentUser();
+            if (currentUser != null && currentUser.language != null) {
+              currentLanguage = currentUser.language ?? 'en';
+            }
+          } catch (e) {
+            debugPrint('⚠️ Could not get current language, using default');
+          }
+          
+          // Create user with preserved language and new state
+          final currentAuth = FirebaseAuth.instance.currentUser;
+          if (currentAuth != null) {
+            return User(
+              id: userId,
+              name: currentAuth.displayName ?? "User",
+              email: currentAuth.email ?? "",
+              language: currentLanguage,
+              state: stateId,
+            );
+          }
+          return _createUserWithState(userId, stateId);
         }
       } catch (functionError) {
-        debugPrint('⚠️ [API] Firebase function update failed, but Firestore update succeeded: $functionError');
+        debugPrint('❌ [API] Firebase function failed: $functionError, trying direct Firestore fallback...');
       }
       
-      // Try to get the current language before creating a new user object
-      String currentLanguage = 'en'; // Default to English
+      // STEP 2: Fallback to direct Firestore update
+      debugPrint('🔄 [API] Using direct Firestore fallback for state update');
       
-      try {
-        // Try to get current language from stored user data
-        final currentUser = await getCurrentUser();
-        if (currentUser != null && currentUser.language != null) {
-          currentLanguage = currentUser.language ?? 'en';
+      await _firestore.collection('users').doc(userId).update({
+        'state': stateId,
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+      
+      debugPrint('✅ [API] State updated successfully via direct Firestore');
+      
+      // Verify the update was successful
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      if (userDoc.exists) {
+        final userData = userDoc.data() as Map<String, dynamic>;
+        final updatedState = userData['state'];
+        debugPrint('✅ [API] Verified state update in Firestore: $updatedState');
+        
+        if (updatedState == stateId) {
+          debugPrint('✅ [API] Firestore state update confirmed');
+        } else {
+          debugPrint('⚠️ [API] State verification mismatch - expected: $stateId, actual: $updatedState');
         }
-      } catch (e) {
-        // Ignore error, we'll use the default
-        debugPrint('⚠️ Could not get current language, using default');
+        
+        // Get current language to preserve it
+        final currentLanguage = userData['language'] ?? 'en';
+        
+        // Create user with preserved language and new state
+        final currentAuth = FirebaseAuth.instance.currentUser;
+        if (currentAuth != null) {
+          return User(
+            id: userId,
+            name: currentAuth.displayName ?? "User",
+            email: currentAuth.email ?? "",
+            language: currentLanguage,
+            state: stateId,
+          );
+        }
       }
       
-      // Create a locally updated user with the new state
-      final currentAuth = FirebaseAuth.instance.currentUser;
-      if (currentAuth != null) {
-        return User(
-          id: userId,
-          name: currentAuth.displayName ?? "User",
-          email: currentAuth.email ?? "",
-          language: currentLanguage,
-          state: stateId,
-        );
-      }
-      
-      // Try to fetch the updated user as a fallback
-      debugPrint('🔍 [API] Getting updated user data after state change');
-      final User? user = await getCurrentUser();
-      if (user == null) {
-        throw 'Failed to retrieve updated user profile';
-      }
-      
-      debugPrint('✅ [API] Successfully updated state, user state is now: ${user.state}');
-      return user;
+      return _createUserWithState(userId, stateId);
       
     } catch (e) {
-      debugPrint('❌ [API] Error updating state: $e');
+      debugPrint('❌ [API] All state update methods failed: $e');
       throw 'Failed to update state: $e';
     }
   }
