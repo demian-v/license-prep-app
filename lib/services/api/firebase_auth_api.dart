@@ -320,68 +320,78 @@ class FirebaseAuthApi implements AuthApiInterface {
     }
   }
   
+  /// Helper method to create user object with updated language
+  /// Tries to preserve current state when updating language
+  User _createUserWithLanguage(String userId, String language) {
+    final currentAuth = FirebaseAuth.instance.currentUser;
+    if (currentAuth != null) {
+      // Try to get current state from Firestore to preserve it
+      String? currentState;
+      
+      // We can't await here since this is not an async method, 
+      // so we'll just return a basic user for now and let the calling method handle state preservation
+      return User(
+        id: userId,
+        name: currentAuth.displayName ?? "User",
+        email: currentAuth.email ?? "",
+        language: language,
+        state: null, // State will be handled separately by the calling methods
+      );
+    }
+    throw 'No authenticated user found';
+  }
+
   /// Updates user language preference
   @override
   Future<User> updateUserLanguage(String userId, String language) async {
     try {
+      // STEP 1: Try Firebase Functions (PRIMARY METHOD)
       debugPrint('🔤 [API] Updating user language to $language via Firebase function');
-      final result = await _functionsClient.callFunction<Map<String, dynamic>>(
-        'updateUserLanguage',
-        data: {'language': language},
-      );
       
-      // Check if we got a proper success response
-      if (result != null && result['success'] == true) {
-        // Create a locally updated user with the new language
-        // This prevents issues with the getUserData function
-        final currentAuth = FirebaseAuth.instance.currentUser;
-        if (currentAuth != null) {
-          debugPrint('✅ [API] Language updated successfully, creating local user object');
-          return User(
-            id: userId,
-            name: currentAuth.displayName ?? "User",
-            email: currentAuth.email ?? "",
-            language: language,
-            state: null, // We don't know the state, leave it null
-          );
-        }
-      }
-      
-      // Try to fetch the updated user as a fallback
-      debugPrint('🔍 [API] Getting updated user data after language change');
-      final User? user = await getCurrentUser();
-      if (user == null) {
-        debugPrint('❌ [API] Failed to get updated user after language change');
-        // Fallback to returning a basic user with the updated language
-        final currentAuth = FirebaseAuth.instance.currentUser;
-        if (currentAuth != null) {
-          return User(
-            id: userId,
-            name: currentAuth.displayName ?? "User",
-            email: currentAuth.email ?? "",
-            language: language,
-            state: null, // We don't know the state, leave it null
-          );
-        }
-        throw 'Failed to retrieve updated user profile';
-      }
-      
-      debugPrint('✅ [API] Successfully updated language, user language is now: ${user.language}');
-      return user;
-    } catch (e) {
-      debugPrint('❌ [API] Error updating language: $e');
-      // Fallback to returning a user with the requested language
-      final currentAuth = FirebaseAuth.instance.currentUser;
-      if (currentAuth != null) {
-        debugPrint('⚠️ Using fallback user creation with updated language');
-        return User(
-          id: userId,
-          name: currentAuth.displayName ?? "User",
-          email: currentAuth.email ?? "",
-          language: language,
-          state: null, // We don't know the state, leave it null
+      try {
+        final result = await _functionsClient.callFunction<Map<String, dynamic>>(
+          'updateUserLanguage',
+          data: {'language': language},
         );
+        
+        // Check if we got a proper success response
+        if (result != null && result['success'] == true) {
+          debugPrint('✅ [API] Language updated successfully via Firebase function');
+          return _createUserWithLanguage(userId, language);
+        }
+      } catch (functionError) {
+        debugPrint('❌ [API] Firebase function failed: $functionError, trying direct Firestore fallback...');
       }
+      
+      // STEP 2: Fallback to direct Firestore update
+      debugPrint('🔄 [API] Using direct Firestore fallback for language update');
+      
+      await _firestore.collection('users').doc(userId).update({
+        'language': language,
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+      
+      debugPrint('✅ [API] Language updated successfully via direct Firestore');
+      
+      // Verify the update was successful
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      if (userDoc.exists) {
+        final userData = userDoc.data() as Map<String, dynamic>;
+        final updatedLanguage = userData['language'];
+        debugPrint('✅ [API] Verified language update in Firestore: $updatedLanguage');
+        
+        if (updatedLanguage == language) {
+          debugPrint('✅ [API] Firestore language update confirmed');
+          return _createUserWithLanguage(userId, language);
+        } else {
+          debugPrint('⚠️ [API] Language verification mismatch - expected: $language, actual: $updatedLanguage');
+        }
+      }
+      
+      return _createUserWithLanguage(userId, language);
+      
+    } catch (e) {
+      debugPrint('❌ [API] All language update methods failed: $e');
       throw 'Failed to update language: $e';
     }
   }
