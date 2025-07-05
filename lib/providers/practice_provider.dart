@@ -21,7 +21,7 @@ class PracticeProvider extends ChangeNotifier {
   
   // Start a new practice test with 40 random questions (no time limit)
   Future<void> startNewPractice({
-    String language = 'uk',
+    String? language, // Remove hardcoded default
     String state = 'all',
     String licenseType = 'driver',
   }) async {
@@ -30,10 +30,30 @@ class PracticeProvider extends ChangeNotifier {
       _errorMessage = null;
       notifyListeners();
       
+      // Get language from user's saved preferences (universal solution)
+      String userLanguage = 'en'; // Default fallback
+      try {
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
+          if (userDoc.exists) {
+            final userData = userDoc.data() as Map<String, dynamic>;
+            userLanguage = userData['language'] ?? 'en';
+            print('🌍 [PRACTICE] Using user\'s saved language: $userLanguage');
+          }
+        }
+      } catch (e) {
+        print('⚠️ [PRACTICE] Could not get user language, using English fallback: $e');
+      }
+      
+      // Use provided language parameter or user's saved language
+      final finalLanguage = language ?? userLanguage;
+      print('🎯 [PRACTICE] Final language for content: $finalLanguage');
+      
       // STEP 1: Try Firebase Functions (PRIMARY METHOD)
       print('🚀 Starting two-tier practice question fetch...');
       List<QuizQuestion> practiceQuestions = await _fetchRandomQuestions_PRIMARY(
-        language: language,
+        language: finalLanguage,
         state: state,
         licenseType: licenseType,
         count: 40,
@@ -44,7 +64,7 @@ class PracticeProvider extends ChangeNotifier {
         print('🚨 Got only ${practiceQuestions.length} questions from Firebase Functions, trying direct Firestore fallback...');
         
         final fallbackQuestions = await _fetchDirectRandomQuestions_FALLBACK(
-          language: language,
+          language: finalLanguage,
           state: state,
           licenseType: licenseType,
           count: 40,

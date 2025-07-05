@@ -70,5 +70,9 @@
   "question_not_found": "Pregunta no encontrada",
   "question_x_of_y": "Pregunta {0} de {1}",
   "multiple_answers": "Múltiples respuestas",
-  "select_all_correct_answers": "Selecciona todas las respuestas correctas"
+  "select_all_correct_answers": "Selecciona todas las respuestas correctas",
+  "practice_training": "Entrenamiento de Práctica",
+  "exit_practice_title": "¿Salir de la práctica?",
+  "exit_practice_message": "Si sales de la práctica, tu progreso no se guardará",
+  "practice_not_active": "Práctica no activa"
 }

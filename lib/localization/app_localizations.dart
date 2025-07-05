@@ -15,13 +15,11 @@ class AppLocalizations {
 
   // Helper method to keep the code in the widgets concise
   static AppLocalizations of(BuildContext context) {
-    // Add debug logs to trace possible issues with localization context
     final appLocalizations = Localizations.of<AppLocalizations>(context, AppLocalizations);
     if (appLocalizations == null) {
       print('🚨 [LOCALE ERROR] AppLocalizations.of() returned null! Context might be incorrect.');
       return _fallbackAppLocalizations();
     }
-    print('🔍 [LOCALE] AppLocalizations.of() returned locale: ${appLocalizations.locale.languageCode}');
     return appLocalizations;
   }
 
@@ -102,10 +100,6 @@ class AppLocalizations {
     }
     
     if (_localizedStrings.containsKey(key)) {
-      // Only log key state_selection to avoid console spam
-      if (key == 'state_selection' || key == 'select_state') {
-        print('🔤 [TRANSLATION] "$key" in ${locale.languageCode} => "${_localizedStrings[key]!}"');
-      }
       return _localizedStrings[key]!;
     }
     

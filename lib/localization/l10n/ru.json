@@ -60,5 +60,19 @@
   "time_60_minutes": "60 минут",
   "questions_40": "40 вопросов",
   "time_unlimited": "Неограниченное время",
-  "questions_100_sorted": "100+ вопросов по темам"
+  "questions_100_sorted": "100+ вопросов по темам",
+  
+  "exit_test_title": "Выйти из теста?",
+  "exit_test_message": "Если вы выйдете из теста, ваш прогресс не будет сохранен",
+  "exit": "Выйти",
+  "stay": "Остаться",
+  "choose": "Выбрать",
+  "question_not_found": "Вопрос не найден",
+  "question_x_of_y": "Вопрос {0} из {1}",
+  "multiple_answers": "Несколько ответов",
+  "select_all_correct_answers": "Выберите все правильные ответы",
+  "practice_training": "Практическая тренировка",
+  "exit_practice_title": "Выйти из практики?",
+  "exit_practice_message": "Если вы выйдете из практики, ваш прогресс не будет сохранен",
+  "practice_not_active": "Практика не активна"
 }

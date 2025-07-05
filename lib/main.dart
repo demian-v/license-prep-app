@@ -285,7 +285,6 @@ void main() async {
       ],
       child: MyApp(
         authProvider: authProvider,
-        languageProvider: languageProvider,
       ),
     ),
   );
@@ -293,194 +292,194 @@ void main() async {
 
 class MyApp extends StatelessWidget {
   final AuthProvider authProvider;
-  final LanguageProvider languageProvider;
 
   const MyApp({
     Key? key,
     required this.authProvider,
-    required this.languageProvider,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final currentLang = languageProvider.language;
-    print('MyApp.build: Setting app locale to language: $currentLang');
-    
-    // Important: Force app rebuild with unique key when language changes
-    return MaterialApp(
-      title: 'USA License Prep',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        colorScheme: ColorScheme.light(secondary: Colors.green),
-        fontFamily: 'Roboto',
-        scaffoldBackgroundColor: Color(0xFFF5F7FA),
-        cardTheme: CardTheme(
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+    return Consumer<LanguageProvider>(
+      builder: (context, languageProvider, child) {
+        final currentLang = languageProvider.language;
+        
+        return MaterialApp(
+          title: 'USA License Prep',
+          theme: ThemeData(
+            primarySwatch: Colors.blue,
+            colorScheme: ColorScheme.light(secondary: Colors.green),
+            fontFamily: 'Roboto',
+            scaffoldBackgroundColor: Color(0xFFF5F7FA),
+            cardTheme: CardTheme(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
           ),
-        ),
-      ),
-      // Set locale and force rebuilding when language changes
-      locale: Locale(currentLang),
-      key: ValueKey('app_${currentLang}_${DateTime.now().millisecondsSinceEpoch}'), // Force rebuild on language change
-      supportedLocales: AppLocalizations.supportedLocales(),
-      localizationsDelegates: [
-        // Set app localizations first to take priority
-        AppLocalizations.delegate,
-        // These framework delegates need to come after our custom delegate
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      
-      // Crucial: Set this to ensure correct localization context
-      localeResolutionCallback: (locale, supportedLocales) {
-        print('🔍 localeResolutionCallback called with locale: ${locale?.languageCode}');
-        print('🔍 Supported locales: ${supportedLocales.map((l) => l.languageCode).join(', ')}');
-        
-        // Use the passed locale if it's supported
-        for (var supportedLocale in supportedLocales) {
-          if (supportedLocale.languageCode == locale?.languageCode) {
-            print('✅ Using matched locale: ${supportedLocale.languageCode}');
-            return supportedLocale;
-          }
-        }
-        
-        // Fall back to the first locale if not supported
-        print('⚠️ Language not supported, falling back to: ${supportedLocales.first.languageCode}');
-        return supportedLocales.first;
-      },
-      
-      // Initialize a route observer to track navigation
-      navigatorObservers: [RouteObserver<PageRoute>()],
-      initialRoute: '/',
-      home: Builder(
-        builder: (context) {
-          // Check for password reset deep links before deciding home screen
-          final deepLinkData = ModalRoute.of(context)?.settings.arguments;
-          if (deepLinkData != null && deepLinkData is Map<String, dynamic> && deepLinkData.containsKey('oobCode')) {
-            debugPrint('🔑 Found password reset code in deep link: ${deepLinkData['oobCode']}');
-            String code = deepLinkData['oobCode'];
-            return ResetPasswordScreen(code: code);
-          }
+          // Set locale and use stable key based only on language
+          locale: Locale(currentLang),
+          key: ValueKey('app_$currentLang'),
+          supportedLocales: AppLocalizations.supportedLocales(),
+          localizationsDelegates: [
+            // Set app localizations first to take priority
+            AppLocalizations.delegate,
+            // These framework delegates need to come after our custom delegate
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
           
-          // Normal flow - check if user is logged in
-          return authProvider.user != null ? HomeScreen() : LoginScreen();
-        }
-      ),
-      routes: {
-        '/login': (context) => LoginScreen(),
-        '/signup': (context) => SignupScreen(),
-        '/home': (context) => HomeScreen(),
-        '/theory': (context) => TrafficRulesTopicsScreen(),
-        '/tests': (context) => TestScreen(),
-        '/profile': (context) => ProfileScreen(),
-        '/subscription': (context) => SubscriptionScreen(),
-        '/settings/reset': (context) => ResetAppSettingsScreen(),
-        // Password reset routes
-        '/forgot-password': (context) => ForgotPasswordScreen(),
-        '/reset-email-sent': (context) {
-          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-          final email = args?['email'] as String? ?? '';
-          return ResetEmailSentScreen();
-        },
-        '/reset-success': (context) => PasswordResetSuccessScreen(),
-      },
-      onGenerateRoute: (settings) {
-        debugPrint('🔗 Route requested: ${settings.name}');
-        
-        if (settings.name!.startsWith('/theory/')) {
-          final moduleId = settings.name!.split('/')[2];
-          // Fetch the module using ContentProvider
-          final contentProvider = Provider.of<ContentProvider>(context, listen: false);
-          final modules = contentProvider.modules;
-          TheoryModule? module;
-          try {
-            module = modules.firstWhere(
-              (m) => m.id == moduleId,
-            );
-          } catch (e) {
-            module = null;
-          }
-          
-          // If module found, navigate to the module screen
-          if (module != null) {
-            // Use non-null assertion since we've already checked module is not null
-            final nonNullModule = module;
-            return MaterialPageRoute(
-              builder: (context) => TheoryModuleScreen(module: nonNullModule),
-            );
-          } else {
-            // If module not found, redirect to theory screen
-            return MaterialPageRoute(
-              builder: (context) => TrafficRulesTopicsScreen(),
-            );
-          }
-        } else if (settings.name!.startsWith('/practice/')) {
-          final licenseId = settings.name!.split('/')[2];
-          return MaterialPageRoute(
-            builder: (context) => PracticeTestScreen(licenseId: licenseId),
-          );
-        } 
-        // Handle password reset deep links with improved detection
-        else if (settings.name!.startsWith('/reset-password') || 
-                settings.name! == 'resetPassword' ||
-                settings.name! == '/resetPassword' ||
-                (settings.name!.contains('resetPassword') && settings.name!.contains('oobCode')) ||
-                settings.name! == 'mode=resetPassword') {
-          
-          debugPrint('📲 Password reset deep link detected: ${settings.name}');
-          
-          // Extract the oobCode using multiple methods to ensure we get it
-          String? code;
-          
-          // Method 1: Extract from query parameters if this is a proper URI
-          try {
-            // First try to parse as a complete URI
-            final uri = Uri.parse(settings.name!);
-            code = uri.queryParameters['oobCode'];
-            debugPrint('🔍 Extracted code from URI: $code');
-          } catch (e) {
-            debugPrint('⚠️ Could not parse as URI: $e');
+          // Crucial: Set this to ensure correct localization context
+          localeResolutionCallback: (locale, supportedLocales) {
+            print('🔍 localeResolutionCallback called with locale: ${locale?.languageCode}');
+            print('🔍 Supported locales: ${supportedLocales.map((l) => l.languageCode).join(', ')}');
             
-            // Method 2: Manual string parsing for query parameters
-            final routePath = settings.name!;
-            if (routePath.contains('?')) {
-              final queryString = routePath.split('?')[1];
-              final params = queryString.split('&');
-              
-              for (final param in params) {
-                if (param.startsWith('oobCode=')) {
-                  code = param.substring('oobCode='.length);
-                  debugPrint('🔍 Extracted code from query string: $code');
-                  break;
-                }
+            // Use the passed locale if it's supported
+            for (var supportedLocale in supportedLocales) {
+              if (supportedLocale.languageCode == locale?.languageCode) {
+                print('✅ Using matched locale: ${supportedLocale.languageCode}');
+                return supportedLocale;
               }
             }
-          }
+            
+            // Fall back to the first locale if not supported
+            print('⚠️ Language not supported, falling back to: ${supportedLocales.first.languageCode}');
+            return supportedLocales.first;
+          },
           
-          // Method 3: Check if code is in the arguments
-          if (code == null && settings.arguments != null) {
-            if (settings.arguments is Map<String, dynamic>) {
-              code = (settings.arguments as Map<String, dynamic>)['oobCode'];
-              debugPrint('🔍 Extracted code from arguments: $code');
+          // Initialize a route observer to track navigation
+          navigatorObservers: [RouteObserver<PageRoute>()],
+          initialRoute: '/',
+          home: Builder(
+            builder: (context) {
+              // Check for password reset deep links before deciding home screen
+              final deepLinkData = ModalRoute.of(context)?.settings.arguments;
+              if (deepLinkData != null && deepLinkData is Map<String, dynamic> && deepLinkData.containsKey('oobCode')) {
+                debugPrint('🔑 Found password reset code in deep link: ${deepLinkData['oobCode']}');
+                String code = deepLinkData['oobCode'];
+                return ResetPasswordScreen(code: code);
+              }
+              
+              // Normal flow - check if user is logged in
+              return authProvider.user != null ? HomeScreen() : LoginScreen();
             }
-          }
-          
-          debugPrint('🔑 Final password reset code: $code');
-          
-          if (code != null) {
-            // Use non-null assertion since we've already checked code is not null
-            final String nonNullableCode = code; // Explicitly create non-nullable string
-            return MaterialPageRoute(
-              builder: (context) => ResetPasswordScreen(code: nonNullableCode),
-            );
-          } else {
-            debugPrint('❌ No reset code found in deep link');
-          }
-        }
-        return null;
+          ),
+          routes: {
+            '/login': (context) => LoginScreen(),
+            '/signup': (context) => SignupScreen(),
+            '/home': (context) => HomeScreen(),
+            '/theory': (context) => TrafficRulesTopicsScreen(),
+            '/tests': (context) => TestScreen(),
+            '/profile': (context) => ProfileScreen(),
+            '/subscription': (context) => SubscriptionScreen(),
+            '/settings/reset': (context) => ResetAppSettingsScreen(),
+            // Password reset routes
+            '/forgot-password': (context) => ForgotPasswordScreen(),
+            '/reset-email-sent': (context) {
+              final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+              final email = args?['email'] as String? ?? '';
+              return ResetEmailSentScreen();
+            },
+            '/reset-success': (context) => PasswordResetSuccessScreen(),
+          },
+          onGenerateRoute: (settings) {
+            debugPrint('🔗 Route requested: ${settings.name}');
+            
+            if (settings.name!.startsWith('/theory/')) {
+              final moduleId = settings.name!.split('/')[2];
+              // Fetch the module using ContentProvider
+              final contentProvider = Provider.of<ContentProvider>(context, listen: false);
+              final modules = contentProvider.modules;
+              TheoryModule? module;
+              try {
+                module = modules.firstWhere(
+                  (m) => m.id == moduleId,
+                );
+              } catch (e) {
+                module = null;
+              }
+              
+              // If module found, navigate to the module screen
+              if (module != null) {
+                // Use non-null assertion since we've already checked module is not null
+                final nonNullModule = module;
+                return MaterialPageRoute(
+                  builder: (context) => TheoryModuleScreen(module: nonNullModule),
+                );
+              } else {
+                // If module not found, redirect to theory screen
+                return MaterialPageRoute(
+                  builder: (context) => TrafficRulesTopicsScreen(),
+                );
+              }
+            } else if (settings.name!.startsWith('/practice/')) {
+              final licenseId = settings.name!.split('/')[2];
+              return MaterialPageRoute(
+                builder: (context) => PracticeTestScreen(licenseId: licenseId),
+              );
+            } 
+            // Handle password reset deep links with improved detection
+            else if (settings.name!.startsWith('/reset-password') || 
+                    settings.name! == 'resetPassword' ||
+                    settings.name! == '/resetPassword' ||
+                    (settings.name!.contains('resetPassword') && settings.name!.contains('oobCode')) ||
+                    settings.name! == 'mode=resetPassword') {
+              
+              debugPrint('📲 Password reset deep link detected: ${settings.name}');
+              
+              // Extract the oobCode using multiple methods to ensure we get it
+              String? code;
+              
+              // Method 1: Extract from query parameters if this is a proper URI
+              try {
+                // First try to parse as a complete URI
+                final uri = Uri.parse(settings.name!);
+                code = uri.queryParameters['oobCode'];
+                debugPrint('🔍 Extracted code from URI: $code');
+              } catch (e) {
+                debugPrint('⚠️ Could not parse as URI: $e');
+                
+                // Method 2: Manual string parsing for query parameters
+                final routePath = settings.name!;
+                if (routePath.contains('?')) {
+                  final queryString = routePath.split('?')[1];
+                  final params = queryString.split('&');
+                  
+                  for (final param in params) {
+                    if (param.startsWith('oobCode=')) {
+                      code = param.substring('oobCode='.length);
+                      debugPrint('🔍 Extracted code from query string: $code');
+                      break;
+                    }
+                  }
+                }
+              }
+              
+              // Method 3: Check if code is in the arguments
+              if (code == null && settings.arguments != null) {
+                if (settings.arguments is Map<String, dynamic>) {
+                  code = (settings.arguments as Map<String, dynamic>)['oobCode'];
+                  debugPrint('🔍 Extracted code from arguments: $code');
+                }
+              }
+              
+              debugPrint('🔑 Final password reset code: $code');
+              
+              if (code != null) {
+                // Use non-null assertion since we've already checked code is not null
+                final String nonNullableCode = code; // Explicitly create non-nullable string
+                return MaterialPageRoute(
+                  builder: (context) => ResetPasswordScreen(code: nonNullableCode),
+                );
+              } else {
+                debugPrint('❌ No reset code found in deep link');
+              }
+            }
+            return null;
+          },
+        );
       },
     );
   }

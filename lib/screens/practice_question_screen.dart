@@ -5,6 +5,7 @@ import '../providers/practice_provider.dart';
 import '../providers/progress_provider.dart';
 import '../models/quiz_question.dart';
 import '../services/service_locator.dart';
+import '../localization/app_localizations.dart';
 import 'practice_result_screen.dart';
 
 class PracticeQuestionScreen extends StatefulWidget {
@@ -111,7 +112,7 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
                 ),
                 SizedBox(width: 8),
                 Text(
-                  "Тренування по білетах",
+                  AppLocalizations.of(context).translate('practice_training'),
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -187,7 +188,9 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  "Питання ${currentQuestionNumber} з ${totalQuestions}",
+                  AppLocalizations.of(context).translate('question_x_of_y')
+                      .replaceAll('{0}', currentQuestionNumber.toString())
+                      .replaceAll('{1}', totalQuestions.toString()),
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -204,7 +207,7 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    "Декілька відповідей",
+                    AppLocalizations.of(context).translate('multiple_answers'),
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w500,
@@ -249,7 +252,7 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        "Оберіть всі правильні відповіді",
+                        AppLocalizations.of(context).translate('select_all_correct_answers'),
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.blue.shade700,
@@ -349,7 +352,7 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
     if (practice == null) {
       return Scaffold(
         body: Center(
-          child: Text("Тренування не активне"),
+          child: Text(AppLocalizations.of(context).translate('practice_not_active')),
         ),
       );
     }
@@ -358,7 +361,7 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
     if (currentQuestion == null) {
       return Scaffold(
         body: Center(
-          child: Text("Питання не знайдено"),
+          child: Text(AppLocalizations.of(context).translate('question_not_found')),
         ),
       );
     }
@@ -675,7 +678,7 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
                           borderRadius: BorderRadius.circular(30),
                           child: Center(
                             child: Text(
-                              "Наступне",
+                              AppLocalizations.of(context).translate('next'),
                               style: TextStyle(
                                 color: Colors.black,
                                 fontWeight: FontWeight.bold,
@@ -718,7 +721,7 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
                                 borderRadius: BorderRadius.circular(30),
                                 child: Center(
                                   child: Text(
-                                    "Пропустити",
+                                    AppLocalizations.of(context).translate('skip'),
                                     style: TextStyle(
                                       color: Colors.black,
                                       fontWeight: FontWeight.bold,
@@ -773,7 +776,7 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
                                 borderRadius: BorderRadius.circular(30),
                                 child: Center(
                                   child: Text(
-                                    "Обрати",
+                                    AppLocalizations.of(context).translate('choose'),
                                     style: TextStyle(
                                       color: selectedAnswer == null ? Colors.grey.shade600 : Colors.black,
                                       fontWeight: FontWeight.bold,
@@ -802,9 +805,9 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text("Вийти з тренування?"),
+        title: Text(AppLocalizations.of(context).translate('exit_practice_title')),
         content: Text(
-          "Якщо ви вийдете з тренування, результат вашого проходження не збережеться",
+          AppLocalizations.of(context).translate('exit_practice_message'),
         ),
         actions: [
           // Exit button with gradient
@@ -832,7 +835,7 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
                   padding: EdgeInsets.symmetric(horizontal: 16),
                   child: Center(
                     child: Text(
-                      "Вийти",
+                      AppLocalizations.of(context).translate('exit'),
                       style: TextStyle(
                         color: Colors.black,
                         fontWeight: FontWeight.bold,
@@ -873,7 +876,7 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
                   padding: EdgeInsets.symmetric(horizontal: 16),
                   child: Center(
                     child: Text(
-                      "Залишитися",
+                      AppLocalizations.of(context).translate('stay'),
                       style: TextStyle(
                         color: Colors.black,
                         fontWeight: FontWeight.bold,

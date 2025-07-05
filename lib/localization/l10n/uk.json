@@ -72,5 +72,9 @@
   "question_not_found": "Питання не знайдено",
   "question_x_of_y": "Питання {0} з {1}",
   "multiple_answers": "Декілька відповідей",
-  "select_all_correct_answers": "Оберіть всі правильні відповіді"
+  "select_all_correct_answers": "Оберіть всі правильні відповіді",
+  "practice_training": "Тренування по білетах",
+  "exit_practice_title": "Вийти з тренування?",
+  "exit_practice_message": "Якщо ви вийдете з тренування, результат вашого проходження не збережеться",
+  "practice_not_active": "Тренування не активне"
 }

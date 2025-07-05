@@ -22,7 +22,7 @@ class ExamProvider extends ChangeNotifier {
   
   // Start a new exam with 40 random questions
   Future<void> startNewExam({
-    String language = 'uk',
+    String? language, // Remove hardcoded default
     String state = 'all',
     String licenseType = 'driver',
   }) async {
@@ -31,10 +31,30 @@ class ExamProvider extends ChangeNotifier {
       _errorMessage = null;
       notifyListeners();
       
+      // Get language from user's saved preferences (universal solution)
+      String userLanguage = 'en'; // Default fallback
+      try {
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
+          if (userDoc.exists) {
+            final userData = userDoc.data() as Map<String, dynamic>;
+            userLanguage = userData['language'] ?? 'en';
+            print('🌍 [EXAM] Using user\'s saved language: $userLanguage');
+          }
+        }
+      } catch (e) {
+        print('⚠️ [EXAM] Could not get user language, using English fallback: $e');
+      }
+      
+      // Use provided language parameter or user's saved language
+      final finalLanguage = language ?? userLanguage;
+      print('🎯 [EXAM] Final language for content: $finalLanguage');
+      
       // STEP 1: Try Firebase Functions (PRIMARY METHOD)
       print('🚀 Starting two-tier exam question fetch...');
       List<QuizQuestion> examQuestions = await _fetchRandomQuestions_PRIMARY(
-        language: language,
+        language: finalLanguage,
         state: state,
         licenseType: licenseType,
         count: 40,
@@ -45,7 +65,7 @@ class ExamProvider extends ChangeNotifier {
         print('🚨 Got only ${examQuestions.length} questions from Firebase Functions, trying direct Firestore fallback...');
         
         final fallbackQuestions = await _fetchDirectRandomQuestions_FALLBACK(
-          language: language,
+          language: finalLanguage,
           state: state,
           licenseType: licenseType,
           count: 40,
