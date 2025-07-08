@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/quiz_topic.dart';
 import '../providers/progress_provider.dart';
-import '../providers/language_provider.dart';
+import '../localization/app_localizations.dart';
 
 class QuizResultScreen extends StatefulWidget {
   final QuizTopic topic;
@@ -114,46 +114,6 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
     super.dispose();
   }
 
-  // Helper method to get correct translations
-  String _translate(String key, LanguageProvider languageProvider) {
-    // Create a direct translation based on the selected language
-    try {
-      // Get the appropriate language based on the language provider
-      switch (languageProvider.language) {
-        case 'es':
-          return {
-            'back_to_tests': 'Volver a Pruebas',
-            'back_to_topics': 'Volver a Temas',
-          }[key] ?? key;
-        case 'uk':
-          return {
-            'back_to_tests': 'Назад до Тестів',
-            'back_to_topics': 'Назад до Тем',
-          }[key] ?? key;
-        case 'ru':
-          return {
-            'back_to_tests': 'Назад к Тестам',
-            'back_to_topics': 'Назад к Темам',
-          }[key] ?? key;
-        case 'pl':
-          return {
-            'back_to_tests': 'Powrót do Testów',
-            'back_to_topics': 'Powrót do Tematów',
-          }[key] ?? key;
-        case 'en':
-        default:
-          return {
-            'back_to_tests': 'Back to Tests',
-            'back_to_topics': 'Back to Topics',
-          }[key] ?? key;
-      }
-    } catch (e) {
-      print('🚨 [QUIZ RESULT] Error getting translation: $e');
-      // Default fallback
-      return key;
-    }
-  }
-
   // Helper method to get gradient for result (always green for quiz success)
   LinearGradient _getResultGradient() {
     return LinearGradient(
@@ -203,7 +163,7 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Вчити по темах',
+          AppLocalizations.of(context).translate('learn_by_topics'),
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         elevation: 0,
@@ -264,38 +224,34 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
           ),
           
           // Bottom button area - two buttons side by side
-          Consumer<LanguageProvider>(
-            builder: (context, languageProvider, _) {
-              return Padding(
-                padding: EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    // Left button - Back to Tests
-                    Expanded(
-                      child: _buildActionButton(
-                        text: _translate('back_to_tests', languageProvider),
-                        onTap: () {
-                          // Navigate back to test screen (home)
-                          Navigator.of(context).popUntil((route) => route.isFirst);
-                        },
-                      ),
-                    ),
-                    SizedBox(width: 16),
-                    // Right button - Back to Topics
-                    Expanded(
-                      child: _buildActionButton(
-                        text: _translate('back_to_topics', languageProvider),
-                        onTap: () {
-                          // Navigate back to topic selection screen (skip the question screen)
-                          Navigator.pop(context); // Pop quiz result screen
-                          Navigator.pop(context); // Pop quiz question screen to reach topic selection
-                        },
-                      ),
-                    ),
-                  ],
+          Padding(
+            padding: EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Left button - Back to Tests
+                Expanded(
+                  child: _buildActionButton(
+                    text: AppLocalizations.of(context).translate('back_to_tests'),
+                    onTap: () {
+                      // Navigate back to test screen (home)
+                      Navigator.of(context).popUntil((route) => route.isFirst);
+                    },
+                  ),
                 ),
-              );
-            },
+                SizedBox(width: 16),
+                // Right button - Back to Topics
+                Expanded(
+                  child: _buildActionButton(
+                    text: AppLocalizations.of(context).translate('back_to_topics'),
+                    onTap: () {
+                      // Navigate back to topic selection screen (skip the question screen)
+                      Navigator.pop(context); // Pop quiz result screen
+                      Navigator.pop(context); // Pop quiz question screen to reach topic selection
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -414,19 +370,19 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
                     _buildStatChip(
                       icon: Icons.check_circle,
                       value: correctAnswers.toString(),
-                      label: 'Вірних',
+                      label: AppLocalizations.of(context).translate('correct'),
                       color: Colors.green,
                     ),
                     _buildStatChip(
                       icon: Icons.cancel,
                       value: incorrectAnswers.toString(),
-                      label: 'Невірних',
+                      label: AppLocalizations.of(context).translate('incorrect'),
                       color: Colors.red,
                     ),
                     _buildStatChip(
                       icon: Icons.quiz,
                       value: totalAnswered.toString(),
-                      label: 'Запитань',
+                      label: AppLocalizations.of(context).translate('questions'),
                       color: Colors.blue,
                     ),
                   ],

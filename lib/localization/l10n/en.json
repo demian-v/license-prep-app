@@ -74,5 +74,22 @@
   "practice_training": "Practice Training",
   "exit_practice_title": "Exit practice?",
   "exit_practice_message": "If you exit the practice, your progress will not be saved",
-  "practice_not_active": "Practice not active"
+  "practice_not_active": "Practice not active",
+  "result": "Result",
+  "correct": "Correct",
+  "incorrect": "Incorrect",
+  "time": "Time",
+  "exam_passed": "Exam passed",
+  "exam_not_passed": "Exam not passed",
+  "questions": "Questions",
+  "back_to_topics": "Back to Topics",
+  "practice_passed": "Practice passed",
+  "practice_not_passed": "Practice not passed",
+  "saved": "Saved",
+  "no_saved_questions": "No saved questions",
+  "tap_heart_to_save": "Tap the heart in questions to add them to saved list",
+  "select_all_correct_answers": "Select all correct answers",
+  "explanation": "Explanation",
+  "try_again": "Try Again",
+  "check": "Check"
 }

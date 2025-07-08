@@ -74,5 +74,18 @@
   "practice_training": "Entrenamiento de Práctica",
   "exit_practice_title": "¿Salir de la práctica?",
   "exit_practice_message": "Si sales de la práctica, tu progreso no se guardará",
-  "practice_not_active": "Práctica no activa"
+  "practice_not_active": "Práctica no activa",
+  "result": "Resultado",
+  "correct": "Correctas",
+  "incorrect": "Incorrectas",
+  "time": "Tiempo",
+  "exam_passed": "Examen aprobado",
+  "exam_not_passed": "Examen no aprobado",
+  "questions": "Preguntas",
+  "back_to_topics": "Volver a Temas",
+  "practice_passed": "Práctica aprobada",
+  "practice_not_passed": "Práctica no aprobada",
+  "no_saved_questions": "No hay preguntas guardadas",
+  "tap_heart_to_save": "Toca el corazón en las preguntas para añadirlas a la lista guardada",
+  "explanation": "Explicación"
 }

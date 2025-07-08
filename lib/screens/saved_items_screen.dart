@@ -5,6 +5,7 @@ import '../models/quiz_question.dart';
 import '../providers/progress_provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/service_locator.dart';
+import '../localization/app_localizations.dart';
 
 class SavedItemsScreen extends StatefulWidget {
   const SavedItemsScreen({Key? key}) : super(key: key);
@@ -144,7 +145,7 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> with TickerProvider
               Icon(Icons.favorite, size: 16, color: Colors.red.shade400),
               SizedBox(width: 6),
               Text(
-                'Збережені',
+                AppLocalizations.of(context).translate('saved'),
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -335,7 +336,7 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> with TickerProvider
                             ),
                             SizedBox(height: 24),
                             Text(
-                              'Немає збережених питань',
+                              AppLocalizations.of(context).translate('no_saved_questions'),
                               style: TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.w600,
@@ -346,7 +347,7 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> with TickerProvider
                             Padding(
                               padding: EdgeInsets.symmetric(horizontal: 16),
                               child: Text(
-                                'Натисніть на сердечко в питаннях, щоб додати їх до списку збережених',
+                                AppLocalizations.of(context).translate('tap_heart_to_save'),
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 16,
@@ -535,7 +536,7 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> with TickerProvider
                                             ),
                                           ),
                                           child: Text(
-                                            "Оберіть всі правильні відповіді",
+                                            AppLocalizations.of(context).translate('select_all_correct_answers'),
                                             style: TextStyle(
                                               fontSize: 14,
                                               color: Colors.blue.shade700,
@@ -677,7 +678,7 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> with TickerProvider
                                                   ),
                                                   SizedBox(width: 6),
                                                   Text(
-                                                    'Пояснення',
+                                                    AppLocalizations.of(context).translate('explanation'),
                                                     style: TextStyle(
                                                       color: Colors.blue.shade600,
                                                       fontWeight: FontWeight.w600,
@@ -739,7 +740,7 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> with TickerProvider
                                                   },
                                                   child: Center(
                                                     child: Text(
-                                                      'Спробувати ще раз',
+                                                      AppLocalizations.of(context).translate('try_again'),
                                                       style: TextStyle(
                                                         color: Colors.grey.shade700,
                                                         fontWeight: FontWeight.w600,
@@ -803,7 +804,7 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> with TickerProvider
                                                       },
                                                   child: Center(
                                                     child: Text(
-                                                      'Перевірити',
+                                                      AppLocalizations.of(context).translate('check'),
                                                       style: TextStyle(
                                                         color: (_selectedAnswers[question.id]?.isEmpty ?? true)
                                                           ? Colors.grey.shade500

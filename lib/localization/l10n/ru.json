@@ -74,5 +74,18 @@
   "practice_training": "Практическая тренировка",
   "exit_practice_title": "Выйти из практики?",
   "exit_practice_message": "Если вы выйдете из практики, ваш прогресс не будет сохранен",
-  "practice_not_active": "Практика не активна"
+  "practice_not_active": "Практика не активна",
+  "result": "Результат",
+  "correct": "Правильных",
+  "incorrect": "Неправильных",
+  "time": "Время",
+  "exam_passed": "Экзамен сдан",
+  "exam_not_passed": "Экзамен не сдан",
+  "questions": "Вопросов",
+  "back_to_topics": "Назад к Темам",
+  "practice_passed": "Практика сдана",
+  "practice_not_passed": "Практика не сдана",
+  "no_saved_questions": "Нет сохраненных вопросов",
+  "tap_heart_to_save": "Нажмите на сердечко в вопросах, чтобы добавить их в список сохраненных",
+  "explanation": "Объяснение"
 }

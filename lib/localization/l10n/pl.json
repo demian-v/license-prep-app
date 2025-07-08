@@ -74,5 +74,18 @@
   "practice_training": "Trening praktyczny",
   "exit_practice_title": "Wyjść z praktyki?",
   "exit_practice_message": "Jeśli wyjdziesz z praktyki, twój postęp nie zostanie zapisany",
-  "practice_not_active": "Praktyka nieaktywna"
+  "practice_not_active": "Praktyka nieaktywna",
+  "result": "Wynik",
+  "correct": "Prawidłowych",
+  "incorrect": "Nieprawidłowych",
+  "time": "Czas",
+  "exam_passed": "Egzamin zdany",
+  "exam_not_passed": "Egzamin nie zdany",
+  "questions": "Pytań",
+  "back_to_topics": "Powrót do Tematów",
+  "practice_passed": "Praktyka zdana",
+  "practice_not_passed": "Praktyka nie zdana",
+  "no_saved_questions": "Brak zapisanych pytań",
+  "tap_heart_to_save": "Dotknij serduszka w pytaniach, aby dodać je do listy zapisanych",
+  "explanation": "Wyjaśnienie"
 }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/practice_provider.dart';
-import '../providers/language_provider.dart';
+import '../localization/app_localizations.dart';
 import 'practice_question_screen.dart';
 
 class PracticeResultScreen extends StatefulWidget {
@@ -74,41 +74,6 @@ class _PracticeResultScreenState extends State<PracticeResultScreen> with Ticker
     _iconAnimationController.dispose();
     _cardAnimationController.dispose();
     super.dispose();
-  }
-
-  // Helper method to get correct translations
-  String _translate(String key, LanguageProvider languageProvider) {
-    // Create a direct translation based on the selected language
-    try {
-      // Get the appropriate language based on the language provider
-      switch (languageProvider.language) {
-        case 'es':
-          return {
-            'back_to_tests': 'Volver a Pruebas',
-          }[key] ?? key;
-        case 'uk':
-          return {
-            'back_to_tests': 'Назад до Тестів',
-          }[key] ?? key;
-        case 'ru':
-          return {
-            'back_to_tests': 'Назад к Тестам',
-          }[key] ?? key;
-        case 'pl':
-          return {
-            'back_to_tests': 'Powrót do Testów',
-          }[key] ?? key;
-        case 'en':
-        default:
-          return {
-            'back_to_tests': 'Back to Tests',
-          }[key] ?? key;
-      }
-    } catch (e) {
-      print('🚨 [PRACTICE RESULT] Error getting translation: $e');
-      // Default fallback
-      return key;
-    }
   }
 
   // Helper method to get gradient for result
@@ -186,16 +151,10 @@ class _PracticeResultScreenState extends State<PracticeResultScreen> with Ticker
     final incorrectAnswers = practice.incorrectAnswersCount;
     final isPassed = practice.isPassed;
     
-    // Format elapsed time
-    final elapsedTime = practice.elapsedTime;
-    final minutes = elapsedTime.inMinutes;
-    final seconds = elapsedTime.inSeconds % 60;
-    final timeText = "${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}";
-    
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Результат',
+          AppLocalizations.of(context).translate('result'),
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         elevation: 0,
@@ -245,7 +204,6 @@ class _PracticeResultScreenState extends State<PracticeResultScreen> with Ticker
                       _buildEnhancedStatsCard(
                         correctAnswers,
                         incorrectAnswers,
-                        timeText,
                         isPassed,
                       ),
                       
@@ -258,59 +216,55 @@ class _PracticeResultScreenState extends State<PracticeResultScreen> with Ticker
           ),
           
           // Bottom button area - same size as Skip button, centered
-          Consumer<LanguageProvider>(
-            builder: (context, languageProvider, _) {
-              return Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(
-                  child: SizedBox(
-                    width: MediaQuery.of(context).size.width * 0.6, // Same width as Skip button
-                    child: Container(
-                      height: 56,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [Colors.white, Colors.blue.shade50.withOpacity(0.4)], // Same blue as Skip button
-                        ),
-                        borderRadius: BorderRadius.circular(30),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.2),
-                            spreadRadius: 0,
-                            blurRadius: 6,
-                            offset: Offset(0, 3),
-                          ),
-                        ],
+          Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(
+              child: SizedBox(
+                width: MediaQuery.of(context).size.width * 0.6, // Same width as Skip button
+                child: Container(
+                  height: 56,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Colors.white, Colors.blue.shade50.withOpacity(0.4)], // Same blue as Skip button
+                    ),
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.2),
+                        spreadRadius: 0,
+                        blurRadius: 6,
+                        offset: Offset(0, 3),
                       ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: () {
-                            // Cancel current practice
-                            practiceProvider.cancelPractice();
-                            
-                            // Navigate back to test screen (home)
-                            Navigator.of(context).popUntil((route) => route.isFirst);
-                          },
-                          borderRadius: BorderRadius.circular(30),
-                          child: Center(
-                            child: Text(
-                              _translate('back_to_tests', languageProvider),
-                              style: TextStyle(
-                                color: Colors.black,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        // Cancel current practice
+                        practiceProvider.cancelPractice();
+                        
+                        // Navigate back to test screen (home)
+                        Navigator.of(context).popUntil((route) => route.isFirst);
+                      },
+                      borderRadius: BorderRadius.circular(30),
+                      child: Center(
+                        child: Text(
+                          AppLocalizations.of(context).translate('back_to_tests'),
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
                           ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              );
-            },
+              ),
+            ),
           ),
         ],
       ),
@@ -351,7 +305,7 @@ class _PracticeResultScreenState extends State<PracticeResultScreen> with Ticker
     );
   }
 
-  Widget _buildEnhancedStatsCard(int correctAnswers, int incorrectAnswers, String timeText, bool isPassed) {
+  Widget _buildEnhancedStatsCard(int correctAnswers, int incorrectAnswers, bool isPassed) {
     return AnimatedBuilder(
       animation: _cardAnimationController,
       builder: (context, child) {
@@ -389,26 +343,22 @@ class _PracticeResultScreenState extends State<PracticeResultScreen> with Ticker
                         _buildStatChip(
                           icon: Icons.check_circle,
                           value: correctAnswers.toString(),
-                          label: 'Вірних',
+                          label: AppLocalizations.of(context).translate('correct'),
                           color: Colors.green,
                         ),
                         _buildStatChip(
                           icon: Icons.cancel,
                           value: incorrectAnswers.toString(),
-                          label: 'Невірних',
+                          label: AppLocalizations.of(context).translate('incorrect'),
                           color: Colors.red,
-                        ),
-                        _buildStatChip(
-                          icon: Icons.timer,
-                          value: timeText,
-                          label: 'Час',
-                          color: Colors.blue,
                         ),
                       ],
                     ),
                     SizedBox(height: 20),
                     Text(
-                      isPassed ? 'Тест складено' : 'Тест не складено',
+                      isPassed 
+                          ? AppLocalizations.of(context).translate('practice_passed')
+                          : AppLocalizations.of(context).translate('practice_not_passed'),
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,

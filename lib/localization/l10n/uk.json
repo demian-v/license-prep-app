@@ -76,5 +76,18 @@
   "practice_training": "Тренування по білетах",
   "exit_practice_title": "Вийти з тренування?",
   "exit_practice_message": "Якщо ви вийдете з тренування, результат вашого проходження не збережеться",
-  "practice_not_active": "Тренування не активне"
+  "practice_not_active": "Тренування не активне",
+  "result": "Результат",
+  "correct": "Вірних",
+  "incorrect": "Невірних",
+  "time": "Час",
+  "exam_passed": "Іспит складено",
+  "exam_not_passed": "Іспит не складено",
+  "questions": "Запитань",
+  "back_to_topics": "Назад до Тем",
+  "practice_passed": "Тест складено",
+  "practice_not_passed": "Тест не складено",
+  "no_saved_questions": "Немає збережених питань",
+  "tap_heart_to_save": "Натисніть на сердечко в питаннях, щоб додати їх до списку збережених",
+  "explanation": "Пояснення"
 }
