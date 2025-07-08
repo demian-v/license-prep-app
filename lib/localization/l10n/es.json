@@ -87,5 +87,19 @@
   "practice_not_passed": "Práctica no aprobada",
   "no_saved_questions": "No hay preguntas guardadas",
   "tap_heart_to_save": "Toca el corazón en las preguntas para añadirlas a la lista guardada",
-  "explanation": "Explicación"
+  "explanation": "Explicación",
+  "subscription": "Suscripción",
+  "monthly_subscription": "Suscripción Mensual",
+  "features_include": "Las características incluyen:",
+  "unlimited_access": "Acceso ilimitado a todos los materiales de licencia",
+  "full_practice_suite": "Suite completa de pruebas de práctica",
+  "progress_tracking": "Seguimiento del progreso",
+  "performance_analytics": "Análisis de rendimiento",
+  "subscribe_now": "Suscribirse ahora",
+  "per_month": "/mes",
+  "auto_renew_text": "Tu suscripción se renovará automáticamente cada mes hasta que la canceles.",
+  "subscribed_success": "¡Estás suscrito! Disfruta del acceso completo a todo el contenido.",
+  "subscription_failed": "La suscripción falló. Por favor, inténtalo de nuevo.",
+  "subscription_error": "Ocurrió un error. Por favor, inténtalo de nuevo.",
+  "subscription_successful": "¡Suscripción exitosa!"
 }

@@ -89,5 +89,19 @@
   "practice_not_passed": "Тест не складено",
   "no_saved_questions": "Немає збережених питань",
   "tap_heart_to_save": "Натисніть на сердечко в питаннях, щоб додати їх до списку збережених",
-  "explanation": "Пояснення"
+  "explanation": "Пояснення",
+  "subscription": "Підписка",
+  "monthly_subscription": "Місячна Підписка",
+  "features_include": "Функції включають:",
+  "unlimited_access": "Необмежений доступ до всіх матеріалів для ліцензії",
+  "full_practice_suite": "Повний набір практичних тестів",
+  "progress_tracking": "Відстеження прогресу",
+  "performance_analytics": "Аналітика ефективності",
+  "subscribe_now": "Підписатися зараз",
+  "per_month": "/місяць",
+  "auto_renew_text": "Ваша підписка буде автоматично продовжена щомісяця до скасування.",
+  "subscribed_success": "Ви підписані! Насолоджуйтесь повним доступом до всього контенту.",
+  "subscription_failed": "Підписка не вдалася. Будь ласка, спробуйте ще раз.",
+  "subscription_error": "Сталася помилка. Будь ласка, спробуйте ще раз.",
+  "subscription_successful": "Підписка успішна!"
 }

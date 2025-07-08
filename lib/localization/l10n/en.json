@@ -91,5 +91,19 @@
   "select_all_correct_answers": "Select all correct answers",
   "explanation": "Explanation",
   "try_again": "Try Again",
-  "check": "Check"
+  "check": "Check",
+  "subscription": "Subscription",
+  "monthly_subscription": "Monthly Subscription",
+  "features_include": "Features Include:",
+  "unlimited_access": "Unlimited access to all license materials",
+  "full_practice_suite": "Full practice test suite",
+  "progress_tracking": "Progress tracking",
+  "performance_analytics": "Performance analytics",
+  "subscribe_now": "Subscribe Now",
+  "per_month": "/month",
+  "auto_renew_text": "Your subscription will automatically renew each month until canceled.",
+  "subscribed_success": "You're subscribed! Enjoy full access to all content.",
+  "subscription_failed": "Subscription failed. Please try again.",
+  "subscription_error": "An error occurred. Please try again.",
+  "subscription_successful": "Subscription successful!"
 }

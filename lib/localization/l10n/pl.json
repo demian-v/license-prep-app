@@ -87,5 +87,19 @@
   "practice_not_passed": "Praktyka nie zdana",
   "no_saved_questions": "Brak zapisanych pytań",
   "tap_heart_to_save": "Dotknij serduszka w pytaniach, aby dodać je do listy zapisanych",
-  "explanation": "Wyjaśnienie"
+  "explanation": "Wyjaśnienie",
+  "subscription": "Subskrypcja",
+  "monthly_subscription": "Miesięczna Subskrypcja",
+  "features_include": "Funkcje obejmują:",
+  "unlimited_access": "Nieograniczony dostęp do wszystkich materiałów licencyjnych",
+  "full_practice_suite": "Pełny zestaw testów praktycznych",
+  "progress_tracking": "Śledzenie postępów",
+  "performance_analytics": "Analityka wydajności",
+  "subscribe_now": "Subskrybuj teraz",
+  "per_month": "/miesiąc",
+  "auto_renew_text": "Twoja subskrypcja będzie automatycznie odnawiana co miesiąc do momentu anulowania.",
+  "subscribed_success": "Jesteś subskrybentem! Ciesz się pełnym dostępem do wszystkich treści.",
+  "subscription_failed": "Subskrypcja nie powiodła się. Spróbuj ponownie.",
+  "subscription_error": "Wystąpił błąd. Spróbuj ponownie.",
+  "subscription_successful": "Subskrypcja udana!"
 }

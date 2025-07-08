@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/subscription_provider.dart';
+import '../localization/app_localizations.dart';
 
 class SubscriptionScreen extends StatefulWidget {
   @override
@@ -22,12 +23,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
   late Animation<double> _buttonFadeAnimation;
   late Animation<double> _buttonScaleAnimation;
 
-  final List<String> _features = [
-    'Unlimited access to all license materials',
-    'Full practice test suite',
-    'Progress tracking',
-    'Performance analytics',
-  ];
+  List<String> _getLocalizedFeatures(BuildContext context) {
+    return [
+      AppLocalizations.of(context).translate('unlimited_access'),
+      AppLocalizations.of(context).translate('full_practice_suite'),
+      AppLocalizations.of(context).translate('progress_tracking'),
+      AppLocalizations.of(context).translate('performance_analytics'),
+    ];
+  }
 
   @override
   void initState() {
@@ -166,7 +169,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Subscription',
+          AppLocalizations.of(context).translate('subscription'),
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         elevation: 0,
@@ -232,7 +235,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
                   children: [
                     // Title
                     Text(
-                      'USA License Prep Premium',
+                      AppLocalizations.of(context).translate('monthly_subscription'),
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
@@ -249,7 +252,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
                     
                     // Features section
                     Text(
-                      'Features Include:',
+                      AppLocalizations.of(context).translate('features_include'),
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -275,7 +278,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
                     
                     // Fine print
                     Text(
-                      'Your subscription will automatically renew each month until canceled.',
+                      AppLocalizations.of(context).translate('auto_renew_text'),
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey.shade700,
@@ -327,7 +330,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
                 ),
               ),
               Text(
-                '/month',
+                AppLocalizations.of(context).translate('per_month'),
                 style: TextStyle(
                   fontSize: 18,
                   color: Colors.grey.shade700,
@@ -356,8 +359,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
   }
 
   Widget _buildEnhancedFeaturesList() {
+    final features = _getLocalizedFeatures(context);
+    
     return Column(
-      children: _features.asMap().entries.map((entry) {
+      children: features.asMap().entries.map((entry) {
         int index = entry.key;
         String feature = entry.value;
         
@@ -500,7 +505,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
           SizedBox(width: 12),
           Expanded(
             child: Text(
-              'You\'re subscribed! Enjoy full access to all content.',
+              AppLocalizations.of(context).translate('subscribed_success'),
               style: TextStyle(
                 color: Colors.black,
                 fontWeight: FontWeight.bold,
@@ -525,13 +530,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
         
         if (!success && mounted) {
           setState(() {
-            _errorMessage = 'Subscription failed. Please try again.';
+            _errorMessage = AppLocalizations.of(context).translate('subscription_failed');
           });
         } else if (mounted) {
           // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Subscription successful!'),
+              content: Text(AppLocalizations.of(context).translate('subscription_successful')),
               backgroundColor: Colors.green,
             ),
           );
@@ -542,7 +547,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
       } catch (e) {
         if (mounted) {
           setState(() {
-            _errorMessage = 'An error occurred. Please try again.';
+            _errorMessage = AppLocalizations.of(context).translate('subscription_error');
           });
         }
       } finally {
@@ -593,7 +598,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
                           ),
                         )
                       : Text(
-                          'Subscribe Now - \$2.50/month',
+                          '${AppLocalizations.of(context).translate('subscribe_now')} - \$2.50${AppLocalizations.of(context).translate('per_month')}',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
