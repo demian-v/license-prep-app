@@ -265,7 +265,9 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  "Питання ${currentQuestionNumber} з ${totalQuestions}",
+                  AppLocalizations.of(context).translate('question_x_of_y')
+                    .replaceAll('{0}', currentQuestionNumber.toString())
+                    .replaceAll('{1}', totalQuestions.toString()),
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -282,7 +284,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    "Декілька відповідей",
+                    AppLocalizations.of(context).translate('multiple_answers'),
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w500,
@@ -457,14 +459,14 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
                 color: Colors.indigo.shade700,
               ),
               SizedBox(width: 8),
-              Text(
-                "Пояснення",
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.indigo.shade700,
-                  fontSize: 16,
-                ),
-              ),
+                              Text(
+                                AppLocalizations.of(context).translate('explanation'),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.indigo.shade700,
+                                  fontSize: 16,
+                                ),
+                              ),
             ],
           ),
           if (question.ruleReference != null) ...[
@@ -981,7 +983,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
                               ),
                               SizedBox(width: 8),
                               Text(
-                                "Пояснення",
+                                AppLocalizations.of(context).translate('explanation'),
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   color: Colors.indigo.shade700,
