@@ -1,11 +1,14 @@
 import '../../models/progress.dart';
 import 'firebase_functions_client.dart';
 import 'base/progress_api_interface.dart';
+import '../direct_firestore_service.dart';
+import 'package:flutter/foundation.dart';
 
 class FirebaseProgressApi implements ProgressApiInterface {
   final FirebaseFunctionsClient _functionsClient;
+  final DirectFirestoreService _directFirestoreService;
   
-  FirebaseProgressApi(this._functionsClient);
+  FirebaseProgressApi(this._functionsClient) : _directFirestoreService = DirectFirestoreService();
   
   /// Get the overall progress for a user
   @override
@@ -124,16 +127,62 @@ class FirebaseProgressApi implements ProgressApiInterface {
   @override
   Future<dynamic> getSavedItems([String? userId]) async {
     try {
-      final Map<String, dynamic>? data = userId != null ? {'userId': userId} : null;
+      // 🥇 PRIMARY: Try Firebase Functions first
+      debugPrint('FirebaseProgressApi: Trying Firebase Functions for getSavedItems');
       
       final response = await _functionsClient.callFunction<Map<String, dynamic>>(
-        'getSavedItems',
-        data: data,
+        'getSavedQuestions',
+        data: {},
       );
       
+      debugPrint('FirebaseProgressApi: Firebase Functions succeeded for getSavedItems');
       return response;
+      
     } catch (e) {
-      throw 'Failed to fetch saved items: $e';
+      debugPrint('FirebaseProgressApi: Firebase Functions failed for getSavedItems: $e');
+      debugPrint('FirebaseProgressApi: Trying Direct Firestore fallback');
+      
+      try {
+        // 🥈 BACKUP: Direct Firestore fallback
+        if (userId == null || userId.isEmpty) {
+          throw 'User ID is required for direct Firestore access';
+        }
+        
+        final savedQuestionIds = await _directFirestoreService.getSavedQuestionsDirect(userId);
+        
+        debugPrint('FirebaseProgressApi: Direct Firestore succeeded for getSavedItems');
+        return {
+          'success': true,
+          'savedQuestions': savedQuestionIds,
+          'count': savedQuestionIds.length,
+          'method': 'direct'
+        };
+        
+      } catch (directError) {
+        debugPrint('FirebaseProgressApi: Direct Firestore also failed: $directError');
+        throw 'Both Firebase Functions and Direct Firestore failed for getSavedItems: $directError';
+      }
+    }
+  }
+  
+  /// Get saved questions with content (Optimized for direct question loading)
+  @override
+  Future<dynamic> getSavedQuestionsWithContent([String? userId]) async {
+    try {
+      // 🥇 PRIMARY: Try optimized Firebase Functions first
+      debugPrint('FirebaseProgressApi: Trying Firebase Functions for getSavedQuestionsWithContent');
+      
+      final response = await _functionsClient.callFunction<Map<String, dynamic>>(
+        'getSavedQuestionsWithContent',
+        data: {},
+      );
+      
+      debugPrint('FirebaseProgressApi: Firebase Functions succeeded for getSavedQuestionsWithContent');
+      return response;
+      
+    } catch (e) {
+      debugPrint('FirebaseProgressApi: Firebase Functions failed for getSavedQuestionsWithContent: $e');
+      throw 'Optimized Firebase Functions failed for getSavedQuestionsWithContent: $e';
     }
   }
   
@@ -141,24 +190,45 @@ class FirebaseProgressApi implements ProgressApiInterface {
   @override
   Future<Map<String, dynamic>> saveItem(String itemId, String itemType, [String? userId]) async {
     try {
+      // 🥇 PRIMARY: Try Firebase Functions first
+      debugPrint('FirebaseProgressApi: Trying Firebase Functions for saveItem');
+      
       final Map<String, dynamic> data = {
-        'itemId': itemId,
-        'itemType': itemType,
+        'questionId': itemId, // Use questionId for the new Firebase Functions
       };
       
-      if (userId != null && userId.isNotEmpty) {
-        data['userId'] = userId;
-      }
-      
       final response = await _functionsClient.callFunction<Map<String, dynamic>>(
-        'addSavedItem',
+        'addSavedQuestion',
         data: data,
       );
       
+      debugPrint('FirebaseProgressApi: Firebase Functions succeeded for saveItem');
       return response;
+      
     } catch (e) {
-      print('Error in saveItem: $e');
-      throw 'Failed to save item: $e';
+      debugPrint('FirebaseProgressApi: Firebase Functions failed for saveItem: $e');
+      debugPrint('FirebaseProgressApi: Trying Direct Firestore fallback');
+      
+      try {
+        // 🥈 BACKUP: Direct Firestore fallback
+        if (userId == null || userId.isEmpty) {
+          throw 'User ID is required for direct Firestore access';
+        }
+        
+        await _directFirestoreService.addSavedQuestionDirect(userId, itemId);
+        
+        debugPrint('FirebaseProgressApi: Direct Firestore succeeded for saveItem');
+        return {
+          'success': true,
+          'message': 'Question saved successfully',
+          'questionId': itemId,
+          'method': 'direct'
+        };
+        
+      } catch (directError) {
+        debugPrint('FirebaseProgressApi: Direct Firestore also failed: $directError');
+        throw 'Both Firebase Functions and Direct Firestore failed for saveItem: $directError';
+      }
     }
   }
   
@@ -166,24 +236,45 @@ class FirebaseProgressApi implements ProgressApiInterface {
   @override
   Future<Map<String, dynamic>> removeSavedItem(String itemId, String itemType, [String? userId]) async {
     try {
+      // 🥇 PRIMARY: Try Firebase Functions first
+      debugPrint('FirebaseProgressApi: Trying Firebase Functions for removeSavedItem');
+      
       final Map<String, dynamic> data = {
-        'itemId': itemId,
-        'itemType': itemType,
+        'questionId': itemId, // Use questionId for the new Firebase Functions
       };
       
-      if (userId != null && userId.isNotEmpty) {
-        data['userId'] = userId;
-      }
-      
       final response = await _functionsClient.callFunction<Map<String, dynamic>>(
-        'removeSavedItem',
+        'removeSavedQuestion',
         data: data,
       );
       
+      debugPrint('FirebaseProgressApi: Firebase Functions succeeded for removeSavedItem');
       return response;
+      
     } catch (e) {
-      print('Error in removeSavedItem: $e');
-      throw 'Failed to remove saved item: $e';
+      debugPrint('FirebaseProgressApi: Firebase Functions failed for removeSavedItem: $e');
+      debugPrint('FirebaseProgressApi: Trying Direct Firestore fallback');
+      
+      try {
+        // 🥈 BACKUP: Direct Firestore fallback
+        if (userId == null || userId.isEmpty) {
+          throw 'User ID is required for direct Firestore access';
+        }
+        
+        await _directFirestoreService.removeSavedQuestionDirect(userId, itemId);
+        
+        debugPrint('FirebaseProgressApi: Direct Firestore succeeded for removeSavedItem');
+        return {
+          'success': true,
+          'message': 'Question removed successfully',
+          'questionId': itemId,
+          'method': 'direct'
+        };
+        
+      } catch (directError) {
+        debugPrint('FirebaseProgressApi: Direct Firestore also failed: $directError');
+        throw 'Both Firebase Functions and Direct Firestore failed for removeSavedItem: $directError';
+      }
     }
   }
 }

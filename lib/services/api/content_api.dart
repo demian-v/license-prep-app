@@ -172,15 +172,35 @@ class ContentApi implements ContentApiInterface {
         '/content/traffic-rule-topics/$topicId',
       );
       
-      final data = response.data;
-      return TrafficRuleTopic(
-        id: data['id'],
-        title: data['title'],
-        content: data['content'],
-      );
-    } catch (e) {
-      print('Failed to load traffic rule topic: ${e.toString()}');
+      if (response.data != null) {
+        final data = response.data;
+        return TrafficRuleTopic(
+          id: data['id'],
+          title: data['title'],
+          content: data['content'],
+        );
+      }
+      
       return null;
+    } catch (e) {
+      throw 'Failed to load traffic rule topic: ${e.toString()}';
+    }
+  }
+  
+  @override
+  Future<QuizQuestion?> getQuestionById(String questionId) async {
+    try {
+      final response = await _apiClient.get(
+        '/content/question/$questionId',
+      );
+      
+      if (response.data != null) {
+        return QuizQuestion.fromMap(response.data);
+      }
+      
+      return null;
+    } catch (e) {
+      throw 'Failed to load question: ${e.toString()}';
     }
   }
   

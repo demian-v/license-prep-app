@@ -18,6 +18,9 @@ abstract class ProgressApiInterface {
   /// Get saved items (bookmarked questions, topics, etc.)
   Future<dynamic> getSavedItems([String? userId]);
   
+  /// Get saved questions with content (Optimized for direct question loading)
+  Future<dynamic> getSavedQuestionsWithContent([String? userId]);
+  
   /// Add a saved item (bookmark a question, topic, etc.)
   Future<Map<String, dynamic>> saveItem(String itemId, String itemType, [String? userId]);
   

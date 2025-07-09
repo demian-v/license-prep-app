@@ -5,6 +5,7 @@ import '../models/quiz_question.dart';
 import '../providers/progress_provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/service_locator.dart';
+import '../services/direct_firestore_service.dart';
 import '../localization/app_localizations.dart';
 
 class SavedItemsScreen extends StatefulWidget {
@@ -166,70 +167,100 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> with TickerProvider
     });
 
     try {
-      final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final userId = authProvider.user?.id ?? '';
       
-      // Get saved question IDs from both old and new structure
-      List<String> savedQuestionIds = [];
+      List<QuizQuestion> questions = [];
       
-      // Add questions from new structure (preferred)
-      if (progressProvider.progress.savedItems.containsKey('question')) {
-        savedQuestionIds.addAll(progressProvider.progress.savedItems['question'] ?? []);
-      }
-      
-      // Add any remaining questions from old structure that aren't already included
-      for (final id in progressProvider.progress.savedQuestions) {
-        if (!savedQuestionIds.contains(id)) {
-          savedQuestionIds.add(id);
+      try {
+        // 🚀 Primary: Try optimized Firebase Functions first
+        print('🔄 Trying optimized getSavedQuestionsWithContent...');
+        final response = await serviceLocator.progress.getSavedQuestionsWithContent(userId);
+        
+        if (response is Map<String, dynamic> && response.containsKey('questions')) {
+          final questionsData = response['questions'] as List;
+          
+          questions = questionsData.map((questionData) {
+            return QuizQuestion.fromMap(questionData);
+          }).toList();
+          
+          print('✅ Optimized Firebase Functions returned ${questions.length} saved questions with content');
+        }
+      } catch (functionsError) {
+        print('❌ Optimized Firebase Functions failed: $functionsError');
+        
+        // 🔥 Backup: Use legacy approach with DirectFirestore
+        print('🔄 Using legacy DirectFirestore backup...');
+        
+        List<String> savedQuestionIds = [];
+        
+        try {
+          // Try legacy Firebase Functions for question IDs
+          final savedItemsResponse = await serviceLocator.progress.getSavedItems(userId);
+          
+          if (savedItemsResponse is Map<String, dynamic> && 
+              savedItemsResponse.containsKey('savedQuestions')) {
+            final savedQuestions = savedItemsResponse['savedQuestions'];
+            if (savedQuestions is List) {
+              savedQuestionIds = savedQuestions.cast<String>();
+              print('✅ Legacy Firebase Functions returned ${savedQuestionIds.length} saved question IDs');
+            }
+          }
+        } catch (legacyError) {
+          print('❌ Legacy Firebase Functions failed: $legacyError');
+          
+          // Final backup: Direct Firestore with timestamp sorting
+          final directFirestore = serviceLocator.directFirestore;
+          final savedQuestionsData = await directFirestore.getSavedQuestionsWithTimestamps(userId);
+          savedQuestionIds = savedQuestionsData.map((data) => data['questionId'] as String).toList();
+          
+          print('✅ DirectFirestore returned ${savedQuestionIds.length} saved question IDs (sorted by timestamp)');
+        }
+
+        // Load question content using direct question loading (NEW APPROACH)
+        if (savedQuestionIds.isNotEmpty) {
+          print('🔄 Loading ${savedQuestionIds.length} questions directly by ID...');
+          
+          for (final questionId in savedQuestionIds) {
+            try {
+              print('📚 Loading question: $questionId');
+              final question = await serviceLocator.content.getQuestionById(questionId);
+              
+              if (question != null) {
+                questions.add(question);
+                print('✅ Added saved question: ${question.id}');
+              } else {
+                print('❌ Question not found: $questionId');
+              }
+            } catch (e) {
+              print('❌ Error loading question $questionId: $e');
+            }
+          }
+          
+          // Sort questions to match the chronological order from savedQuestionIds
+          questions.sort((a, b) {
+            final indexA = savedQuestionIds.indexOf(a.id);
+            final indexB = savedQuestionIds.indexOf(b.id);
+            return indexA.compareTo(indexB);
+          });
         }
       }
 
-      // Load questions from Firebase
-      List<QuizQuestion> questions = [];
-      
-      if (savedQuestionIds.isNotEmpty) {
-        // Use Firebase to fetch questions from all topics
-        for (final topicId in ['q_topic_il_ua_01', 'q_topic_il_ua_02', 'q_topic_il_ua_03', 'q_topic_il_ua_04']) {
-          try {
-            final topicQuestions = await serviceLocator.content.getQuizQuestions(
-              topicId, // First parameter is topicId
-              'uk',   // Second parameter is language
-              'IL'    // Third parameter is state
-            );
-            
-            // Only add questions that are in the saved question IDs
-            for (final question in topicQuestions) {
-              if (savedQuestionIds.contains(question.id)) {
-                questions.add(question);
-              }
-            }
-          } catch (e) {
-            print('Error loading questions for topic $topicId: $e');
-          }
-        }
-        
-        // Sort the questions by the order they were saved (if available)
-        // This ensures that most recently added questions appear last in the list
-        final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
-        questions.sort((a, b) {
-          final orderA = progressProvider.getQuestionSaveOrder(a.id);
-          final orderB = progressProvider.getQuestionSaveOrder(b.id);
-          return orderA.compareTo(orderB); // Ascending order - older items first, newer last
-        });
-      }
+      print('🎉 Successfully loaded ${questions.length} saved questions');
 
       setState(() {
         _savedQuestions = questions;
         _isLoading = false;
       });
     } catch (e) {
+      print('❌ Error loading saved questions: $e');
       setState(() {
         _error = 'Failed to load saved questions: $e';
         _isLoading = false;
       });
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

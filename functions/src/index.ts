@@ -798,3 +798,343 @@ export const createOrUpdateUserDocument = functions.https.onCall(async (data, co
     );
   }
 });
+
+// Saved Questions Functions
+
+// Add a saved question (Updated for single-document structure)
+export const addSavedQuestion = functions.https.onCall(async (data, context) => {
+  try {
+    console.log('addSavedQuestion called with data:', data);
+    
+    // Validate authentication
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        'unauthenticated',
+        'User must be authenticated to save questions'
+      );
+    }
+    
+    const userId = context.auth.uid;
+    const { questionId } = data;
+    
+    // Validate required parameters
+    if (!questionId) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'Question ID is required'
+      );
+    }
+    
+    console.log(`Adding saved question for user ${userId}: ${questionId}`);
+    
+    // Use userId as document ID for single-document structure
+    const docRef = db.collection('savedQuestions').doc(userId);
+    const userDoc = await docRef.get();
+    
+    if (userDoc.exists) {
+      // Update existing document
+      const data = userDoc.data();
+      const itemIds = data?.itemIds || [];
+      
+      // Check if question is already saved
+      if (itemIds.includes(questionId)) {
+        console.log(`Question ${questionId} already saved for user ${userId}`);
+        return { 
+          success: true, 
+          message: 'Question already saved',
+          questionId: questionId,
+          alreadyExists: true
+        };
+      }
+      
+      // Add question to array and update order
+      await docRef.update({
+        itemIds: admin.firestore.FieldValue.arrayUnion(questionId),
+        [`order.${questionId}`]: Date.now(),
+        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      
+    } else {
+      // Create new document
+      const savedQuestionData = {
+        userId: userId,
+        itemIds: [questionId],
+        order: { [questionId]: Date.now() },
+        savedAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      
+      await docRef.set(savedQuestionData);
+    }
+    
+    console.log(`Successfully saved question ${questionId} for user ${userId}`);
+    
+    return { 
+      success: true, 
+      message: 'Question saved successfully',
+      questionId: questionId,
+      alreadyExists: false
+    };
+    
+  } catch (error) {
+    console.error('Error in addSavedQuestion:', error);
+    
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    
+    throw new functions.https.HttpsError(
+      'internal',
+      'Failed to save question: ' + (error instanceof Error ? error.message : String(error))
+    );
+  }
+});
+
+// Remove a saved question (Updated for single-document structure)
+export const removeSavedQuestion = functions.https.onCall(async (data, context) => {
+  try {
+    console.log('removeSavedQuestion called with data:', data);
+    
+    // Validate authentication
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        'unauthenticated',
+        'User must be authenticated to remove saved questions'
+      );
+    }
+    
+    const userId = context.auth.uid;
+    const { questionId } = data;
+    
+    // Validate required parameters
+    if (!questionId) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'Question ID is required'
+      );
+    }
+    
+    console.log(`Removing saved question for user ${userId}: ${questionId}`);
+    
+    // Use userId as document ID for single-document structure
+    const docRef = db.collection('savedQuestions').doc(userId);
+    const userDoc = await docRef.get();
+    
+    if (!userDoc.exists) {
+      console.log(`No saved questions document found for user ${userId}`);
+      return { 
+        success: true, 
+        message: 'Question was not saved',
+        questionId: questionId,
+        wasNotSaved: true
+      };
+    }
+    
+    const docData = userDoc.data();
+    const itemIds = docData?.itemIds || [];
+    
+    // Check if question is in the saved list
+    if (!itemIds.includes(questionId)) {
+      console.log(`Question ${questionId} not found in saved questions for user ${userId}`);
+      return { 
+        success: true, 
+        message: 'Question was not saved',
+        questionId: questionId,
+        wasNotSaved: true
+      };
+    }
+    
+    // Remove question from array and order map
+    await docRef.update({
+      itemIds: admin.firestore.FieldValue.arrayRemove(questionId),
+      [`order.${questionId}`]: admin.firestore.FieldValue.delete(),
+      lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    
+    console.log(`Successfully removed saved question ${questionId} for user ${userId}`);
+    
+    return { 
+      success: true, 
+      message: 'Question removed successfully',
+      questionId: questionId,
+      wasNotSaved: false
+    };
+    
+  } catch (error) {
+    console.error('Error in removeSavedQuestion:', error);
+    
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    
+    throw new functions.https.HttpsError(
+      'internal',
+      'Failed to remove saved question: ' + (error instanceof Error ? error.message : String(error))
+    );
+  }
+});
+
+// Get all saved questions for a user (Updated for single-document structure)
+export const getSavedQuestions = functions.https.onCall(async (data, context) => {
+  try {
+    console.log('getSavedQuestions called with data:', data);
+    
+    // Validate authentication
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        'unauthenticated',
+        'User must be authenticated to get saved questions'
+      );
+    }
+    
+    const userId = context.auth.uid;
+    
+    console.log(`Getting saved questions for user: ${userId}`);
+    
+    // Get single document for this user
+    const userDoc = await db.collection('savedQuestions').doc(userId).get();
+    
+    if (!userDoc.exists) {
+      console.log(`No saved questions document found for user ${userId}`);
+      return {
+        success: true,
+        savedQuestions: [],
+        count: 0
+      };
+    }
+    
+    const docData = userDoc.data();
+    const itemIds = docData?.itemIds || [];
+    const orderMap = docData?.order || {};
+    
+    // Sort by order (newest first)
+    const sortedQuestionIds = itemIds.sort((a: string, b: string) => (orderMap[b] || 0) - (orderMap[a] || 0));
+    
+    console.log(`Returning ${sortedQuestionIds.length} saved question IDs`);
+    
+    return {
+      success: true,
+      savedQuestions: sortedQuestionIds,
+      count: sortedQuestionIds.length
+    };
+    
+  } catch (error) {
+    console.error('Error in getSavedQuestions:', error);
+    
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    
+    throw new functions.https.HttpsError(
+      'internal',
+      'Failed to get saved questions: ' + (error instanceof Error ? error.message : String(error))
+    );
+  }
+});
+
+// Get saved questions with content (Optimized for direct question loading)
+export const getSavedQuestionsWithContent = functions.https.onCall(async (data, context) => {
+  try {
+    console.log('getSavedQuestionsWithContent called with data:', data);
+    
+    // Validate authentication
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        'unauthenticated',
+        'User must be authenticated to get saved questions'
+      );
+    }
+    
+    const userId = context.auth.uid;
+    
+    console.log(`Getting saved questions with content for user: ${userId}`);
+    
+    // Get single document for this user
+    const userDoc = await db.collection('savedQuestions').doc(userId).get();
+    
+    if (!userDoc.exists) {
+      console.log(`No saved questions document found for user ${userId}`);
+      return {
+        success: true,
+        questions: [],
+        count: 0
+      };
+    }
+    
+    const docData = userDoc.data();
+    const itemIds = docData?.itemIds || [];
+    const orderMap = docData?.order || {};
+    
+    if (itemIds.length === 0) {
+      console.log(`No saved questions found for user ${userId}`);
+      return {
+        success: true,
+        questions: [],
+        count: 0
+      };
+    }
+    
+    console.log(`Found ${itemIds.length} saved question IDs, fetching content...`);
+    
+    // Query individual questions directly by document ID
+    const questionPromises = itemIds.map((questionId: string) => 
+      db.collection('quizQuestions').doc(questionId).get()
+    );
+    
+    const questionDocs = await Promise.all(questionPromises);
+    
+    // Process and return questions
+    const questions = questionDocs
+      .filter(doc => doc.exists)
+      .map(doc => {
+        const data = doc.data();
+        
+        // Handle different correct answer field names in Firestore
+        let correctAnswer = data?.correctAnswer;
+        if (!correctAnswer && data?.correctAnswerString) {
+          correctAnswer = data.correctAnswerString;
+        }
+        if (!correctAnswer && data?.correctAnswers) {
+          correctAnswer = data.correctAnswers;
+        }
+        
+        return {
+          id: data?.id || doc.id,
+          topicId: data?.topicId || '',
+          questionText: data?.questionText || '',
+          options: data?.options || [],
+          correctAnswer: correctAnswer,
+          explanation: data?.explanation || '',
+          ruleReference: data?.ruleReference || '',
+          imagePath: data?.imagePath || null,
+          type: data?.type || 'singleChoice',
+          language: data?.language || 'en',
+          state: data?.state || 'ALL',
+          order: data?.order || 0
+        };
+      });
+    
+    // Sort by saved order (newest first)
+    questions.sort((a, b) => (orderMap[b.id] || 0) - (orderMap[a.id] || 0));
+    
+    console.log(`Returning ${questions.length} saved questions with content`);
+    
+    return {
+      success: true,
+      questions: questions,
+      count: questions.length
+    };
+    
+  } catch (error) {
+    console.error('Error in getSavedQuestionsWithContent:', error);
+    
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    
+    throw new functions.https.HttpsError(
+      'internal',
+      'Failed to get saved questions with content: ' + (error instanceof Error ? error.message : String(error))
+    );
+  }
+});

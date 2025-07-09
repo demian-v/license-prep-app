@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users can read/write their own user document
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Users can read/write their own saved questions (Updated for single-document structure)
+    match /savedQuestions/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Allow reading quiz questions, topics, etc. (read-only for all authenticated users)
+    match /quizQuestions/{document} {
+      allow read: if request.auth != null;
+    }
+    
+    match /quizTopics/{document} {
+      allow read: if request.auth != null;
+    }
+    
+    match /trafficRuleTopics/{document} {
+      allow read: if request.auth != null;
+    }
+    
+    match /theoryModules/{document} {
+      allow read: if request.auth != null;
+    }
+    
+    match /practiceTests/{document} {
+      allow read: if request.auth != null;
+    }
+    
+    // Default deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

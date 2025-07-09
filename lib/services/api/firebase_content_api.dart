@@ -614,6 +614,72 @@ class FirebaseContentApi implements ContentApiInterface {
     }
   }
   
+  /// Get a specific quiz question by ID
+  @override
+  Future<QuizQuestion?> getQuestionById(String questionId) async {
+    try {
+      print('🔍 Fetching question by document ID: $questionId');
+      
+      // Get document directly by ID (not by field query)
+      final DocumentSnapshot docSnapshot = await _firestore
+          .collection('quizQuestions')
+          .doc(questionId)
+          .get();
+      
+      if (docSnapshot.exists) {
+        final data = docSnapshot.data() as Map<String, dynamic>;
+        
+        // Safe text preview to avoid RangeError
+        final questionText = data['questionText']?.toString() ?? 'No text';
+        final preview = questionText.length > 50 ? questionText.substring(0, 50) + '...' : questionText;
+        print('✅ Found question: $questionId - $preview');
+        
+        // Safe extraction of options
+        List<String> options = [];
+        if (data['options'] != null && data['options'] is List) {
+          options = (data['options'] as List)
+              .map((item) => item?.toString() ?? "")
+              .where((item) => item.isNotEmpty)
+              .toList();
+        }
+        
+        // Extract correct answer
+        dynamic correctAnswer;
+        if (data['correctAnswers'] != null && data['correctAnswers'] is List) {
+          correctAnswer = (data['correctAnswers'] as List)
+              .map((item) => item.toString())
+              .toList();
+        } else if (data['correctAnswer'] != null) {
+          correctAnswer = data['correctAnswer'].toString();
+        } else if (data['correctAnswerString'] != null) {
+          String answerStr = data['correctAnswerString'].toString();
+          if (data['type']?.toString()?.toLowerCase() == 'multiplechoice') {
+            correctAnswer = answerStr.split(', ').map((s) => s.trim()).toList();
+          } else {
+            correctAnswer = answerStr;
+          }
+        }
+        
+        return QuizQuestion(
+          id: questionId, // Use the document ID
+          topicId: data['topicId'] ?? '',
+          questionText: data['questionText'] ?? 'No question text',
+          options: options,
+          correctAnswer: correctAnswer,
+          explanation: data['explanation']?.toString(),
+          ruleReference: data['ruleReference']?.toString(),
+          imagePath: data['imagePath']?.toString(),
+          type: _parseQuestionType(data['type'] ?? 'singleChoice'),
+        );
+      }
+      
+      print('❌ Question document not found: $questionId');
+      return null;
+    } catch (e) {
+      print('❌ Error fetching question by ID $questionId: $e');
+      return null;
+    }
+  }
   
   /// Get traffic rule topics from Firestore
   /// This is used for the direct Firestore approach

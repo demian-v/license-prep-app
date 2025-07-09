@@ -226,6 +226,20 @@ class ProgressApi implements ProgressApiInterface {
     }
   }
   
+  @override
+  Future<dynamic> getSavedQuestionsWithContent([String? userId]) async {
+    try {
+      final String id = userId ?? await _getCurrentUserId();
+      final response = await _apiClient.get(
+        '/progress/$id/saved-questions-with-content',
+      );
+      
+      return response.data;
+    } catch (e) {
+      throw 'Failed to load saved questions with content: ${e.toString()}';
+    }
+  }
+  
   // Legacy method for maintaining compatibility
   Future<void> addSavedItem(String userId, String itemId, String itemType) async {
     try {

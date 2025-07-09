@@ -12,6 +12,9 @@ abstract class ContentApiInterface {
   /// Get quiz questions based on topic ID, language, and state
   Future<List<QuizQuestion>> getQuizQuestions(String topicId, String language, String state);
   
+  /// Get a specific quiz question by ID
+  Future<QuizQuestion?> getQuestionById(String questionId);
+  
   /// Get practice questions for random practice tests
   Future<List<QuizQuestion>> getPracticeQuestions({
     required String language,
