@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -5,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'firebase_options.dart';
 
 import 'services/service_locator.dart';
@@ -12,6 +14,7 @@ import 'services/service_locator_extensions.dart';
 import 'services/api/api_implementation.dart';
 import 'services/content_loading_manager.dart';
 import 'services/email_sync_service.dart';
+import 'services/analytics_service.dart';
 
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
@@ -127,6 +130,21 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   
+  // Initialize Firebase Analytics
+  await analyticsService.initialize();
+  debugPrint('📊 Firebase Analytics initialized');
+  
+  // Enable Firebase Analytics debug mode in debug builds
+  if (kDebugMode) {
+    try {
+      await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
+      debugPrint('🔍 Firebase Analytics debug mode enabled');
+      debugPrint('🔍 To see events in DebugView, run: adb shell setprop debug.firebase.analytics.app com.example.license_prep_app');
+    } catch (e) {
+      debugPrint('⚠️ Failed to enable Firebase Analytics debug mode: $e');
+    }
+  }
+  
   // Set up auth listener to detect email changes
   setupAuthListener();
   
@@ -235,6 +253,9 @@ void main() async {
   // Connect AuthProvider and LanguageProvider for synchronization
   authProvider.setLanguageProvider(languageProvider);
   
+  // Connect AuthProvider with SubscriptionProvider for analytics
+  authProvider.setSubscriptionProvider(subscriptionProvider);
+  
   final stateProvider = StateProvider();
   
   // Initialize state provider
@@ -268,6 +289,37 @@ void main() async {
     final userId = user.id; // User.id is non-nullable based on the model
     Future.microtask(() async {
       await progressProvider.migrateSavedQuestionsIfNeeded(userId);
+    });
+  }
+  
+  // Set up initial user properties for GA4 analytics
+  if (user != null) {
+    await analyticsService.setUserProperties(
+      userId: user.id,
+      state: user.state,
+      language: user.language ?? languageProvider.language,
+      subscriptionStatus: subscription.planType,
+    );
+    
+    // Log GA4 user configured event
+    await analyticsService.logEvent('ga4_user_configured', {
+      'user_id': user.id,
+      'has_state': user.state != null,
+      'has_language': user.language != null,
+      'subscription_type': subscription.planType,
+      'is_trial': subscription.planType == 'trial',
+    });
+  } else {
+    // For anonymous users, set basic properties
+    await analyticsService.setUserProperties(
+      language: languageProvider.language,
+      subscriptionStatus: subscription.planType,
+    );
+    
+    // Log GA4 anonymous user configured event
+    await analyticsService.logEvent('ga4_anonymous_user_configured', {
+      'language': languageProvider.language,
+      'subscription_type': subscription.planType,
     });
   }
   

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'analytics_service.dart';
 import 'firebase_storage_service.dart';
 import 'direct_firestore_service.dart';
 import 'api/api_client.dart';
@@ -60,6 +61,9 @@ class ServiceLocator {
   // Direct Firestore Service
   late DirectFirestoreService _directFirestoreService;
   
+  // Analytics Service
+  late AnalyticsService _analyticsService;
+  
   bool _isInitialized = false;
 
   /// Initialize all services with default implementation (REST)
@@ -81,6 +85,7 @@ class ServiceLocator {
     _firebaseFunctionsClient = FirebaseFunctionsClient();
     _firebaseStorageService = FirebaseStorageService();
     _directFirestoreService = DirectFirestoreService();
+    _analyticsService = AnalyticsService();
     
     // Initialize REST implementations
     _restAuthApi = AuthApi(_apiClient);
@@ -126,6 +131,12 @@ class ServiceLocator {
   DirectFirestoreService get directFirestore {
     _checkInitialization();
     return _directFirestoreService;
+  }
+  
+  /// Getter for Analytics Service
+  AnalyticsService get analytics {
+    _checkInitialization();
+    return _analyticsService;
   }
   
   /// Getters for accessing interface-based services (recommended)

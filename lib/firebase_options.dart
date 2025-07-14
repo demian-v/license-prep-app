@@ -56,6 +56,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '987638335534',
     projectId: 'licenseprepapp',
     storageBucket: 'licenseprepapp.firebasestorage.app',
+    measurementId: 'G-8TTZX72V8P',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(

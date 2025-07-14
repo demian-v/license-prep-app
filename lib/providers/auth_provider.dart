@@ -8,18 +8,51 @@ import '../services/email_sync_service.dart';
 import '../data/state_data.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'language_provider.dart';
+import 'subscription_provider.dart';
 
 class AuthProvider extends ChangeNotifier {
   User? user;
   final firebase_auth.FirebaseAuth _firebaseAuth = firebase_auth.FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   LanguageProvider? _languageProvider;
+  SubscriptionProvider? _subscriptionProvider;
 
   AuthProvider(this.user);
 
   // Set the language provider for synchronization
   void setLanguageProvider(LanguageProvider languageProvider) {
     _languageProvider = languageProvider;
+  }
+
+  // Set the subscription provider for analytics
+  void setSubscriptionProvider(SubscriptionProvider subscriptionProvider) {
+    _subscriptionProvider = subscriptionProvider;
+  }
+
+  /// Categorize login errors for analytics (no PII)
+  String _categorizeLoginError(String error) {
+    final errorLower = error.toLowerCase();
+    
+    if (errorLower.contains('user-not-found') || 
+        errorLower.contains('invalid-email')) {
+      return 'user_not_found';
+    } else if (errorLower.contains('wrong-password') || 
+              errorLower.contains('invalid-credential')) {
+      return 'invalid_password';
+    } else if (errorLower.contains('too-many-requests')) {
+      return 'rate_limited';
+    } else if (errorLower.contains('network')) {
+      return 'network_error';
+    }
+    return 'unknown_error';
+  }
+
+  /// Get subscription status for analytics
+  String _getSubscriptionStatus() {
+    if (_subscriptionProvider?.subscription?.isActive == true) {
+      return _subscriptionProvider?.subscription?.planType ?? 'active';
+    }
+    return 'inactive';
   }
 
   Future<bool> login(String email, String password) async {
@@ -109,6 +142,20 @@ class AuthProvider extends ChangeNotifier {
         // Sync user's language preference to LanguageProvider
         await _syncUserLanguageToProvider();
         
+        // Track successful login event
+        try {
+          await serviceLocator.analytics.logLogin('email');
+          await serviceLocator.analytics.setUserProperties(
+            userId: user!.id,
+            state: user!.state,
+            language: user!.language ?? (_languageProvider?.language ?? 'en'),
+            subscriptionStatus: _getSubscriptionStatus(),
+          );
+          debugPrint('📊 AuthProvider: Login analytics tracked successfully');
+        } catch (e) {
+          debugPrint('⚠️ AuthProvider: Analytics login tracking error (non-critical): $e');
+        }
+        
         // Persist to shared preferences
         await prefs.setString('user', jsonEncode(user!.toJson()));
         
@@ -119,6 +166,18 @@ class AuthProvider extends ChangeNotifier {
     } catch (e) {
       // Handle login errors
       debugPrint('AuthProvider: Login error: $e');
+      
+      // Track login failure event (no PII)
+      try {
+        await serviceLocator.analytics.logEvent('login_attempt_failed', {
+          'error_category': _categorizeLoginError(e.toString()),
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+        });
+        debugPrint('📊 AuthProvider: Login failure analytics tracked');
+      } catch (analyticsError) {
+        debugPrint('⚠️ AuthProvider: Analytics error tracking failed (non-critical): $analyticsError');
+      }
+      
       return false;
     }
   }

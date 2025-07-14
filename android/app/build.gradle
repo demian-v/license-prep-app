@@ -45,6 +45,19 @@ kotlinOptions {
     }
 }
 
+dependencies {
+    // Firebase Analytics (required for DebugView)
+    implementation 'com.google.firebase:firebase-analytics:21.3.0'
+    // Firebase Core
+    implementation 'com.google.firebase:firebase-core:21.1.1'
+    // Firebase Auth
+    implementation 'com.google.firebase:firebase-auth:22.1.0'
+    // Cloud Firestore
+    implementation 'com.google.firebase:firebase-firestore:24.7.0'
+    // Cloud Functions
+    implementation 'com.google.firebase:firebase-functions:20.3.0'
+}
+
 flutter {
     source = "../.."
 }
