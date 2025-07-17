@@ -45,81 +45,43 @@ class AnalyticsService {
       _analytics = FirebaseAnalytics.instance;
       _observer = FirebaseAnalyticsObserver(analytics: _analytics);
       
-      // GA4-specific initialization
-      await _initializeGA4Configuration();
-      await _configureGA4Stream();
+      // Generate or retrieve client ID for internal tracking
+      _clientId = await _getOrGenerateClientId();
+      _currentLanguage = 'en-us'; // Default, will be updated
+      
+      // Set only non-reserved default event parameters
+      await _analytics.setDefaultEventParameters({
+        'app_version': '1.0.0',
+        'platform': defaultTargetPlatform.name,
+      });
+      
+      // Enable analytics collection
+      await _analytics.setAnalyticsCollectionEnabled(true);
       
       _isInitialized = true;
       
       // Enhanced debug logging for GA4
       if (kDebugMode) {
-        debugPrint('🔍 GA4 Firebase Analytics Debug Information:');
+        debugPrint('🔍 Firebase Analytics Debug Information:');
         debugPrint('📱 App Package: com.example.license_prep_app');
         debugPrint('🔧 Measurement ID: $_measurementId');
         debugPrint('🔢 Stream ID: $_streamId');
         debugPrint('🆔 Firebase App ID: $_firebaseAppId');
-        debugPrint('🆔 Client ID: $_clientId');
-        debugPrint('🌐 Language: $_currentLanguage');
         debugPrint('🐛 Debug Mode: ${kDebugMode ? 'ENABLED' : 'DISABLED'}');
         debugPrint('📊 Analytics collection enabled: $_isAnalyticsEnabled');
         debugPrint('🔧 To enable DebugView, run: adb shell setprop debug.firebase.analytics.app com.example.license_prep_app');
         debugPrint('🔍 Then restart your app and check Firebase Console > Analytics > DebugView');
-        debugPrint('✅ GA4 Stream configured with Stream ID: $_streamId');
       }
-      
-      // Log GA4 configuration event
-      await logEvent('ga4_stream_configured', {
-        'measurement_id': _measurementId,
-        'client_id': _clientId,
-        'language': _currentLanguage,
-        'analytics_enabled': _isAnalyticsEnabled,
-      });
       
       // Log app start event
       await logAppOpened();
       
     } catch (e) {
-      debugPrint('❌ Error initializing GA4 AnalyticsService: $e');
+      debugPrint('❌ Error initializing Firebase Analytics: $e');
       // Don't throw - analytics should fail gracefully
     }
   }
   
-  /// Initialize GA4 configuration parameters
-  Future<void> _initializeGA4Configuration() async {
-    // Generate or retrieve client ID
-    _clientId = await _getOrGenerateClientId();
-    _currentLanguage = 'en-us'; // Default, will be updated
-    
-    // Set GA4 default event parameters (excluding reserved parameters)
-    await _analytics.setDefaultEventParameters({
-      'measurement_id': _measurementId,
-      'stream_id': _streamId,
-      'client_id': _clientId,
-      'language': _currentLanguage,
-      'app_version': '1.0.0',
-      'platform': defaultTargetPlatform.name,
-      'debug_mode': kDebugMode ? 'true' : 'false',
-      'installation_timestamp': DateTime.now().millisecondsSinceEpoch,
-    });
-    
-    debugPrint('🔧 GA4 default parameters configured');
-  }
-  
-  /// Configure GA4 stream with proper parameters
-  Future<void> _configureGA4Stream() async {
-    try {
-      // Enable analytics collection
-      await _analytics.setAnalyticsCollectionEnabled(true);
-      
-      // Set screen resolution
-      final screenResolution = await _getScreenResolution();
-      await _analytics.setUserProperty(name: 'screen_resolution', value: screenResolution);
-      
-      debugPrint('📊 GA4 stream configuration complete');
-    } catch (e) {
-      debugPrint('❌ Error configuring GA4 stream: $e');
-    }
-  }
   
   /// Generate or retrieve client ID
   Future<String> _getOrGenerateClientId() async {
@@ -184,27 +146,18 @@ class AnalyticsService {
     if (!_isInitialized || !_isAnalyticsEnabled) return;
     
     try {
-      // Add GA4 metadata to all events (excluding reserved parameters)
-      final ga4Parameters = {
-        ...?parameters,
-        'client_id': _clientId,
-        'language': _currentLanguage,
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
-        'stream_id': _streamId,
-        'debug_mode': kDebugMode ? 'true' : 'false',
-      };
-      
+      // Send parameters as-is without adding reserved GA4 parameters
       await _analytics.logEvent(
         name: eventName,
-        parameters: ga4Parameters,
+        parameters: parameters,
       );
       
-      debugPrint('📊 GA4 Event logged: $eventName');
+      debugPrint('📊 Event logged: $eventName');
       if (parameters != null) {
         debugPrint('   Parameters: $parameters');
       }
     } catch (e) {
-      debugPrint('❌ Error logging GA4 event $eventName: $e');
+      debugPrint('❌ Error logging event $eventName: $e');
     }
   }
   

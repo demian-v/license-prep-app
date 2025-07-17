@@ -134,17 +134,6 @@ void main() async {
   await analyticsService.initialize();
   debugPrint('📊 Firebase Analytics initialized');
   
-  // Enable Firebase Analytics debug mode in debug builds
-  if (kDebugMode) {
-    try {
-      await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
-      debugPrint('🔍 Firebase Analytics debug mode enabled');
-      debugPrint('🔍 To see events in DebugView, run: adb shell setprop debug.firebase.analytics.app com.example.license_prep_app');
-    } catch (e) {
-      debugPrint('⚠️ Failed to enable Firebase Analytics debug mode: $e');
-    }
-  }
-  
   // Set up auth listener to detect email changes
   setupAuthListener();
   
@@ -292,7 +281,7 @@ void main() async {
     });
   }
   
-  // Set up initial user properties for GA4 analytics
+  // Set up initial user properties for analytics
   if (user != null) {
     await analyticsService.setUserProperties(
       userId: user.id,
@@ -301,11 +290,8 @@ void main() async {
       subscriptionStatus: subscription.planType,
     );
     
-    // Log GA4 user configured event
-    await analyticsService.logEvent('ga4_user_configured', {
-      'user_id': user.id,
-      'has_state': user.state != null,
-      'has_language': user.language != null,
+    // Log user configured event
+    await analyticsService.logEvent('user_configured', {
       'subscription_type': subscription.planType,
       'is_trial': subscription.planType == 'trial',
     });
@@ -316,9 +302,8 @@ void main() async {
       subscriptionStatus: subscription.planType,
     );
     
-    // Log GA4 anonymous user configured event
-    await analyticsService.logEvent('ga4_anonymous_user_configured', {
-      'language': languageProvider.language,
+    // Log anonymous user configured event
+    await analyticsService.logEvent('anonymous_user_configured', {
       'subscription_type': subscription.planType,
     });
   }
