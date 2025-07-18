@@ -217,7 +217,7 @@ class AnalyticsService {
     await logEvent('signup_form_completed', {
       'signup_method': 'email',
       if (timeSpentSeconds != null) 'time_spent_seconds': timeSpentSeconds,
-      if (hasFormErrors != null) 'had_form_errors': hasFormErrors,
+      if (hasFormErrors != null) 'had_form_errors': hasFormErrors.toString(),
       if (validationErrors != null) 'validation_errors': validationErrors,
       'timestamp': DateTime.now().millisecondsSinceEpoch,
     });
@@ -232,8 +232,8 @@ class AnalyticsService {
   }) async {
     await logEvent('user_account_created', {
       'signup_method': signupMethod ?? 'email',
-      if (hasName != null) 'has_name': hasName,
-      if (emailVerified != null) 'email_verified': emailVerified,
+      if (hasName != null) 'has_name': hasName.toString(),
+      if (emailVerified != null) 'email_verified': emailVerified.toString(),
       'account_type': 'trial',
       'timestamp': DateTime.now().millisecondsSinceEpoch,
     });
@@ -345,7 +345,7 @@ class AnalyticsService {
       if (totalQuestions != null) 'total_questions': totalQuestions,
       if (correctAnswers != null) 'correct_answers': correctAnswers,
       if (timeSpent != null) 'time_spent_seconds': timeSpent,
-      if (passed != null) 'passed': passed,
+      if (passed != null) 'passed': passed.toString(),
       if (state != null) 'state': state,
       if (licenseType != null) 'license_type': licenseType,
     });
@@ -395,7 +395,7 @@ class AnalyticsService {
     await logEvent('question_answered', {
       if (questionId != null) 'question_id': questionId,
       if (questionType != null) 'question_type': questionType,
-      if (isCorrect != null) 'is_correct': isCorrect,
+      if (isCorrect != null) 'is_correct': isCorrect.toString(),
       if (timeSpent != null) 'time_spent_seconds': timeSpent,
       if (state != null) 'state': state,
       if (licenseType != null) 'license_type': licenseType,
