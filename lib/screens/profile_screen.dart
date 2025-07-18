@@ -10,6 +10,7 @@ import '../providers/progress_provider.dart';
 import '../examples/api_switcher_example.dart';
 import '../examples/function_name_mapping_example.dart';
 import '../services/email_sync_service.dart';
+import '../services/analytics_service.dart';
 import '../models/user.dart';
 import '../data/state_data.dart';
 import '../widgets/enhanced_profile_card.dart';
@@ -29,6 +30,10 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
   bool _isLoadingName = true;
   String? _cachedFirestoreState;
   String? _cachedFirestoreName;
+  
+  // Analytics tracking variables
+  DateTime? _languageDialogStartTime;
+  String? _languageBeforeChange;
 
   @override
   void initState() {
@@ -818,8 +823,30 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     );
   }
 
+  String _getErrorType(String errorMessage) {
+    if (errorMessage.contains('provider')) {
+      return 'provider_error';
+    } else if (errorMessage.contains('auth')) {
+      return 'auth_error';
+    } else if (errorMessage.contains('network')) {
+      return 'network_error';
+    } else {
+      return 'unknown_error';
+    }
+  }
+
   void _showLanguageSelector(BuildContext context, LanguageProvider languageProvider) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    // Track dialog opening
+    _languageDialogStartTime = DateTime.now();
+    _languageBeforeChange = languageProvider.language;
+    
+    analyticsService.logLanguageSelectionStarted(
+      selectionContext: 'profile',
+      currentLanguage: _languageBeforeChange,
+    );
+    debugPrint('📊 Analytics: language_selection_started logged (context: profile)');
 
     // Map language codes to display names
     final Map<String, String> languageNames = {
@@ -854,18 +881,57 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
       title: Text(language),
       trailing: provider.language == code ? Icon(Icons.check, color: Colors.green) : null,
       onTap: () async {
-        // Update both providers, just like in the language_selection_screen
-        await provider.setLanguage(code);
-        await authProvider.updateUserLanguage(code);
-        Navigator.pop(context);
-        
-        // Visual feedback
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${_translate('language_changed', provider)} $language'),
-            duration: Duration(seconds: 1),
-          ),
-        );
+        try {
+          // Get current language before change
+          final previousLanguage = provider.language;
+          
+          // Update both providers
+          await provider.setLanguage(code);
+          await authProvider.updateUserLanguage(code);
+          
+          // Calculate time spent
+          final timeSpent = _languageDialogStartTime != null 
+              ? DateTime.now().difference(_languageDialogStartTime!).inSeconds 
+              : null;
+          
+          // Track successful language change
+          analyticsService.logLanguageChanged(
+            selectionContext: 'profile',
+            previousLanguage: previousLanguage,
+            newLanguage: code,
+            languageName: language,
+            timeSpentSeconds: timeSpent,
+          );
+          debugPrint('📊 Analytics: language_changed logged (profile: $previousLanguage → $code)');
+          
+          Navigator.pop(context);
+          
+          // Visual feedback
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${_translate('language_changed', provider)} $language'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        } catch (e) {
+          // Track failure
+          analyticsService.logLanguageChangeFailed(
+            selectionContext: 'profile',
+            targetLanguage: code,
+            errorType: _getErrorType(e.toString()),
+            errorMessage: e.toString(),
+          );
+          debugPrint('📊 Analytics: language_change_failed logged (profile: $code)');
+          
+          // Close dialog and show error
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error changing language: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       },
     );
   }

@@ -5,6 +5,7 @@ import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
 import '../localization/app_localizations.dart';
 import '../widgets/enhanced_language_card.dart';
+import '../services/analytics_service.dart';
 import 'state_selection_screen.dart';
 
 class LanguageSelectionScreen extends StatefulWidget {
@@ -13,9 +14,26 @@ class LanguageSelectionScreen extends StatefulWidget {
 }
 
 class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
+  // Analytics tracking variables
+  DateTime? _selectionStartTime;
+  String? _initialLanguage;
+  
   @override
   void initState() {
     super.initState();
+    
+    // Track selection start time and initial language
+    _selectionStartTime = DateTime.now();
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    _initialLanguage = languageProvider.language;
+    
+    // Log selection started
+    analyticsService.logLanguageSelectionStarted(
+      selectionContext: 'signup',
+      currentLanguage: _initialLanguage,
+    );
+    debugPrint('📊 Analytics: language_selection_started logged (context: signup)');
+    
     // Perform a final check for incorrect default values
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _verifyUserDefaults(context);
@@ -147,6 +165,18 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
     );
   }
 
+  String _getErrorType(String errorMessage) {
+    if (errorMessage.contains('provider')) {
+      return 'provider_error';
+    } else if (errorMessage.contains('auth')) {
+      return 'auth_error';
+    } else if (errorMessage.contains('network')) {
+      return 'network_error';
+    } else {
+      return 'unknown_error';
+    }
+  }
+
   Widget _buildLanguageButton(BuildContext context, String language, String code) {
     // Get the color for the language (for the snackbar)
     final Map<String, Color> languageColors = {
@@ -172,8 +202,11 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
         );
         
         try {
-          // Update language provider
+          // Get current language before change
           final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+          final previousLanguage = languageProvider.language;
+          
+          // Update language provider
           print('🔄 [LANGUAGE SCREEN] Setting language to: $code');
           await languageProvider.setLanguage(code);
           
@@ -184,6 +217,21 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
           final authProvider = Provider.of<AuthProvider>(context, listen: false);
           await authProvider.updateUserLanguage(code);
           print('✅ [LANGUAGE SCREEN] User language updated in auth provider');
+          
+          // Calculate time spent
+          final timeSpent = _selectionStartTime != null 
+              ? DateTime.now().difference(_selectionStartTime!).inSeconds 
+              : null;
+          
+          // Track successful language change
+          analyticsService.logLanguageChanged(
+            selectionContext: 'signup',
+            previousLanguage: previousLanguage,
+            newLanguage: code,
+            languageName: language,
+            timeSpentSeconds: timeSpent,
+          );
+          debugPrint('📊 Analytics: language_changed logged (signup: $previousLanguage → $code)');
           
           // Wait longer to ensure the language is properly loaded
           print('⏳ [LANGUAGE SCREEN] Waiting for language to propagate...');
@@ -210,6 +258,15 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
             print('🔄 [LANGUAGE SCREEN] Navigated to state selection screen');
           }
         } catch (e) {
+          // Track failure
+          analyticsService.logLanguageChangeFailed(
+            selectionContext: 'signup',
+            targetLanguage: code,
+            errorType: _getErrorType(e.toString()),
+            errorMessage: e.toString(),
+          );
+          debugPrint('📊 Analytics: language_change_failed logged (signup: $code)');
+          
           print('🚨 [LANGUAGE SCREEN] Error updating language: $e');
           // Show error snackbar
           ScaffoldMessenger.of(context).showSnackBar(

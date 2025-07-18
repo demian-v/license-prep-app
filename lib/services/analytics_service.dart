@@ -358,6 +358,54 @@ class AnalyticsService {
     });
   }
   
+  // MARK: - Language Change Events
+  
+  /// Log when user opens language selection interface
+  Future<void> logLanguageSelectionStarted({
+    String? selectionContext,
+    String? currentLanguage,
+  }) async {
+    await logEvent('language_selection_started', {
+      'selection_context': selectionContext ?? 'unknown',
+      'current_language': currentLanguage ?? 'unknown',
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  /// Log successful language change
+  Future<void> logLanguageChanged({
+    String? selectionContext,
+    String? previousLanguage,
+    String? newLanguage,
+    String? languageName,
+    int? timeSpentSeconds,
+  }) async {
+    await logEvent('language_changed', {
+      'selection_context': selectionContext ?? 'unknown',
+      'previous_language': previousLanguage ?? 'unknown',
+      'new_language': newLanguage ?? 'unknown',
+      'language_name': languageName ?? 'unknown',
+      if (timeSpentSeconds != null) 'time_spent_seconds': timeSpentSeconds,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  /// Log language change failure
+  Future<void> logLanguageChangeFailed({
+    String? selectionContext,
+    String? targetLanguage,
+    String? errorType,
+    String? errorMessage,
+  }) async {
+    await logEvent('language_change_failed', {
+      'selection_context': selectionContext ?? 'unknown',
+      'target_language': targetLanguage ?? 'unknown',
+      'error_type': errorType ?? 'unknown_error',
+      'error_message': errorMessage ?? 'unknown',
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+  
   // MARK: - Learning Events
   
   /// Log quiz start event
@@ -514,12 +562,6 @@ class AnalyticsService {
     await setUserProperty('license_type', licenseType);
   }
   
-  /// Log language change event
-  Future<void> logLanguageChanged(String language) async {
-    _currentLanguage = language;
-    await logEvent('language_changed', {'language': language});
-    await setUserProperty('language', language);
-  }
   
   /// Log subscription viewed event
   Future<void> logSubscriptionViewed() async {
