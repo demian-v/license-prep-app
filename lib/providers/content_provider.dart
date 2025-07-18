@@ -108,6 +108,8 @@ class ContentProvider extends ChangeNotifier {
       fetchContent();
     } else {
       print('ContentProvider: Skipping content fetch (explicit request = $_contentRequestedExplicitly)');
+      // Just notify listeners about the preference change without fetching content
+      notifyListeners();
     }
   }
   

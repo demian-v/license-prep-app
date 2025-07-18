@@ -242,6 +242,7 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
             Navigator.of(context).popUntil((route) => route.isFirst);
             
             print('🔍 [LANGUAGE SCREEN] Current language before navigation: ${languageProvider.language}');
+            print('🔍 [LANGUAGE SCREEN] About to navigate to StateSelectionScreen');
             
             // Use pushReplacement with unique key to force rebuild
             Navigator.of(context).pushReplacement(
@@ -255,7 +256,7 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
                 transitionDuration: Duration.zero,
               ),
             );
-            print('🔄 [LANGUAGE SCREEN] Navigated to state selection screen');
+            print('🔄 [LANGUAGE SCREEN] Navigation completed to StateSelectionScreen');
           }
         } catch (e) {
           // Track failure

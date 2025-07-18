@@ -28,11 +28,13 @@ class ContentLoadingManager {
   
   /// Handle language changes
   void _onLanguageChanged() {
+    // Only react to language changes if content has been initialized
+    // This prevents interference during sign-up flow
     if (_hasInitializedContent) {
       print('ContentLoadingManager: Language changed to: ${languageProvider.language}, updating content');
       reloadContentIfNeeded(force: true);
     } else {
-      print('ContentLoadingManager: Language changed but content not initialized yet, skipping update');
+      print('ContentLoadingManager: Language changed during initialization, skipping content update');
     }
   }
   

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../screens/test_screen.dart';
 import '../screens/theory_screen.dart';
 import '../screens/profile_screen.dart';
 import '../widgets/super_enhanced_footer.dart';
 import '../services/service_locator_extensions.dart';
+import '../providers/language_provider.dart';
+import '../providers/content_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -42,6 +45,16 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     });
   }
   
+  // Sync content language with language provider
+  void _syncContentLanguage() {
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final contentProvider = Provider.of<ContentProvider>(context, listen: false);
+    
+    // Sync language preference when home screen loads
+    contentProvider.setPreferences(language: languageProvider.language);
+    print('HomeScreen: Synced content language to: ${languageProvider.language}');
+  }
+  
   // Initialize content using ContentLoadingManager
   Future<void> _initializeContent() async {
     setState(() {
@@ -49,6 +62,9 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     });
     
     try {
+      // Sync content language first
+      _syncContentLanguage();
+      
       // Get the content loading manager and initialize content
       final contentLoadingManager = ServiceLocatorExtensions.contentLoadingManager;
       await contentLoadingManager.initializeContent();

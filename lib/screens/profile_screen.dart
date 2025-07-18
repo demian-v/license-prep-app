@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
+import '../providers/content_provider.dart';
 import '../localization/app_localizations.dart';
 import '../providers/subscription_provider.dart';
 import '../providers/progress_provider.dart';
@@ -888,6 +889,10 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
           // Update both providers
           await provider.setLanguage(code);
           await authProvider.updateUserLanguage(code);
+          
+          // Update content provider language preference
+          final contentProvider = Provider.of<ContentProvider>(context, listen: false);
+          contentProvider.setPreferences(language: code);
           
           // Calculate time spent
           final timeSpent = _languageDialogStartTime != null 

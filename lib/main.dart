@@ -23,6 +23,7 @@ import 'screens/practice_test_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/subscription_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/state_selection_screen.dart';
 import 'screens/traffic_rules_topics_screen.dart';
 import 'screens/test_screen.dart';
 import 'screens/reset_app_settings_screen.dart';
@@ -267,11 +268,8 @@ void main() async {
   // Initialize service locator extensions
   ServiceLocatorExtensions.initialize();
   
-  // Listen for language changes and update content language
-  languageProvider.addListener(() {
-    contentProvider.setPreferences(language: languageProvider.language);
-    print('Language updated in ContentProvider to: ${languageProvider.language}');
-  });
+  // Removed global language listener that was causing interference during sign-up
+  // Language synchronization is now handled in HomeScreen and ProfileScreen
   
   // Check if we need to migrate saved questions
   if (user != null) {
@@ -399,8 +397,15 @@ class MyApp extends StatelessWidget {
                 return ResetPasswordScreen(code: code);
               }
               
-              // Normal flow - check if user is logged in
-              return authProvider.user != null ? HomeScreen() : LoginScreen();
+              // Normal flow - check if user is logged in and has completed signup
+              final user = authProvider.user;
+              if (user != null && user.state != null) {
+                return HomeScreen(); // User is fully set up
+              } else if (user != null && user.state == null) {
+                return StateSelectionScreen(); // User needs to complete signup
+              } else {
+                return LoginScreen(); // User not logged in
+              }
             }
           ),
           routes: {
