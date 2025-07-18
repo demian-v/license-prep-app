@@ -275,6 +275,89 @@ class AnalyticsService {
     await logEvent('password_reset');
   }
   
+  // MARK: - Enhanced Password Reset Journey Events
+  
+  /// Log when user starts password reset flow
+  Future<void> logPasswordResetFormStarted() async {
+    await logEvent('password_reset_form_started', {
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+      'reset_method': 'email',
+    });
+  }
+
+  /// Log when reset email is successfully sent
+  Future<void> logPasswordResetEmailRequested({
+    String? emailDomain,
+    int? timeSpentSeconds,
+    bool? hasFormErrors,
+    String? validationErrors,
+  }) async {
+    await logEvent('password_reset_email_requested', {
+      'reset_method': 'email',
+      if (emailDomain != null) 'email_domain': emailDomain,
+      if (timeSpentSeconds != null) 'time_spent_seconds': timeSpentSeconds,
+      if (hasFormErrors != null) 'had_form_errors': hasFormErrors.toString(),
+      if (validationErrors != null) 'validation_errors': validationErrors,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  /// Log when user resends reset email
+  Future<void> logPasswordResetEmailResent({
+    String? emailDomain,
+    int? timeSinceFirstRequest,
+  }) async {
+    await logEvent('password_reset_email_resent', {
+      'reset_method': 'email',
+      if (emailDomain != null) 'email_domain': emailDomain,
+      if (timeSinceFirstRequest != null) 'time_since_first_request': timeSinceFirstRequest,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  /// Log when user accesses reset link
+  Future<void> logPasswordResetLinkAccessed({
+    int? timeSinceEmailSent,
+    bool? validLink,
+  }) async {
+    await logEvent('password_reset_link_accessed', {
+      'reset_method': 'email',
+      if (timeSinceEmailSent != null) 'time_since_email_sent': timeSinceEmailSent,
+      if (validLink != null) 'valid_link': validLink.toString(),
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  /// Log successful password reset completion
+  Future<void> logPasswordResetCompleted({
+    int? timeSpentOnForm,
+    int? validationAttempts,
+    bool? strongPassword,
+  }) async {
+    await logEvent('password_reset_completed', {
+      'reset_method': 'email',
+      if (timeSpentOnForm != null) 'time_spent_on_form': timeSpentOnForm,
+      if (validationAttempts != null) 'validation_attempts': validationAttempts,
+      if (strongPassword != null) 'strong_password': strongPassword.toString(),
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  /// Log failures at any stage
+  Future<void> logPasswordResetFailed({
+    String? failureStage,
+    String? errorType,
+    String? errorMessage,
+  }) async {
+    await logEvent('password_reset_failed', {
+      'reset_method': 'email',
+      if (failureStage != null) 'failure_stage': failureStage,
+      if (errorType != null) 'error_type': errorType,
+      if (errorMessage != null) 'error_message': errorMessage,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+  
   // MARK: - Learning Events
   
   /// Log quiz start event

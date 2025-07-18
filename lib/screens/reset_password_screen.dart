@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/analytics_service.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   final String code;
@@ -27,6 +28,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   
+  // Analytics tracking variables
+  DateTime? _formStartTime;
+  int _validationAttempts = 0;
+  
   @override
   void initState() {
     super.initState();
@@ -40,6 +45,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     
+    // Track form start time
+    _formStartTime = DateTime.now();
+    
     _verifyResetCode();
   }
   
@@ -51,13 +59,48 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
     super.dispose();
   }
   
+  String _getErrorType(String errorMessage) {
+    if (errorMessage.contains('expired')) {
+      return 'expired_link';
+    } else if (errorMessage.contains('invalid')) {
+      return 'invalid_code';
+    } else if (errorMessage.contains('malformed')) {
+      return 'malformed_link';
+    } else if (errorMessage.contains('network')) {
+      return 'network_error';
+    } else if (errorMessage.contains('token')) {
+      return 'token_expired';
+    } else {
+      return 'unknown_error';
+    }
+  }
+  
   Future<void> _verifyResetCode() async {
     try {
       setState(() => _isLoading = true);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       _email = await authProvider.verifyPasswordResetCode(widget.code);
+      
+      // Track successful link access
+      analyticsService.logPasswordResetLinkAccessed(
+        validLink: true,
+      );
+      debugPrint('📊 Analytics: password_reset_link_accessed logged (valid: true)');
+      
       setState(() => _errorMessage = null);
     } catch (e) {
+      // Track failed link access
+      analyticsService.logPasswordResetLinkAccessed(
+        validLink: false,
+      );
+      
+      analyticsService.logPasswordResetFailed(
+        failureStage: 'link_access',
+        errorType: _getErrorType(e.toString()),
+        errorMessage: e.toString(),
+      );
+      debugPrint('📊 Analytics: password_reset_failed logged (stage: link_access)');
+      
       setState(() => _errorMessage = e.toString());
     } finally {
       setState(() => _isLoading = false);
@@ -102,7 +145,18 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
     return _validationErrors.isEmpty;
   }
   
+  bool _isStrongPassword(String password) {
+    // Check if password meets all criteria beyond basic validation
+    return password.length >= 8 &&
+           password.contains(RegExp(r'[a-z]')) &&
+           password.contains(RegExp(r'[A-Z]')) &&
+           password.contains(RegExp(r'[0-9]')) &&
+           password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'));
+  }
+
   Future<void> _resetPassword() async {
+    _validationAttempts++;
+    
     if (!_formKey.currentState!.validate()) return;
     
     if (_passwordController.text != _confirmPasswordController.text) {
@@ -126,10 +180,40 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       await authProvider.confirmPasswordReset(widget.code, _passwordController.text);
       
+      // Track successful completion
+      final timeSpent = _formStartTime != null 
+          ? DateTime.now().difference(_formStartTime!).inSeconds 
+          : null;
+      final strongPassword = _isStrongPassword(_passwordController.text);
+      
+      analyticsService.logPasswordResetCompleted(
+        timeSpentOnForm: timeSpent,
+        validationAttempts: _validationAttempts,
+        strongPassword: strongPassword,
+      );
+      debugPrint('📊 Analytics: password_reset_completed logged (time: ${timeSpent}s, attempts: $_validationAttempts)');
+      
       if (mounted) {
         Navigator.pushReplacementNamed(context, '/reset-success');
       }
     } catch (e) {
+      // Track failure
+      String errorType = 'unknown_error';
+      if (e.toString().contains('weak-password')) {
+        errorType = 'weak_password';
+      } else if (e.toString().contains('expired')) {
+        errorType = 'token_expired';
+      } else if (e.toString().contains('network')) {
+        errorType = 'network_error';
+      }
+      
+      analyticsService.logPasswordResetFailed(
+        failureStage: 'password_change',
+        errorType: errorType,
+        errorMessage: e.toString(),
+      );
+      debugPrint('📊 Analytics: password_reset_failed logged (stage: password_change)');
+      
       if (mounted) {
         setState(() => _errorMessage = e.toString());
       }

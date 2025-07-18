@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/analytics_service.dart';
 
 class ResetEmailSentScreen extends StatefulWidget {
   @override
@@ -14,6 +15,9 @@ class _ResetEmailSentScreenState extends State<ResetEmailSentScreen> with Ticker
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   
+  // Analytics tracking variables
+  DateTime? _emailSentTime;
+  
   @override
   void initState() {
     super.initState();
@@ -25,12 +29,27 @@ class _ResetEmailSentScreenState extends State<ResetEmailSentScreen> with Ticker
     _scaleAnimation = Tween<double>(begin: 1.0, end: 0.98).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
+    
+    // Track when email confirmation screen is shown
+    _emailSentTime = DateTime.now();
   }
   
   @override
   void dispose() {
     _animationController.dispose();
     super.dispose();
+  }
+
+  String _getErrorType(String errorMessage) {
+    if (errorMessage.contains('too-many-requests')) {
+      return 'rate_limited';
+    } else if (errorMessage.contains('network')) {
+      return 'network_error';
+    } else if (errorMessage.contains('invalid-email')) {
+      return 'invalid_email';
+    } else {
+      return 'unknown_error';
+    }
   }
 
   Future<void> _resendEmail() async {
@@ -45,12 +64,32 @@ class _ResetEmailSentScreenState extends State<ResetEmailSentScreen> with Ticker
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       await authProvider.sendPasswordResetEmail(email);
       
+      // Track resend success
+      final timeSinceFirst = _emailSentTime != null 
+          ? DateTime.now().difference(_emailSentTime!).inSeconds 
+          : null;
+      final emailDomain = email.split('@').length > 1 ? email.split('@')[1] : null;
+      
+      analyticsService.logPasswordResetEmailResent(
+        emailDomain: emailDomain,
+        timeSinceFirstRequest: timeSinceFirst,
+      );
+      debugPrint('📊 Analytics: password_reset_email_resent logged (time since first: ${timeSinceFirst}s)');
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Reset email resent'))
         );
       }
     } catch (e) {
+      // Track resend failure
+      analyticsService.logPasswordResetFailed(
+        failureStage: 'email_resend',
+        errorType: _getErrorType(e.toString()),
+        errorMessage: e.toString(),
+      );
+      debugPrint('📊 Analytics: password_reset_failed logged (stage: email_resend)');
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error sending email. Please try again.'))

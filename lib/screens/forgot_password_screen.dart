@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/analytics_service.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   @override
@@ -16,6 +17,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
   // Animation controller for card press effect
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
+  
+  // Analytics tracking variables
+  DateTime? _formStartTime;
+  bool _formStarted = false;
+  bool _hasFormErrors = false;
+  String? _formErrors;
   
   @override
   void initState() {
@@ -37,8 +44,39 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
     super.dispose();
   }
 
+  // Analytics tracking methods
+  void _onFormStarted() {
+    if (!_formStarted) {
+      _formStarted = true;
+      _formStartTime = DateTime.now();
+      analyticsService.logPasswordResetFormStarted();
+      debugPrint('📊 Analytics: password_reset_form_started logged');
+    }
+  }
+
+  String _getErrorType(String errorMessage) {
+    if (errorMessage.contains('user-not-found')) {
+      return 'user_not_found';
+    } else if (errorMessage.contains('too-many-requests')) {
+      return 'rate_limited';
+    } else if (errorMessage.contains('network')) {
+      return 'network_error';
+    } else if (errorMessage.contains('invalid-email')) {
+      return 'invalid_email';
+    } else {
+      return 'unknown_error';
+    }
+  }
+
   Future<void> _sendResetEmail() async {
+    // Reset error tracking
+    _hasFormErrors = false;
+    _formErrors = null;
+    
     if (!_formKey.currentState!.validate()) {
+      // Track validation errors
+      _hasFormErrors = true;
+      _formErrors = 'validation_failed';
       return;
     }
     
@@ -53,6 +91,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       await authProvider.sendPasswordResetEmail(email);
       
+      // Track successful email request
+      final timeSpent = _formStartTime != null 
+          ? DateTime.now().difference(_formStartTime!).inSeconds 
+          : null;
+      final emailDomain = email.split('@').length > 1 ? email.split('@')[1] : null;
+      
+      analyticsService.logPasswordResetEmailRequested(
+        emailDomain: emailDomain,
+        timeSpentSeconds: timeSpent,
+        hasFormErrors: _hasFormErrors,
+        validationErrors: _formErrors,
+      );
+      debugPrint('📊 Analytics: password_reset_email_requested logged (time: ${timeSpent}s)');
+      
       if (mounted) {
         Navigator.pushNamed(
           context, 
@@ -61,6 +113,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
         );
       }
     } catch (e) {
+      // Track failure
+      analyticsService.logPasswordResetFailed(
+        failureStage: 'email_request',
+        errorType: _getErrorType(e.toString()),
+        errorMessage: e.toString(),
+      );
+      debugPrint('📊 Analytics: password_reset_failed logged (stage: email_request)');
+      
       if (mounted) {
         setState(() {
           // For security reasons, we don't show specific errors
@@ -180,6 +240,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
                                 ],
                                 TextFormField(
                                   controller: _emailController,
+                                  onTap: _onFormStarted,
+                                  onChanged: (value) => _onFormStarted(),
                                   decoration: InputDecoration(
                                     labelText: 'Email address',
                                     hintText: 'Enter your email',
