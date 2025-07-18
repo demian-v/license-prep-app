@@ -198,6 +198,78 @@ class AnalyticsService {
     await logEvent('sign_up', method != null ? {'method': method} : null);
   }
   
+  // MARK: - Enhanced Signup Journey Events
+  
+  /// Log when user starts filling the signup form
+  Future<void> logSignupFormStarted() async {
+    await logEvent('signup_form_started', {
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+      'signup_method': 'email',
+    });
+  }
+
+  /// Log when signup form is successfully submitted
+  Future<void> logSignupFormCompleted({
+    int? timeSpentSeconds,
+    bool? hasFormErrors,
+    String? validationErrors,
+  }) async {
+    await logEvent('signup_form_completed', {
+      'signup_method': 'email',
+      if (timeSpentSeconds != null) 'time_spent_seconds': timeSpentSeconds,
+      if (hasFormErrors != null) 'had_form_errors': hasFormErrors,
+      if (validationErrors != null) 'validation_errors': validationErrors,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  /// Log when user account is successfully created
+  Future<void> logUserAccountCreated({
+    String? userId,
+    String? signupMethod,
+    bool? hasName,
+    bool? emailVerified,
+  }) async {
+    await logEvent('user_account_created', {
+      'signup_method': signupMethod ?? 'email',
+      if (hasName != null) 'has_name': hasName,
+      if (emailVerified != null) 'email_verified': emailVerified,
+      'account_type': 'trial',
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  /// Log when free trial starts
+  Future<void> logSignupTrialStarted({
+    String? userId,
+    String? signupMethod,
+    String? trialType,
+    int? trialDays,
+  }) async {
+    await logEvent('signup_trial_started', {
+      'signup_method': signupMethod ?? 'email',
+      'trial_type': trialType ?? '3_day_free_trial',
+      'trial_duration_days': trialDays ?? 3,
+      'trial_price_after': '2.50',
+      'currency': 'USD',
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  /// Log signup failure event
+  Future<void> logSignupFailed({
+    String? errorType,
+    String? errorMessage,
+    String? signupMethod,
+  }) async {
+    await logEvent('signup_failed', {
+      'signup_method': signupMethod ?? 'email',
+      if (errorType != null) 'error_type': errorType,
+      if (errorMessage != null) 'error_message': errorMessage,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+  
   /// Log password reset event
   Future<void> logPasswordReset() async {
     await logEvent('password_reset');

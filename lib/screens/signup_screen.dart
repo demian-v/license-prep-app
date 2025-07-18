@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/analytics_service.dart';
 import 'language_selection_screen.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -19,6 +20,12 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
   // Animation controller for card press effect
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
+  
+  // Analytics tracking variables
+  DateTime? _formStartTime;
+  bool _formStarted = false;
+  bool _hasFormErrors = false;
+  String? _formErrors;
   
   @override
   void initState() {
@@ -41,11 +48,78 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
     _animationController.dispose();
     super.dispose();
   }
+  
+  // Analytics tracking methods
+  void _onFormStarted() {
+    if (!_formStarted) {
+      _formStarted = true;
+      _formStartTime = DateTime.now();
+      analyticsService.logSignupFormStarted();
+      debugPrint('📊 Analytics: signup_form_started logged');
+    }
+  }
+  
+  void _onFormCompleted() {
+    final timeSpent = _formStartTime != null 
+        ? DateTime.now().difference(_formStartTime!).inSeconds 
+        : null;
+        
+    analyticsService.logSignupFormCompleted(
+      timeSpentSeconds: timeSpent,
+      hasFormErrors: _hasFormErrors,
+      validationErrors: _formErrors,
+    );
+    debugPrint('📊 Analytics: signup_form_completed logged (time: ${timeSpent}s)');
+  }
+  
+  void _onAccountCreated(String? userId) {
+    analyticsService.logUserAccountCreated(
+      userId: userId,
+      signupMethod: 'email',
+      hasName: _nameController.text.trim().isNotEmpty,
+      emailVerified: false, // Usually false at signup
+    );
+    debugPrint('📊 Analytics: user_account_created logged');
+  }
+  
+  void _onTrialStarted(String? userId) {
+    analyticsService.logSignupTrialStarted(
+      userId: userId,
+      signupMethod: 'email',
+      trialType: '3_day_free_trial',
+      trialDays: 3,
+    );
+    debugPrint('📊 Analytics: signup_trial_started logged');
+  }
+  
+  String _getErrorType(String errorMessage) {
+    if (errorMessage.contains('email-already-in-use')) {
+      return 'email_already_in_use';
+    } else if (errorMessage.contains('weak-password')) {
+      return 'weak_password';
+    } else if (errorMessage.contains('invalid-email')) {
+      return 'invalid_email';
+    } else if (errorMessage.contains('createUserDocument')) {
+      return 'document_creation_failed';
+    } else {
+      return 'unknown_error';
+    }
+  }
 
   Future<void> _signup() async {
+    // Reset error tracking
+    _hasFormErrors = false;
+    _formErrors = null;
+    
     if (!_formKey.currentState!.validate()) {
+      // Track validation errors
+      _hasFormErrors = true;
+      _formErrors = 'validation_failed';
       return;
     }
+    
+    // Log form completed event
+    _onFormCompleted();
     
     setState(() {
       _isLoading = true;
@@ -66,8 +140,27 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
       if (success) {
         debugPrint('✅ [SignupScreen] Signup successful');
         
-        // Verify that the user has the correct default values
+        // Get user ID from auth provider
         final currentUser = authProvider.user;
+        final userId = currentUser?.id;
+        
+        // Log all the analytics events in sequence
+        try {
+          // Log standard GA4 signup event
+          await analyticsService.logSignUp('email');
+          
+          // Log account created event
+          _onAccountCreated(userId);
+          
+          // Log trial started event
+          _onTrialStarted(userId);
+          
+          debugPrint('📊 Analytics: All signup events logged successfully');
+        } catch (analyticsError) {
+          debugPrint('⚠️ Analytics error (non-critical): $analyticsError');
+        }
+        
+        // Verify that the user has the correct default values
         if (currentUser != null) {
           debugPrint('🔍 [SignupScreen] Verifying user default values:');
           debugPrint('    - Language: ${currentUser.language}');
@@ -90,6 +183,14 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
         }
       } else {
         debugPrint('SignupScreen: Signup failed');
+        
+        // Log signup failure
+        analyticsService.logSignupFailed(
+          errorType: 'signup_failed',
+          errorMessage: 'Unknown signup failure',
+          signupMethod: 'email',
+        );
+        
         if (mounted) {
           setState(() {
             _errorMessage = 'Signup failed. Please try again.';
@@ -98,6 +199,13 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
       }
     } catch (e) {
       debugPrint('SignupScreen: Error during signup: $e');
+      
+      // Log signup failure with error details
+      analyticsService.logSignupFailed(
+        errorType: _getErrorType(e.toString()),
+        errorMessage: e.toString(),
+        signupMethod: 'email',
+      );
       
       // Check if this is a Firebase-specific error that we can handle
       if (e.toString().contains('email-already-in-use')) {
@@ -116,6 +224,19 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
         // User was created in Firebase Auth but document creation failed
         // This is a non-critical error, so we can still proceed
         debugPrint('SignupScreen: User created but document creation failed: $e');
+        
+        // Still log the successful events since the user was created
+        try {
+          final authProvider = Provider.of<AuthProvider>(context, listen: false);
+          final currentUser = authProvider.user;
+          final userId = currentUser?.id;
+          
+          await analyticsService.logSignUp('email');
+          _onAccountCreated(userId);
+          _onTrialStarted(userId);
+        } catch (analyticsError) {
+          debugPrint('⚠️ Analytics error (non-critical): $analyticsError');
+        }
         
         if (mounted) {
           // Show a toast or snackbar with warning
@@ -240,6 +361,8 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
                                 ],
                                 TextFormField(
                                   controller: _nameController,
+                                  onTap: _onFormStarted,
+                                  onChanged: (value) => _onFormStarted(),
                                   decoration: InputDecoration(
                                     labelText: 'Full Name',
                                     border: OutlineInputBorder(
@@ -269,6 +392,8 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
                                 SizedBox(height: 16),
                                 TextFormField(
                                   controller: _emailController,
+                                  onTap: _onFormStarted,
+                                  onChanged: (value) => _onFormStarted(),
                                   decoration: InputDecoration(
                                     labelText: 'Email',
                                     border: OutlineInputBorder(
@@ -304,6 +429,8 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
                                 SizedBox(height: 16),
                                 TextFormField(
                                   controller: _passwordController,
+                                  onTap: _onFormStarted,
+                                  onChanged: (value) => _onFormStarted(),
                                   decoration: InputDecoration(
                                     labelText: 'Password',
                                     border: OutlineInputBorder(
