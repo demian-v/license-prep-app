@@ -408,6 +408,62 @@ class AnalyticsService {
     });
   }
   
+  // MARK: - State Selection Events
+  
+  /// Log when user opens state selection interface
+  Future<void> logStateSelectionStarted({
+    String? selectionContext,
+    String? currentState,
+    String? currentStateName,
+  }) async {
+    await logEvent('state_selection_started', {
+      'selection_context': selectionContext ?? 'unknown',
+      'current_state': currentState ?? 'none',
+      'current_state_name': currentStateName ?? 'Not selected',
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  /// Log successful state change
+  Future<void> logStateChanged({
+    String? selectionContext,
+    String? previousState,
+    String? previousStateName,
+    String? newState,
+    String? newStateName,
+    int? timeSpentSeconds,
+  }) async {
+    await logEvent('state_changed', {
+      'selection_context': selectionContext ?? 'unknown',
+      'previous_state': previousState ?? 'none',
+      'previous_state_name': previousStateName ?? 'Not selected',
+      'new_state': newState ?? 'unknown',
+      'new_state_name': newStateName ?? 'unknown',
+      if (timeSpentSeconds != null) 'time_spent_seconds': timeSpentSeconds,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  /// Log state change failure
+  Future<void> logStateChangeFailed({
+    String? selectionContext,
+    String? targetState,
+    String? targetStateName,
+    String? errorType,
+    String? errorMessage,
+  }) async {
+    await logEvent('state_change_failed', {
+      'selection_context': selectionContext ?? 'unknown',
+      'target_state': targetState ?? 'unknown',
+      'target_state_name': targetStateName ?? 'unknown',
+      'error_type': errorType ?? 'unknown_error',
+      'error_message': errorMessage != null 
+          ? (errorMessage.length > 100 ? errorMessage.substring(0, 97) + '...' : errorMessage)
+          : 'unknown',
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+  
   // MARK: - Learning Events
   
   /// Log quiz start event

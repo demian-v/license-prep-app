@@ -10,6 +10,7 @@ import '../screens/language_selection_screen.dart';
 import '../localization/app_localizations.dart';
 import '../data/state_data.dart';
 import '../services/service_locator_extensions.dart';
+import '../services/analytics_service.dart';
 import '../widgets/enhanced_state_card.dart';
 
 class StateSelectionScreen extends StatefulWidget {
@@ -30,6 +31,11 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> with Ticker
   // Animation controller for continue button press effect
   late AnimationController _continueButtonController;
   late Animation<double> _continueButtonScaleAnimation;
+
+  // Analytics tracking variables
+  DateTime? _stateSelectionStartTime;
+  String? _stateBeforeChange;
+  String? _stateNameBeforeChange;
 
   // Get states from hardcoded data in StateData class
   final List<String> _allStates = StateData.getAllStateNames();
@@ -52,6 +58,11 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> with Ticker
     
     // No longer forcing language to English
     // This allows the selected language from the Language Selection screen to be used
+    
+    // Track analytics start
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _trackStateSelectionStarted();
+    });
   }
 
   @override
@@ -79,6 +90,21 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> with Ticker
             .toList();
       }
     });
+  }
+
+  void _trackStateSelectionStarted() {
+    _stateSelectionStartTime = DateTime.now();
+    
+    // In signup context, user typically has no previous state
+    _stateBeforeChange = null;
+    _stateNameBeforeChange = 'Not selected';
+    
+    analyticsService.logStateSelectionStarted(
+      selectionContext: 'signup',
+      currentState: _stateBeforeChange,
+      currentStateName: _stateNameBeforeChange,
+    );
+    debugPrint('📊 Analytics: state_selection_started logged (context: signup)');
   }
 
   // Helper method to get correct translations
@@ -428,13 +454,40 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> with Ticker
     // Get the state ID (two-letter code)
     final stateId = selectedStateInfo?.id;
     
+    // Calculate time spent
+    final timeSpent = _stateSelectionStartTime != null 
+        ? DateTime.now().difference(_stateSelectionStartTime!).inSeconds 
+        : null;
+    
     if (stateId == null) {
       print('⚠️ [STATE SCREEN] Error: Could not find state ID for $_selectedState');
+      
+      // Track error case with analytics
+      analyticsService.logStateChangeFailed(
+        selectionContext: 'signup',
+        targetState: _selectedState!,
+        targetStateName: _selectedState!,
+        errorType: 'state_lookup_error',
+        errorMessage: 'Could not find state ID for $_selectedState',
+      );
+      debugPrint('📊 Analytics: state_change_failed logged (signup: $_selectedState)');
+      
       // Fallback to using the name if we can't find the ID for some reason
       stateProvider.setSelectedStateByName(_selectedState!);
       authProvider.updateUserState(_selectedState!);
     } else {
       print('🌎 [STATE SCREEN] User selected state: $_selectedState (ID: $stateId)');
+      
+      // Track successful state change
+      analyticsService.logStateChanged(
+        selectionContext: 'signup',
+        previousState: _stateBeforeChange,
+        previousStateName: _stateNameBeforeChange,
+        newState: stateId,
+        newStateName: _selectedState!,
+        timeSpentSeconds: timeSpent,
+      );
+      debugPrint('📊 Analytics: state_changed logged (signup: ${_stateBeforeChange ?? "none"} → $stateId)');
       
       // Update both providers with the correct state ID
       stateProvider.setSelectedStateByName(_selectedState!); // This already converts to ID internally

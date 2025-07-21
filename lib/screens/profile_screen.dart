@@ -34,6 +34,11 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
   // Analytics tracking variables
   DateTime? _languageDialogStartTime;
   String? _languageBeforeChange;
+  
+  // State selection analytics tracking variables  
+  DateTime? _stateDialogStartTime;
+  String? _stateBeforeChange;
+  String? _stateNameBeforeChange;
 
   @override
   void initState() {
@@ -965,6 +970,20 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final currentState = authProvider.user?.state;
     
+    // Track dialog opening
+    _stateDialogStartTime = DateTime.now();
+    _stateBeforeChange = currentState;
+    _stateNameBeforeChange = currentState != null 
+        ? _getFullStateName(currentState)
+        : 'Not selected';
+    
+    analyticsService.logStateSelectionStarted(
+      selectionContext: 'profile',
+      currentState: _stateBeforeChange,
+      currentStateName: _stateNameBeforeChange,
+    );
+    debugPrint('📊 Analytics: state_selection_started logged (context: profile)');
+    
     // List of all US states
     final List<String> allStates = [
       'ALABAMA',
@@ -1020,7 +1039,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
       'WYOMING',
     ];
     
-    showDialog(
+    showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(_translate('select_state_dialog', languageProvider)),
@@ -1043,42 +1062,98 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                 title: Text(titleCaseState),
                 trailing: isSelected ? Icon(Icons.check, color: Colors.green) : null,
                 onTap: () async {
-                  // Update state in auth provider
-                  await authProvider.updateUserState(state);
-                  
-                  // Force immediate UI update
-                  if (mounted) {
-                    setState(() {
-                      // This will trigger an immediate UI rebuild
-                      _isLoadingState = false;
+                  try {
+                    // Calculate time spent
+                    final timeSpent = _stateDialogStartTime != null 
+                        ? DateTime.now().difference(_stateDialogStartTime!).inSeconds 
+                        : null;
+                    
+                    // Update state in auth provider
+                    await authProvider.updateUserState(state);
+                    
+                    // Get state info for analytics
+                    final stateInfo = StateData.getStateByName(state);
+                    final stateId = stateInfo?.id ?? state;
+                    
+                    // Track successful state change
+                    analyticsService.logStateChanged(
+                      selectionContext: 'profile',
+                      previousState: _stateBeforeChange,
+                      previousStateName: _stateNameBeforeChange,
+                      newState: stateId,
+                      newStateName: titleCaseState,
+                      timeSpentSeconds: timeSpent,
+                    );
+                    debugPrint('📊 Analytics: state_changed logged (profile: ${_stateBeforeChange ?? "none"} → $stateId)');
+                    
+                    // Force immediate UI update
+                    if (mounted) {
+                      setState(() {
+                        // This will trigger an immediate UI rebuild
+                        _isLoadingState = false;
+                      });
+                    }
+                    
+                    // Close dialog with success result
+                    Navigator.pop(context, {
+                      'success': true,
+                      'state': stateId,
+                      'stateName': titleCaseState,
+                      'previousState': _stateBeforeChange,
+                    });
+                    
+                  } catch (e) {
+                    // Enhanced error logging
+                    final errorMessage = e.toString();
+                    final truncatedError = errorMessage.length > 100 
+                        ? errorMessage.substring(0, 97) + '...'
+                        : errorMessage;
+                    
+                    analyticsService.logStateChangeFailed(
+                      selectionContext: 'profile',
+                      targetState: state,
+                      targetStateName: titleCaseState,
+                      errorType: _getErrorType(errorMessage),
+                      errorMessage: truncatedError,
+                    );
+                    debugPrint('📊 Analytics: state_change_failed logged (profile: $state)');
+                    debugPrint('🚨 Profile Screen: State change error: $errorMessage');
+                    
+                    // Close dialog with error result
+                    Navigator.pop(context, {
+                      'success': false,
+                      'error': 'Error changing state. Please try again.',
+                      'targetState': state,
                     });
                   }
-                  
-                  Navigator.pop(context);
-                  
-                  // Get the state abbreviation (ID) from the full name for more accurate display
-                  final stateInfo = StateData.getStateByName(state);
-                  final stateId = stateInfo?.id ?? state;
-                  
-                  // Visual feedback showing the full state name
-                  // Convert state to title case for display in snackbar
-                  final titleCaseStateForDisplay = state.split(' ').map((word) => 
-                    word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}' : ''
-                  ).join(' ');
-                  
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('${_translate('state_changed', languageProvider)} $titleCaseStateForDisplay'),
-                      duration: Duration(seconds: 1),
-                    ),
-                  );
                 },
               );
             },
           ),
         ),
       ),
-    );
+    ).then((result) {
+      // Handle dialog result
+      if (result != null && mounted) {
+        if (result['success'] == true) {
+          // Show success snackbar
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${_translate('state_changed', languageProvider)} ${result['stateName']}'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        } else if (result['success'] == false) {
+          // Show error snackbar
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['error']),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    });
   }
 
   void _showDeveloperOptions(BuildContext context, LanguageProvider languageProvider) {
