@@ -401,7 +401,9 @@ class AnalyticsService {
       'selection_context': selectionContext ?? 'unknown',
       'target_language': targetLanguage ?? 'unknown',
       'error_type': errorType ?? 'unknown_error',
-      'error_message': errorMessage ?? 'unknown',
+      'error_message': errorMessage != null 
+          ? (errorMessage.length > 100 ? errorMessage.substring(0, 97) + '...' : errorMessage)
+          : 'unknown',
       'timestamp': DateTime.now().millisecondsSinceEpoch,
     });
   }

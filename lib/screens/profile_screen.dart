@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
-import '../providers/content_provider.dart';
 import '../localization/app_localizations.dart';
 import '../providers/subscription_provider.dart';
 import '../providers/progress_provider.dart';
@@ -858,7 +857,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
       'ru': 'Russian',
     };
 
-    showDialog(
+    showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(_translate('select_lang_dialog', languageProvider)),
@@ -873,7 +872,28 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
           ],
         ),
       ),
-    );
+    ).then((result) {
+      // Handle dialog result using parent context
+      if (result != null && mounted) {
+        if (result['success'] == true) {
+          // Show success snackbar
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${_translate('language_changed', result['provider'])} ${result['languageName']}'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        } else if (result['success'] == false) {
+          // Show error snackbar
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['error']),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    });
   }
 
   Widget _buildLanguageOption(BuildContext context, String language, String code, 
@@ -886,13 +906,9 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
           // Get current language before change
           final previousLanguage = provider.language;
           
-          // Update both providers
+          // Update both providers (same as signup flow)
           await provider.setLanguage(code);
           await authProvider.updateUserLanguage(code);
-          
-          // Update content provider language preference
-          final contentProvider = Provider.of<ContentProvider>(context, listen: false);
-          contentProvider.setPreferences(language: code);
           
           // Calculate time spent
           final timeSpent = _languageDialogStartTime != null 
@@ -909,33 +925,37 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
           );
           debugPrint('📊 Analytics: language_changed logged (profile: $previousLanguage → $code)');
           
-          Navigator.pop(context);
+          // Close dialog with success result
+          Navigator.pop(context, {
+            'success': true,
+            'language': code,
+            'languageName': language,
+            'previousLanguage': previousLanguage,
+            'provider': provider,
+          });
           
-          // Visual feedback
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${_translate('language_changed', provider)} $language'),
-              duration: Duration(seconds: 1),
-            ),
-          );
         } catch (e) {
-          // Track failure
+          // Enhanced error logging with truncation
+          final errorMessage = e.toString();
+          final truncatedError = errorMessage.length > 100 
+              ? errorMessage.substring(0, 97) + '...'
+              : errorMessage;
+          
           analyticsService.logLanguageChangeFailed(
             selectionContext: 'profile',
             targetLanguage: code,
-            errorType: _getErrorType(e.toString()),
-            errorMessage: e.toString(),
+            errorType: _getErrorType(errorMessage),
+            errorMessage: truncatedError,
           );
           debugPrint('📊 Analytics: language_change_failed logged (profile: $code)');
+          debugPrint('🚨 Profile Screen: Language change error: $errorMessage');
           
-          // Close dialog and show error
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error changing language: ${e.toString()}'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          // Close dialog with error result
+          Navigator.pop(context, {
+            'success': false,
+            'error': 'Error changing language. Please try again.',
+            'targetLanguage': code,
+          });
         }
       },
     );
