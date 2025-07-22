@@ -17,6 +17,7 @@ import 'api/firebase_progress_api.dart';
 import 'api/firebase_subscription_api.dart';
 import 'api/progress_api.dart';
 import 'api/subscription_api.dart';
+import 'theory_cache_service.dart';
 
 /// ServiceLocator provides a centralized way to access all API services
 /// It follows the Singleton pattern to ensure only one instance exists
@@ -64,6 +65,9 @@ class ServiceLocator {
   // Analytics Service
   late AnalyticsService _analyticsService;
   
+  // Theory Cache Service
+  late TheoryCacheService _theoryCacheService;
+  
   bool _isInitialized = false;
 
   /// Initialize all services with default implementation (REST)
@@ -86,6 +90,7 @@ class ServiceLocator {
     _firebaseStorageService = FirebaseStorageService();
     _directFirestoreService = DirectFirestoreService();
     _analyticsService = AnalyticsService();
+    _theoryCacheService = TheoryCacheService();
     
     // Initialize REST implementations
     _restAuthApi = AuthApi(_apiClient);
@@ -137,6 +142,12 @@ class ServiceLocator {
   AnalyticsService get analytics {
     _checkInitialization();
     return _analyticsService;
+  }
+  
+  /// Getter for Theory Cache Service
+  TheoryCacheService get theoryCache {
+    _checkInitialization();
+    return _theoryCacheService;
   }
   
   /// Getters for accessing interface-based services (recommended)

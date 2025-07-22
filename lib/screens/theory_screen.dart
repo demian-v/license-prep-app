@@ -41,15 +41,12 @@ class _TheoryScreenState extends State<TheoryScreen> {
         state: userState,
       );
       
-      // Clear any previous caches to ensure we get fresh data
-      contentProvider.clearAllCaches();
-      
       // Wait a bit to ensure the UI is ready and preferences are set
       await Future.delayed(Duration(milliseconds: 200));
       
-      // Fetch content with force refresh
+      // Fetch content - let cache logic handle whether to use cache or fetch fresh data
       print('TheoryScreen: Explicitly fetching content with state=$userState, language=${languageProvider.language}');
-      await contentProvider.fetchContentAfterSelection(forceRefresh: true);
+      await contentProvider.fetchContentAfterSelection(forceRefresh: false);
       
       // Check if content was loaded
       if (contentProvider.modules.isEmpty) {
@@ -99,10 +96,10 @@ class _TheoryScreenState extends State<TheoryScreen> {
         actions: [
           IconButton(
             icon: Icon(Icons.refresh),
-            onPressed: () {
-              // Show loading indicator
+            onPressed: () async {
+              // Clear cache for current state/language and force refresh
               final contentProvider = Provider.of<ContentProvider>(context, listen: false);
-              contentProvider.clearAllCaches();
+              await contentProvider.clearSpecificCache();
               contentProvider.fetchContentAfterSelection(forceRefresh: true);
               
               // Show a snackbar to indicate refresh is happening

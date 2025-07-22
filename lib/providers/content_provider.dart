@@ -4,6 +4,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import '../models/theory_module.dart';
 import '../models/traffic_rule_topic.dart';
 import '../services/service_locator.dart';
+import '../services/theory_cache_service.dart';
 
 class ContentProvider extends ChangeNotifier {
   bool _isLoading = false;
@@ -17,6 +18,9 @@ class ContentProvider extends ChangeNotifier {
   
   // Connectivity instance
   final Connectivity _connectivity = Connectivity();
+  
+  // Cache service
+  final TheoryCacheService _cacheService = serviceLocator.theoryCache;
   
   // Cache timestamps
   DateTime? _lastFetchTime;
@@ -161,28 +165,43 @@ class ContentProvider extends ChangeNotifier {
   
   // Fetch all content
   Future<void> fetchContent({bool forceRefresh = false}) async {
-    // Check if we have cached content for this specific language and state
-    final String cacheKey = '${_currentState ?? "null"}:$_currentLanguage';
-    
-    // If cache is valid and we're not forcing a refresh, use cached content if available
-    if (isCacheValid && !forceRefresh) {
-      // Check if we have topics in cache
-      if (_topicCache.containsKey(_currentState) && 
-          _topicCache[_currentState]!.containsKey(_currentLanguage) &&
-          _topicCache[_currentState]![_currentLanguage]!.isNotEmpty) {
+    // 🏗️ NEW CACHING LOGIC - Check persistent cache first
+    if (!forceRefresh) {
+      final stateValue = _currentState ?? 'ALL';
+      
+      // Check if we have valid cached theory modules
+      final cachedModules = await _cacheService.getCachedTheoryModules(
+        stateValue, 
+        _currentLanguage, 
+        _currentLicenseId
+      );
+      
+      if (cachedModules != null && cachedModules.isNotEmpty) {
+        print('✅ Using cached theory modules for ${stateValue}_${_currentLanguage}_${_currentLicenseId}');
+        _modules = cachedModules;
+        _lastError = null;
         
-        _topics = _topicCache[_currentState]![_currentLanguage]!;
-        
-        // Check if we have modules in cache
-        if (_moduleCache.containsKey(_currentState) && 
-            _moduleCache[_currentState]!.containsKey(_currentLanguage) &&
-            _moduleCache[_currentState]![_currentLanguage]!.isNotEmpty) {
-          
-          _modules = _moduleCache[_currentState]![_currentLanguage]!;
-          return; // Use cached content and skip Firestore fetch
+        // Also check for cached traffic topics if we have a traffic rules module
+        final trafficRulesModule = _modules.where((module) => module.type == 'traffic_rules').firstOrNull;
+        if (trafficRulesModule != null) {
+          final cachedTopics = await _cacheService.getCachedTrafficTopics(stateValue, _currentLanguage);
+          if (cachedTopics != null) {
+            print('✅ Using cached traffic topics for ${stateValue}_${_currentLanguage}');
+            // Convert cached topics back to TrafficRuleTopic objects
+            _topics = cachedTopics.map((topicData) {
+              final Map<String, dynamic> data = Map<String, dynamic>.from(topicData);
+              return TrafficRuleTopic.fromFirestore(data, data['id'] ?? '');
+            }).toList();
+          }
         }
+        
+        notifyListeners();
+        return; // EXIT HERE - using cached data, no Firebase call needed
       }
     }
+    
+    // If we reach here, we need to fetch from Firebase (no cache or cache invalid or forced refresh)
+    print('🔥 Fetching fresh data from Firebase - cache ${forceRefresh ? 'bypassed' : 'not available/invalid'}');
     
     _isLoading = true;
     _lastError = null;
@@ -236,7 +255,10 @@ class ContentProvider extends ChangeNotifier {
         );
       }
       
-      // Cache the modules
+      // 💾 Cache the modules in persistent storage
+      await _cacheService.cacheTheoryModules(_modules, stateValue, _currentLanguage, _currentLicenseId);
+      
+      // Cache the modules in memory too (for existing logic)
       if (!_moduleCache.containsKey(_currentState)) {
         _moduleCache[_currentState] = {};
       }
@@ -272,7 +294,14 @@ class ContentProvider extends ChangeNotifier {
           );
         }
         
-        // Cache the topics
+        // 💾 Cache the traffic topics in persistent storage
+        await _cacheService.cacheTrafficTopics(
+          _topics.map((topic) => topic.toFirestore()).toList(), 
+          stateValue, 
+          _currentLanguage
+        );
+        
+        // Cache the topics in memory too (for existing logic)
         if (!_topicCache.containsKey(_currentState)) {
           _topicCache[_currentState] = {};
         }
@@ -486,12 +515,48 @@ class ContentProvider extends ChangeNotifier {
     _topics = [];
   }
   
+  // Clear cache for current state/language combination
+  Future<void> clearSpecificCache() async {
+    final stateValue = _currentState ?? 'ALL';
+    
+    // Clear persistent cache
+    await _cacheService.clearCache(stateValue, _currentLanguage, _currentLicenseId);
+    await _cacheService.clearTrafficTopicsCache(stateValue, _currentLanguage);
+    
+    // Clear in-memory cache for current combination
+    if (_moduleCache.containsKey(_currentState)) {
+      _moduleCache[_currentState]?.remove(_currentLanguage);
+    }
+    if (_topicCache.containsKey(_currentState)) {
+      _topicCache[_currentState]?.remove(_currentLanguage);
+    }
+    
+    print('🗑️ Cleared cache for current settings: ${stateValue}_${_currentLanguage}_${_currentLicenseId}');
+  }
+  
+  // Method to check cache status (for debugging)
+  Future<bool> hasCacheForCurrentSettings() async {
+    final stateValue = _currentState ?? 'ALL';
+    return await _cacheService.isCacheValid(stateValue, _currentLanguage, _currentLicenseId);
+  }
+  
+  // Get cache statistics (for debugging)
+  Future<Map<String, dynamic>> getCacheStats() async {
+    return await _cacheService.getCacheStats();
+  }
+  
   // Clear all caches - use this for logout or when you want to force a complete refresh
-  void clearAllCaches() {
+  Future<void> clearAllCaches() async {
+    // Clear persistent cache
+    await _cacheService.clearAllCaches();
+    
+    // Clear in-memory caches
     _lastFetchTime = null;
     _lastFetchTimes.clear();
     _topicCache.clear();
     _moduleCache.clear();
     _topicDetailCache.clear();
+    
+    print('🗑️ Cleared all caches');
   }
 }
