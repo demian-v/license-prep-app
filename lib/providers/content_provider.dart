@@ -16,6 +16,12 @@ class ContentProvider extends ChangeNotifier {
   String? _lastError;
   bool _isOffline = false;
   
+  // Track what was actually requested vs what was found (for empty state messaging)
+  String _requestedLanguage = 'en';
+  String? _requestedState = null;
+  bool _isUsingLanguageFallback = false;
+  bool _isUsingStateFallback = false;
+  
   // Cache performance tracking
   int _cacheHits = 0;
   int _cacheMisses = 0;
@@ -48,6 +54,38 @@ class ContentProvider extends ChangeNotifier {
   String get currentLicenseId => _currentLicenseId;
   String? get lastError => _lastError;
   bool get isOffline => _isOffline;
+  
+  // New getters for empty state detection
+  String get requestedLanguage => _requestedLanguage;
+  String? get requestedState => _requestedState;
+  bool get isUsingLanguageFallback => _isUsingLanguageFallback;
+  bool get isUsingStateFallback => _isUsingStateFallback;
+  
+  // Check if we have content in the originally requested language/state
+  bool get hasRequestedContent {
+    // If modules are empty, we definitely don't have requested content
+    if (_modules.isEmpty) return false;
+    
+    // Check if we got content in the requested language and state
+    return _requestedLanguage == _currentLanguage && 
+           _requestedState == _currentState &&
+           !_isUsingLanguageFallback &&
+           !_isUsingStateFallback;
+  }
+  
+  // Get reason why content wasn't found (for empty state messaging)
+  String get contentNotFoundReason {
+    if (_requestedState != _currentState || _isUsingStateFallback) {
+      if (_requestedLanguage != _currentLanguage || _isUsingLanguageFallback) {
+        return 'language_and_state';
+      }
+      return 'state';
+    }
+    if (_requestedLanguage != _currentLanguage || _isUsingLanguageFallback) {
+      return 'language';
+    }
+    return 'unknown';
+  }
   
   // Cache performance getters
   int get cacheHits => _cacheHits;
@@ -189,6 +227,14 @@ class ContentProvider extends ChangeNotifier {
   
   // Fetch all content
   Future<void> fetchContent({bool forceRefresh = false}) async {
+    // Track what user actually requested (for empty state messaging)
+    _requestedLanguage = _currentLanguage;
+    _requestedState = _currentState;
+    _isUsingLanguageFallback = false;
+    _isUsingStateFallback = false;
+    
+    print('📋 ContentProvider: Tracking request - language: $_requestedLanguage, state: $_requestedState');
+    
     // 🏗️ ENHANCED CACHING LOGIC - Check both modules AND topics cache
     if (!forceRefresh) {
       final stateValue = _currentState ?? 'ALL';
@@ -366,29 +412,16 @@ class ContentProvider extends ChangeNotifier {
         print('✅ Sequential fallback completed: ${_modules.length} modules, ${_topics.length} topics');
       }
       
-      // Handle English fallback for modules if needed
-      if (_modules.isEmpty && _currentLanguage != 'en') {
-        print('No modules found in $_currentLanguage, trying English fallback');
-        
-        _modules = await contentService.getTheoryModules(
-          _currentLicenseId,  // licenseType should be first
-          'en',               // language second
-          stateValue          // state third
-        );
-        
-        print('English fallback for modules: ${_modules.length} modules found');
-      }
+      // REMOVED: Silent English fallback for consistent behavior
+      // Now when no content exists in requested language, app will show empty state
+      // This makes language behavior consistent with state behavior
       
-      // Handle English fallback for topics if needed
-      if (_topics.isEmpty && _currentLanguage != 'en') {
-        print('No topics found in $_currentLanguage, trying English fallback');
-        
-        _topics = await contentService.getTrafficRuleTopics(
-          'en', 
-          stateValue
-        );
-        
-        print('English fallback for topics: ${_topics.length} topics found');
+      print('📋 ContentProvider: Fetch completed - ${_modules.length} modules, ${_topics.length} topics in $_requestedLanguage');
+      
+      // Check if we got content in the requested language/state combination
+      if (_modules.isEmpty) {
+        print('⚠️ No content found for language: $_requestedLanguage, state: $_requestedState');
+        // Let the UI show empty state with proper messaging
       }
       
       // 💾 Batch cache both results
