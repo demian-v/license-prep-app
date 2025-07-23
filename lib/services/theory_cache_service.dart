@@ -275,4 +275,200 @@ class TheoryCacheService {
       return {'error': e.toString()};
     }
   }
+  
+  /// Convenience method to check both theory modules AND traffic topics cache together
+  /// Returns a map with both cache statuses for easier batch checking
+  Future<Map<String, dynamic>> getBatchCacheStatus(String state, String language, String licenseType) async {
+    try {
+      final modulesValid = await isCacheValid(state, language, licenseType);
+      final topicsValid = await isTrafficTopicsCacheValid(state, language);
+      
+      return {
+        'modules_cache_valid': modulesValid,
+        'topics_cache_valid': topicsValid,
+        'both_valid': modulesValid && topicsValid,
+        'state': state,
+        'language': language,
+        'license_type': licenseType,
+      };
+    } catch (e) {
+      print('❌ Error checking batch cache status: $e');
+      return {
+        'error': e.toString(),
+        'modules_cache_valid': false,
+        'topics_cache_valid': false,
+        'both_valid': false,
+      };
+    }
+  }
+  
+  /// Search for a specific topic in cached data with PRIORITIZED ID variations
+  Future<Map<String, dynamic>?> findCachedTopicById(String topicId, String state, String language) async {
+    try {
+      final cacheKey = _generateTrafficTopicsCacheKey(state, language);
+      final prefs = await SharedPreferences.getInstance();
+      final cachedData = prefs.getString(cacheKey);
+      
+      print('🔧 CACHE SEARCH: topicId="$topicId", cacheKey="$cacheKey"');
+      
+      if (cachedData != null) {
+        final List<dynamic> topics = jsonDecode(cachedData);
+        print('🔧 Cache exists: ${topics.length} topics in $cacheKey');
+        print('🔧 Topic IDs in cache: ${topics.map((t) => t['id']).toList()}');
+        
+        // PRIORITY 1: Extract simple numeric ID first (this is what's actually in cache!)
+        final numericId = topicId
+            .replaceAll('topic_', '')
+            .replaceAll(RegExp(r'_[a-zA-Z]{2}_[A-Z]{2,3}$'), '') // Remove _en_IL suffix
+            .replaceAll(RegExp(r'_[a-zA-Z]{2}$'), '') // Remove _en suffix
+            .replaceAll(RegExp(r'_ALL$'), ''); // Remove _ALL suffix
+        
+        // Search for topic with PRIORITIZED ID variations
+        final possibleIds = [
+          numericId,                         // "1" ⭐ HIGHEST PRIORITY - this is what's in cache!
+          topicId.replaceAll('topic_', ''),  // "1_en_IL" 
+          topicId,                           // "topic_1_en_IL" - original search term
+          'topic_$numericId',                // "topic_1"
+          topicId.toLowerCase(),             // "topic_1_en_il"
+          numericId.toLowerCase(),           // "1" (but lowercase, just in case)
+        ];
+        
+        print('🔧 Trying ID variations: $possibleIds');
+        
+        // Search for exact match
+        for (var topicData in topics) {
+          if (topicData is Map<String, dynamic>) {
+            final cachedId = topicData['id']?.toString() ?? '';
+            print('🔧 Comparing against cached ID: "$cachedId"');
+            
+            for (int i = 0; i < possibleIds.length; i++) {
+              final possibleId = possibleIds[i];
+              print('🔧 [${i+1}/${possibleIds.length}] Comparing: "$possibleId" == "$cachedId"');
+              
+              if (cachedId == possibleId) {
+                print('✅ EXACT MATCH FOUND: $cachedId (using variation: $possibleId)');
+                return topicData;
+              }
+            }
+          }
+        }
+        
+        print('❌ No exact match found for any variation');
+      } else {
+        print('🔧 No cache data for: $cacheKey');
+      }
+      
+      print('❌ Topic $topicId not found in persistent cache');
+      return null;
+    } catch (e) {
+      print('❌ Error searching for cached topic: $e');
+      return null;
+    }
+  }
+
+  /// Get topic IDs that are available in cache (for debugging)
+  Future<List<String>> getCachedTopicIds(String state, String language) async {
+    try {
+      final cachedTopics = await getCachedTrafficTopics(state, language);
+      if (cachedTopics != null) {
+        return cachedTopics
+            .map((topic) => topic['id']?.toString() ?? '')
+            .where((id) => id.isNotEmpty)
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      print('❌ Error getting cached topic IDs: $e');
+      return [];
+    }
+  }
+
+  /// Check if specific topic exists in cache
+  Future<bool> hasTopicInCache(String topicId, String state, String language) async {
+    final topicData = await findCachedTopicById(topicId, state, language);
+    return topicData != null;
+  }
+  
+  /// Helper method to get the traffic topics cache key (expose for direct access)
+  String _getTrafficTopicsCacheKey(String state, String language) {
+    return _generateTrafficTopicsCacheKey(state, language);
+  }
+  
+  /// Enhanced search with state fallback - tries multiple state variations
+  Future<Map<String, dynamic>?> findCachedTopicByIdWithFallback(String topicId, String state, String language) async {
+    // State variations to try (in priority order)
+    final stateVariations = [
+      state,           // Current state (e.g., 'IL')
+      'ALL',          // Universal fallback
+      state.toUpperCase(), // Ensure uppercase
+      state.toLowerCase(), // Try lowercase
+    ].where((s) => s.isNotEmpty).toSet().toList(); // Remove duplicates and empty
+
+    for (var stateVariation in stateVariations) {
+      print('🔍 Trying cache lookup: state=$stateVariation, language=$language, topicId=$topicId');
+      
+      final result = await findCachedTopicById(topicId, stateVariation, language);
+      if (result != null) {
+        print('✅ Found topic in cache with state variation: $stateVariation');
+        return result;
+      }
+    }
+    
+    print('❌ Topic not found in cache after trying all state variations: $stateVariations');
+    return null;
+  }
+  
+  /// Debug method to list all available cache keys
+  Future<List<String>> getAllCacheKeys() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final keys = prefs.getKeys();
+      
+      final trafficCacheKeys = keys
+          .where((key) => key.startsWith(_TRAFFIC_TOPICS_PREFIX))
+          .toList();
+      
+      print('🗂️ Available traffic cache keys: $trafficCacheKeys');
+      return trafficCacheKeys;
+    } catch (e) {
+      print('❌ Error getting cache keys: $e');
+      return [];
+    }
+  }
+
+  /// Debug method to inspect specific cache key contents
+  Future<Map<String, dynamic>> inspectCacheKey(String state, String language) async {
+    try {
+      final cacheKey = _generateTrafficTopicsCacheKey(state, language);
+      final prefs = await SharedPreferences.getInstance();
+      final cachedData = prefs.getString(cacheKey);
+      
+      if (cachedData != null) {
+        final List<dynamic> topics = jsonDecode(cachedData);
+        final topicIds = topics
+            .map((topic) => topic['id']?.toString() ?? 'no-id')
+            .toList();
+        
+        return {
+          'cacheKey': cacheKey,
+          'exists': true,
+          'topicCount': topics.length,
+          'topicIds': topicIds,
+        };
+      } else {
+        return {
+          'cacheKey': cacheKey,
+          'exists': false,
+          'topicCount': 0,
+          'topicIds': [],
+        };
+      }
+    } catch (e) {
+      return {
+        'error': e.toString(),
+        'cacheKey': _generateTrafficTopicsCacheKey(state, language),
+        'exists': false,
+      };
+    }
+  }
 }

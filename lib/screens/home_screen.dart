@@ -7,6 +7,7 @@ import '../widgets/super_enhanced_footer.dart';
 import '../services/service_locator_extensions.dart';
 import '../providers/language_provider.dart';
 import '../providers/content_provider.dart';
+import '../providers/state_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -45,31 +46,46 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     });
   }
   
-  // Sync content language with language provider
-  void _syncContentLanguage() {
+  // Sync content language AND state with providers
+  Future<void> _syncContentLanguageAndState() async {
     final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
     final contentProvider = Provider.of<ContentProvider>(context, listen: false);
+    final stateProvider = Provider.of<StateProvider>(context, listen: false);
     
-    // Sync language preference when home screen loads
-    contentProvider.setPreferences(language: languageProvider.language);
-    print('HomeScreen: Synced content language to: ${languageProvider.language}');
+    // Wait for StateProvider to be fully initialized
+    await stateProvider.waitForInitialization();
+    
+    final selectedStateId = stateProvider.selectedStateId;
+    
+    // Sync BOTH language AND state preferences
+    contentProvider.setPreferences(
+      language: languageProvider.language,
+      state: selectedStateId,
+    );
+    
+    print('HomeScreen: Synced content - language: ${languageProvider.language}, state: ${selectedStateId ?? "null"}');
+    print('HomeScreen: StateProvider isInitialized: ${stateProvider.isInitialized}');
   }
   
-  // Initialize content using ContentLoadingManager
+  // Initialize HomeScreen preferences (language/state sync only)
   Future<void> _initializeContent() async {
     setState(() {
       _isInitializing = true;
     });
     
     try {
-      // Sync content language first
-      _syncContentLanguage();
+      // Sync both content language AND state preferences to providers
+      // This ensures providers have the correct values for when individual screens need them
+      await _syncContentLanguageAndState();
       
-      // Get the content loading manager and initialize content
-      final contentLoadingManager = ServiceLocatorExtensions.contentLoadingManager;
-      await contentLoadingManager.initializeContent();
+      print('🏠 HomeScreen: Preferences synced successfully - ready to show navigation');
+      
+      // NOTE: We don't load theory/practice content here anymore!
+      // Each screen (TheoryScreen, TestScreen) will load its own content when accessed
+      // This makes HomeScreen load instantly while keeping lazy loading for content
+      
     } catch (e) {
-      print('Error initializing content: $e');
+      print('Error syncing HomeScreen preferences: $e');
     } finally {
       if (mounted) {
         setState(() {

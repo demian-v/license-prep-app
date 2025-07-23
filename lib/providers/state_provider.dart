@@ -33,21 +33,40 @@ class StateProvider extends ChangeNotifier {
   Future<void> initialize() async {
     if (_hasInitialized) return;
     
+    print('🏛️ StateProvider: Starting initialization...');
+    
     try {
       final prefs = await SharedPreferences.getInstance();
       final stateId = prefs.getString('selected_state_id');
       
       if (stateId != null) {
         _selectedState = StateData.getStateById(stateId);
+        print('🏛️ StateProvider: Loaded state from prefs: $stateId → ${_selectedState?.name}');
+      } else {
+        print('🏛️ StateProvider: No saved state found in preferences');
       }
     } catch (e) {
-      print('Error initializing StateProvider: $e');
+      print('❌ StateProvider: Error initializing: $e');
     }
     
     _hasInitialized = true;
+    print('✅ StateProvider: Initialization complete, selectedStateId: ${_selectedState?.id}');
     notifyListeners();
     
     return;
+  }
+  
+  /// Wait for provider to be fully initialized
+  Future<void> waitForInitialization() async {
+    while (!_hasInitialized) {
+      await Future.delayed(Duration(milliseconds: 10));
+    }
+  }
+
+  /// Get selected state ID safely after initialization
+  Future<String?> getSelectedStateIdSafe() async {
+    await waitForInitialization();
+    return _selectedState?.id;
   }
   
   /// Set the selected state using state ID

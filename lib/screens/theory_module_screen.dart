@@ -39,6 +39,13 @@ class _TheoryModuleScreenState extends State<TheoryModuleScreen> {
     print('Module topics: ${widget.module.topics}');
     print('Module state: ${widget.module.state}, language: ${widget.module.language}');
     
+    // ENHANCEMENT: Pre-warm topics for this module to improve performance
+    try {
+      await contentProvider.preWarmTopicsForModule(widget.module);
+    } catch (e) {
+      print('Warning: Pre-warming failed, continuing with normal loading: $e');
+    }
+    
     // Using the topics from the provider
     final allTopics = contentProvider.topics;
     

@@ -5,6 +5,7 @@ import '../providers/language_provider.dart';
 import '../providers/content_provider.dart';
 import '../providers/progress_provider.dart';
 import '../providers/state_provider.dart';
+import '../providers/auth_provider.dart';
 import '../widgets/module_card.dart';
 import 'theory_module_screen.dart';
 import 'traffic_rule_content_screen.dart';
@@ -29,10 +30,16 @@ class _TheoryScreenState extends State<TheoryScreen> {
       final contentProvider = Provider.of<ContentProvider>(context, listen: false);
       final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
       final stateProvider = Provider.of<StateProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
       
-      // Get state from provider - ensure we have a valid value
-      final userState = stateProvider.selectedStateId;
+      // ROBUSTNESS FIX: Get state from multiple sources for maximum reliability
+      // AuthProvider takes priority as it's the most up-to-date from ProfileScreen changes
+      final stateFromAuth = authProvider.user?.state;
+      final stateFromProvider = stateProvider.selectedStateId;
+      final userState = stateFromAuth ?? stateFromProvider;
       
+      print('TheoryScreen: State sources - Auth: $stateFromAuth, StateProvider: $stateFromProvider');
+      print('TheoryScreen: Using state=$userState (priority: Auth > StateProvider)');
       print('TheoryScreen: Initializing with state=$userState, language=${languageProvider.language}');
       
       // Set current language and fetch content

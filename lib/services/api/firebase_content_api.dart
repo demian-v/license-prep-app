@@ -681,15 +681,21 @@ class FirebaseContentApi implements ContentApiInterface {
     }
   }
   
-  /// Get traffic rule topics from Firestore
-  /// This is used for the direct Firestore approach
+  /// Get traffic rule topics with Firebase Functions primary + Firestore fallback
+  /// Enhanced to match theory modules 2-way fetching pattern
   @override
   Future<List<TrafficRuleTopic>> getTrafficRuleTopics(String language, String state) async {
     try {
+      // Ensure language code is correct (use 'uk' for Ukrainian)
+      if (language == 'ua') {
+        language = 'uk';
+        print('🔧 Corrected language code from ua to uk');
+      }
+      
       // If state is null or empty, we'll query without state filtering
       // This allows us to show the empty state UI when no state is selected
       var stateValue = (state == null || state.isEmpty) ? 'ALL' : state;
-      print('State value for Firebase query: $stateValue (original value: $state)');
+      print('🏢 State value for Firebase query: $stateValue (original value: $state)');
       
       // First try to get the user's state from Firestore to ensure we're using the most up-to-date value
       try {
@@ -702,40 +708,159 @@ class FirebaseContentApi implements ContentApiInterface {
             
             // If the user has a state in Firestore, use that instead of the parameter
             if (userState != null && userState.isNotEmpty) {
-              print('IMPORTANT - Overriding traffic topics state parameter from "$stateValue" to Firestore user state: "$userState"');
+              print('⚠️ IMPORTANT - Overriding traffic topics state parameter from "$stateValue" to Firestore user state: "$userState"');
               stateValue = userState;
             }
             
-            print('DEBUG - User document state: ${userData['state']}, Final state for traffic topics query: $stateValue');
+            print('🔍 DEBUG - User document state: ${userData['state']}, Final state for traffic topics query: $stateValue');
           }
         }
       } catch (e) {
-        print('Error checking user state for traffic topics: $e');
+        print('❌ Error checking user state for traffic topics: $e');
       }
       
-      print('Fetching traffic rule topics from Firestore with: language=$language, state=$stateValue');
+      print('🎯 Fetching traffic rule topics with: language=$language, state=$stateValue');
       
-      // Query Firestore collection
-      QuerySnapshot querySnapshot;
+      // First attempt: Try Firebase Functions (PRIMARY METHOD - NEW!)
+      List<TrafficRuleTopic> processedTopics = [];
       
-      querySnapshot = await _firestore
-          .collection('trafficRuleTopics')
-          .where('language', isEqualTo: language)
-          .where('state', isEqualTo: stateValue)
-          .orderBy('order')
-          .get();
+      try {
+        print('📞 Attempting Firebase Functions: getTrafficRuleTopics with: language=$language, state=$stateValue');
+        
+        final response = await _functionsClient.callFunction<List<dynamic>>(
+          'getTrafficRuleTopics',
+          data: {
+            'language': language,
+            'state': stateValue,
+          },
+        );
+        
+        // Enhanced debug output
+        print('📋 Raw Firebase Function Response:');
+        print('   - Response type: ${response.runtimeType}');
+        print('   - Response length: ${response?.length ?? 0}');
+        
+        if (response != null && response.isNotEmpty) {
+          // Log each topic ID before processing
+          print('📝 Topics received from Firebase Function:');
+          for (int i = 0; i < response.length; i++) {
+            try {
+              final item = response[i];
+              final Map<dynamic, dynamic> rawData = item as Map<dynamic, dynamic>;
+              final Map<String, dynamic> data = Map<String, dynamic>.from(rawData.map(
+                (key, value) => MapEntry(key.toString(), value),
+              ));
+              print('   ${i + 1}. ${data['id']} - ${data['title']} (lang: ${data['language']}, state: ${data['state']})');
+            } catch (e) {
+              print('   ${i + 1}. ❌ Error reading topic: $e');
+            }
+          }
+          
+          // Enhanced processing with better error handling
+          for (int i = 0; i < response.length; i++) {
+            try {
+              final item = response[i];
+              final Map<dynamic, dynamic> rawData = item as Map<dynamic, dynamic>;
+              final Map<String, dynamic> data = Map<String, dynamic>.from(rawData.map(
+                (key, value) => MapEntry(key.toString(), value),
+              ));
+              
+              final topicId = data['id']?.toString() ?? 'unknown';
+              
+              print('🔨 Processing topic $topicId:');
+              
+              final topic = TrafficRuleTopic.fromFirestore(data, topicId);
+              processedTopics.add(topic);
+              print('   ✅ Successfully processed topic $topicId');
+              
+            } catch (e) {
+              print('   ❌ Error processing topic ${i + 1}: $e');
+              print('   Raw data: ${response[i]}');
+              // Continue processing other topics instead of failing completely
+            }
+          }
+          
+          print('📊 Firebase Functions result: ${processedTopics.length} topics processed');
+        } else {
+          print('❌ Firebase Functions returned empty response');
+        }
+      } catch (e) {
+        print('❌ Error with Firebase Functions: $e');
+      }
       
-      print('Got ${querySnapshot.docs.length} traffic rule topics from Firestore');
+      // Second attempt: Direct Firestore query (FALLBACK METHOD)
+      if (processedTopics.length == 0) {
+        print('🚨 Got only ${processedTopics.length} topics from Firebase Functions, trying direct Firestore query...');
+        
+        try {
+          print('📞 Attempting direct Firestore query: trafficRuleTopics collection');
+          print('Query parameters: language=$language, state=$stateValue');
+          
+          // Enhanced Firestore query - remove orderBy to avoid composite index issues
+          QuerySnapshot querySnapshot = await _firestore
+              .collection('trafficRuleTopics')
+              .where('language', isEqualTo: language)
+              .where('state', isEqualTo: stateValue)
+              .get(); // Removed .orderBy('order') to avoid index issues
+          
+          print('📋 Direct Firestore result: ${querySnapshot.docs.length} documents found');
+          
+          if (querySnapshot.docs.isNotEmpty) {
+            final List<TrafficRuleTopic> firestoreTopics = [];
+            
+            for (var doc in querySnapshot.docs) {
+              try {
+                final data = doc.data() as Map<String, dynamic>;
+                final topicId = data['id']?.toString() ?? doc.id;
+                
+                print('🔨 Processing Firestore topic: $topicId - ${data['title']} (state: ${data['state']})');
+                
+                final topic = TrafficRuleTopic.fromFirestore(data, doc.id);
+                firestoreTopics.add(topic);
+                print('   ✅ Successfully processed Firestore topic: $topicId');
+                
+              } catch (e) {
+                print('   ❌ Error processing Firestore topic: $e');
+              }
+            }
+            
+            // Manual sorting by order field since we removed orderBy from query
+            firestoreTopics.sort((a, b) {
+              final aOrder = a.order ?? 0;
+              final bOrder = b.order ?? 0;
+              return aOrder.compareTo(bOrder);
+            });
+            
+            if (firestoreTopics.length > processedTopics.length) {
+              print('🎉 Firestore provided more topics (${firestoreTopics.length}) than Firebase Functions (${processedTopics.length}), using Firestore result');
+              processedTopics = firestoreTopics;
+            } else {
+              print('📊 Firebase Functions result was better, keeping it');
+            }
+          } else {
+            print('❌ No topics found in Firestore either');
+          }
+        } catch (e) {
+          print('❌ Error querying Firestore directly: $e');
+        }
+      }
       
-      // Process results
-      List<TrafficRuleTopic> topics = querySnapshot.docs.map((doc) {
-        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-        return TrafficRuleTopic.fromFirestore(data, doc.id);
-      }).toList();
+      // Final result
+      if (processedTopics.isEmpty) {
+        print('⚠️ No traffic topics found - will show "Coming soon" message in UI');
+      }
       
-      return topics;
+      print('🎉 Final result: ${processedTopics.length} traffic topics successfully processed');
+      for (int i = 0; i < processedTopics.length; i++) {
+        print('   ${i + 1}. ${processedTopics[i].id} - ${processedTopics[i].title}');
+      }
+      
+      return processedTopics;
     } catch (e) {
-      print('Error fetching traffic rule topics from Firestore: $e');
+      print('💥 Critical error fetching traffic rule topics: $e');
+      print('📍 Stack trace: ${StackTrace.current}');
+      
+      // Return empty list - UI will show "Coming soon" message
       return [];
     }
   }

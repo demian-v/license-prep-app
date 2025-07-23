@@ -248,8 +248,21 @@ void main() async {
   
   final stateProvider = StateProvider();
   
+  // Connect AuthProvider with StateProvider for synchronization
+  authProvider.setStateProvider(stateProvider);
+  
   // Initialize state provider
   await stateProvider.initialize();
+
+  // For logged-in users, apply their saved state preference
+  if (user != null && user.state != null && user.state!.isNotEmpty) {
+    await stateProvider.setSelectedState(user.state!);
+    print('Applied user state preference: ${user.state}');
+  } else if (user == null) {
+    print('No user logged in, state remains null');
+  } else {
+    print('User logged in but no state preference set, state remains null');
+  }
 
   // Create exam and practice providers
   final examProvider = ExamProvider();

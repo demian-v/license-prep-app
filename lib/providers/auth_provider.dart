@@ -9,6 +9,7 @@ import '../data/state_data.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'language_provider.dart';
 import 'subscription_provider.dart';
+import 'state_provider.dart';
 
 class AuthProvider extends ChangeNotifier {
   User? user;
@@ -16,6 +17,7 @@ class AuthProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   LanguageProvider? _languageProvider;
   SubscriptionProvider? _subscriptionProvider;
+  StateProvider? _stateProvider;
 
   AuthProvider(this.user);
 
@@ -27,6 +29,11 @@ class AuthProvider extends ChangeNotifier {
   // Set the subscription provider for analytics
   void setSubscriptionProvider(SubscriptionProvider subscriptionProvider) {
     _subscriptionProvider = subscriptionProvider;
+  }
+
+  // Set the state provider for synchronization
+  void setStateProvider(StateProvider stateProvider) {
+    _stateProvider = stateProvider;
   }
 
   /// Categorize login errors for analytics (no PII)
@@ -141,6 +148,9 @@ class AuthProvider extends ChangeNotifier {
         
         // Sync user's language preference to LanguageProvider
         await _syncUserLanguageToProvider();
+        
+        // Sync user's state preference to StateProvider
+        await _syncUserStateToProvider();
         
         // Track successful login event
         try {
@@ -607,6 +617,9 @@ class AuthProvider extends ChangeNotifier {
       // Reset language to English when user logs out
       await _resetLanguageToEnglish();
       
+      // Reset state to null when user logs out
+      await _resetStateToNull();
+      
       // Clear local user data
       user = null;
       
@@ -622,6 +635,9 @@ class AuthProvider extends ChangeNotifier {
       
       // Reset language to English when user logs out
       await _resetLanguageToEnglish();
+      
+      // Reset state to null when user logs out
+      await _resetStateToNull();
       
       user = null;
       
@@ -645,6 +661,25 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // Private method to sync user's state preference to StateProvider
+  Future<void> _syncUserStateToProvider() async {
+    if (_stateProvider != null && user != null && user!.state != null && user!.state!.isNotEmpty) {
+      try {
+        debugPrint('🏛️ AuthProvider: User state sync - user.state: ${user!.state}');
+        debugPrint('🏛️ AuthProvider: StateProvider before sync: ${_stateProvider?.selectedStateId}');
+        
+        await _stateProvider!.setSelectedState(user!.state!);
+        
+        debugPrint('🏛️ AuthProvider: StateProvider after sync: ${_stateProvider?.selectedStateId}');
+        debugPrint('🔄 AuthProvider: Synced user state ${user!.state} to StateProvider');
+      } catch (e) {
+        debugPrint('⚠️ AuthProvider: Error syncing state to provider: $e');
+      }
+    } else {
+      debugPrint('ℹ️ AuthProvider: Skipping state sync - state provider: ${_stateProvider != null}, user: ${user != null}, user state: ${user?.state}');
+    }
+  }
+
   // Private method to reset language to English (for logout)
   Future<void> _resetLanguageToEnglish() async {
     if (_languageProvider != null) {
@@ -653,6 +688,18 @@ class AuthProvider extends ChangeNotifier {
         debugPrint('🔄 AuthProvider: Reset LanguageProvider to English on logout');
       } catch (e) {
         debugPrint('⚠️ AuthProvider: Error resetting language to English: $e');
+      }
+    }
+  }
+
+  // Private method to reset state to null (for logout)
+  Future<void> _resetStateToNull() async {
+    if (_stateProvider != null) {
+      try {
+        await _stateProvider!.clearSelectedState();
+        debugPrint('🔄 AuthProvider: Reset StateProvider to null on logout');
+      } catch (e) {
+        debugPrint('⚠️ AuthProvider: Error resetting state to null: $e');
       }
     }
   }

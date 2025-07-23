@@ -24,6 +24,9 @@ class ContentLoadingManager {
   }) {
     // Listen for language changes and update content when needed
     languageProvider.addListener(_onLanguageChanged);
+    
+    // Listen for state changes
+    stateProvider.addListener(_onStateChanged);
   }
   
   /// Handle language changes
@@ -35,6 +38,16 @@ class ContentLoadingManager {
       reloadContentIfNeeded(force: true);
     } else {
       print('ContentLoadingManager: Language changed during initialization, skipping content update');
+    }
+  }
+  
+  /// Handle state changes
+  void _onStateChanged() {
+    if (_hasInitializedContent) {
+      print('ContentLoadingManager: State changed to: ${stateProvider.selectedStateId}, updating content');
+      reloadContentIfNeeded(force: true);
+    } else {
+      print('ContentLoadingManager: State changed during initialization, skipping content update');
     }
   }
   
@@ -53,14 +66,17 @@ class ContentLoadingManager {
       return;
     }
     
-    // Now we allow null states
     if (languageProvider.language.isNotEmpty) {
-      print('ContentLoadingManager: Initializing content with language=${languageProvider.language}, state=${stateProvider.selectedStateId ?? "null"}');
+      // CRITICAL FIX: Use async-safe state access
+      final selectedStateId = await stateProvider.getSelectedStateIdSafe();
       
-      // Set content provider preferences - use the selected language
+      print('ContentLoadingManager: Initializing content with language=${languageProvider.language}, state=${selectedStateId ?? "null"}');
+      print('ContentLoadingManager: StateProvider isInitialized: ${stateProvider.isInitialized}');
+      
+      // Set content provider preferences with properly retrieved state
       contentProvider.setPreferences(
         language: languageProvider.language,
-        state: stateProvider.selectedStateId, // Can be null
+        state: selectedStateId, // Now properly retrieved!
       );
       
       // Now explicitly load content after both selections are made
@@ -79,12 +95,14 @@ class ContentLoadingManager {
     if (force || 
         (languageProvider.language.isNotEmpty && _hasInitializedContent)) {
       
-      print('ContentLoadingManager: Reloading content - language=${languageProvider.language}, state=${stateProvider.selectedStateId ?? "null"}');
+      final selectedStateId = await stateProvider.getSelectedStateIdSafe();
       
-      // Update preferences and reload - use selected language
+      print('ContentLoadingManager: Reloading content - language=${languageProvider.language}, state=${selectedStateId ?? "null"}');
+      
+      // Update preferences and reload
       contentProvider.setPreferences(
         language: languageProvider.language,
-        state: stateProvider.selectedStateId, // Can be null
+        state: selectedStateId, // Now properly retrieved!
       );
       
       await _loadContent();
@@ -107,6 +125,7 @@ class ContentLoadingManager {
   /// Remove listeners and cleanup
   void dispose() {
     languageProvider.removeListener(_onLanguageChanged);
+    stateProvider.removeListener(_onStateChanged); // Add this line
   }
   
   /// Reset state for logout

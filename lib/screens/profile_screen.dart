@@ -7,6 +7,7 @@ import '../providers/language_provider.dart';
 import '../localization/app_localizations.dart';
 import '../providers/subscription_provider.dart';
 import '../providers/progress_provider.dart';
+import '../providers/state_provider.dart';
 import '../examples/api_switcher_example.dart';
 import '../examples/function_name_mapping_example.dart';
 import '../services/email_sync_service.dart';
@@ -1071,9 +1072,14 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                     // Update state in auth provider
                     await authProvider.updateUserState(state);
                     
-                    // Get state info for analytics
+                    // CRITICAL FIX: Also update StateProvider to sync with AuthProvider
+                    // This ensures TheoryScreen gets the updated state immediately
+                    final stateProvider = Provider.of<StateProvider>(context, listen: false);
                     final stateInfo = StateData.getStateByName(state);
                     final stateId = stateInfo?.id ?? state;
+                    await stateProvider.setSelectedState(stateId);
+                    
+                    debugPrint('🔄 ProfileScreen: Updated both AuthProvider and StateProvider with state: $stateId');
                     
                     // Track successful state change
                     analyticsService.logStateChanged(
