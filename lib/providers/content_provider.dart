@@ -271,36 +271,6 @@ class ContentProvider extends ChangeNotifier {
               final Map<String, dynamic> data = Map<String, dynamic>.from(topicData);
               return TrafficRuleTopic.fromFirestore(data, data['id'] ?? '');
             }).toList();
-            
-            // ENHANCEMENT: Pre-populate detail cache for faster individual lookups with ALL possible variations
-            print('💾 Pre-populating detail cache with all topic ID variations...');
-            int totalVariations = 0;
-            
-            for (var topic in _topics) {
-              // Store under original ID
-              _storeInDetailCache(topic.id, topic);
-              totalVariations++;
-              
-              // Generate and store ALL possible search variations
-              final variations = _generateTopicIdVariations(topic.id);
-              for (var variation in variations) {
-                if (variation != topic.id && variation.isNotEmpty) {
-                  _storeInDetailCache(variation, topic);
-                  totalVariations++;
-                  print('💾 Detail cache [${_getDetailCacheStateKey()}][${_currentLanguage}]: "$variation" → "${topic.id}"');
-                }
-              }
-              
-              // Also store reverse mappings (topic_X_en_IL format)
-              if (_currentState != null && _currentLanguage.isNotEmpty) {
-                final complexId = 'topic_${topic.id}_${_currentLanguage}_${_currentState}';
-                _storeInDetailCache(complexId, topic);
-                totalVariations++;
-                print('💾 Detail cache [${_getDetailCacheStateKey()}][${_currentLanguage}]: "$complexId" → "${topic.id}"');
-              }
-            }
-            
-            print('💾 Pre-populated detail cache: ${_topics.length} topics → $totalVariations total cache entries');
           } else {
             _topics = [];
           }
@@ -639,65 +609,24 @@ class ContentProvider extends ChangeNotifier {
   }
 
 
-  /// Enhanced topic ID variations with PRIORITY for simple numeric IDs
+  /// Simple topic ID variations - only basic fallbacks
   List<String> _generateTopicIdVariations(String topicId) {
-    // PRIORITY 1: Extract simple numeric ID first (this is what's actually in cache!)
+    // Extract simple numeric ID
     final numericId = topicId
         .replaceAll('topic_', '')
         .replaceAll(RegExp(r'_[a-zA-Z]{2}_[A-Z]{2,3}$'), '') // Remove _en_IL suffix
         .replaceAll(RegExp(r'_[a-zA-Z]{2}$'), '') // Remove _en suffix
         .replaceAll(RegExp(r'_ALL$'), ''); // Remove _ALL suffix
     
-    // Start with highest priority variations (simple IDs that are actually cached)
-    final priorityVariations = <String>[
-      numericId,                         // "1" ⭐ HIGHEST PRIORITY - this is what's in cache!
+    // Only return essential variations to minimize API calls
+    return [
+      numericId,                         // "1" - most likely to work
       topicId.replaceAll('topic_', ''),  // "1_en_IL" 
-      topicId,                           // "topic_1_en_IL" - original search term
-    ];
-    
-    // PRIORITY 2: Add other common variations
-    final commonVariations = <String>{
-      'topic_$numericId',                // "topic_1"
-      topicId.toLowerCase(),             // "topic_1_en_il"
-      numericId.toLowerCase(),           // "1" (but lowercase, just in case)
-    };
-    
-    // PRIORITY 3: Add state/language specific variations
-    final complexVariations = <String>{};
-    if (_currentState != null && _currentLanguage.isNotEmpty) {
-      complexVariations.addAll([
-        '${topicId}_${_currentLanguage}_${_currentState}',
-        topicId.replaceAll('_${_currentLanguage}_', '_en_'), // English fallback
-        '${topicId}_${_currentLanguage}_ALL',
-        topicId.replaceAll('_${_currentState}_', '_ALL_'),
-        '${_currentLanguage}_${_currentState}_$topicId',
-        '${_currentLanguage}_ALL_$topicId',
-      ]);
-    }
-    
-    // Return prioritized list: simple numeric IDs FIRST!
-    final allVariations = [
-      ...priorityVariations,
-      ...commonVariations,
-      ...complexVariations,
-    ].where((id) => id.isNotEmpty && id != topicId).toList();
-    
-    // Remove duplicates while preserving order
-    final uniqueVariations = <String>[];
-    final seen = <String>{};
-    for (final variation in allVariations) {
-      if (!seen.contains(variation)) {
-        seen.add(variation);
-        uniqueVariations.add(variation);
-      }
-    }
-    
-    print('🔧 Generated variations for "$topicId": $uniqueVariations');
-    
-    return uniqueVariations;
+      topicId,                           // "topic_1_en_IL" - original
+    ].where((id) => id.isNotEmpty).toList();
   }
 
-  /// Helper method to search in-memory topics with flexible ID matching
+  /// Helper method to search in-memory topics with simple ID matching
   TrafficRuleTopic? _findTopicInMemory(String topicId) {
     final possibleIds = _generateTopicIdVariations(topicId);
     
@@ -717,64 +646,28 @@ class ContentProvider extends ChangeNotifier {
     return null;
   }
 
-  /// Helper method to search persistent cache with enhanced debugging
+  /// Helper method to search persistent cache - simplified
   Future<TrafficRuleTopic?> _findTopicInPersistentCache(String topicId) async {
     try {
       final stateValue = _currentState ?? 'ALL';
       final variations = _generateTopicIdVariations(topicId);
       
-      print('🔍 PERSISTENT CACHE SEARCH for: "$topicId"');
-      print('🔍 STATE: $stateValue, LANGUAGE: $_currentLanguage');
-      print('🔍 VARIATIONS TO TRY (${variations.length}): $variations');
-      
-      // First, let's see what's actually in the cache
-      final cacheInspection = await _cacheService.inspectCacheKey(stateValue, _currentLanguage);
-      print('🔍 CACHE CONTENTS: $cacheInspection');
-      
-      // Try each variation with detailed logging
-      for (int i = 0; i < variations.length; i++) {
-        final variation = variations[i];
-        print('🔍 [${i+1}/${variations.length}] Trying variation: "$variation"');
-        
+      // Try only essential variations
+      for (var variation in variations) {
         final result = await _cacheService.findCachedTopicByIdWithFallback(variation, stateValue, _currentLanguage);
         if (result != null) {
-          print('✅ FOUND with variation: "$variation" → result ID: "${result['id']}"');
           return TrafficRuleTopic.fromFirestore(result, result['id'] ?? variation);
         }
-        print('❌ Not found with: "$variation"');
       }
-      
-      // If we still haven't found it, try the simple approach directly
-      print('🔍 FALLBACK: Trying simple direct cache lookup...');
-      
-      // Check if simple numeric ID is in cache
-      final simpleNumericId = topicId
-          .replaceAll('topic_', '')
-          .replaceAll(RegExp(r'_[a-zA-Z]{2}_[A-Z]{2,3}$'), '')
-          .replaceAll(RegExp(r'_[a-zA-Z]{2}$'), '');
-      
-      if (simpleNumericId.isNotEmpty && simpleNumericId != topicId) {
-        print('🔍 TRYING SIMPLE ID: "$simpleNumericId" (extracted from "$topicId")');
-        final simpleResult = await _cacheService.findCachedTopicByIdWithFallback(simpleNumericId, stateValue, _currentLanguage);
-        if (simpleResult != null) {
-          print('✅ FOUND with simple ID: "$simpleNumericId"');
-          return TrafficRuleTopic.fromFirestore(simpleResult, simpleResult['id'] ?? simpleNumericId);
-        }
-      }
-      
-      print('❌ TOPIC NOT FOUND after trying ${variations.length} variations + simple ID');
-      print('🔍 DEBUG: Inspecting what\'s actually in cache...');
-      await _debugCacheContents(stateValue);
       
       return null;
     } catch (cacheError) {
-      // Log cache error but don't fail the request
       print('⚠️ Cache lookup failed for $topicId: $cacheError');
       return null;
     }
   }
 
-  /// Helper method for Firestore fetching (preserves existing logic)
+  /// Helper method for Firestore fetching - simplified
   Future<TrafficRuleTopic?> _fetchTopicFromFirestore(String topicId) async {
     print('🌐 ContentProvider: Topic not found in cache, checking Firestore for ID: $topicId');
     
@@ -785,15 +678,11 @@ class ContentProvider extends ChangeNotifier {
       return null;
     }
     
-    // Otherwise fetch from API
     try {
-      // Try each possible ID format with the API
+      // Try simple variations only to minimize API calls
       final possibleIds = _generateTopicIdVariations(topicId);
       
       for (var possibleId in possibleIds) {
-        print('ContentProvider: Trying to fetch topic with ID: $possibleId');
-        
-        // Skip empty IDs
         if (possibleId.isEmpty) continue;
         
         try {
@@ -802,20 +691,15 @@ class ContentProvider extends ChangeNotifier {
           if (fetchedTopic != null) {
             print('ContentProvider: Successfully fetched topic: ${fetchedTopic.id}');
             
-            // Cache the topic under the original ID
+            // Cache the topic
             _storeInDetailCache(topicId, fetchedTopic);
-            
-            // Also cache under its actual ID
             _storeInDetailCache(fetchedTopic.id, fetchedTopic);
             
-            // If this is a new topic not in our list, add it
+            // Add to topics array if not already there
             if (!_topics.any((t) => t.id == fetchedTopic.id)) {
               _topics.add(fetchedTopic);
               notifyListeners();
             }
-            
-            // NEW: Repair cache for future lookups
-            await _repairCache(topicId, fetchedTopic);
             
             _firestoreQueries++; // Track Firestore usage
             return fetchedTopic;
@@ -826,15 +710,11 @@ class ContentProvider extends ChangeNotifier {
         }
       }
       
-      // If we get here, try fetching English version as last resort
+      // Simple English fallback if current language is not English
       if (_currentLanguage != 'en') {
-        print('ContentProvider: Trying English fallback for topic');
-        
-        // Look for English version - modify the ID if it contains language code
         String englishTopicId = topicId;
         if (topicId.contains('_${_currentLanguage}_')) {
           englishTopicId = topicId.replaceAll('_${_currentLanguage}_', '_en_');
-          print('ContentProvider: Generated English topic ID: $englishTopicId');
           
           try {
             final englishTopic = await serviceLocator.content.getTrafficRuleTopic(englishTopicId);
@@ -842,11 +722,10 @@ class ContentProvider extends ChangeNotifier {
             if (englishTopic != null) {
               print('ContentProvider: Found English fallback topic: ${englishTopic.id}');
               
-              // Cache the topic under both IDs
+              // Cache the topic
               _storeInDetailCache(topicId, englishTopic);
               _storeInDetailCache(englishTopicId, englishTopic);
               
-              // If this is a new topic not in our list, add it
               if (!_topics.any((t) => t.id == englishTopic.id)) {
                 _topics.add(englishTopic);
                 notifyListeners();
@@ -871,100 +750,6 @@ class ContentProvider extends ChangeNotifier {
     }
   }
 
-  /// Debug method to check cache status for a specific topic
-  Future<Map<String, dynamic>> debugTopicCacheStatus(String topicId) async {
-    final stateValue = _currentState ?? 'ALL';
-    
-    return {
-      'topicId': topicId,
-      'inDetailCache': _topicDetailCache.containsKey(topicId),
-      'inMemoryTopics': _topics.any((t) => t.id == topicId),
-      'availableCachedTopicIds': await _cacheService.getCachedTopicIds(stateValue, _currentLanguage),
-      'currentState': stateValue,
-      'currentLanguage': _currentLanguage,
-      'totalTopicsInMemory': _topics.length,
-      'totalTopicsInDetailCache': _topicDetailCache.length,
-      'cachePerformance': getCachePerformanceStats(),
-    };
-  }
-
-  /// Method to pre-warm cache for a specific module
-  Future<void> preWarmTopicsForModule(TheoryModule module) async {
-    if (module.topics.isEmpty) return;
-    
-    print('🔥 Pre-warming topics for module: ${module.title}');
-    
-    int preWarmed = 0;
-    for (var topicId in module.topics) {
-      if (!_topicDetailCache.containsKey(topicId)) {
-        // Try to load from persistent cache without going to Firestore
-        final topic = await _findTopicInPersistentCache(topicId);
-        if (topic != null) {
-          _storeInDetailCache(topicId, topic);
-          preWarmed++;
-        }
-      }
-    }
-    
-    print('✅ Pre-warmed $preWarmed/${module.topics.length} topics for module: ${module.title}');
-  }
-  
-  /// Debug method to inspect cache contents when lookup fails
-  Future<void> _debugCacheContents(String currentState) async {
-    try {
-      // Check all available cache keys
-      final allKeys = await _cacheService.getAllCacheKeys();
-      print('🗂️ All traffic cache keys: $allKeys');
-      
-      // Inspect current state cache
-      final currentStateCache = await _cacheService.inspectCacheKey(currentState, _currentLanguage);
-      print('🔍 Current state cache ($currentState, $_currentLanguage): $currentStateCache');
-      
-      // Inspect ALL state cache
-      final allStateCache = await _cacheService.inspectCacheKey('ALL', _currentLanguage);
-      print('🔍 ALL state cache (ALL, $_currentLanguage): $allStateCache');
-      
-      // If current language is not English, check English cache too
-      if (_currentLanguage != 'en') {
-        final englishCache = await _cacheService.inspectCacheKey(currentState, 'en');
-        print('🔍 English cache ($currentState, en): $englishCache');
-      }
-    } catch (e) {
-      print('❌ Error debugging cache contents: $e');
-    }
-  }
-  
-  /// Smart cache repair - if topic found via Firestore, improve cache for next time
-  Future<void> _repairCache(String topicId, TrafficRuleTopic fetchedTopic) async {
-    try {
-      // After successful Firestore fetch, check if we can improve cache
-      final stateValue = _currentState ?? 'ALL';
-      
-      // Get current cached topics
-      final cachedTopics = await _cacheService.getCachedTrafficTopics(stateValue, _currentLanguage);
-      
-      if (cachedTopics != null) {
-        // Check if the fetched topic should be added to cache
-        final existingIds = cachedTopics.map((t) => t['id']).toSet();
-        
-        if (!existingIds.contains(fetchedTopic.id)) {
-          print('🔧 Repairing cache by adding missing topic: ${fetchedTopic.id}');
-          
-          // Add the fetched topic to cached topics
-          final updatedTopics = List<dynamic>.from(cachedTopics);
-          updatedTopics.add(fetchedTopic.toFirestore());
-          
-          // Re-cache with updated list
-          await _cacheService.cacheTrafficTopics(updatedTopics, stateValue, _currentLanguage);
-          
-          print('✅ Cache repaired successfully');
-        }
-      }
-    } catch (e) {
-      print('⚠️ Cache repair failed: $e');
-    }
-  }
-  
   // Clear cache for current state/language combination
   Future<void> clearSpecificCache() async {
     final stateValue = _currentState ?? 'ALL';
@@ -1003,28 +788,6 @@ class ContentProvider extends ChangeNotifier {
     print('🗑️ Cleared detail cache for state: $stateKey, language: $_currentLanguage');
   }
   
-  /// Debug method for multi-dimensional cache inspection
-  Future<void> debugMultiDimensionalCache() async {
-    print('\n🔍 === MULTI-DIMENSIONAL DETAIL CACHE DEBUG ===');
-    
-    for (var stateKey in _topicDetailCache.keys) {
-      final stateCache = _topicDetailCache[stateKey]!;
-      print('State: $stateKey');
-      
-      for (var langKey in stateCache.keys) {
-        final langCache = stateCache[langKey]!;
-        final topicIds = langCache.keys.take(5).join(', ');
-        print('  └── Language: $langKey → ${langCache.length} topics (${topicIds}${langCache.length > 5 ? '...' : ''})');
-      }
-    }
-    
-    final currentStateKey = _getDetailCacheStateKey();
-    final currentLangCache = _topicDetailCache[currentStateKey]?[_currentLanguage];
-    print('\nCurrent active cache: [$currentStateKey][$_currentLanguage] → ${currentLangCache?.length ?? 0} topics');
-    
-    print('=== END MULTI-DIMENSIONAL DEBUG ===\n');
-  }
-  
   // Method to check cache status (for debugging)
   Future<bool> hasCacheForCurrentSettings() async {
     final stateValue = _currentState ?? 'ALL';
@@ -1050,57 +813,25 @@ class ContentProvider extends ChangeNotifier {
     
     print('🗑️ Cleared all caches');
   }
-  
-  /// Print comprehensive cache status (for debugging)
-  Future<void> printCacheStatus([String? specificTopicId]) async {
-    print('\n🔍 === CACHE STATUS DEBUG ===');
+
+  /// Method to pre-warm cache for a specific module
+  Future<void> preWarmTopicsForModule(TheoryModule module) async {
+    if (module.topics.isEmpty) return;
     
-    final stats = getCachePerformanceStats();
-    print('📊 Performance: ${stats['cacheHits']} hits, ${stats['cacheMisses']} misses, ${stats['firestoreQueries']} Firestore queries');
-    print('📈 Cache hit ratio: ${(stats['cacheHitRatio'] * 100).toStringAsFixed(1)}%');
-    print('💾 In memory: ${stats['topicsInMemory']} topics, ${stats['topicsInDetailCache']} in detail cache');
+    print('🔥 Pre-warming topics for module: ${module.title}');
     
-    if (specificTopicId != null) {
-      final debug = await debugTopicCacheStatus(specificTopicId);
-      print('🎯 Topic "$specificTopicId": $debug');
-    }
-    
-    final stateValue = _currentState ?? 'ALL';
-    final cachedIds = await _cacheService.getCachedTopicIds(stateValue, _currentLanguage);
-    print('🗂️ Available cached topic IDs (${cachedIds.length}): ${cachedIds.take(5).join(', ')}${cachedIds.length > 5 ? '...' : ''}');
-    
-    print('=== END CACHE STATUS ===\n');
-  }
-  
-  /// Comprehensive cache debugging for troubleshooting
-  Future<void> debugFullCacheStatus(String topicId) async {
-    print('\n🔍 === COMPREHENSIVE CACHE DEBUG ===');
-    print('Looking for topic: $topicId');
-    print('Current state: $_currentState, language: $_currentLanguage');
-    
-    // Check all cache keys
-    final allKeys = await _cacheService.getAllCacheKeys();
-    print('Available cache keys: $allKeys');
-    
-    // Check multiple state combinations
-    final statesToCheck = ['$_currentState', 'ALL'];
-    final languagesToCheck = ['$_currentLanguage', 'en'];
-    
-    for (var state in statesToCheck) {
-      for (var language in languagesToCheck) {
-        final inspection = await _cacheService.inspectCacheKey(state, language);
-        print('Cache[$state][$language]: ${inspection}');
+    int preWarmed = 0;
+    for (var topicId in module.topics) {
+      if (!_topicDetailCache.containsKey(topicId)) {
+        // Try to load from persistent cache without going to Firestore
+        final topic = await _findTopicInPersistentCache(topicId);
+        if (topic != null) {
+          _storeInDetailCache(topicId, topic);
+          preWarmed++;
+        }
       }
     }
     
-    // Check if topic exists in detail cache
-    print('In detail cache: ${_topicDetailCache.containsKey(topicId)}');
-    print('In memory topics: ${_topics.any((t) => t.id == topicId)}');
-    
-    // Check all topic ID variations
-    final variations = _generateTopicIdVariations(topicId);
-    print('Topic ID variations to try: $variations');
-    
-    print('=== END CACHE DEBUG ===\n');
+    print('✅ Pre-warmed $preWarmed/${module.topics.length} topics for module: ${module.title}');
   }
 }
