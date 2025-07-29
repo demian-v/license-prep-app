@@ -497,7 +497,7 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
   // Enhanced content rendering
   Widget _buildEnhancedContent() {
     return SingleChildScrollView(
-      padding: EdgeInsets.only(bottom: 24),
+      padding: EdgeInsets.only(bottom: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -519,6 +519,47 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
           else 
             _buildFallbackContent(),
         ],
+      ),
+    );
+  }
+
+  // Back to Theory button
+  Widget _buildBackToTheoryButton() {
+    return Container(
+      height: 56,
+      margin: EdgeInsets.only(left: 16, right: 16, bottom: 24, top: 4),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.white, Colors.blue.shade50.withOpacity(0.4)],
+        ),
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            spreadRadius: 0,
+            blurRadius: 6,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => Navigator.pop(context),
+          borderRadius: BorderRadius.circular(30),
+          child: Center(
+            child: Text(
+              AppLocalizations.of(context).translate('back_to_theory'),
+              style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -591,6 +632,9 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
                 ),
               ),
             ),
+            
+            // Bottom button area
+            _buildBackToTheoryButton(),
           ],
         ),
       ),
