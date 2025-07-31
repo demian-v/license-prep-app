@@ -464,6 +464,152 @@ class AnalyticsService {
     });
   }
   
+  // MARK: - Theory Module Events
+  
+  /// Log when theory module list is successfully viewed
+  Future<void> logTheoryModuleListViewed({
+    int? moduleCount,
+    String? state,
+    String? language,
+    String? licenseType,
+  }) async {
+    await logEvent('theory_module_list_viewed', {
+      if (moduleCount != null) 'module_count': moduleCount,
+      if (state != null) 'state': state,
+      if (language != null) 'language': language,
+      if (licenseType != null) 'license_type': licenseType,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  /// Log when theory module list is empty  
+  Future<void> logTheoryModuleListEmpty({
+    String? emptyReason,
+    String? requestedState,
+    String? requestedLanguage,
+    String? requestedLicenseType,
+  }) async {
+    await logEvent('theory_module_list_empty', {
+      'empty_reason': emptyReason ?? 'unknown',
+      if (requestedState != null) 'requested_state': requestedState,
+      if (requestedLanguage != null) 'requested_language': requestedLanguage,
+      if (requestedLicenseType != null) 'requested_license_type': requestedLicenseType,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  /// Log when user selects a theory module
+  Future<void> logTheoryModuleSelected({
+    String? moduleId,
+    String? moduleTitle,
+    int? timeOnListSeconds,
+    String? state,
+    String? language,
+    String? licenseType,
+  }) async {
+    await logEvent('theory_module_selected', {
+      if (moduleId != null) 'module_id': moduleId,
+      if (moduleTitle != null) 'module_title': moduleTitle,
+      if (timeOnListSeconds != null) 'time_on_list_seconds': timeOnListSeconds,
+      if (state != null) 'state': state,
+      if (language != null) 'language': language,
+      if (licenseType != null) 'license_type': licenseType,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  /// Log when theory module list fails to load
+  Future<void> logTheoryModuleListFailed({
+    String? errorType,
+    String? errorMessage,
+    String? state,
+    String? language,
+    String? licenseType,
+  }) async {
+    await logEvent('theory_module_list_failed', {
+      'error_type': errorType ?? 'unknown_error',
+      'error_message': errorMessage != null 
+          ? (errorMessage.length > 100 ? errorMessage.substring(0, 97) + '...' : errorMessage)
+          : 'unknown',
+      if (state != null) 'state': state,
+      if (language != null) 'language': language,
+      if (licenseType != null) 'license_type': licenseType,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  /// Log when theory content is successfully viewed
+  Future<void> logTheoryContentViewed({
+    String? moduleId,
+    String? moduleTitle,
+    String? topicId,
+    String? topicTitle,
+    String? state,
+    String? language,
+    String? licenseType,
+  }) async {
+    await logEvent('theory_content_viewed', {
+      if (moduleId != null) 'module_id': moduleId,
+      if (moduleTitle != null) 'module_title': moduleTitle,
+      if (topicId != null) 'topic_id': topicId,
+      if (topicTitle != null) 'topic_title': topicTitle,
+      if (state != null) 'state': state,
+      if (language != null) 'language': language,
+      if (licenseType != null) 'license_type': licenseType,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  /// Log when theory content fails to view
+  Future<void> logTheoryContentViewFailed({
+    String? moduleId,
+    String? moduleTitle,
+    String? topicId,
+    String? topicTitle,
+    String? errorType,
+    String? errorMessage,
+    String? state,
+    String? language,
+  }) async {
+    await logEvent('theory_content_view_failed', {
+      if (moduleId != null) 'module_id': moduleId,
+      if (moduleTitle != null) 'module_title': moduleTitle,
+      if (topicId != null) 'topic_id': topicId,
+      if (topicTitle != null) 'topic_title': topicTitle,
+      'error_type': errorType ?? 'unknown_error',
+      'error_message': errorMessage != null 
+          ? (errorMessage.length > 100 ? errorMessage.substring(0, 97) + '...' : errorMessage)
+          : 'unknown',
+      if (state != null) 'state': state,
+      if (language != null) 'language': language,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  /// Log when user completes reading theory content
+  Future<void> logTheoryContentCompleted({
+    String? moduleId,
+    String? moduleTitle,
+    String? topicId,
+    String? topicTitle,
+    int? timeSpentReadingSeconds,
+    String? state,
+    String? language,
+    String? licenseType,
+  }) async {
+    await logEvent('theory_content_completed', {
+      if (moduleId != null) 'module_id': moduleId,
+      if (moduleTitle != null) 'module_title': moduleTitle,
+      if (topicId != null) 'topic_id': topicId,
+      if (topicTitle != null) 'topic_title': topicTitle,
+      if (timeSpentReadingSeconds != null) 'time_spent_reading_seconds': timeSpentReadingSeconds,
+      if (state != null) 'state': state,
+      if (language != null) 'language': language,
+      if (licenseType != null) 'license_type': licenseType,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+  
   // MARK: - Learning Events
   
   /// Log quiz start event

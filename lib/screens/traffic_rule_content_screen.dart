@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../models/traffic_rule_topic.dart';
 import '../localization/app_localizations.dart';
 import '../providers/language_provider.dart';
+import '../providers/auth_provider.dart';
+import '../providers/state_provider.dart';
+import '../services/analytics_service.dart';
 import 'package:provider/provider.dart';
 
 class TrafficRuleContentScreen extends StatefulWidget {
@@ -22,9 +25,15 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
   late AnimationController _contentAnimationController;
   late Animation<double> _contentFadeAnimation;
   
+  // Analytics tracking variables
+  DateTime? _contentViewStartTime;
+  bool _hasTrackedContentViewed = false;
+  bool _hasTrackedViewFailed = false;
+  
   @override
   void initState() {
     super.initState();
+    _contentViewStartTime = DateTime.now();
     
     // Title pulse animation (3-second cycle)
     _titleAnimationController = AnimationController(
@@ -57,6 +66,11 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
     // Start animations
     _titleAnimationController.repeat(reverse: true);
     _contentAnimationController.forward();
+    
+    // Track content viewed after animations start
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _trackContentViewed();
+    });
   }
   
   @override
@@ -64,6 +78,96 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
     _titleAnimationController.dispose();
     _contentAnimationController.dispose();
     super.dispose();
+  }
+
+  // Analytics tracking methods
+  void _trackContentViewed() {
+    if (_hasTrackedContentViewed) return;
+    
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final stateProvider = Provider.of<StateProvider>(context, listen: false);
+    
+    final userState = authProvider.user?.state ?? stateProvider.selectedStateId;
+    
+    analyticsService.logTheoryContentViewed(
+      moduleId: null, // Module info not available in topic model
+      moduleTitle: null, // Module info not available in topic model
+      topicId: widget.topic.id,
+      topicTitle: widget.topic.title,
+      state: userState,
+      language: languageProvider.language,
+      licenseType: 'driver', // Default license type
+    );
+    
+    _hasTrackedContentViewed = true;
+    debugPrint('📊 Analytics: theory_content_viewed logged (topic: ${widget.topic.title})');
+  }
+
+  void _trackContentViewFailed(Object error) {
+    if (_hasTrackedViewFailed) return;
+    
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final stateProvider = Provider.of<StateProvider>(context, listen: false);
+    
+    final userState = authProvider.user?.state ?? stateProvider.selectedStateId;
+    final errorMessage = error.toString();
+    
+    analyticsService.logTheoryContentViewFailed(
+      moduleId: null, // Module info not available in topic model
+      moduleTitle: null, // Module info not available in topic model
+      topicId: widget.topic.id,
+      topicTitle: widget.topic.title,
+      errorType: _getErrorType(errorMessage),
+      errorMessage: errorMessage.length > 100 
+          ? errorMessage.substring(0, 97) + '...'
+          : errorMessage,
+      state: userState,
+      language: languageProvider.language,
+    );
+    
+    _hasTrackedViewFailed = true;
+    debugPrint('📊 Analytics: theory_content_view_failed logged (topic: ${widget.topic.title}, error: ${_getErrorType(errorMessage)})');
+  }
+
+  void _trackContentCompleted() {
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final stateProvider = Provider.of<StateProvider>(context, listen: false);
+    
+    final userState = authProvider.user?.state ?? stateProvider.selectedStateId;
+    final timeSpent = _contentViewStartTime != null 
+        ? DateTime.now().difference(_contentViewStartTime!).inSeconds 
+        : null;
+    
+    analyticsService.logTheoryContentCompleted(
+      moduleId: null, // Module info not available in topic model
+      moduleTitle: null, // Module info not available in topic model
+      topicId: widget.topic.id,
+      topicTitle: widget.topic.title,
+      timeSpentReadingSeconds: timeSpent,
+      state: userState,
+      language: languageProvider.language,
+      licenseType: 'driver', // Default license type
+    );
+    
+    debugPrint('📊 Analytics: theory_content_completed logged (topic: ${widget.topic.title}, reading_time: ${timeSpent}s)');
+  }
+
+  // Helper method for error type classification
+  String _getErrorType(String errorMessage) {
+    if (errorMessage.contains('network') || errorMessage.contains('connection')) {
+      return 'network_error';
+    } else if (errorMessage.contains('content') || errorMessage.contains('load')) {
+      return 'content_load_error';
+    } else if (errorMessage.contains('render') || errorMessage.contains('display')) {
+      return 'render_error';
+    } else if (errorMessage.contains('firestore') || errorMessage.contains('firebase')) {
+      return 'database_error';
+    } else {
+      return 'unknown_error';
+    }
   }
 
   // Topic-based gradient selection
@@ -547,7 +651,11 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () => Navigator.pop(context),
+          onTap: () {
+            // Track content completion
+            _trackContentCompleted();
+            Navigator.pop(context);
+          },
           borderRadius: BorderRadius.circular(30),
           child: Center(
             child: Text(
@@ -575,7 +683,11 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
         foregroundColor: Colors.black,
         leading: IconButton(
           icon: Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            // Track content completion (same as "Back to Theory" button)
+            _trackContentCompleted();
+            Navigator.pop(context);
+          },
         ),
         actions: [
           IconButton(
@@ -626,6 +738,10 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
                       return _buildEnhancedContent();
                     } catch (e) {
                       print('Error rendering topic content: $e');
+                      // Track content view failure
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        _trackContentViewFailed(e);
+                      });
                       return _buildErrorState(e);
                     }
                   },

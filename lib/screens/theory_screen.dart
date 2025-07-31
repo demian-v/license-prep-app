@@ -6,6 +6,7 @@ import '../providers/content_provider.dart';
 import '../providers/progress_provider.dart';
 import '../providers/state_provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/analytics_service.dart';
 import '../widgets/module_card.dart';
 import 'theory_module_screen.dart';
 import 'traffic_rule_content_screen.dart';
@@ -16,9 +17,16 @@ class TheoryScreen extends StatefulWidget {
 }
 
 class _TheoryScreenState extends State<TheoryScreen> {
+  // Analytics tracking variables
+  DateTime? _screenLoadTime;
+  bool _hasTrackedListViewed = false;
+  bool _hasTrackedEmptyState = false;
+  
   @override
   void initState() {
     super.initState();
+    _screenLoadTime = DateTime.now();
+    
     // Fetch modules when screen initializes
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeContent();
@@ -67,6 +75,59 @@ class _TheoryScreenState extends State<TheoryScreen> {
     } catch (e) {
       print('TheoryScreen: Error initializing content: $e');
     }
+  }
+
+  // Analytics tracking methods
+  void _trackModuleListViewed(List<TheoryModule> modules) {
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final stateProvider = Provider.of<StateProvider>(context, listen: false);
+    
+    final userState = authProvider.user?.state ?? stateProvider.selectedStateId;
+    
+    analyticsService.logTheoryModuleListViewed(
+      moduleCount: modules.length,
+      state: userState,
+      language: languageProvider.language,
+      licenseType: 'driver', // Default license type
+    );
+    
+    debugPrint('📊 Analytics: theory_module_list_viewed logged (modules: ${modules.length}, state: $userState, language: ${languageProvider.language})');
+  }
+
+  void _trackModuleListEmpty(ContentProvider contentProvider) {
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    
+    analyticsService.logTheoryModuleListEmpty(
+      emptyReason: contentProvider.contentNotFoundReason ?? 'unknown',
+      requestedState: contentProvider.requestedState,
+      requestedLanguage: contentProvider.requestedLanguage,
+      requestedLicenseType: 'driver', // Default license type
+    );
+    
+    debugPrint('📊 Analytics: theory_module_list_empty logged (reason: ${contentProvider.contentNotFoundReason}, state: ${contentProvider.requestedState}, language: ${contentProvider.requestedLanguage})');
+  }
+
+  void _trackModuleSelected(TheoryModule module) {
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final stateProvider = Provider.of<StateProvider>(context, listen: false);
+    
+    final userState = authProvider.user?.state ?? stateProvider.selectedStateId;
+    final timeOnList = _screenLoadTime != null 
+        ? DateTime.now().difference(_screenLoadTime!).inSeconds 
+        : null;
+    
+    analyticsService.logTheoryModuleSelected(
+      moduleId: module.id,
+      moduleTitle: module.title,
+      timeOnListSeconds: timeOnList,
+      state: userState,
+      language: languageProvider.language,
+      licenseType: 'driver', // Default license type
+    );
+    
+    debugPrint('📊 Analytics: theory_module_selected logged (module: ${module.title}, time_on_list: ${timeOnList}s)');
   }
 
   @override
@@ -139,7 +200,22 @@ class _TheoryScreenState extends State<TheoryScreen> {
           // Enhanced empty state detection - check both empty modules AND tracking data
           final shouldShowEmptyState = modules.isEmpty || !contentProvider.hasRequestedContent;
           
+          // Analytics tracking for successful module list view
+          if (!shouldShowEmptyState && modules.isNotEmpty && !_hasTrackedListViewed) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _trackModuleListViewed(modules);
+            });
+            _hasTrackedListViewed = true;
+          }
+          
           if (shouldShowEmptyState) {
+            // Analytics tracking for empty state (only track once)
+            if (!_hasTrackedEmptyState) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _trackModuleListEmpty(contentProvider);
+              });
+              _hasTrackedEmptyState = true;
+            }
             return Consumer<StateProvider>(
               builder: (context, stateProvider, _) {
                 // Generate dynamic empty state message based on what was missing
@@ -247,6 +323,9 @@ class _TheoryScreenState extends State<TheoryScreen> {
                   module: module,
                   isCompleted: isCompleted,
                   onSelect: () async {
+                    // Track module selection
+                    _trackModuleSelected(module);
+                    
                     final contentProvider = Provider.of<ContentProvider>(context, listen: false);
                     
                     // Get the topics list from the module
