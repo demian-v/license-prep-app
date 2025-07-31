@@ -488,12 +488,14 @@ class AnalyticsService {
     String? requestedState,
     String? requestedLanguage,
     String? requestedLicenseType,
+    int? loadingTimeMs,
   }) async {
     await logEvent('theory_module_list_empty', {
       'empty_reason': emptyReason ?? 'unknown',
       if (requestedState != null) 'requested_state': requestedState,
       if (requestedLanguage != null) 'requested_language': requestedLanguage,
       if (requestedLicenseType != null) 'requested_license_type': requestedLicenseType,
+      if (loadingTimeMs != null && emptyReason == 'loading') 'loading_duration_ms': loadingTimeMs,
       'timestamp': DateTime.now().millisecondsSinceEpoch,
     });
   }

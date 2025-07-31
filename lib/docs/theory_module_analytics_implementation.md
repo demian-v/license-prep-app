@@ -20,12 +20,13 @@ This document describes the complete analytics implementation for theory module 
 
 #### `theory_module_list_empty`
 **Trigger**: When TheoryScreen shows empty state (no modules found)
-**Purpose**: Track empty states for content optimization
+**Purpose**: Track empty states for content optimization with loading context
 **Parameters**:
-- `empty_reason` (string) - Reason for empty state ('language', 'state', 'language_and_state', 'unknown')
+- `empty_reason` (string) - Reason for empty state ('loading', 'language', 'state', 'language_and_state', 'no_content', 'unknown')
 - `requested_state` (string) - State that was requested
 - `requested_language` (string) - Language that was requested  
 - `requested_license_type` (string) - License type that was requested
+- `loading_duration_ms` (int) - Loading time in milliseconds (only for 'loading' events)
 - `timestamp` (int) - Event timestamp
 
 #### `theory_module_selected`

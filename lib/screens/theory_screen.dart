@@ -19,6 +19,7 @@ class TheoryScreen extends StatefulWidget {
 class _TheoryScreenState extends State<TheoryScreen> {
   // Analytics tracking variables
   DateTime? _screenLoadTime;
+  DateTime? _loadingStartTime;
   bool _hasTrackedListViewed = false;
   bool _hasTrackedEmptyState = false;
   
@@ -95,17 +96,25 @@ class _TheoryScreenState extends State<TheoryScreen> {
     debugPrint('📊 Analytics: theory_module_list_viewed logged (modules: ${modules.length}, state: $userState, language: ${languageProvider.language})');
   }
 
-  void _trackModuleListEmpty(ContentProvider contentProvider) {
+  void _trackModuleListEmpty(ContentProvider contentProvider, {String? overrideReason}) {
     final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final reason = overrideReason ?? contentProvider.contentNotFoundReason ?? 'unknown';
+    
+    // Calculate loading time if this is a loading event
+    int? loadingTimeMs;
+    if (reason == 'loading' && _loadingStartTime != null) {
+      loadingTimeMs = DateTime.now().difference(_loadingStartTime!).inMilliseconds;
+    }
     
     analyticsService.logTheoryModuleListEmpty(
-      emptyReason: contentProvider.contentNotFoundReason ?? 'unknown',
+      emptyReason: reason,
       requestedState: contentProvider.requestedState,
       requestedLanguage: contentProvider.requestedLanguage,
       requestedLicenseType: 'driver', // Default license type
+      loadingTimeMs: loadingTimeMs,
     );
     
-    debugPrint('📊 Analytics: theory_module_list_empty logged (reason: ${contentProvider.contentNotFoundReason}, state: ${contentProvider.requestedState}, language: ${contentProvider.requestedLanguage})');
+    debugPrint('📊 Analytics: theory_module_list_empty logged (reason: $reason, state: ${contentProvider.requestedState}, language: ${contentProvider.requestedLanguage}${loadingTimeMs != null ? ', loading_time: ${loadingTimeMs}ms' : ''})');
   }
 
   void _trackModuleSelected(TheoryModule module) {
@@ -212,7 +221,24 @@ class _TheoryScreenState extends State<TheoryScreen> {
             // Analytics tracking for empty state (only track once)
             if (!_hasTrackedEmptyState) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
-                _trackModuleListEmpty(contentProvider);
+                // Determine if this is loading vs truly empty
+                final isCurrentlyLoading = contentProvider.isLoading;
+                final wasLoading = _loadingStartTime != null;
+                
+                // Set loading start time if this is first empty state during loading
+                if (isCurrentlyLoading && _loadingStartTime == null) {
+                  _loadingStartTime = DateTime.now();
+                }
+                
+                // Determine the empty reason
+                String emptyReason;
+                if (isCurrentlyLoading || (!isCurrentlyLoading && wasLoading && modules.isEmpty)) {
+                  emptyReason = 'loading';
+                } else {
+                  emptyReason = contentProvider.contentNotFoundReason ?? 'no_content';
+                }
+                
+                _trackModuleListEmpty(contentProvider, overrideReason: emptyReason);
               });
               _hasTrackedEmptyState = true;
             }
