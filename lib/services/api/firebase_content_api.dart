@@ -93,13 +93,10 @@ class FirebaseContentApi implements ContentApiInterface {
         );
         
         // Enhanced debug output
-        print('📋 Raw Firebase Function Response:');
-        print('   - Response type: ${response.runtimeType}');
-        print('   - Response length: ${response?.length ?? 0}');
-        
         if (response != null && response.isNotEmpty) {
-          // Log each topic ID before filtering
-          print('📝 Topics received from Firebase Function:');
+          print('📋 Firebase Function returned ${response.length} topics');
+          
+          // Process response directly without filtering (Firebase Function already filtered the data)
           for (int i = 0; i < response.length; i++) {
             try {
               final item = response[i];
@@ -107,69 +104,7 @@ class FirebaseContentApi implements ContentApiInterface {
               final Map<String, dynamic> data = Map<String, dynamic>.from(rawData.map(
                 (key, value) => MapEntry(key.toString(), value),
               ));
-              print('   ${i + 1}. ${data['id']} - ${data['title']} (lang: ${data['language']}, state: ${data['state']})');
-            } catch (e) {
-              print('   ${i + 1}. ❌ Error reading topic: $e');
-            }
-          }
-          
-          // Enhanced filtering with detailed logging
-          print('🔍 Starting filtering process for language: $language');
-          final List<Map<String, dynamic>> filteredResponse = [];
-          
-          for (int i = 0; i < response.length; i++) {
-            try {
-              final item = response[i];
-              final Map<dynamic, dynamic> rawData = item as Map<dynamic, dynamic>;
-              final Map<String, dynamic> data = Map<String, dynamic>.from(rawData.map(
-                (key, value) => MapEntry(key.toString(), value),
-              ));
-              
               final topicId = data['id']?.toString() ?? 'unknown';
-              final topicLanguage = data['language']?.toString() ?? '';
-              final topicState = data['state']?.toString() ?? '';
-              
-              print('   🔍 Checking topic $topicId:');
-              print('     - Topic language: "$topicLanguage" vs Required: "$language"');
-              print('     - Topic state: "$topicState"');
-              
-              // First, ensure the topic matches the user's language
-              final languageMatches = (topicLanguage == language);
-              
-              if (!languageMatches) {
-                print('     ❌ FILTERED OUT: Language mismatch');
-                continue;
-              }
-              
-              // Simplified state logic - let's be more permissive
-              bool stateMatches = true;
-              
-              // Only filter out if there's a clear state mismatch
-              if (topicState.isNotEmpty && stateValue != 'ALL' && topicState != 'ALL' && topicState != stateValue) {
-                stateMatches = false;
-              }
-              
-              if (!stateMatches) {
-                print('     ❌ FILTERED OUT: State mismatch');
-                continue;
-              }
-              
-              print('     ✅ PASSED FILTERING');
-              filteredResponse.add(data);
-            } catch (e) {
-              print('     ❌ Error filtering topic ${i + 1}: $e');
-            }
-          }
-          
-          print('✅ After filtering: ${filteredResponse.length} topics remain');
-          
-          // Enhanced processing with better error handling
-          for (int i = 0; i < filteredResponse.length; i++) {
-            try {
-              final data = filteredResponse[i];
-              final topicId = data['id']?.toString() ?? 'unknown';
-              
-              print('🔨 Processing topic $topicId:');
               
               // Safe extraction of questionIds
               List<String> questionIds = [];
@@ -193,10 +128,6 @@ class FirebaseContentApi implements ContentApiInterface {
                   double.tryParse(data['progress'].toString()) ?? 0.0) : 
                 0.0;
               
-              print('   - Title: $title');
-              print('   - Question Count: $questionCount');
-              print('   - Question IDs: ${questionIds.length} items');
-              
               final topic = QuizTopic(
                 id: topicId,
                 title: title,
@@ -206,16 +137,14 @@ class FirebaseContentApi implements ContentApiInterface {
               );
               
               processedTopics.add(topic);
-              print('   ✅ Successfully processed topic $topicId');
               
             } catch (e) {
-              print('   ❌ Error processing topic ${i + 1}: $e');
-              print('   Raw data: ${filteredResponse[i]}');
-              // Continue processing other topics instead of filtering out
+              print('❌ Error processing topic ${i + 1}: $e');
+              // Continue processing other topics
             }
           }
           
-          print('📊 Firebase Functions result: ${processedTopics.length} topics processed');
+          print('✅ Successfully processed ${processedTopics.length} topics from Firebase Functions');
         } else {
           print('❌ Firebase Functions returned empty response');
         }
