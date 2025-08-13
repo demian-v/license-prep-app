@@ -6,13 +6,54 @@ import '../providers/exam_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/progress_provider.dart';
 import '../providers/practice_provider.dart';
+import '../providers/state_provider.dart';
+import '../services/service_locator.dart';
 import 'topic_quiz_screen.dart';
 import 'saved_items_screen.dart';
 import 'exam_question_screen.dart';
 import 'practice_question_screen.dart';
 import '../localization/app_localizations.dart';
 
-class TestScreen extends StatelessWidget {
+class TestScreen extends StatefulWidget {
+  @override
+  _TestScreenState createState() => _TestScreenState();
+}
+
+class _TestScreenState extends State<TestScreen> {
+  
+  @override
+  void initState() {
+    super.initState();
+    // Pre-load quiz data after the first frame is rendered
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _preloadQuizData();
+    });
+  }
+  
+  /// Pre-fetches all quiz questions for the user's current state and language
+  /// This runs silently in the background when the Tests screen loads
+  Future<void> _preloadQuizData() async {
+    try {
+      // Get user's current state
+      final stateProvider = Provider.of<StateProvider>(context, listen: false);
+      final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+      
+      // Ensure selectedState is cast to String properly
+      final userState = stateProvider.selectedState?.toString() ?? 'IL';
+      final userLanguage = languageProvider.language;
+      
+      print('🔍 [TEST SCREEN] Pre-loading quiz data for state: $userState, language: $userLanguage');
+      
+      // Call the new preload method in Firebase Content API
+      await serviceLocator.content.preloadAllQuizQuestions(userState, userLanguage);
+      
+      print('✅ [TEST SCREEN] Quiz data pre-loading completed');
+    } catch (e) {
+      print('⚠️ [TEST SCREEN] Error pre-loading quiz data: $e');
+      // Silent failure - user can still use the app with regular fetching
+    }
+  }
+  
   // Helper method to get correct translations
   String _translate(String key, LanguageProvider languageProvider) {
     // Create a direct translation based on the selected language

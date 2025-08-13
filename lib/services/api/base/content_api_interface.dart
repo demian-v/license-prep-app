@@ -35,4 +35,8 @@ abstract class ContentApiInterface {
   /// Get a specific traffic rule topic by ID
   /// This method is only used by the FirebaseContentApi implementation
   Future<TrafficRuleTopic?> getTrafficRuleTopic(String topicId);
+  
+  /// Preload all quiz questions for a given state and language into cache
+  /// This method fetches ALL questions and caches them for quick access
+  Future<void> preloadAllQuizQuestions(String state, String language);
 }

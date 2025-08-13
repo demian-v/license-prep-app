@@ -5,6 +5,7 @@ import '../../models/quiz_question.dart';
 import '../../models/theory_module.dart';
 import '../../models/practice_test.dart';
 import '../../models/traffic_rule_topic.dart';
+import '../service_locator.dart';
 import 'firebase_functions_client.dart';
 import 'base/content_api_interface.dart';
 
@@ -76,6 +77,21 @@ class FirebaseContentApi implements ContentApiInterface {
       } catch (e) {
         print('❌ Error checking user state for topics: $e');
       }
+      
+      // 🔍 STEP 1: Check cache first
+      print('💾 [CACHE CHECK] Checking for cached quiz topics...');
+      final cachedTopics = await serviceLocator.quizCache.getCachedQuizTopics(stateValue, language);
+      
+      if (cachedTopics != null && cachedTopics.isNotEmpty) {
+        print('💾 [CACHE HIT] Using ${cachedTopics.length} cached quiz topics');
+        print('🎉 Returning cached topics:');
+        for (int i = 0; i < cachedTopics.length; i++) {
+          print('   ${i + 1}. ${cachedTopics[i].id} - ${cachedTopics[i].title}');
+        }
+        return cachedTopics;
+      }
+      
+      print('📭 [CACHE MISS] No cached topics found, fetching from Firebase...');
       
       // First attempt: Try Firebase Functions
       List<QuizTopic> processedTopics = [];
@@ -260,6 +276,13 @@ class FirebaseContentApi implements ContentApiInterface {
         print('   ${i + 1}. ${processedTopics[i].id} - ${processedTopics[i].title}');
       }
       
+      // 💾 STEP 3: Cache the results if we got any topics
+      if (processedTopics.isNotEmpty) {
+        print('💾 [CACHE SAVE] Caching ${processedTopics.length} topics for future use...');
+        await serviceLocator.quizCache.cacheQuizTopics(processedTopics, stateValue, language);
+        print('✅ [CACHE SAVE] Topics successfully cached');
+      }
+      
       return processedTopics;
     } catch (e) {
       print('💥 Critical error fetching quiz topics: $e');
@@ -307,6 +330,49 @@ class FirebaseContentApi implements ContentApiInterface {
         print('❌ Error checking user state for questions: $e');
       }
       
+      // 🔍 STEP 1: Check cache first for questions of this topic
+      print('💾 [CACHE CHECK] Checking for cached questions for topic: $topicId');
+      final cachedQuestions = await serviceLocator.quizCache.getCachedPracticeQuestions(stateValue, language);
+      
+      if (cachedQuestions != null && cachedQuestions.isNotEmpty) {
+        print('🔍 [DEBUG] Analyzing cached questions for topic matching...');
+        print('🔍 [DEBUG] Target topicId: "$topicId"');
+        print('🔍 [DEBUG] Total cached questions: ${cachedQuestions.length}');
+        
+        // Show all matching questions for the selected topic
+        print('🔍 [DEBUG] Sample of cached questions (prioritized by relevance):');
+
+        // Get ALL matching questions (no limit)
+        final matchingQuestions = cachedQuestions.where((q) => q.topicId == topicId).toList();
+
+        if (matchingQuestions.isEmpty) {
+          print('🔍 [DEBUG] ⚠️ No matching questions found for "$topicId"');
+        } else {
+          // Display all matching questions
+          for (int i = 0; i < matchingQuestions.length; i++) {
+            final q = matchingQuestions[i];
+            print('   ${i+1}. ${q.id} -> topicId: "${q.topicId}" ✅ MATCH');
+          }
+        }
+        
+        // Get unique topicIds from cache for analysis
+        final uniqueTopicIds = cachedQuestions.map((q) => q.topicId).toSet().toList();
+        print('🔍 [DEBUG] Unique topicIds in cache: ${uniqueTopicIds.join(", ")}');
+        
+        // Filter cached questions by topicId
+        final topicQuestions = cachedQuestions.where((q) => q.topicId == topicId).toList();
+        print('🔍 [DEBUG] Found ${topicQuestions.length} matching questions for topicId "$topicId"');
+        
+        if (topicQuestions.isNotEmpty) {
+          print('💾 [CACHE HIT] Found ${topicQuestions.length} cached questions for topic $topicId');
+          print('🎯 [CACHE HIT] Returning cached questions: ${topicQuestions.map((q) => q.id).take(5).join(", ")}${topicQuestions.length > 5 ? "..." : ""}');
+          return topicQuestions;
+        }
+        print('📭 [CACHE PARTIAL] Cache exists but no questions match topicId "$topicId"');
+        print('📭 [CACHE ANALYSIS] This suggests a topicId format mismatch or missing data');
+      }
+      
+      print('📭 [CACHE MISS] No cached questions for topic, fetching from Firebase...');
       print('🎯 Fetching quiz questions with: topicId=$topicId, language=$language, state=$stateValue');
       
       // First attempt: Try Firebase Functions (PRIMARY METHOD)
@@ -1030,6 +1096,202 @@ class FirebaseContentApi implements ContentApiInterface {
     }
   }
   
+  /// Preload all quiz questions for a given state and language into cache
+  /// This method fetches ALL questions and caches them for quick access
+  Future<void> preloadAllQuizQuestions(String state, String language) async {
+    try {
+      print('🔍 [PRELOAD] Checking cache status for quiz questions...');
+      
+      // Check if questions are already cached
+      final cachedQuestions = await serviceLocator.quizCache.getCachedPracticeQuestions(state, language);
+      if (cachedQuestions != null && cachedQuestions.isNotEmpty) {
+        print('💾 [PRELOAD] Cache already contains ${cachedQuestions.length} questions - skipping preload');
+        return;
+      }
+      
+      print('📭 [PRELOAD] Cache empty - fetching all quiz questions for state=$state, language=$language');
+      
+      // Ensure language code is correct (use 'uk' for Ukrainian)
+      if (language == 'ua') {
+        language = 'uk';
+        print('🔧 [PRELOAD] Corrected language code from ua to uk');
+      }
+      
+      // Get user's state from Firestore for consistency
+      var stateValue = state;
+      try {
+        final currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
+          if (userDoc.exists) {
+            final userData = userDoc.data() as Map<String, dynamic>;
+            final userState = userData['state'] as String?;
+            
+            if (userState != null && userState.isNotEmpty) {
+              print('⚠️ [PRELOAD] Using Firestore user state: "$userState" instead of "$stateValue"');
+              stateValue = userState;
+            }
+          }
+        }
+      } catch (e) {
+        print('❌ [PRELOAD] Error checking user state: $e');
+      }
+      
+      // First attempt: Try Firebase Functions to get ALL questions
+      List<QuizQuestion> allQuestions = [];
+      
+      try {
+        print('📞 [PRELOAD] Attempting Firebase Functions: getPracticeQuestions (fetching ALL)');
+        
+        // Request a large number to get all available questions
+        final response = await _functionsClient.callFunction<List<dynamic>>(
+          'getPracticeQuestions',
+          data: {
+            'language': language,
+            'state': stateValue,
+            'count': 500, // Request more than we'll ever have
+          },
+        );
+        
+        if (response != null && response.isNotEmpty) {
+          print('📋 [PRELOAD] Firebase Functions returned ${response.length} questions');
+          
+          for (int i = 0; i < response.length; i++) {
+            try {
+              final item = response[i];
+              final Map<dynamic, dynamic> rawData = item as Map<dynamic, dynamic>;
+              final Map<String, dynamic> data = Map<String, dynamic>.from(rawData.map(
+                (key, value) => MapEntry(key.toString(), value),
+              ));
+              
+              // Safe extraction of options
+              List<String> options = [];
+              if (data['options'] != null && data['options'] is List) {
+                options = (data['options'] as List)
+                    .map((item) => item?.toString() ?? "")
+                    .where((item) => item.isNotEmpty)
+                    .toList();
+              }
+              
+              // Extract correct answer
+              dynamic correctAnswer;
+              if (data['correctAnswers'] != null && data['correctAnswers'] is List) {
+                correctAnswer = (data['correctAnswers'] as List)
+                    .map((item) => item.toString())
+                    .toList();
+              } else if (data['correctAnswer'] != null) {
+                correctAnswer = data['correctAnswer'].toString();
+              } else if (data['correctAnswerString'] != null) {
+                String answerStr = data['correctAnswerString'].toString();
+                if (data['type']?.toString()?.toLowerCase() == 'multiplechoice') {
+                  correctAnswer = answerStr.split(', ').map((s) => s.trim()).toList();
+                } else {
+                  correctAnswer = answerStr;
+                }
+              }
+              
+              final question = QuizQuestion(
+                id: data['id'] ?? 'unknown',
+                topicId: data['topicId'] ?? '',
+                questionText: data['questionText'] ?? 'No question text',
+                options: options,
+                correctAnswer: correctAnswer,
+                explanation: data['explanation']?.toString(),
+                ruleReference: data['ruleReference']?.toString(),
+                imagePath: data['imagePath']?.toString(),
+                type: _parseQuestionType(data['type'] ?? 'singleChoice'),
+              );
+              
+              allQuestions.add(question);
+            } catch (e) {
+              print('❌ [PRELOAD] Error processing question ${i + 1}: $e');
+            }
+          }
+        }
+      } catch (e) {
+        print('❌ [PRELOAD] Firebase Functions error: $e');
+      }
+      
+      // Fallback: Direct Firestore query if Firebase Functions failed
+      if (allQuestions.isEmpty) {
+        print('🚨 [PRELOAD] Firebase Functions failed, trying direct Firestore query...');
+        
+        try {
+          final querySnapshot = await _firestore
+              .collection('quizQuestions')
+              .where('language', isEqualTo: language)
+              .where('state', whereIn: [stateValue, 'ALL'])
+              .get();
+          
+          print('📋 [PRELOAD] Direct Firestore found ${querySnapshot.docs.length} questions');
+          
+          for (var doc in querySnapshot.docs) {
+            try {
+              final data = doc.data() as Map<String, dynamic>;
+              
+              // Safe extraction of options
+              List<String> options = [];
+              if (data['options'] != null && data['options'] is List) {
+                options = (data['options'] as List)
+                    .map((item) => item?.toString() ?? "")
+                    .where((item) => item.isNotEmpty)
+                    .toList();
+              }
+              
+              // Extract correct answer
+              dynamic correctAnswer;
+              if (data['correctAnswers'] != null && data['correctAnswers'] is List) {
+                correctAnswer = (data['correctAnswers'] as List)
+                    .map((item) => item.toString())
+                    .toList();
+              } else if (data['correctAnswer'] != null) {
+                correctAnswer = data['correctAnswer'].toString();
+              } else if (data['correctAnswerString'] != null) {
+                String answerStr = data['correctAnswerString'].toString();
+                if (data['type']?.toString()?.toLowerCase() == 'multiplechoice') {
+                  correctAnswer = answerStr.split(', ').map((s) => s.trim()).toList();
+                } else {
+                  correctAnswer = answerStr;
+                }
+              }
+              
+              final question = QuizQuestion(
+                id: data['id'] ?? doc.id,
+                topicId: data['topicId'] ?? '',
+                questionText: data['questionText'] ?? 'No question text',
+                options: options,
+                correctAnswer: correctAnswer,
+                explanation: data['explanation']?.toString(),
+                ruleReference: data['ruleReference']?.toString(),
+                imagePath: data['imagePath']?.toString(),
+                type: _parseQuestionType(data['type'] ?? 'singleChoice'),
+              );
+              
+              allQuestions.add(question);
+            } catch (e) {
+              print('❌ [PRELOAD] Error processing Firestore question: $e');
+            }
+          }
+        } catch (e) {
+          print('❌ [PRELOAD] Direct Firestore error: $e');
+        }
+      }
+      
+      // Cache the results if we got any questions
+      if (allQuestions.isNotEmpty) {
+        print('💾 [PRELOAD] Caching ${allQuestions.length} questions for future use...');
+        await serviceLocator.quizCache.cachePracticeQuestions(allQuestions, stateValue, language);
+        print('✅ [PRELOAD] Successfully pre-loaded and cached ${allQuestions.length} quiz questions');
+      } else {
+        print('⚠️ [PRELOAD] No questions found to cache');
+      }
+      
+    } catch (e) {
+      print('💥 [PRELOAD] Critical error during preload: $e');
+      // Silent failure - app continues to work with regular fetching
+    }
+  }
+  
   /// Get practice questions for random practice tests
   @override
   Future<List<QuizQuestion>> getPracticeQuestions({
@@ -1064,6 +1326,20 @@ class FirebaseContentApi implements ContentApiInterface {
         print('❌ Error checking user state for practice questions: $e');
       }
       
+      // 🔍 STEP 1: Check cache first
+      print('💾 [CACHE CHECK] Checking for cached practice questions...');
+      final cachedQuestions = await serviceLocator.quizCache.getCachedPracticeQuestions(stateValue, language);
+      
+      if (cachedQuestions != null && cachedQuestions.isNotEmpty) {
+        print('💾 [CACHE HIT] Using ${cachedQuestions.length} cached questions');
+        // Shuffle and return requested count
+        final shuffled = List<QuizQuestion>.from(cachedQuestions)..shuffle();
+        final selectedQuestions = shuffled.take(count).toList();
+        print('🎯 Selected ${selectedQuestions.length} random questions from cache for practice/exam');
+        return selectedQuestions;
+      }
+      
+      print('📭 [CACHE MISS] No cached questions found, fetching from Firebase...');
       print('🎯 Fetching practice questions with Firebase Functions: language=$language, state=$stateValue, count=$count');
       
       final response = await _functionsClient.callFunction<List<dynamic>>(

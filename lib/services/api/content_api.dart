@@ -269,6 +269,17 @@ class ContentApi implements ContentApiInterface {
     }
   }
   
+  // Preload all quiz questions (not supported in REST API implementation)
+  @override
+  Future<void> preloadAllQuizQuestions(String state, String language) async {
+    // This is a no-op for the REST API implementation
+    // Pre-loading is only implemented for Firebase Content API which has direct cache access
+    print('⚠️ [REST API] Pre-loading not supported in REST API implementation');
+    // The REST API doesn't have direct access to the cache service
+    // Normal API calls will be made when needed
+    return;
+  }
+  
   // Practice Tests
   @override
   Future<List<PracticeTest>> getPracticeTests(String licenseType, String language, String state) async {
