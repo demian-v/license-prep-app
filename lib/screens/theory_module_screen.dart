@@ -136,9 +136,11 @@ class _TheoryModuleScreenState extends State<TheoryModuleScreen> {
     print('Loaded ${_moduleTopics.length} topics for module ${widget.module.id}');
     
     // 🚀 AUTO-NAVIGATE: If there's only 1 topic, go directly to content
+    // (This should now be rare since TheoryScreen handles it directly)
     if (_moduleTopics.length == 1 && mounted) {
       print('📍 Auto-navigating to single topic: ${_moduleTopics[0].title}');
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Use immediate navigation without post-frame callback to reduce flash
+      Future.microtask(() {
         if (mounted) {
           Navigator.pushReplacement(
             context,

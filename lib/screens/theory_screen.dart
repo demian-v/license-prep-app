@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/theory_module.dart';
+import '../models/traffic_rule_topic.dart';
 import '../providers/language_provider.dart';
 import '../providers/content_provider.dart';
 import '../providers/progress_provider.dart';
@@ -354,28 +355,71 @@ class _TheoryScreenState extends State<TheoryScreen> {
                     
                     final contentProvider = Provider.of<ContentProvider>(context, listen: false);
                     
-                    // Get the topics list from the module
-                    final topicsList = module.getTopicsList();
+                    // ENHANCED: Multiple strategies for single-topic detection
+                    bool isSingleTopicModule = false;
+                    String? singleTopicId;
                     
-                    // If there's only one topic, navigate directly to content
+                    // Strategy 1: Check module topics list
+                    final topicsList = module.getTopicsList();
                     if (topicsList.length == 1) {
-                      final topicId = topicsList[0];
-                      final topic = await contentProvider.getTopicById(topicId);
-                      
-                      if (topic != null) {
-                        // Navigate directly to content screen for single topic
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => TrafficRuleContentScreen(topic: topic),
-                          ),
-                        );
-                        return;
+                      isSingleTopicModule = true;
+                      singleTopicId = topicsList[0];
+                      print('🎯 Single topic detected via topics list: $singleTopicId');
+                    }
+                    
+                    // Strategy 2: Extract from module ID pattern (traffic_rules_uk_IL_01 → topic "1")
+                    if (!isSingleTopicModule) {
+                      final moduleIdParts = module.id.split('_');
+                      if (moduleIdParts.length >= 4) {
+                        final moduleNumber = moduleIdParts.last;
+                        singleTopicId = moduleNumber.replaceAll(RegExp(r'^0+'), ''); // 01 → 1
+                        isSingleTopicModule = true;
+                        print('🎯 Single topic detected via ID pattern: ${module.id} → topic $singleTopicId');
                       }
                     }
                     
-                    // For modules with multiple topics, navigate directly to the module screen
-                    // This will show the numbered topics list
+                    // DIRECT NAVIGATION for single-topic modules
+                    if (isSingleTopicModule && singleTopicId != null) {
+                      print('🚀 Attempting direct navigation to topic $singleTopicId');
+                      
+                      // Find the topic efficiently
+                      TrafficRuleTopic? topic;
+                      
+                      // First try in-memory lookup from cached topics
+                      final allTopics = contentProvider.topics;
+                      try {
+                        topic = allTopics.firstWhere(
+                          (t) => t.id == singleTopicId && 
+                                 (t.state == module.state || t.state == 'ALL') && 
+                                 t.language == module.language,
+                        );
+                        print('✅ Found topic in memory: ${topic.id} - ${topic.title}');
+                      } catch (e) {
+                        print('⏳ Topic not in memory, fetching from database...');
+                        // Fallback: fetch from database
+                        topic = await contentProvider.getTopicById(singleTopicId);
+                        if (topic != null) {
+                          print('✅ Successfully fetched topic: ${topic.id} - ${topic.title}');
+                        } else {
+                          print('❌ Failed to fetch topic: $singleTopicId');
+                        }
+                      }
+                      
+                      if (topic != null) {
+                        // 🚀 DIRECT NAVIGATION - Skip TheoryModuleScreen entirely!
+                        print('🎉 Navigating directly to content, skipping intermediate screen');
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => TrafficRuleContentScreen(topic: topic!),
+                          ),
+                        );
+                        return; // IMPORTANT: Exit early to prevent TheoryModuleScreen navigation
+                      }
+                    }
+                    
+                    // FALLBACK: Navigate to TheoryModuleScreen for multi-topic modules or if direct navigation failed
+                    print('📋 Navigating to TheoryModuleScreen (multi-topic or fallback)');
                     Navigator.push(
                       context,
                       MaterialPageRoute(
