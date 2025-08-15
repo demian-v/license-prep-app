@@ -27,6 +27,36 @@ class FirebaseContentApi implements ContentApiInterface {
   
   FirebaseContentApi(this._functionsClient);
   
+  /// Helper method to convert Firebase Functions data to Firestore-compatible format
+  /// This allows us to reuse the working Firestore processing logic
+  Map<String, dynamic> _convertFirebaseFunctionData(Map<dynamic, dynamic> rawData) {
+    final Map<String, dynamic> convertedData = {};
+    
+    rawData.forEach((key, value) {
+      final String stringKey = key.toString();
+      
+      if (value == null) {
+        convertedData[stringKey] = null;
+      } else if (value is Map) {
+        // Recursively convert nested maps (like sections)
+        convertedData[stringKey] = _convertFirebaseFunctionData(Map<dynamic, dynamic>.from(value));
+      } else if (value is List) {
+        // Convert lists that may contain maps (like sections array)
+        convertedData[stringKey] = value.map((item) {
+          if (item is Map) {
+            return _convertFirebaseFunctionData(Map<dynamic, dynamic>.from(item));
+          }
+          return item;
+        }).toList();
+      } else {
+        // Keep primitive types as-is
+        convertedData[stringKey] = value;
+      }
+    });
+    
+    return convertedData;
+  }
+  
   /// Helper method to extract order from topic ID for sorting
   int _extractOrderFromId(String id) {
     // Extract numeric part from IDs like "q_topic_il_ua_01" -> 1
@@ -751,19 +781,20 @@ class FirebaseContentApi implements ContentApiInterface {
             }
           }
           
-          // Enhanced processing with better error handling
+          // Enhanced processing using the reusable converter (same logic as Firestore)
           for (int i = 0; i < response.length; i++) {
             try {
               final item = response[i];
               final Map<dynamic, dynamic> rawData = item as Map<dynamic, dynamic>;
-              final Map<String, dynamic> data = Map<String, dynamic>.from(rawData.map(
-                (key, value) => MapEntry(key.toString(), value),
-              ));
+              
+              // Use the new recursive converter to make Firebase Functions data compatible
+              final Map<String, dynamic> data = _convertFirebaseFunctionData(rawData);
               
               final topicId = data['id']?.toString() ?? 'unknown';
               
               print('🔨 Processing topic $topicId:');
               
+              // Now we can reuse the exact same working logic as Firestore! ✅
               final topic = TrafficRuleTopic.fromFirestore(data, topicId);
               processedTopics.add(topic);
               print('   ✅ Successfully processed topic $topicId');

@@ -55,29 +55,59 @@ class _TheoryModuleScreenState extends State<TheoryModuleScreen> {
     // Filter topics based on the topics listed in the module
     final filteredTopics = <TrafficRuleTopic>[];
     
-    // First try to match topics from the ones already loaded in memory
-    for (var topicId in topicsList) {
-      print('Looking for topic ID: $topicId');
+    // 🔧 FIX: If module topics array is empty, match by ID pattern
+    if (topicsList.isEmpty && allTopics.isNotEmpty) {
+      print('Module topics array is empty, attempting to match by ID pattern...');
       
-      // Try multiple ways to match the topic ID
-      TrafficRuleTopic? topic;
-      try {
-        topic = allTopics.firstWhere(
-          (t) => t.id == topicId || 
-                 t.id == topicId.replaceAll('topic_', '') || 
-                 'topic_${t.id}' == topicId,
-        );
-        print('Found topic in memory: ${topic.id} - ${topic.title}');
-        filteredTopics.add(topic);
-      } catch (e) {
-        print('Topic not found in memory, fetching from database: $topicId');
-        // If topic not found in memory, try to fetch it directly
-        final fetchedTopic = await contentProvider.getTopicById(topicId);
-        if (fetchedTopic != null) {
-          print('Successfully fetched topic: ${fetchedTopic.id} - ${fetchedTopic.title}');
-          filteredTopics.add(fetchedTopic);
-        } else {
-          print('Failed to fetch topic: $topicId');
+      // Extract number from module ID: traffic_rules_en_IL_01 → 01 → 1
+      final moduleIdParts = widget.module.id.split('_');
+      if (moduleIdParts.length >= 4) {
+        final moduleNumber = moduleIdParts.last;
+        final topicNumber = moduleNumber.replaceAll(RegExp(r'^0+'), ''); // Remove leading zeros: 01 → 1
+        
+        print('Extracted module number: $moduleNumber → topic number: $topicNumber');
+        print('Looking for topic with ID: $topicNumber, state: ${widget.module.state}, language: ${widget.module.language}');
+        
+        // Find THE matching topic with same ID, state, and language
+        try {
+          final matchingTopic = allTopics.firstWhere(
+            (t) => t.id == topicNumber && 
+                   (t.state == widget.module.state || t.state == 'ALL') && 
+                   t.language == widget.module.language,
+          );
+          
+          print('✅ Successfully matched topic: ${matchingTopic.id} - ${matchingTopic.title}');
+          filteredTopics.add(matchingTopic);
+        } catch (e) {
+          print('❌ Could not find matching topic for module ${widget.module.id}');
+          print('Available topic IDs: ${allTopics.map((t) => "${t.id}(${t.state},${t.language})").take(5).join(", ")}...');
+        }
+      }
+    } else {
+      // Original logic: First try to match topics from the ones already loaded in memory
+      for (var topicId in topicsList) {
+        print('Looking for topic ID: $topicId');
+        
+        // Try multiple ways to match the topic ID
+        TrafficRuleTopic? topic;
+        try {
+          topic = allTopics.firstWhere(
+            (t) => t.id == topicId || 
+                   t.id == topicId.replaceAll('topic_', '') || 
+                   'topic_${t.id}' == topicId,
+          );
+          print('Found topic in memory: ${topic.id} - ${topic.title}');
+          filteredTopics.add(topic);
+        } catch (e) {
+          print('Topic not found in memory, fetching from database: $topicId');
+          // If topic not found in memory, try to fetch it directly
+          final fetchedTopic = await contentProvider.getTopicById(topicId);
+          if (fetchedTopic != null) {
+            print('Successfully fetched topic: ${fetchedTopic.id} - ${fetchedTopic.title}');
+            filteredTopics.add(fetchedTopic);
+          } else {
+            print('Failed to fetch topic: $topicId');
+          }
         }
       }
     }
@@ -104,6 +134,21 @@ class _TheoryModuleScreenState extends State<TheoryModuleScreen> {
     });
     
     print('Loaded ${_moduleTopics.length} topics for module ${widget.module.id}');
+    
+    // 🚀 AUTO-NAVIGATE: If there's only 1 topic, go directly to content
+    if (_moduleTopics.length == 1 && mounted) {
+      print('📍 Auto-navigating to single topic: ${_moduleTopics[0].title}');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TrafficRuleContentScreen(topic: _moduleTopics[0]),
+            ),
+          );
+        }
+      });
+    }
   }
 
   @override

@@ -226,8 +226,10 @@ exports.getTrafficRuleTopics = functions.https.onCall(async (data, context) => {
                 id: data.id || doc.id,
                 title: data.title || 'Untitled Topic',
                 content: data.content || '',
+                sections: data.sections || [],
                 language: data.language,
                 state: data.state,
+                licenseId: data.licenseId || 'driver',
                 order: data.order || 0
             };
         });
