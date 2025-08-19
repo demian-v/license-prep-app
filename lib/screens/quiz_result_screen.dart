@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/quiz_topic.dart';
-import '../providers/progress_provider.dart';
 import '../localization/app_localizations.dart';
 
 class QuizResultScreen extends StatefulWidget {
@@ -79,21 +78,11 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
       curve: Curves.easeIn,
     ));
 
-    // Start animations with delays and update progress
-    _startAnimationsAndUpdateProgress();
+    // Start animations with delays
+    _startAnimations();
   }
 
-  void _startAnimationsAndUpdateProgress() {
-    // Calculate and update progress
-    int totalAnswered = widget.answers.length;
-    int correctAnswers = widget.answers.values.where((v) => v).length;
-    double progressPercentage = correctAnswers / widget.topic.questionCount;
-    
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
-      progressProvider.updateTopicProgress(widget.topic.id, progressPercentage);
-    });
-
+  void _startAnimations() {
     // Start animations with staggered timing
     Future.delayed(Duration(milliseconds: 100), () {
       if (mounted) _headerAnimationController.forward();

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/quiz_topic.dart';
-import '../models/quiz_progress.dart';
-import '../providers/progress_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/state_provider.dart';
 import '../services/service_locator.dart';
@@ -38,23 +36,6 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> with TickerProviderSt
     }
   }
   
-  // Helper method to get progress card title based on language
-  String _getProgressCardTitle(String language) {
-    switch (language) {
-      case 'en':
-        return 'Overall progress by topics:';
-      case 'es':
-        return 'Progreso general por temas:';
-      case 'uk':
-        return 'Загальний прогрес по темах:';
-      case 'pl':
-        return 'Ogólny postęp według tematów:';
-      case 'ru':
-        return 'Общий прогресс по темам:';
-      default:
-        return 'Overall progress by topics:';
-    }
-  }
   
   // Helper method to get questions count text based on language
   String _getQuestionsCountText(String language, int count) {
@@ -301,99 +282,6 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> with TickerProviderSt
     }
   }
 
-  // Helper method to get progress color
-  Color _getProgressColor(double progress) {
-    if (progress >= 0.8) {
-      return Colors.green;
-    } else if (progress >= 0.5) {
-      return Colors.orange;
-    } else {
-      return Colors.red;
-    }
-  }
-
-  // Enhanced progress card widget
-  Widget _buildEnhancedProgressCard(String currentLanguage, double overallProgress) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Colors.white, Colors.grey.shade50.withOpacity(0.8)],
-          stops: [0.0, 1.0],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 0,
-            blurRadius: 8,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            _getProgressCardTitle(currentLanguage),
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-            ),
-          ),
-          SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  height: 12,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(6),
-                    gradient: LinearGradient(
-                      colors: [Colors.red.shade100, Colors.red.shade50],
-                    ),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: LinearProgressIndicator(
-                      value: overallProgress,
-                      backgroundColor: Colors.transparent,
-                      valueColor: AlwaysStoppedAnimation<Color>(_getProgressColor(overallProgress)),
-                      minHeight: 12,
-                    ),
-                  ),
-                ),
-              ),
-              SizedBox(width: 16),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _getProgressColor(overallProgress).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _getProgressColor(overallProgress).withOpacity(0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Text(
-                  '${(overallProgress * 100).round()}%',
-                  style: TextStyle(
-                    color: _getProgressColor(overallProgress),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
   // Section header styled exactly like "Тестування" on test screen
   Widget _buildSectionHeader(String title) {
@@ -423,7 +311,7 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> with TickerProviderSt
   }
 
   // Enhanced topic card widget - NO percentage indicators on individual cards
-  Widget _buildEnhancedTopicCard(QuizTopic topic, int index, double progress, String currentLanguage) {
+  Widget _buildEnhancedTopicCard(QuizTopic topic, int index, String currentLanguage) {
     return Container(
       margin: EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -522,16 +410,12 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> with TickerProviderSt
     
     try {
       final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
-      final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
       final stateProvider = Provider.of<StateProvider>(context, listen: false);
       
       final language = languageProvider.language;
       final state = stateProvider.selectedStateId ?? 'ALL'; // Use actual state ID from provider
       
       print('TopicQuizScreen: Loading topics with language=$language, state=$state');
-      
-      // Get license type 
-      final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
       
       // Fetch topics from Firebase
       final fetchedTopics = await serviceLocator.content.getQuizTopics(
@@ -558,10 +442,6 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> with TickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    final progressProvider = Provider.of<ProgressProvider>(context);
-    final topicProgress = progressProvider.progress.topicProgress;
-    final overallProgress = progressProvider.progress.overallTopicProgress;
-    
     // Get current language
     final languageProvider = Provider.of<LanguageProvider>(context);
     final currentLanguage = languageProvider.language;
@@ -642,10 +522,7 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> with TickerProviderSt
       appBar: appBar,
       body: Column(
         children: [
-          // Enhanced progress card (moved to top)
-          _buildEnhancedProgressCard(currentLanguage, overallProgress),
-          
-          // Section header styled exactly like "Тестування" (moved below progress card)
+          // Section header styled exactly like "Тестування"
           _buildSectionHeader(_getSubtitleText(currentLanguage)),
           
           // Enhanced topic list
@@ -708,9 +585,8 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> with TickerProviderSt
                 itemCount: topics.length,
                 itemBuilder: (context, index) {
                   final topic = topics[index];
-                  final progress = topicProgress[topic.id] ?? 0.0;
                   
-                  return _buildEnhancedTopicCard(topic, index, progress, currentLanguage);
+                  return _buildEnhancedTopicCard(topic, index, currentLanguage);
                 },
               ),
           ),
