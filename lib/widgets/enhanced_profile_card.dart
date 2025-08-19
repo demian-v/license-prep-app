@@ -102,7 +102,7 @@ class _EnhancedProfileCardState extends State<EnhancedProfileCard> with TickerPr
         child: Card(
           elevation: 3,
           shadowColor: Colors.black.withOpacity(0.3),
-          margin: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+          margin: EdgeInsets.symmetric(horizontal: 2, vertical: 1),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
