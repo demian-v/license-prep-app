@@ -7,15 +7,22 @@ import '../providers/progress_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/state_provider.dart';
 import '../services/service_locator.dart';
+import '../services/analytics_service.dart';
 import '../localization/app_localizations.dart';
 import 'quiz_result_screen.dart';
 
 class QuizQuestionScreen extends StatefulWidget {
   final QuizTopic topic;
+  final String? sessionId;
+  final bool isTopicMode;
+  final DateTime? startTime;
   
   const QuizQuestionScreen({
     Key? key,
     required this.topic,
+    this.sessionId,
+    this.isTopicMode = false,
+    this.startTime,
   }) : super(key: key);
   
   @override
@@ -34,10 +41,16 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
   ScrollController _pillsScrollController = ScrollController();
   late AnimationController _titleAnimationController;
   late Animation<double> _titlePulseAnimation;
+  late String _sessionId;
+  DateTime? _startTime;
   
   @override
   void initState() {
     super.initState();
+    
+    // Initialize session ID and start time
+    _sessionId = widget.sessionId ?? DateTime.now().millisecondsSinceEpoch.toString();
+    _startTime = widget.startTime ?? DateTime.now();
     
     // Initialize title animation
     _titleAnimationController = AnimationController(
@@ -500,6 +513,22 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
       ),
     );
   }
+
+  Future<void> _trackTopicTerminated(String exitMethod) async {
+    if (widget.isTopicMode && widget.sessionId != null) {
+      final stateProvider = Provider.of<StateProvider>(context, listen: false);
+      await serviceLocator.analytics.trackQTopicTerminated(
+        sessionId: _sessionId,
+        stateId: stateProvider.selectedState?.id ?? 'unknown',
+        licenseType: 'cdl',
+        topicId: widget.topic.id,
+        topicName: widget.topic.title,
+        questionNumber: currentQuestionIndex + 1,
+        totalQuestions: questions.length,
+        exitMethod: exitMethod,
+      );
+    }
+  }
   
   Future<void> loadQuestions() async {
     setState(() {
@@ -605,6 +634,9 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
           builder: (context) => QuizResultScreen(
             topic: widget.topic,
             answers: answers,
+            isTopicMode: widget.isTopicMode,
+            sessionId: _sessionId,
+            startTime: _startTime,
           ),
         ),
       );
@@ -706,7 +738,10 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
       elevation: 0,
       leading: IconButton(
         icon: Icon(Icons.arrow_back),
-        onPressed: () => Navigator.pop(context),
+        onPressed: () async {
+          await _trackTopicTerminated('back_arrow');
+          Navigator.pop(context);
+        },
       ),
       actions: [
         IconButton(
@@ -1143,7 +1178,8 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                onTap: () {
+                onTap: () async {
+                  await _trackTopicTerminated('end_topic_button');
                   Navigator.pop(context);
                 },
                 borderRadius: BorderRadius.circular(30),

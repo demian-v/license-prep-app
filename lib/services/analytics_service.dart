@@ -768,6 +768,100 @@ class AnalyticsService {
     await logEvent('practice_finished', parameters);
   }
   
+  // MARK: - Learn by Topics Events
+  
+  /// Log when user starts Learn by Topics flow
+  Future<void> trackLearnByTopicsStarted({
+    required String stateId,
+    required String licenseType,
+  }) async {
+    final parameters = <String, dynamic>{
+      'state_id': stateId,
+      'license_type': licenseType,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    };
+    await logEvent('learn_by_topics_started', parameters);
+  }
+
+  /// Log when user starts a specific topic quiz
+  Future<void> trackQTopicStarted({
+    required String sessionId,
+    required String stateId,
+    required String licenseType,
+    required String topicId,
+    required String topicName,
+    required int questionCount,
+  }) async {
+    final parameters = <String, dynamic>{
+      'session_id': sessionId,
+      'state_id': stateId,
+      'license_type': licenseType,
+      'topic_id': topicId,
+      'topic_name': topicName,
+      'question_count': questionCount,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    };
+    await logEvent('q_topic_started', parameters);
+  }
+
+  /// Log when user terminates/exits topic quiz early
+  Future<void> trackQTopicTerminated({
+    required String sessionId,
+    required String stateId,
+    required String licenseType,
+    required String topicId,
+    required String topicName,
+    required int questionNumber,
+    required int totalQuestions,
+    required String exitMethod,
+  }) async {
+    final parameters = <String, dynamic>{
+      'session_id': sessionId,
+      'state_id': stateId,
+      'license_type': licenseType,
+      'topic_id': topicId,
+      'topic_name': topicName,
+      'question_number': questionNumber,
+      'total_questions': totalQuestions,
+      'exit_method': exitMethod, // 'back_arrow' or 'end_topic_button'
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    };
+    await logEvent('q_topic_terminated', parameters);
+  }
+
+  /// Log when user finishes topic quiz and views results
+  Future<void> trackQTopicFinished({
+    required String sessionId,
+    required String stateId,
+    required String licenseType,
+    required String topicId,
+    required String topicName,
+    required int correctAnswers,
+    required int totalQuestions,
+    required int timeSpentSeconds,
+    required String completionMethod,
+    double? accuracyPercentage,
+  }) async {
+    final parameters = <String, dynamic>{
+      'session_id': sessionId,
+      'state_id': stateId,
+      'license_type': licenseType,
+      'topic_id': topicId,
+      'topic_name': topicName,
+      'correct_answers': correctAnswers,
+      'total_questions': totalQuestions,
+      'time_spent_seconds': timeSpentSeconds,
+      'completion_method': completionMethod, // 'back_arrow', 'back_to_tests', or 'back_to_topics'
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    };
+    
+    if (accuracyPercentage != null) {
+      parameters['accuracy_percentage'] = accuracyPercentage;
+    }
+    
+    await logEvent('q_topic_finished', parameters);
+  }
+  
   // MARK: - Learning Events
   
   /// Log quiz start event

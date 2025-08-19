@@ -122,6 +122,32 @@ class _TestScreenState extends State<TestScreen> {
     }
   }
   
+  /// Analytics method for Learn by Topics started event
+  void _logLearnByTopicsStartedAnalytics(LanguageProvider languageProvider) async {
+    try {
+      // Get providers for analytics
+      final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
+      final stateProvider = Provider.of<StateProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // Get analytics parameters
+      final language = languageProvider.language;
+      final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
+      final state = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'IL';
+      
+      // Log Learn by Topics started analytics event
+      await analyticsService.trackLearnByTopicsStarted(
+        stateId: state,
+        licenseType: licenseType,
+      );
+      
+      print('📊 Analytics: learn_by_topics_started logged (state: $state, license_type: $licenseType)');
+    } catch (e) {
+      print('❌ Analytics error: $e');
+      // Don't block user flow if analytics fails
+    }
+  }
+  
   // Helper method to get correct translations
   String _translate(String key, LanguageProvider languageProvider) {
     // Create a direct translation based on the selected language
@@ -297,11 +323,17 @@ class _TestScreenState extends State<TestScreen> {
                     _translate('learn_by_topics', languageProvider),
                     _translate('questions_by_topics', languageProvider),
                     () {
+                      // Track Learn by Topics start FIRST
+                      _logLearnByTopicsStartedAnalytics(languageProvider);
+                      
+                      // Generate session ID for this Learn by Topics session
+                      final sessionId = DateTime.now().millisecondsSinceEpoch.toString();
+                      
                       // Navigate to themed questions
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => TopicQuizScreen(),
+                          builder: (context) => TopicQuizScreen(sessionId: sessionId),
                         ),
                       );
                     },

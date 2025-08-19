@@ -2,15 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/quiz_topic.dart';
 import '../localization/app_localizations.dart';
+import '../services/analytics_service.dart';
+import '../services/service_locator.dart';
+import '../providers/state_provider.dart';
 
 class QuizResultScreen extends StatefulWidget {
   final QuizTopic topic;
   final Map<String, bool> answers;
+  final bool isTopicMode;
+  final String? sessionId;
+  final DateTime? startTime;
   
   const QuizResultScreen({
     Key? key,
     required this.topic,
     required this.answers,
+    this.isTopicMode = false,
+    this.sessionId,
+    this.startTime,
   }) : super(key: key);
 
   @override
@@ -103,6 +112,34 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
     super.dispose();
   }
 
+  int get _correctAnswers => widget.answers.values.where((result) => result).length;
+  int get _totalQuestions => widget.answers.length;
+  double get _accuracyPercentage => (_correctAnswers / _totalQuestions) * 100;
+  int get _timeSpentSeconds {
+    if (widget.startTime != null) {
+      return DateTime.now().difference(widget.startTime!).inSeconds;
+    }
+    return 0;
+  }
+
+  Future<void> _trackTopicFinished(String completionMethod) async {
+    if (widget.isTopicMode && widget.sessionId != null) {
+      final stateProvider = Provider.of<StateProvider>(context, listen: false);
+      await serviceLocator.analytics.trackQTopicFinished(
+        sessionId: widget.sessionId!,
+        stateId: stateProvider.selectedState?.id ?? 'unknown',
+        licenseType: 'cdl',
+        topicId: widget.topic.id,
+        topicName: widget.topic.title,
+        correctAnswers: _correctAnswers,
+        totalQuestions: _totalQuestions,
+        timeSpentSeconds: _timeSpentSeconds,
+        completionMethod: completionMethod,
+        accuracyPercentage: _accuracyPercentage,
+      );
+    }
+  }
+
   // Helper method to get gradient for result (always green for quiz success)
   LinearGradient _getResultGradient() {
     return LinearGradient(
@@ -161,7 +198,10 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
         centerTitle: true,
         leading: IconButton(
           icon: Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () async {
+            await _trackTopicFinished('back_arrow');
+            Navigator.pop(context);
+          },
         ),
       ),
       body: Column(
@@ -221,7 +261,8 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
                 Expanded(
                   child: _buildActionButton(
                     text: AppLocalizations.of(context).translate('back_to_tests'),
-                    onTap: () {
+                    onTap: () async {
+                      await _trackTopicFinished('back_to_tests');
                       // Navigate back to test screen (home)
                       Navigator.of(context).popUntil((route) => route.isFirst);
                     },
@@ -232,7 +273,8 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
                 Expanded(
                   child: _buildActionButton(
                     text: AppLocalizations.of(context).translate('back_to_topics'),
-                    onTap: () {
+                    onTap: () async {
+                      await _trackTopicFinished('back_to_topics');
                       // Navigate back to topic selection screen (skip the question screen)
                       Navigator.pop(context); // Pop quiz result screen
                       Navigator.pop(context); // Pop quiz question screen to reach topic selection

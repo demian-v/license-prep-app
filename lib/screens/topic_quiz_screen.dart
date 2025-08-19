@@ -3,10 +3,20 @@ import 'package:provider/provider.dart';
 import '../models/quiz_topic.dart';
 import '../providers/language_provider.dart';
 import '../providers/state_provider.dart';
+import '../providers/auth_provider.dart';
+import '../providers/progress_provider.dart';
 import '../services/service_locator.dart';
+import '../services/analytics_service.dart';
 import '../screens/quiz_question_screen.dart';
 
 class TopicQuizScreen extends StatefulWidget {
+  final String? sessionId;
+  
+  const TopicQuizScreen({
+    Key? key,
+    this.sessionId,
+  }) : super(key: key);
+  
   @override
   _TopicQuizScreenState createState() => _TopicQuizScreenState();
 }
@@ -17,6 +27,7 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> with TickerProviderSt
   String? errorMessage;
   late AnimationController _titleAnimationController;
   late Animation<double> _titlePulseAnimation;
+  late String _sessionId;
   
   // Helper method to get subtitle text based on language
   String _getSubtitleText(String language) {
@@ -112,6 +123,9 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> with TickerProviderSt
   @override
   void initState() {
     super.initState();
+    
+    // Generate or use provided session ID
+    _sessionId = widget.sessionId ?? DateTime.now().millisecondsSinceEpoch.toString();
     
     // Initialize title animation
     _titleAnimationController = AnimationController(
@@ -330,11 +344,42 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> with TickerProviderSt
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () {
+          onTap: () async {
+            try {
+              // Track topic started analytics event
+              final stateProvider = Provider.of<StateProvider>(context, listen: false);
+              final authProvider = Provider.of<AuthProvider>(context, listen: false);
+              final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
+              final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+              
+              final stateId = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'IL';
+              final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
+              
+              await analyticsService.trackQTopicStarted(
+                sessionId: _sessionId,
+                stateId: stateId,
+                licenseType: licenseType,
+                topicId: topic.id,
+                topicName: topic.title,
+                questionCount: topic.questionCount,
+              );
+              
+              print('📊 Analytics: q_topic_started logged (session_id: $_sessionId, topic_id: ${topic.id}, topic_name: ${topic.title})');
+            } catch (e) {
+              print('❌ Analytics error: $e');
+              // Don't block user flow if analytics fails
+            }
+            
+            // Navigate to quiz questions with session ID and parameters for analytics
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => QuizQuestionScreen(topic: topic),
+                builder: (context) => QuizQuestionScreen(
+                  topic: topic,
+                  sessionId: _sessionId,
+                  isTopicMode: true,
+                  startTime: DateTime.now(),
+                ),
               ),
             );
           },
