@@ -7,7 +7,9 @@ import '../providers/language_provider.dart';
 import '../providers/progress_provider.dart';
 import '../providers/practice_provider.dart';
 import '../providers/state_provider.dart';
+import '../providers/auth_provider.dart';
 import '../services/service_locator.dart';
+import '../services/analytics_service.dart';
 import 'topic_quiz_screen.dart';
 import 'saved_items_screen.dart';
 import 'exam_question_screen.dart';
@@ -51,6 +53,39 @@ class _TestScreenState extends State<TestScreen> {
     } catch (e) {
       print('⚠️ [TEST SCREEN] Error pre-loading quiz data: $e');
       // Silent failure - user can still use the app with regular fetching
+    }
+  }
+  
+  /// Analytics method for exam started event
+  void _logExamStartedAnalytics(LanguageProvider languageProvider) async {
+    try {
+      // Get providers for analytics
+      final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
+      final stateProvider = Provider.of<StateProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // Get analytics parameters
+      final language = languageProvider.language;
+      final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
+      final state = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'IL';
+      
+      // Generate unique exam ID for analytics
+      final examId = 'exam_${DateTime.now().millisecondsSinceEpoch}';
+      
+      // Log exam started analytics event
+      await analyticsService.logExamStarted(
+        examId: examId,
+        state: state,
+        language: language,
+        licenseType: licenseType,
+        totalQuestions: 40,
+        timeLimitMinutes: 60,
+      );
+      
+      print('📊 Analytics: exam_started logged (exam_id: $examId, state: $state, language: $language)');
+    } catch (e) {
+      print('❌ Analytics error: $e');
+      // Don't block user flow if analytics fails
     }
   }
   
@@ -190,6 +225,9 @@ class _TestScreenState extends State<TestScreen> {
                     _translate('take_exam', languageProvider),
                     _translate('dmv_exam_desc', languageProvider),
                     () {
+                      // Track exam start FIRST
+                      _logExamStartedAnalytics(languageProvider);
+                      
                       // Start a new exam
                       final examProvider = Provider.of<ExamProvider>(context, listen: false);
                       

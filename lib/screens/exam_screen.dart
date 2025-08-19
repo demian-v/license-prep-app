@@ -3,11 +3,45 @@ import 'package:provider/provider.dart';
 import '../providers/exam_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/progress_provider.dart';
+import '../providers/state_provider.dart';
+import '../providers/auth_provider.dart';
 import '../widgets/enhanced_test_card.dart';
 import 'exam_question_screen.dart';
 import '../localization/app_localizations.dart';
 
 class ExamScreen extends StatelessWidget {
+  // Method to start exam flow
+  void _startExamFlow(
+    BuildContext context, 
+    LanguageProvider languageProvider,
+  ) {
+    // Get providers for exam start
+    final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
+    final stateProvider = Provider.of<StateProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final examProvider = Provider.of<ExamProvider>(context, listen: false);
+    
+    // Get exam parameters
+    final language = languageProvider.language;
+    final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
+    final state = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'IL';
+    
+    // Start new exam with required parameters
+    examProvider.startNewExam(
+      language: language,
+      state: state,
+      licenseType: licenseType,
+    );
+    
+    // Navigate to the exam question screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ExamQuestionScreen(),
+      ),
+    );
+  }
+
   // Helper method to get correct translations
   String _translate(String key, LanguageProvider languageProvider) {
     // Create a direct translation based on the selected language
@@ -82,30 +116,8 @@ class ExamScreen extends StatelessWidget {
                     _translate('take_exam', languageProvider),
                     _translate('dmv_exam_desc', languageProvider),
                     () {
-                      // Start a new exam
-                      final examProvider = Provider.of<ExamProvider>(context, listen: false);
-                      
-                      // Get language from provider
-                      final language = languageProvider.language;
-                      
-                      // Get license type from provider, default to 'driver'
-                      final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
-                      final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
-                      
-                      // Start new exam with required parameters
-                      examProvider.startNewExam(
-                        language: language,
-                        state: 'IL', // Use 'IL' to match Firebase data structure
-                        licenseType: licenseType,
-                      );
-                      
-                      // Navigate to the exam question screen
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ExamQuestionScreen(),
-                        ),
-                      );
+                      // Start exam flow
+                      _startExamFlow(context, languageProvider);
                     },
                     leftInfoText: "60 minutes",
                     rightInfoText: "40 questions",

@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/exam_provider.dart';
 import '../providers/progress_provider.dart';
+import '../providers/language_provider.dart';
+import '../providers/state_provider.dart';
+import '../providers/auth_provider.dart';
 import '../localization/app_localizations.dart';
+import '../services/analytics_service.dart';
 import 'exam_question_screen.dart';
 
 class ExamResultScreen extends StatefulWidget {
@@ -136,6 +140,47 @@ class _ExamResultScreenState extends State<ExamResultScreen> with TickerProvider
     }
   }
 
+  Future<void> _logExamFinished(String completionMethod) async {
+    final examProvider = Provider.of<ExamProvider>(context, listen: false);
+    final exam = examProvider.currentExam;
+    
+    if (exam != null) {
+      // Get providers for analytics
+      final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+      final stateProvider = Provider.of<StateProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // Calculate analytics parameters
+      final examId = 'exam_${exam.startTime.millisecondsSinceEpoch}';
+      final finalScore = exam.correctAnswersCount;
+      final totalQuestions = exam.questionIds.length;
+      final correctAnswers = exam.correctAnswersCount;
+      final incorrectAnswers = exam.incorrectAnswersCount;
+      final examPassed = exam.isPassed;
+      final timeSpentSeconds = exam.elapsedTime.inSeconds;
+      final state = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'IL';
+      final language = languageProvider.language;
+      final licenseType = 'driver'; // Default license type
+      
+      // Log exam finished analytics event
+      await analyticsService.logExamFinished(
+        examId: examId,
+        finalScore: finalScore,
+        totalQuestions: totalQuestions,
+        correctAnswers: correctAnswers,
+        incorrectAnswers: incorrectAnswers,
+        examPassed: examPassed,
+        timeSpentSeconds: timeSpentSeconds,
+        completionMethod: completionMethod,
+        state: state,
+        language: language,
+        licenseType: licenseType,
+      );
+      
+      print('📊 Analytics: exam_finished logged (exam_id: $examId, score: $correctAnswers/$totalQuestions, passed: $examPassed, method: $completionMethod)');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final examProvider = Provider.of<ExamProvider>(context);
@@ -177,7 +222,10 @@ class _ExamResultScreenState extends State<ExamResultScreen> with TickerProvider
         centerTitle: true,
         leading: IconButton(
           icon: Icon(Icons.arrow_back),
-          onPressed: () {
+          onPressed: () async {
+            // Log analytics before navigation
+            await _logExamFinished('back_arrow');
+            
             // Return to test screen
             Navigator.of(context).popUntil((route) => route.isFirst);
             
@@ -257,7 +305,10 @@ class _ExamResultScreenState extends State<ExamResultScreen> with TickerProvider
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: () {
+                      onTap: () async {
+                        // Log analytics before navigation
+                        await _logExamFinished('back_to_tests_button');
+                        
                         // Cancel current exam
                         examProvider.cancelExam();
                         

@@ -3,9 +3,12 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/exam_provider.dart';
 import '../providers/progress_provider.dart';
+import '../providers/state_provider.dart';
+import '../providers/language_provider.dart';
 import '../models/quiz_question.dart';
 import '../services/service_locator.dart';
 import '../localization/app_localizations.dart';
+import '../services/analytics_service.dart';
 import 'exam_result_screen.dart';
 
 class ExamQuestionScreen extends StatefulWidget {
@@ -860,10 +863,44 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> with TickerProv
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                onTap: () {
+                onTap: () async {
+                  // Get analytics data before canceling exam
+                  final examProvider = Provider.of<ExamProvider>(context, listen: false);
+                  final exam = examProvider.currentExam;
+                  
+                  if (exam != null) {
+                    // Get providers for analytics
+                    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+                    final stateProvider = Provider.of<StateProvider>(context, listen: false);
+                    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                    
+                    // Calculate analytics parameters
+                    final examId = 'exam_${exam.startTime.millisecondsSinceEpoch}';
+                    final questionsCompleted = exam.answeredQuestionsCount;
+                    final correctAnswers = exam.correctAnswersCount;
+                    final timeSpentSeconds = exam.elapsedTime.inSeconds;
+                    final state = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'IL';
+                    final language = languageProvider.language;
+                    final licenseType = 'driver'; // Default license type
+                    
+                    // Log exam terminated analytics event
+                    await analyticsService.logExamTerminated(
+                      examId: examId,
+                      questionsCompleted: questionsCompleted,
+                      correctAnswers: correctAnswers,
+                      timeSpentSeconds: timeSpentSeconds,
+                      terminationReason: 'user_exit',
+                      state: state,
+                      language: language,
+                      licenseType: licenseType,
+                    );
+                    
+                    print('📊 Analytics: exam_terminated logged (exam_id: $examId, completed: $questionsCompleted/40, time: ${timeSpentSeconds}s)');
+                  }
+                  
                   Navigator.of(context).pop(true); // Yes, exit
                   // Cancel the exam
-                  Provider.of<ExamProvider>(context, listen: false).cancelExam();
+                  examProvider.cancelExam();
                   Navigator.of(context).pop(); // Return to previous screen
                 },
                 borderRadius: BorderRadius.circular(20),

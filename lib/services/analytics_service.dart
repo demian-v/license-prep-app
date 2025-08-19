@@ -612,6 +612,82 @@ class AnalyticsService {
     });
   }
   
+  // MARK: - Take Exam Events
+  
+  /// Log when user starts an exam
+  Future<void> logExamStarted({
+    String? examId,
+    String? state,
+    String? language,
+    String? licenseType,
+    int? totalQuestions,
+    int? timeLimitMinutes,
+  }) async {
+    await logEvent('exam_started', {
+      if (examId != null) 'exam_id': examId,
+      if (state != null) 'state': state,
+      if (language != null) 'language': language,
+      if (licenseType != null) 'license_type': licenseType,
+      if (totalQuestions != null) 'total_questions': totalQuestions,
+      if (timeLimitMinutes != null) 'time_limit_minutes': timeLimitMinutes,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  /// Log when user terminates/exits exam early
+  Future<void> logExamTerminated({
+    String? examId,
+    int? questionsCompleted,
+    int? correctAnswers,
+    int? timeSpentSeconds,
+    String? terminationReason,
+    String? state,
+    String? language,
+    String? licenseType,
+  }) async {
+    await logEvent('exam_terminated', {
+      if (examId != null) 'exam_id': examId,
+      if (questionsCompleted != null) 'questions_completed': questionsCompleted,
+      if (correctAnswers != null) 'correct_answers': correctAnswers,
+      if (timeSpentSeconds != null) 'time_spent_seconds': timeSpentSeconds,
+      'termination_reason': terminationReason ?? 'user_exit',
+      if (state != null) 'state': state,
+      if (language != null) 'language': language,
+      if (licenseType != null) 'license_type': licenseType,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  /// Log when user completes exam and views results
+  Future<void> logExamFinished({
+    String? examId,
+    int? finalScore,
+    int? totalQuestions,
+    int? correctAnswers,
+    int? incorrectAnswers,
+    bool? examPassed,
+    int? timeSpentSeconds,
+    String? completionMethod,
+    String? state,
+    String? language,
+    String? licenseType,
+  }) async {
+    await logEvent('exam_finished', {
+      if (examId != null) 'exam_id': examId,
+      if (finalScore != null) 'final_score': finalScore,
+      if (totalQuestions != null) 'total_questions': totalQuestions,
+      if (correctAnswers != null) 'correct_answers': correctAnswers,
+      if (incorrectAnswers != null) 'incorrect_answers': incorrectAnswers,
+      if (examPassed != null) 'exam_passed': examPassed.toString(),
+      if (timeSpentSeconds != null) 'time_spent_seconds': timeSpentSeconds,
+      'completion_method': completionMethod ?? 'unknown',
+      if (state != null) 'state': state,
+      if (language != null) 'language': language,
+      if (licenseType != null) 'license_type': licenseType,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+  
   // MARK: - Learning Events
   
   /// Log quiz start event
