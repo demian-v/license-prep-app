@@ -89,6 +89,39 @@ class _TestScreenState extends State<TestScreen> {
     }
   }
   
+  /// Analytics method for practice started event
+  void _logPracticeStartedAnalytics(LanguageProvider languageProvider) async {
+    try {
+      // Get providers for analytics
+      final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
+      final stateProvider = Provider.of<StateProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // Get analytics parameters
+      final language = languageProvider.language;
+      final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
+      final state = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'IL';
+      
+      // Generate unique practice ID for analytics
+      final practiceId = 'practice_${DateTime.now().millisecondsSinceEpoch}';
+      
+      // Log practice started analytics event
+      await analyticsService.logPracticeStarted(
+        practiceId: practiceId,
+        state: state,
+        language: language,
+        licenseType: licenseType,
+        totalQuestions: null, // Unlimited questions
+        timeLimitMinutes: null, // Unlimited time
+      );
+      
+      print('📊 Analytics: practice_started logged (practice_id: $practiceId, state: $state, language: $language)');
+    } catch (e) {
+      print('❌ Analytics error: $e');
+      // Don't block user flow if analytics fails
+    }
+  }
+  
   // Helper method to get correct translations
   String _translate(String key, LanguageProvider languageProvider) {
     // Create a direct translation based on the selected language
@@ -283,6 +316,9 @@ class _TestScreenState extends State<TestScreen> {
                     _translate('practice_tickets', languageProvider),
                     _translate('random_questions_no_limit', languageProvider),
                     () {
+                      // Track practice start FIRST
+                      _logPracticeStartedAnalytics(languageProvider);
+                      
                       // Start a new practice test
                       final practiceProvider = Provider.of<PracticeProvider>(context, listen: false);
                       final progressProvider = Provider.of<ProgressProvider>(context, listen: false);

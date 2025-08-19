@@ -688,6 +688,86 @@ class AnalyticsService {
     });
   }
   
+  // MARK: - Practice Tickets Events
+  
+  /// Log when user starts a practice session
+  Future<void> logPracticeStarted({
+    required String practiceId,
+    required String state,
+    required String language,
+    required String licenseType,
+    int? totalQuestions, // null for unlimited
+    int? timeLimitMinutes, // null for unlimited time
+  }) async {
+    await logEvent('practice_started', {
+      'practice_id': practiceId,
+      'state': state,
+      'language': language,
+      'license_type': licenseType,
+      if (totalQuestions != null) 'total_questions': totalQuestions,
+      if (timeLimitMinutes != null) 'time_limit_minutes': timeLimitMinutes,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  /// Log when user terminates/exits practice early
+  Future<void> logPracticeTerminated({
+    required String practiceId,
+    required int questionsCompleted,
+    required int correctAnswers,
+    required int timeSpentSeconds,
+    required String terminationReason,
+    required String state,
+    required String language,
+    required String licenseType,
+  }) async {
+    final parameters = {
+      'practice_id': practiceId,
+      'questions_completed': questionsCompleted,
+      'correct_answers': correctAnswers,
+      'time_spent_seconds': timeSpentSeconds,
+      'termination_reason': terminationReason,
+      'state': state,
+      'language': language,
+      'license_type': licenseType,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    };
+
+    await logEvent('practice_terminated', parameters);
+  }
+
+  /// Log when user completes practice and views results
+  Future<void> logPracticeFinished({
+    required String practiceId,
+    required int finalScore,
+    required int totalQuestions,
+    required int correctAnswers,
+    required int incorrectAnswers,
+    required bool practicePassed,
+    required int timeSpentSeconds,
+    required String completionMethod,
+    required String state,
+    required String language,
+    required String licenseType,
+  }) async {
+    final parameters = {
+      'practice_id': practiceId,
+      'final_score': finalScore,
+      'total_questions': totalQuestions,
+      'correct_answers': correctAnswers,
+      'incorrect_answers': incorrectAnswers,
+      'practice_passed': practicePassed.toString(),
+      'time_spent_seconds': timeSpentSeconds,
+      'completion_method': completionMethod,
+      'state': state,
+      'language': language,
+      'license_type': licenseType,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    };
+
+    await logEvent('practice_finished', parameters);
+  }
+  
   // MARK: - Learning Events
   
   /// Log quiz start event

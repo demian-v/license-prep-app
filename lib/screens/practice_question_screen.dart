@@ -3,8 +3,11 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/practice_provider.dart';
 import '../providers/progress_provider.dart';
+import '../providers/language_provider.dart';
+import '../providers/state_provider.dart';
 import '../models/quiz_question.dart';
 import '../services/service_locator.dart';
+import '../services/analytics_service.dart';
 import '../localization/app_localizations.dart';
 import 'practice_result_screen.dart';
 
@@ -74,6 +77,47 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
       duration: Duration(milliseconds: 300),
       curve: Curves.easeOut,
     );
+  }
+
+  /// Analytics method for practice terminated event
+  Future<void> _logPracticeTerminatedAnalytics() async {
+    try {
+      final practiceProvider = Provider.of<PracticeProvider>(context, listen: false);
+      final practice = practiceProvider.currentPractice;
+      
+      if (practice != null) {
+        // Get providers for analytics
+        final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+        final stateProvider = Provider.of<StateProvider>(context, listen: false);
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
+        
+        // Calculate analytics parameters
+        final practiceId = 'practice_${practice.startTime.millisecondsSinceEpoch}';
+        final questionsCompleted = practice.answeredQuestionsCount;
+        final correctAnswers = practice.correctAnswersCount;
+        final timeSpentSeconds = practice.elapsedTime.inSeconds;
+        final state = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'IL';
+        final language = languageProvider.language;
+        final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
+        
+        // Log practice terminated analytics event
+        await analyticsService.logPracticeTerminated(
+          practiceId: practiceId,
+          questionsCompleted: questionsCompleted,
+          correctAnswers: correctAnswers,
+          timeSpentSeconds: timeSpentSeconds,
+          terminationReason: 'user_exit',
+          state: state,
+          language: language,
+          licenseType: licenseType,
+        );
+        
+        print('📊 Analytics: practice_terminated logged (practice_id: $practiceId, completed: $questionsCompleted/${practice.questionIds.length}, time: ${timeSpentSeconds}s)');
+      }
+    } catch (e) {
+      print('❌ Analytics error: $e');
+    }
   }
 
   // Enhanced practice title widget
@@ -824,7 +868,10 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                onTap: () {
+                onTap: () async {
+                  // Log analytics before canceling
+                  await _logPracticeTerminatedAnalytics();
+                  
                   Navigator.of(context).pop(true); // Yes, exit
                   // Cancel the practice
                   Provider.of<PracticeProvider>(context, listen: false).cancelPractice();

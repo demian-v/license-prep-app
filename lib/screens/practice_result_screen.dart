@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/practice_provider.dart';
+import '../providers/language_provider.dart';
+import '../providers/state_provider.dart';
+import '../providers/auth_provider.dart';
+import '../providers/progress_provider.dart';
+import '../services/analytics_service.dart';
 import '../localization/app_localizations.dart';
 import 'practice_question_screen.dart';
 
@@ -128,6 +133,49 @@ class _PracticeResultScreenState extends State<PracticeResultScreen> with Ticker
     }
   }
 
+  /// Analytics method for practice finished event
+  Future<void> _logPracticeFinished(String completionMethod) async {
+    final practiceProvider = Provider.of<PracticeProvider>(context, listen: false);
+    final practice = practiceProvider.currentPractice;
+    
+    if (practice != null) {
+      // Get providers for analytics
+      final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+      final stateProvider = Provider.of<StateProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
+      
+      // Calculate analytics parameters
+      final practiceId = 'practice_${practice.startTime.millisecondsSinceEpoch}';
+      final finalScore = practice.correctAnswersCount;
+      final totalQuestions = practice.answeredQuestionsCount;
+      final correctAnswers = practice.correctAnswersCount;
+      final incorrectAnswers = practice.incorrectAnswersCount;
+      final practicePassed = practice.isPassed;
+      final timeSpentSeconds = practice.elapsedTime.inSeconds;
+      final state = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'IL';
+      final language = languageProvider.language;
+      final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
+      
+      // Log practice finished analytics event
+      await analyticsService.logPracticeFinished(
+        practiceId: practiceId,
+        finalScore: finalScore,
+        totalQuestions: totalQuestions,
+        correctAnswers: correctAnswers,
+        incorrectAnswers: incorrectAnswers,
+        practicePassed: practicePassed,
+        timeSpentSeconds: timeSpentSeconds,
+        completionMethod: completionMethod,
+        state: state,
+        language: language,
+        licenseType: licenseType,
+      );
+      
+      print('📊 Analytics: practice_finished logged (practice_id: $practiceId, score: $correctAnswers/$totalQuestions, passed: $practicePassed, method: $completionMethod)');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final practiceProvider = Provider.of<PracticeProvider>(context);
@@ -163,7 +211,10 @@ class _PracticeResultScreenState extends State<PracticeResultScreen> with Ticker
         centerTitle: true,
         leading: IconButton(
           icon: Icon(Icons.arrow_back),
-          onPressed: () {
+          onPressed: () async {
+            // Log analytics before navigation
+            await _logPracticeFinished('back_arrow');
+            
             // Return to test screen
             Navigator.of(context).popUntil((route) => route.isFirst);
             
@@ -242,7 +293,10 @@ class _PracticeResultScreenState extends State<PracticeResultScreen> with Ticker
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: () {
+                      onTap: () async {
+                        // Log analytics before navigation
+                        await _logPracticeFinished('back_to_tests_button');
+                        
                         // Cancel current practice
                         practiceProvider.cancelPractice();
                         
