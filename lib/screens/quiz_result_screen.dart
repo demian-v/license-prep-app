@@ -199,8 +199,10 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
         leading: IconButton(
           icon: Icon(Icons.arrow_back),
           onPressed: () async {
-            await _trackTopicFinished('back_arrow');
-            Navigator.pop(context);
+            await _trackTopicFinished('back_to_topics');
+            // Navigate back to topic selection screen (skip the question screen)
+            Navigator.pop(context); // Pop quiz result screen
+            Navigator.pop(context); // Pop quiz question screen to reach topic selection
           },
         ),
       ),
