@@ -23,7 +23,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getSavedQuestionsWithContent = exports.getSavedQuestions = exports.removeSavedQuestion = exports.addSavedQuestion = exports.createOrUpdateUserDocument = exports.getUserData = exports.updateUserState = exports.updateUserLanguage = exports.getPracticeTests = exports.getPracticeQuestions = exports.getTheoryModules = exports.getTrafficRuleTopics = exports.getQuizQuestions = exports.contentGetQuizTopics = exports.getQuizTopics = void 0;
+exports.updateProfile = exports.getSavedQuestionsWithContent = exports.getSavedQuestions = exports.removeSavedQuestion = exports.addSavedQuestion = exports.createOrUpdateUserDocument = exports.getUserData = exports.updateUserState = exports.updateUserLanguage = exports.getPracticeTests = exports.getPracticeQuestions = exports.getTheoryModules = exports.getTrafficRuleTopics = exports.getQuizQuestions = exports.contentGetQuizTopics = exports.getQuizTopics = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 // Initialize Firebase Admin
@@ -855,6 +855,79 @@ exports.getSavedQuestionsWithContent = functions.https.onCall(async (data, conte
             throw error;
         }
         throw new functions.https.HttpsError('internal', 'Failed to get saved questions with content: ' + (error instanceof Error ? error.message : String(error)));
+    }
+});
+// Update user profile (combined name, language, state update)
+exports.updateProfile = functions.https.onCall(async (data, context) => {
+    try {
+        console.log('updateProfile called with data:', data);
+        // Validate authentication
+        if (!context.auth) {
+            throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated to update profile');
+        }
+        const userId = context.auth.uid;
+        const { name, language, state } = data;
+        console.log(`Updating profile for user ${userId}: name=${name}, language=${language}, state=${state}`);
+        // Build update data object
+        const updateData = {
+            lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+        };
+        // Add name if provided
+        if (name !== undefined && name !== null) {
+            if (typeof name !== 'string' || name.trim().length === 0) {
+                throw new functions.https.HttpsError('invalid-argument', 'Name must be a non-empty string');
+            }
+            updateData.name = name.trim();
+        }
+        // Add language if provided
+        if (language !== undefined && language !== null) {
+            const validLanguages = ['en', 'uk', 'ru', 'es', 'pl'];
+            if (!validLanguages.includes(language)) {
+                throw new functions.https.HttpsError('invalid-argument', `Invalid language code. Must be one of: ${validLanguages.join(', ')}`);
+            }
+            updateData.language = language;
+        }
+        // Add state if provided (can be null to clear state)
+        if (state !== undefined) {
+            // Handle state conversion if needed - convert full state names to IDs
+            let stateId = state;
+            if (state && typeof state === 'string' && state.length > 2 && state !== 'ALL') {
+                // This might be a full state name, but we'll accept it as-is
+                // The client should handle state name to ID conversion
+                stateId = state;
+            }
+            updateData.state = stateId;
+        }
+        console.log(`Update data prepared:`, updateData);
+        // Update user document in Firestore
+        await db.collection('users').doc(userId).update(updateData);
+        console.log(`Successfully updated profile for user ${userId}`);
+        // Get updated user document to return complete user data
+        const updatedUserDoc = await db.collection('users').doc(userId).get();
+        if (!updatedUserDoc.exists) {
+            throw new functions.https.HttpsError('not-found', 'User document not found after update');
+        }
+        const userData = updatedUserDoc.data();
+        if (!userData) {
+            throw new functions.https.HttpsError('not-found', 'User data is empty after update');
+        }
+        // Return user data in expected format
+        const result = {
+            id: userId,
+            name: userData.name || '',
+            email: userData.email || context.auth.token.email || '',
+            language: userData.language || 'en',
+            state: userData.state || null,
+        };
+        console.log(`Returning updated user data:`, result);
+        return result;
+    }
+    catch (error) {
+        console.error('Error in updateProfile:', error);
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
+        throw new functions.https.HttpsError('internal', 'Failed to update profile: ' + (error instanceof Error ? error.message : String(error)));
     }
 });
 //# sourceMappingURL=index.js.map
