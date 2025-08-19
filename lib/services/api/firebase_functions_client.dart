@@ -128,6 +128,67 @@ class FirebaseFunctionsClient {
     return 'UNKNOWN_ERROR';
   }
 
+  /// Helper method to safely convert Firebase Functions response data
+  /// Handles the conversion from _Map<Object?, Object?> to Map<String, dynamic>
+  dynamic _convertResponseData(dynamic data) {
+    if (data == null) {
+      return null;
+    }
+    
+    if (data is Map<Object?, Object?>) {
+      // Convert Map<Object?, Object?> to Map<String, dynamic>
+      return Map<String, dynamic>.from(data.map(
+        (key, value) => MapEntry(key.toString(), _convertNestedData(value)),
+      ));
+    }
+    
+    if (data is List) {
+      // Convert List items recursively
+      return data.map((item) => _convertResponseData(item)).toList();
+    }
+    
+    // Return primitive types as-is
+    return data;
+  }
+
+  /// Recursively convert nested data structures
+  dynamic _convertNestedData(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+    
+    if (value is Map<Object?, Object?>) {
+      return Map<String, dynamic>.from(value.map(
+        (k, v) => MapEntry(k.toString(), _convertNestedData(v)),
+      ));
+    }
+    
+    if (value is List) {
+      return value.map((item) => _convertNestedData(item)).toList();
+    }
+    
+    return value;
+  }
+
+  /// Debug method to analyze response data structure
+  void _debugResponseStructure(dynamic data, [String prefix = '']) {
+    print('🔍 [RESPONSE DEBUG] $prefix Type: ${data.runtimeType}');
+    
+    if (data is Map) {
+      print('🔍 [RESPONSE DEBUG] $prefix Map keys: ${data.keys.toList()}');
+      if (data.isNotEmpty) {
+        final firstEntry = data.entries.first;
+        print('🔍 [RESPONSE DEBUG] $prefix First key type: ${firstEntry.key.runtimeType}');
+        print('🔍 [RESPONSE DEBUG] $prefix First value type: ${firstEntry.value.runtimeType}');
+      }
+    } else if (data is List) {
+      print('🔍 [RESPONSE DEBUG] $prefix List length: ${data.length}');
+      if (data.isNotEmpty) {
+        print('🔍 [RESPONSE DEBUG] $prefix First item type: ${data.first.runtimeType}');
+      }
+    }
+  }
+
   // Enhanced method to call Firebase Functions with comprehensive debugging
   Future<T> callFunction<T>(String functionName, {Map<String, dynamic>? data}) async {
     print('\n🚀 [FUNCTION DEBUG] Starting function call: $functionName');
@@ -178,28 +239,42 @@ class FirebaseFunctionsClient {
       print('📡 [FUNCTION DEBUG] Firebase Functions instance: ${_functions.toString()}');
       
       final startTime = DateTime.now();
+      dynamic result;
       
       try {
         final callable = _functions.httpsCallable(cloudFunctionName);
         print('📞 [FUNCTION DEBUG] Created callable for: $cloudFunctionName');
         
-        final result = await callable.call(data ?? {});
+        result = await callable.call(data ?? {});
         
         final duration = DateTime.now().difference(startTime);
         print('✅ [FUNCTION DEBUG] Function call successful in ${duration.inMilliseconds}ms');
-        print('📊 [FUNCTION DEBUG] Result type: ${result.data.runtimeType}');
-        
-        if (result.data is List) {
-          print('📊 [FUNCTION DEBUG] Result list length: ${(result.data as List).length}');
-        } else if (result.data is Map) {
-          print('📊 [FUNCTION DEBUG] Result map keys: ${(result.data as Map).keys.toList()}');
+        print('📊 [FUNCTION DEBUG] Raw result type: ${result.data.runtimeType}');
+
+        // 🔧 CONVERSION: Convert Firebase Functions response to proper Dart types
+        final convertedData = _convertResponseData(result.data);
+        print('📊 [FUNCTION DEBUG] Converted result type: ${convertedData.runtimeType}');
+
+        if (convertedData is List) {
+          print('📊 [FUNCTION DEBUG] Result list length: ${(convertedData as List).length}');
+        } else if (convertedData is Map) {
+          print('📊 [FUNCTION DEBUG] Result map keys: ${(convertedData as Map).keys.toList()}');
         }
-        
-        return result.data as T;
+
+        return convertedData as T;
         
       } catch (callError) {
         final duration = DateTime.now().difference(startTime);
         print('❌ [FUNCTION DEBUG] Function call failed after ${duration.inMilliseconds}ms');
+        
+        // Check if it's a conversion error
+        if (callError.toString().contains('type') && callError.toString().contains('subtype')) {
+          print('🔧 [CONVERSION ERROR] Type conversion issue detected');
+          if (result != null) {
+            _debugResponseStructure(result.data, '[ERROR] ');
+          }
+        }
+        
         rethrow;
       }
       
