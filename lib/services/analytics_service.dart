@@ -146,10 +146,15 @@ class AnalyticsService {
     if (!_isInitialized || !_isAnalyticsEnabled) return;
     
     try {
-      // Send parameters as-is without adding reserved GA4 parameters
+      // Convert Map<String, dynamic> to Map<String, Object> for Firebase Analytics compatibility
+      Map<String, Object>? convertedParameters;
+      if (parameters != null) {
+        convertedParameters = parameters.cast<String, Object>();
+      }
+      
       await _analytics.logEvent(
         name: eventName,
-        parameters: parameters,
+        parameters: convertedParameters,
       );
       
       debugPrint('📊 Event logged: $eventName');

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/analytics_service.dart';
+import '../services/password_reset_handler.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   final String code;

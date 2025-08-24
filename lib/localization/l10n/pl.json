@@ -102,5 +102,17 @@
   "subscribed_success": "Jesteś subskrybentem! Ciesz się pełnym dostępem do wszystkich treści.",
   "subscription_failed": "Subskrypcja nie powiodła się. Spróbuj ponownie.",
   "subscription_error": "Wystąpił błąd. Spróbuj ponownie.",
-  "subscription_successful": "Subskrypcja udana!"
+  "subscription_successful": "Subskrypcja udana!",
+  
+  "verify_email": "Zweryfikuj E-mail",
+  "email_verified": "E-mail Zweryfikowany",
+  "verification_failed": "Weryfikacja Nie Powiodła Się",
+  "verifying_email": "Weryfikujemy Twój E-mail",
+  "go_to_profile": "Przejdź do Profilu",
+  "verifying_email_message": "Proszę czekać, weryfikujemy Twój nowy adres e-mail...",
+  "email_verified_message": "Twój adres e-mail został pomyślnie zweryfikowany. Za chwilę zostaniesz przekierowany do swojego profilu.",
+  "verification_failed_message": "Nie udało się zweryfikować e-maila. Spróbuj ponownie lub poproś o nowy e-mail weryfikacyjny.",
+  "email_changed_success_title": "E-mail Zmieniony Pomyślnie!",
+  "email_changed_success_message": "Twój e-mail został pomyślnie zmieniony! Zaloguj się używając nowego adresu e-mail.",
+  "go_to_signin": "Przejdź do Logowania"
 }

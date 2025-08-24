@@ -87,9 +87,9 @@ class FirebaseFunctionsClient {
     try {
       if (auth.currentUser != null) {
         final token = await auth.currentUser!.getIdToken(false);
-        print('🎫 [AUTH DEBUG] Token exists: ${token.isNotEmpty}');
-        print('🎫 [AUTH DEBUG] Token length: ${token.length}');
-        print('🎫 [AUTH DEBUG] Token preview: ${token.length > 20 ? token.substring(0, 20) : token}...');
+        print('🎫 [AUTH DEBUG] Token exists: ${token?.isNotEmpty ?? false}');
+        print('🎫 [AUTH DEBUG] Token length: ${token?.length ?? 0}');
+        print('🎫 [AUTH DEBUG] Token preview: ${token != null && token.length > 20 ? token.substring(0, 20) : token ?? "null"}...');
         
         // Try to get claims
         final result = await auth.currentUser!.getIdTokenResult();
@@ -226,8 +226,8 @@ class FirebaseFunctionsClient {
       try {
         final token = await auth.currentUser!.getIdToken(true);
         print('✅ [FUNCTION DEBUG] Token refresh successful');
-        print('🎫 [FUNCTION DEBUG] New token length: ${token.length}');
-        print('🎫 [FUNCTION DEBUG] Token starts with: ${token.length > 10 ? token.substring(0, 10) : token}...');
+        print('🎫 [FUNCTION DEBUG] New token length: ${token?.length ?? 0}');
+        print('🎫 [FUNCTION DEBUG] Token starts with: ${token != null && token.length > 10 ? token.substring(0, 10) : token ?? "null"}...');
       } catch (tokenError) {
         print('❌ [FUNCTION DEBUG] Token refresh failed: $tokenError');
         throw 'Token refresh failed: $tokenError';

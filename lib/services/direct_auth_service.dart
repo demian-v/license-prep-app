@@ -217,8 +217,8 @@ class DirectAuthService implements AuthApiInterface {
         throw Exception('No authenticated user found');
       }
       
-      // Update email in Firebase Auth
-      await currentUser.updateEmail(email);
+      // Update email in Firebase Auth (use verifyBeforeUpdateEmail for security)
+      await currentUser.verifyBeforeUpdateEmail(email);
       debugPrint('DirectAuthService: Firebase Auth email updated successfully');
       
       // Update email in Firestore

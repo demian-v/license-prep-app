@@ -62,6 +62,16 @@
                     android:host="licenseprepapp.web.app" 
                     android:pathPrefix="/password-reset.html" />
             </intent-filter>
+            <!-- Handle email verification deep links with oobCode -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="licenseprep" android:host="email-verified" />
+                <data android:scheme="licenseprep" android:host="emailVerified" />
+                <data android:scheme="licenseprep" android:path="/email-verified" />
+                <data android:scheme="licenseprep" android:path="/emailVerified" />
+            </intent-filter>
             <!-- Handle resetPassword deep links with specific paths -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

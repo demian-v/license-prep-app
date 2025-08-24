@@ -426,23 +426,26 @@ class AuthProvider extends ChangeNotifier {
     try {
       if (user == null) {
         debugPrint('⚠️ AuthProvider: Cannot apply verified email - user is null');
-        return;
+        throw Exception('User is not logged in');
       }
       
       // Reload the Firebase Auth user to get the latest email
       final firebaseUser = _firebaseAuth.currentUser;
       if (firebaseUser == null) {
         debugPrint('⚠️ AuthProvider: No Firebase Auth user found');
-        return;
+        throw Exception('Firebase Auth user not found');
       }
       
       // Force reload to get latest data from Firebase Auth
       await firebaseUser.reload();
-      final verifiedEmail = firebaseUser.email;
+      
+      // Get the updated user after reload
+      final updatedFirebaseUser = _firebaseAuth.currentUser;
+      final verifiedEmail = updatedFirebaseUser?.email;
       
       if (verifiedEmail == null) {
-        debugPrint('⚠️ AuthProvider: Firebase Auth user has no email');
-        return;
+        debugPrint('⚠️ AuthProvider: Firebase Auth user has no email after reload');
+        throw Exception('No email found in Firebase Auth user');
       }
       
       debugPrint('📧 AuthProvider: Found verified email in Firebase Auth: $verifiedEmail');
@@ -466,8 +469,7 @@ class AuthProvider extends ChangeNotifier {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('user', jsonEncode(updatedUser.toJson()));
         
-        // Try one more time to update Firestore, but don't worry if it fails
-        // This is just an attempt since we've seen permission issues
+        // Try to update Firestore, but don't fail if it doesn't work
         try {
           await _firestore.collection('users').doc(user!.id).update({
             'email': verifiedEmail,
@@ -475,8 +477,16 @@ class AuthProvider extends ChangeNotifier {
           });
           debugPrint('✅ AuthProvider: Successfully updated Firestore with verified email');
         } catch (e) {
-          // This is expected to fail due to permission issues
-          debugPrint('⚠️ AuthProvider: Could not update Firestore (expected): $e');
+          // This is expected to fail due to permission issues, but that's OK
+          debugPrint('⚠️ AuthProvider: Could not update Firestore (this is expected): $e');
+        }
+        
+        // Force an email sync to ensure everything is in sync
+        try {
+          await emailSyncService.smartSync(force: true);
+          debugPrint('🔄 AuthProvider: Forced email sync completed');
+        } catch (e) {
+          debugPrint('⚠️ AuthProvider: Email sync warning: $e');
         }
         
         // Notify listeners to update the UI
@@ -487,92 +497,87 @@ class AuthProvider extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('❌ AuthProvider: Error applying verified email: $e');
+      throw e; // Re-throw to handle in UI
     }
   }
   
   Future<void> updateUserEmail(String email, {String? password}) async {
-    if (user != null) {
-      try {
-        debugPrint('📧 AuthProvider: Updating user email to: $email');
-        
-        // Use secure method if password is provided
-        if (password != null) {
-          debugPrint('🔐 AuthProvider: Using secure email update with authentication');
-          await serviceLocator.auth.updateUserEmailSecure(user!.id, email, password);
-        } else {
-          // Try legacy method (this will likely fail on Firebase)
-          debugPrint('⚠️ AuthProvider: Using non-secure email update (may fail)');
-          await serviceLocator.auth.updateUserEmail(user!.id, email);
-        }
-        
-        // Get the updated user from the API
-        try {
-          final updatedUserFromApi = await serviceLocator.auth.getCurrentUser();
-          if (updatedUserFromApi != null) {
-            debugPrint('✅ AuthProvider: Successfully updated user email to $email via API');
-            user = updatedUserFromApi;
-          } else {
-            debugPrint('⚠️ AuthProvider: API returned null user, using local update');
-            // Create a new user object with updated email
-            // We can't use copyWith here because it doesn't allow email changes
-            user = User(
-              id: user!.id,
-              name: user!.name,
-              email: email, // Update the email
-              language: user!.language,
-              state: user!.state,
-            );
-          }
-        } catch (getUserError) {
-          debugPrint('⚠️ AuthProvider: Error getting updated user: $getUserError');
-          // Use local update as fallback
-          user = User(
-            id: user!.id,
-            name: user!.name,
-            email: email, // Update the email
-            language: user!.language,
-            state: user!.state,
-          );
-        }
-        
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('user', jsonEncode(user!.toJson()));
-        
-        notifyListeners();
-      } catch (e) {
-        // Check if this is an authentication error
-        String errorMessage = e.toString();
-        if (errorMessage.contains('INVALID_LOGIN_CREDENTIALS') || 
-            errorMessage.contains('wrong-password') ||
-            errorMessage.contains('Authentication failed') ||
-            errorMessage.contains('auth/invalid-credential') ||
-            errorMessage.contains('Reauthentication failed')) {
-          // This is an authentication error - do NOT update locally
-          debugPrint('❌ AuthProvider: Authentication error, NOT updating email: $e');
-          // Re-throw the error so it can be handled by the UI
-          throw e;
-        } else {
-          // Only for network errors or API unavailability, fall back to local update
-          debugPrint('⚠️ AuthProvider: Non-auth API error, updating email locally: $e');
-          
-          // Create a new user object with updated email
-          final updatedUser = User(
-            id: user!.id,
-            name: user!.name,
-            email: email, // Update the email
-            language: user!.language,
-            state: user!.state,
-          );
-          user = updatedUser;
-          
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('user', jsonEncode(updatedUser.toJson()));
-          
-          notifyListeners();
-        }
-      }
-    } else {
+    if (user == null) {
       debugPrint('⚠️ AuthProvider: Cannot update email - user is null');
+      throw Exception('User is not logged in');
+    }
+
+    debugPrint('📧 AuthProvider: Initiating email update to: $email');
+    
+    final firebaseUser = _firebaseAuth.currentUser;
+    if (firebaseUser == null) {
+      throw Exception('No Firebase user found');
+    }
+
+    try {
+      // Try to update email directly first
+      await firebaseUser.verifyBeforeUpdateEmail(email);
+      
+      debugPrint('✅ AuthProvider: Email verification sent successfully');
+      debugPrint('📧 AuthProvider: Verification email sent to: $email');
+      debugPrint('ℹ️ AuthProvider: User must verify new email to complete update');
+      
+    } catch (e) {
+      debugPrint('❌ AuthProvider: Email update failed: $e');
+      
+      // Check if this is a requires-recent-login error
+      if (e.toString().contains('requires-recent-login')) {
+        debugPrint('🔒 AuthProvider: Recent authentication required, attempting reauthentication');
+        
+        // Check if password was provided
+        if (password == null || password.isEmpty) {
+          debugPrint('⚠️ AuthProvider: Password required for reauthentication');
+          throw Exception('Password required for email change due to security requirements');
+        }
+        
+        try {
+          // Get current user's email for reauthentication
+          final currentEmail = firebaseUser.email;
+          if (currentEmail == null) {
+            throw Exception('Current user email not found');
+          }
+          
+          // Create credential with current email and provided password
+          final credential = firebase_auth.EmailAuthProvider.credential(
+            email: currentEmail,
+            password: password,
+          );
+          
+          debugPrint('🔑 AuthProvider: Reauthenticating user with provided password');
+          
+          // Reauthenticate the user
+          await firebaseUser.reauthenticateWithCredential(credential);
+          
+          debugPrint('✅ AuthProvider: Reauthentication successful, retrying email update');
+          
+          // Now retry the email update
+          await firebaseUser.verifyBeforeUpdateEmail(email);
+          
+          debugPrint('✅ AuthProvider: Email verification sent successfully after reauthentication');
+          debugPrint('📧 AuthProvider: Verification email sent to: $email');
+          debugPrint('ℹ️ AuthProvider: User must verify new email to complete update');
+          
+        } catch (reauthError) {
+          debugPrint('❌ AuthProvider: Reauthentication failed: $reauthError');
+          
+          // Check for specific authentication errors
+          if (reauthError.toString().contains('wrong-password') || 
+              reauthError.toString().contains('invalid-credential') ||
+              reauthError.toString().contains('invalid-login-credentials')) {
+            throw Exception('Incorrect password. Please check your password and try again.');
+          } else {
+            throw Exception('Authentication failed: ${reauthError.toString()}');
+          }
+        }
+      } else {
+        // Re-throw other errors as-is
+        throw e;
+      }
     }
   }
 
@@ -746,4 +751,5 @@ class AuthProvider extends ChangeNotifier {
       throw e;
     }
   }
+
 }

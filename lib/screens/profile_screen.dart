@@ -40,12 +40,21 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
   DateTime? _stateDialogStartTime;
   String? _stateBeforeChange;
   String? _stateNameBeforeChange;
+  
+  // Email verification status tracking
+  bool _isCheckingVerification = false;
+  bool _isVerificationPending = false;
+  String? _pendingEmail;
+  String? _currentEmailDuringVerification;
 
   @override
   void initState() {
     super.initState();
     // Force sync the email in Firestore when the profile screen loads
     _syncEmailOnScreenLoad();
+    
+    // Check email verification status
+    _checkEmailVerificationStatus();
     
     // Ensure state data is properly loaded
     _ensureStateDataLoaded();
@@ -356,23 +365,65 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     return stateInfo?.name ?? stateCode; // Return full name or code if not found
   }
 
+  // Simplified method to check email verification status
+  Future<void> _checkEmailVerificationStatus() async {
+    if (mounted) {
+      setState(() {
+        _isCheckingVerification = true;
+      });
+    }
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        // With simplified system, we don't track pending verifications
+        // Just ensure the current email is up to date
+        if (mounted) {
+          setState(() {
+            _isVerificationPending = false;
+            _pendingEmail = null;
+            _currentEmailDuringVerification = null;
+            _isCheckingVerification = false;
+          });
+        }
+        
+        debugPrint('📧 ProfileScreen: Email verification status checked - simplified system');
+        
+      } catch (e) {
+        debugPrint('⚠️ ProfileScreen: Error checking email verification status: $e');
+        if (mounted) {
+          setState(() {
+            _isCheckingVerification = false;
+          });
+        }
+      }
+    });
+  }
+
   // This method forces a sync of the email in Firestore when the profile screen loads
   void _syncEmailOnScreenLoad() {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // Force sync the email in Firebase with Firestore
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // CRITICAL: First apply any verified email from Firebase Auth
+      // This handles the case where user just completed email verification
+      await authProvider.applyVerifiedEmail();
+      
+      // Force sync the email in Firebase with Firestore (simplified)
       await emailSyncService.smartSync();
       
-      // Check for and handle email verification with context for dialog display
-      bool emailChanged = await emailSyncService.handlePostEmailVerification(context);
-      
-      // If email wasn't changed (no verification happened), just update the UI
-      if (!emailChanged && mounted) {
+      // With simplified system, no complex verification handling needed
+      if (mounted) {
         // Update Firestore with the current auth email
         await emailSyncService.updateFirestoreEmail();
 
         // Also update the AuthProvider's user object with correct email
         await emailSyncService.updateAuthProviderEmail(context);
       }
+      
+      // After syncing, refresh the verification status
+      await _checkEmailVerificationStatus();
+      
+      debugPrint('📧 ProfileScreen: Completed email sync on screen load');
     });
   }
 
@@ -639,6 +690,29 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
+                              SizedBox(height: 4),
+                              // Email display (simplified)
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.email,
+                                    size: 14,
+                                    color: Colors.grey[600],
+                                  ),
+                                  SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      user.email,
+                                      style: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 12,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: 8),
                               GestureDetector(
                                 onTap: () {
                                   // Navigate to edit profile screen

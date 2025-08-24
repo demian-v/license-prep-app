@@ -31,6 +31,7 @@ import 'screens/forgot_password_screen.dart';
 import 'screens/reset_email_sent_screen.dart';
 import 'screens/reset_password_screen.dart';
 import 'screens/password_reset_success_screen.dart';
+import 'screens/email_verification_screen.dart';
 import 'models/user.dart';
 import 'models/subscription.dart';
 import 'models/progress.dart';
@@ -44,6 +45,8 @@ import 'providers/practice_provider.dart';
 import 'providers/content_provider.dart';
 import 'providers/state_provider.dart';
 import 'localization/app_localizations.dart';
+import 'services/email_verification_handler.dart';
+import 'services/action_code_router.dart';
 
 // Setup auth listener to detect changes to the user's email
 void setupAuthListener() {
@@ -91,15 +94,16 @@ class AppLifecycleObserver extends WidgetsBindingObserver {
   
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // When app resumes from background (like when coming back from browser verification)
+    // When app resumes from background, sync emails
     if (state == AppLifecycleState.resumed) {
       // Only sync if app was backgrounded for more than 30 seconds
       if (_lastResumeSync == null || 
           DateTime.now().difference(_lastResumeSync!) > Duration(seconds: 30)) {
-        debugPrint('🔄 App resumed from background - running smart sync check');
+        debugPrint('🔄 App resumed from background - running sync check');
         _lastResumeSync = DateTime.now();
+        
+        // Simple email sync on app resume
         emailSyncService.smartSync();
-        emailSyncService.handlePostEmailVerification(null);
       } else {
         debugPrint('⏭️ App resume sync skipped - too recent');
       }
@@ -138,7 +142,7 @@ void main() async {
   // Set up auth listener to detect email changes
   setupAuthListener();
   
-  // Handle email verification immediately on startup
+  // Handle email sync on startup
   final currentAuthUser = firebase_auth.FirebaseAuth.instance.currentUser;
   if (currentAuthUser != null) {
     try {
@@ -148,9 +152,6 @@ void main() async {
       
       // Use smart sync with force flag for startup
       await emailSyncService.smartSync(force: true);
-      
-      // Handle post-verification flow
-      await emailSyncService.handlePostEmailVerification(null);
     } catch (e) {
       debugPrint('⚠️ Startup sync error: $e');
     }
@@ -222,6 +223,7 @@ void main() async {
   final authProvider = AuthProvider(user);
   final subscriptionProvider = SubscriptionProvider(subscription);
   final progressProvider = ProgressProvider(progress);
+  
   
   // Create language provider - only force English for non-registered users
   // For registered users, load their saved language preference
@@ -442,6 +444,70 @@ class MyApp extends StatelessWidget {
           onGenerateRoute: (settings) {
             debugPrint('🔗 Route requested: ${settings.name}');
             
+            // Handle all action code deep links (email verification and password reset) with smart routing
+            if (settings.name != null && ActionCodeRouter.containsActionCode(settings.name!)) {
+              debugPrint('🔗 Action code deep link detected: ${settings.name}');
+              
+              // Extract oobCode using the ActionCodeRouter
+              final oobCode = ActionCodeRouter.extractOobCode(settings.name!);
+              
+              if (oobCode != null) {
+                debugPrint('✅ Extracted oobCode: ${oobCode.substring(0, 8)}...');
+                
+                // Use FutureBuilder to determine route based on action type
+                return MaterialPageRoute(
+                  builder: (context) => FutureBuilder<ActionCodeRouteInfo>(
+                    future: ActionCodeRouter.determineRoute(oobCode),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return Scaffold(
+                          body: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                CircularProgressIndicator(),
+                                SizedBox(height: 16),
+                                Text('Processing verification link...'),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+                      
+                      if (snapshot.hasError) {
+                        debugPrint('❌ ActionCodeRouter error: ${snapshot.error}');
+                        return ProfileScreen(); // Fallback to profile
+                      }
+                      
+                      if (snapshot.hasData) {
+                        final routeInfo = snapshot.data!;
+                        debugPrint('🎯 ActionCodeRouter determined route: ${routeInfo.type} -> ${routeInfo.route}');
+                        
+                        switch (routeInfo.type) {
+                          case ActionCodeType.emailVerification:
+                            return EmailVerificationScreen(oobCode: oobCode);
+                          case ActionCodeType.passwordReset:
+                            return ResetPasswordScreen(code: oobCode);
+                          case ActionCodeType.unknown:
+                          default:
+                            debugPrint('⚠️ Unknown action code type, defaulting to profile');
+                            return ProfileScreen();
+                        }
+                      }
+                      
+                      // Fallback
+                      return ProfileScreen();
+                    },
+                  ),
+                );
+              } else {
+                debugPrint('❌ Could not extract oobCode from URL, routing to profile');
+                return MaterialPageRoute(
+                  builder: (context) => ProfileScreen(),
+                );
+              }
+            }
+            
             if (settings.name!.startsWith('/theory/')) {
               final moduleId = settings.name!.split('/')[2];
               // Fetch the module using ContentProvider
@@ -474,63 +540,31 @@ class MyApp extends StatelessWidget {
               return MaterialPageRoute(
                 builder: (context) => PracticeTestScreen(licenseId: licenseId),
               );
-            } 
-            // Handle password reset deep links with improved detection
-            else if (settings.name!.startsWith('/reset-password') || 
-                    settings.name! == 'resetPassword' ||
-                    settings.name! == '/resetPassword' ||
-                    (settings.name!.contains('resetPassword') && settings.name!.contains('oobCode')) ||
-                    settings.name! == 'mode=resetPassword') {
+            }
+            // Handle email verification deep links - simplified to just redirect to profile
+            else if (settings.name!.startsWith('/email-verified') || 
+                    settings.name! == 'emailVerified' ||
+                    settings.name! == '/emailVerified' ||
+                    settings.name!.contains('email-verified')) {
               
-              debugPrint('📲 Password reset deep link detected: ${settings.name}');
+              debugPrint('📧 Email verification deep link detected: ${settings.name}');
               
-              // Extract the oobCode using multiple methods to ensure we get it
-              String? code;
+              // Simply navigate to profile screen - the applyVerifiedEmail method
+              // will be called manually by the user if needed
+              return MaterialPageRoute(
+                builder: (context) => ProfileScreen(),
+              );
+            }
+            // Handle email verification error deep links
+            else if (settings.name!.startsWith('/email-verification-error') ||
+                    settings.name!.contains('email-verification-error')) {
               
-              // Method 1: Extract from query parameters if this is a proper URI
-              try {
-                // First try to parse as a complete URI
-                final uri = Uri.parse(settings.name!);
-                code = uri.queryParameters['oobCode'];
-                debugPrint('🔍 Extracted code from URI: $code');
-              } catch (e) {
-                debugPrint('⚠️ Could not parse as URI: $e');
-                
-                // Method 2: Manual string parsing for query parameters
-                final routePath = settings.name!;
-                if (routePath.contains('?')) {
-                  final queryString = routePath.split('?')[1];
-                  final params = queryString.split('&');
-                  
-                  for (final param in params) {
-                    if (param.startsWith('oobCode=')) {
-                      code = param.substring('oobCode='.length);
-                      debugPrint('🔍 Extracted code from query string: $code');
-                      break;
-                    }
-                  }
-                }
-              }
+              debugPrint('❌ Email verification error deep link detected: ${settings.name}');
               
-              // Method 3: Check if code is in the arguments
-              if (code == null && settings.arguments != null) {
-                if (settings.arguments is Map<String, dynamic>) {
-                  code = (settings.arguments as Map<String, dynamic>)['oobCode'];
-                  debugPrint('🔍 Extracted code from arguments: $code');
-                }
-              }
-              
-              debugPrint('🔑 Final password reset code: $code');
-              
-              if (code != null) {
-                // Use non-null assertion since we've already checked code is not null
-                final String nonNullableCode = code; // Explicitly create non-nullable string
-                return MaterialPageRoute(
-                  builder: (context) => ResetPasswordScreen(code: nonNullableCode),
-                );
-              } else {
-                debugPrint('❌ No reset code found in deep link');
-              }
+              // Navigate to profile screen
+              return MaterialPageRoute(
+                builder: (context) => ProfileScreen(),
+              );
             }
             return null;
           },

@@ -24,7 +24,7 @@ class EmailSyncService {
   static const Duration _minSyncInterval = Duration(minutes: 2);
   static const Duration _periodicSyncInterval = Duration(minutes: 10);
   
-  // Smart sync with debouncing
+  // Smart sync with debouncing - simplified without verification checks
   Future<void> smartSync({bool force = false}) async {
     // Skip if sync in progress
     if (_syncInProgress && !force) {
@@ -49,7 +49,7 @@ class EmailSyncService {
     _lastSyncTime = DateTime.now();
     
     try {
-      debugPrint('🚀 EmailSyncService: Starting smart sync (force: $force)');
+      debugPrint('🚀 EmailSyncService: Starting simplified smart sync (force: $force)');
       await syncEmailWithFirestore();
       _logSyncStats();
     } finally {
@@ -127,8 +127,7 @@ class EmailSyncService {
     _lastStatusCheck = null;
   }
   
-  // Sync emails if there's a mismatch - with improved debugging and forced updates
-  // While preserving user state information and fixing incorrect default values
+  // Simplified sync emails between Firebase Auth and Firestore
   Future<void> syncEmailWithFirestore() async {
     final user = _auth.currentUser;
     if (user == null || user.email == null) {
@@ -139,7 +138,7 @@ class EmailSyncService {
     final userId = user.uid;
     final authEmail = user.email!;
     
-    debugPrint('🔍 EmailSyncService: Starting email sync for user $userId - Auth email: $authEmail');
+    debugPrint('🔍 EmailSyncService: Starting simplified email sync for user $userId - Auth email: $authEmail');
     
     try {
       // Get current email from Firestore
@@ -424,219 +423,16 @@ class EmailSyncService {
     }
   }
   
-  // Special method for handling email verification return flow
-  // Call this when the user returns to the app after verifying email
-  Future<bool> handlePostEmailVerification(BuildContext? context) async {
-    debugPrint('🔄 EmailSyncService: Handling post-email verification flow');
-    bool emailChanged = false;
-    
-    try {
-      // First reload the user to ensure we have the most current email
-      final user = _auth.currentUser;
-      if (user != null) {
-        // Get the current email before reloading
-        final oldEmail = user.email;
-        
-        try {
-          // Force reload user data from Firebase
-          await user.reload();
-          
-          final newEmail = user.email;
-          if (newEmail != null && oldEmail != newEmail) {
-            debugPrint('📧 EmailSyncService: Email has changed from $oldEmail to $newEmail');
-            emailChanged = true;
-            
-            // Update Firestore with the reloaded email
-            await updateFirestoreEmail();
-            
-            // Update local state
-            await _refreshLocalUserData();
-            
-            // Store state, language, and name data in shared preferences for restoration after login
-            final prefs = await SharedPreferences.getInstance();
-            final userId = user.uid; // Get userId from user object
-            final userDoc = await _firestore.collection('users').doc(userId).get();
-            if (userDoc.exists) {
-              final userData = userDoc.data() as Map<String, dynamic>;
-              final state = userData['state']; 
-              final language = userData['language'];
-              final name = userData['name']; // Get the user's original name
-              
-              // Save user's name - this is critical for preserving name during email changes
-              if (name != null) {
-                await prefs.setString('last_user_name', name.toString());
-                // Verify it was saved
-                final savedName = prefs.getString('last_user_name');
-                debugPrint('✅ EmailSyncService: Saved name "$name" to preferences, verified: $savedName');
-                
-                if (savedName != name.toString()) {
-                  debugPrint('⚠️ EmailSyncService: Name may not have been saved correctly! Expected: $name, Actual: $savedName');
-                  // Try one more time with explicit toString
-                  await prefs.setString('last_user_name', '$name');
-                  final retryName = prefs.getString('last_user_name');
-                  debugPrint('✅ EmailSyncService: Retry saving name: $retryName');
-                }
-              } else {
-                // If name is null in Firestore, try to save a default name to prevent email-derived names
-                debugPrint('⚠️ EmailSyncService: User name is null in Firestore, attempting to use a default name');
-                await prefs.setString('last_user_name', 'User');
-                final savedName = prefs.getString('last_user_name');
-                debugPrint('✅ EmailSyncService: Saved default name "User" to preferences, verified: $savedName');
-              }
-              
-              if (state != null) {
-                await prefs.setString('last_user_state', state.toString());
-                // Verify it was saved
-                final savedState = prefs.getString('last_user_state');
-                debugPrint('✅ EmailSyncService: Saved state "$state" to preferences, verified: $savedState');
-                
-                if (savedState != state.toString()) {
-                  debugPrint('⚠️ EmailSyncService: State may not have been saved correctly! Expected: $state, Actual: $savedState');
-                  // Try one more time with explicit toString
-                  await prefs.setString('last_user_state', '$state');
-                  final retryState = prefs.getString('last_user_state');
-                  debugPrint('✅ EmailSyncService: Retry saving state: $retryState');
-                }
-              } else {
-                debugPrint('⚠️ EmailSyncService: User state is null, nothing to save for restoration');
-              }
-              
-              if (language != null) {
-                await prefs.setString('last_user_language', language.toString());
-                // Verify it was saved
-                final savedLanguage = prefs.getString('last_user_language');
-                debugPrint('✅ EmailSyncService: Saved language "$language" to preferences, verified: $savedLanguage');
-                
-                if (savedLanguage != language.toString()) {
-                  debugPrint('⚠️ EmailSyncService: Language may not have been saved correctly! Expected: $language, Actual: $savedLanguage');
-                  // Try one more time with explicit toString
-                  await prefs.setString('last_user_language', '$language');
-                  final retryLanguage = prefs.getString('last_user_language');
-                  debugPrint('✅ EmailSyncService: Retry saving language: $retryLanguage');
-                }
-              } else {
-                debugPrint('⚠️ EmailSyncService: User language is null, nothing to save for restoration');
-              }
-              
-              // Log the complete set of saved preferences for debugging
-              debugPrint('📋 EmailSyncService: Saved preferences summary:');
-              debugPrint('   - State: ${prefs.getString('last_user_state')}');
-              debugPrint('   - Language: ${prefs.getString('last_user_language')}');
-            } else {
-              debugPrint('⚠️ EmailSyncService: User document does not exist in Firestore, cannot save state/language');
-            }
-            
-            // If we have a context, show a dialog informing the user they need to login with new email
-            if (context != null && context.mounted) {
-              _showEmailChangedDialog(context, newEmail);
-              
-              // Log out the user so they can log back in with the new email
-              await _auth.signOut();
-              debugPrint('✅ EmailSyncService: User logged out after email change');
-              return true;
-            } else {
-              // If no context available, just log the user out silently
-              debugPrint('⚠️ EmailSyncService: No context available for dialog, logging out silently');
-              await _auth.signOut();
-              return true;
-            }
-          } else if (newEmail != null) {
-            debugPrint('📧 EmailSyncService: Email unchanged after verification: $newEmail');
-            
-            // Update Firestore with the current email to ensure sync
-            await updateFirestoreEmail();
-          }
-        } catch (e) {
-          if (e.toString().toLowerCase().contains('user-token-expired') || 
-              e.toString().toLowerCase().contains('requires-recent-login')) {
-            debugPrint('📧 EmailSyncService: User token expired, email verification likely completed');
-            emailChanged = true;
-            
-            // If we have a context, show a dialog informing the user they need to login again
-            if (context != null && context.mounted) {
-              _showSessionExpiredDialog(context);
-              
-              // Log out the user so they can log back in with the new email
-              await _auth.signOut();
-              return true;
-            } else {
-              // If no context available, just log the user out silently
-              debugPrint('⚠️ EmailSyncService: No context available for dialog, logging out silently');
-              await _auth.signOut();
-              return true;
-            }
-          } else {
-            debugPrint('⚠️ EmailSyncService: Reload error: $e');
-            // Don't rethrow - we should try to finish the operation
-          }
-        }
-      } else {
-        debugPrint('⚠️ EmailSyncService: No authenticated user found');
-      }
-    } catch (e) {
-      debugPrint('❌ EmailSyncService: Error handling post-verification: $e');
-    }
-    
-    return emailChanged;
-  }
-  
-  // Show a dialog informing the user about the email change and next steps
-  void _showEmailChangedDialog(BuildContext context, String newEmail) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Text('Email Verified Successfully'),
-        content: Text(
-          'Your email has been changed to $newEmail. You will need to log in again with your new email address.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-            },
-            child: Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  // Show a dialog informing the user about session expiration
-  void _showSessionExpiredDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Text('Session Expired'),
-        content: Text(
-          'Your session has expired, likely due to email verification. Please log in again with your new email address.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-            },
-            child: Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  // Helper method to refresh local user data
-  Future<void> _refreshLocalUserData() async {
-    try {
-      // Force reload the Firebase Auth user
-      final user = _auth.currentUser;
-      if (user != null) {
-        await user.reload();
-      }
-    } catch (e) {
-      debugPrint('❌ EmailSyncService: Error refreshing local user data: $e');
-    }
+  // Get basic email sync status for debugging - simplified
+  Map<String, dynamic> getSyncStatus() {
+    return {
+      'lastSyncTime': _lastSyncTime?.toIso8601String(),
+      'syncInProgress': _syncInProgress,
+      'lastKnownAuthEmail': _lastKnownAuthEmail,
+      'lastKnownFirestoreEmail': _lastKnownFirestoreEmail,
+      'lastStatusCheck': _lastStatusCheck?.toIso8601String(),
+      'periodicTimerActive': _periodicTimer?.isActive ?? false,
+    };
   }
 }
 

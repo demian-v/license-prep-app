@@ -106,5 +106,17 @@
   "subscribed_success": "You're subscribed! Enjoy full access to all content.",
   "subscription_failed": "Subscription failed. Please try again.",
   "subscription_error": "An error occurred. Please try again.",
-  "subscription_successful": "Subscription successful!"
+  "subscription_successful": "Subscription successful!",
+  
+  "verify_email": "Verify Email",
+  "email_verified": "Email Verified",
+  "verification_failed": "Verification Failed",
+  "verifying_email": "Verifying Your Email",
+  "go_to_profile": "Go To Profile",
+  "verifying_email_message": "Please wait while we verify your new email address...",
+  "email_verified_message": "Your email address has been successfully verified. You will be redirected to your profile shortly.",
+  "verification_failed_message": "Failed to verify email. Please try again or request a new verification email.",
+  "email_changed_success_title": "Email Changed Successfully!",
+  "email_changed_success_message": "Your email has been changed successfully! Please sign in with your new email address.",
+  "go_to_signin": "Go to Sign In"
 }

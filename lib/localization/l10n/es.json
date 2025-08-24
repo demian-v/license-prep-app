@@ -102,5 +102,17 @@
   "subscribed_success": "¡Estás suscrito! Disfruta del acceso completo a todo el contenido.",
   "subscription_failed": "La suscripción falló. Por favor, inténtalo de nuevo.",
   "subscription_error": "Ocurrió un error. Por favor, inténtalo de nuevo.",
-  "subscription_successful": "¡Suscripción exitosa!"
+  "subscription_successful": "¡Suscripción exitosa!",
+  
+  "verify_email": "Verificar Correo",
+  "email_verified": "Correo Verificado",
+  "verification_failed": "Verificación Falló",
+  "verifying_email": "Verificando Su Correo",
+  "go_to_profile": "Ir al Perfil",
+  "verifying_email_message": "Por favor espere mientras verificamos su nueva dirección de correo...",
+  "email_verified_message": "Su dirección de correo ha sido verificada exitosamente. Será redirigido a su perfil en breve.",
+  "verification_failed_message": "No se pudo verificar el correo. Por favor, inténtelo de nuevo o solicite un nuevo correo de verificación.",
+  "email_changed_success_title": "¡Correo Cambiado Exitosamente!",
+  "email_changed_success_message": "¡Su correo ha sido cambiado exitosamente! Por favor inicie sesión con su nueva dirección de correo.",
+  "go_to_signin": "Ir a Iniciar Sesión"
 }

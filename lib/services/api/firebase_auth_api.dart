@@ -679,8 +679,8 @@ class FirebaseAuthApi implements AuthApiInterface {
         throw 'No authenticated user found';
       }
       
-      // Update email in Firebase Auth
-      await currentAuth.updateEmail(email);
+      // Update email in Firebase Auth (use verifyBeforeUpdateEmail for security)
+      await currentAuth.verifyBeforeUpdateEmail(email);
       
       // Then update in Firestore via function
       final result = await _functionsClient.callFunction<Map<String, dynamic>>(
