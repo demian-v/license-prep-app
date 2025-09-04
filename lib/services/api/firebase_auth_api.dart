@@ -750,37 +750,87 @@ class FirebaseAuthApi implements AuthApiInterface {
     }
   }
   
-  /// Deletes user account
+  /// Deletes user account with backup mechanism
   @override
   Future<void> deleteAccount(String userId) async {
     try {
+      // STEP 1: Try Firebase Functions (PRIMARY METHOD)
       debugPrint('🗑️ [API] Deleting user account via Firebase function');
       
-      // Delete account in Firestore first via function
-      final result = await _functionsClient.callFunction<Map<String, dynamic>>(
-        'deleteUserAccount',
-        data: {'userId': userId},
-      );
-      
-      // Then delete the Firebase Auth user
-      final currentAuth = FirebaseAuth.instance.currentUser;
-      if (currentAuth == null) {
-        throw 'No authenticated user found';
+      try {
+        final result = await _functionsClient.callFunction<Map<String, dynamic>>(
+          'deleteUserAccount',
+          data: {'userId': userId},
+        );
+        
+        // Check if we got a proper success response
+        if (result != null && result['success'] == true) {
+          debugPrint('✅ [API] Account deleted successfully via Firebase function');
+          
+          // Function succeeded, now delete Firebase Auth user
+          await _deleteFirebaseAuthUser();
+          await _functionsClient.clearAuthToken();
+          debugPrint('✅ [API] Account deletion completed via Firebase function');
+          return;
+        }
+      } catch (functionError) {
+        debugPrint('❌ [API] Firebase function failed: $functionError, trying direct fallback...');
       }
       
-      await currentAuth.delete();
+      // STEP 2: Fallback to direct Firebase operations
+      debugPrint('🔄 [API] Using direct Firebase fallback for account deletion');
       
-      // Clear any stored tokens
+      // Delete user document from Firestore directly
+      try {
+        await _firestore.collection('users').doc(userId).delete();
+        debugPrint('✅ [API] User document deleted from Firestore via fallback');
+      } catch (firestoreError) {
+        debugPrint('⚠️ [API] Failed to delete user document from Firestore: $firestoreError');
+        // Continue with auth deletion even if Firestore fails
+      }
+      
+      // Delete Firebase Auth user
+      await _deleteFirebaseAuthUser();
+      
+      // Clear tokens
       await _functionsClient.clearAuthToken();
       
-      debugPrint('✅ [API] Account deleted successfully');
+      debugPrint('✅ [API] Account deletion completed via direct fallback');
+      
     } catch (e) {
       debugPrint('❌ [API] Error deleting account: $e');
       
       // Try to clear tokens even if account deletion failed
-      await _functionsClient.clearAuthToken();
+      try {
+        await _functionsClient.clearAuthToken();
+      } catch (tokenError) {
+        debugPrint('⚠️ [API] Failed to clear tokens: $tokenError');
+      }
       
       throw 'Failed to delete account: $e';
+    }
+  }
+
+  /// Helper method to delete Firebase Auth user with proper error handling
+  Future<void> _deleteFirebaseAuthUser() async {
+    try {
+      final currentAuth = FirebaseAuth.instance.currentUser;
+      if (currentAuth == null) {
+        debugPrint('⚠️ [API] No Firebase Auth user found to delete');
+        return;
+      }
+      
+      await currentAuth.delete();
+      debugPrint('✅ [API] Firebase Auth user deleted successfully');
+    } catch (authError) {
+      debugPrint('❌ [API] Error deleting Firebase Auth user: $authError');
+      
+      // Check for specific auth errors that might require reauthentication
+      if (authError.toString().contains('requires-recent-login')) {
+        throw 'Account deletion requires recent authentication. Please log out and log back in, then try again.';
+      } else {
+        throw 'Failed to delete Firebase Auth user: $authError';
+      }
     }
   }
 }

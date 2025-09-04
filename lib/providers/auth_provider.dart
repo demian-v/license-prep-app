@@ -586,7 +586,7 @@ class AuthProvider extends ChangeNotifier {
       try {
         debugPrint('🗑️ AuthProvider: Deleting user account for ID: ${user!.id}');
         
-        // Try to use the API to delete the account
+        // Try to use the API to delete the account (now with backup mechanism)
         await serviceLocator.auth.deleteAccount(user!.id);
         
         // Clear local data after successful API deletion
@@ -597,8 +597,10 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
         debugPrint('✅ AuthProvider: User account deleted successfully');
       } catch (e) {
-        debugPrint('⚠️ AuthProvider: Account deletion error: $e');
+        debugPrint('! AuthProvider: Account deletion error: $e');
+        
         // Still clear local data even if API deletion fails
+        // This ensures the user is logged out locally regardless
         user = null;
         
         final prefs = await SharedPreferences.getInstance();
@@ -606,9 +608,13 @@ class AuthProvider extends ChangeNotifier {
         
         notifyListeners();
         debugPrint('🗑️ AuthProvider: User account deleted locally due to API error');
+        
+        // Re-throw the error so the UI can handle it appropriately
+        throw 'Failed to delete account: $e';
       }
     } else {
       debugPrint('⚠️ AuthProvider: Cannot delete account - user is null');
+      throw 'No user logged in';
     }
   }
 

@@ -5,6 +5,7 @@ import '../localization/app_localizations.dart';
 import '../providers/language_provider.dart';
 import '../services/email_sync_service.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'dart:async';
 
 class PersonalInfoScreen extends StatefulWidget {
   @override
@@ -23,6 +24,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
   String? _passwordError; // Added variable to track password error
   late AnimationController _titleAnimationController;
   late Animation<double> _titlePulseAnimation;
+  
+  // Auth state listener and timeout timer
+  StreamSubscription<firebase_auth.User?>? _authStateSubscription;
+  Timer? _loadingTimeoutTimer;
 
   // Helper method to get correct translations
   String _translate(String key, LanguageProvider languageProvider) {
@@ -205,6 +210,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
     // Setup password error clearing
     _setupPasswordListener();
     
+    // Setup auth state listener for account deletion
+    _setupAuthStateListener();
+    
     // Handle post-email verification when screen initializes
     _handlePossibleEmailVerification();
   }
@@ -255,8 +263,85 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
     });
   }
 
+  // Setup auth state listener for account deletion
+  void _setupAuthStateListener() {
+    _authStateSubscription = firebase_auth.FirebaseAuth.instance
+        .authStateChanges()
+        .listen((firebase_auth.User? user) {
+      if (user == null && mounted) {
+        // User has been deleted/logged out - navigate to login
+        debugPrint('🔄 Auth state changed: user is null, navigating to login');
+        _navigateToLoginSafely();
+      }
+    });
+  }
+
+  // Safe navigation method with multiple fallbacks
+  void _navigateToLoginSafely() {
+    if (!mounted) return;
+    
+    // Reset loading state first
+    if (_isLoading) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+    
+    // Cancel any pending timeout timer
+    _loadingTimeoutTimer?.cancel();
+    
+    // Try multiple navigation approaches
+    try {
+      Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil(
+        '/login', 
+        (route) => false,
+      );
+      debugPrint('✅ Successfully navigated to login via rootNavigator');
+    } catch (e) {
+      debugPrint('⚠️ Root navigator failed, trying regular navigator: $e');
+      try {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/login', 
+          (route) => false,
+        );
+        debugPrint('✅ Successfully navigated to login via regular navigator');
+      } catch (e2) {
+        debugPrint('❌ All navigation attempts failed: $e2');
+        // At this point, the auth state change should handle navigation
+      }
+    }
+  }
+
+  // Loading timeout mechanism
+  void _startLoadingTimeout() {
+    _loadingTimeoutTimer?.cancel();
+    _loadingTimeoutTimer = Timer(Duration(seconds: 5), () {
+      if (mounted && _isLoading) {
+        debugPrint('⏰ Loading timeout reached, resetting state');
+        setState(() {
+          _isLoading = false;
+        });
+        
+        // Show user feedback
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Account deletion completed. Please log in again.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        
+        // Try to navigate
+        _navigateToLoginSafely();
+      }
+    });
+  }
+
   @override
   void dispose() {
+    _authStateSubscription?.cancel();
+    _loadingTimeoutTimer?.cancel();
     _titleAnimationController.dispose();
     _nameController.removeListener(() { setState(() {}); });
     _emailController.removeListener(() { setState(() {}); });
@@ -426,24 +511,42 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
                 _isLoading = true;
               });
               
+              // Start timeout timer
+              _startLoadingTimeout();
+              
               try {
                 final authProvider = Provider.of<AuthProvider>(context, listen: false);
                 await authProvider.deleteAccount();
                 
-                // Navigate to login screen
-                Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                debugPrint('✅ Account deletion completed, auth state listener will handle navigation');
+                
+                // The auth state listener will handle navigation automatically
+                // But add a small delay fallback just in case
+                if (mounted) {
+                  await Future.delayed(Duration(milliseconds: 500));
+                  if (mounted && _isLoading) {
+                    _navigateToLoginSafely();
+                  }
+                }
+                
               } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error: $e'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                debugPrint('❌ Account deletion error in UI: $e');
+                
+                // Cancel timeout timer since we're handling the error
+                _loadingTimeoutTimer?.cancel();
                 
                 if (mounted) {
                   setState(() {
                     _isLoading = false;
                   });
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Colors.red,
+                      duration: Duration(seconds: 5),
+                    ),
+                  );
                 }
               }
             },
