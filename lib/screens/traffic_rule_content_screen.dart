@@ -5,6 +5,7 @@ import '../providers/language_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/state_provider.dart';
 import '../services/analytics_service.dart';
+import '../widgets/report_sheet.dart';
 import 'package:provider/provider.dart';
 
 class TrafficRuleContentScreen extends StatefulWidget {
@@ -168,6 +169,57 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
     } else {
       return 'unknown_error';
     }
+  }
+
+  // Report methods
+  void _showTopicReportSheet() {
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final stateProvider = Provider.of<StateProvider>(context, listen: false);
+    
+    final userState = authProvider.user?.state ?? stateProvider.selectedStateId;
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => ReportSheet(
+        contentType: 'theory_section',
+        contextData: {
+          'topicDocId': widget.topic.id, // e.g., topic_3_en_IL
+          'sectionIndex': -1, // -1 indicates entire topic
+          'sectionTitle': 'Entire Topic: ${widget.topic.title}',
+          'language': languageProvider.language,
+          'state': userState,
+          'topicTitle': widget.topic.title, // Additional context for triage
+          'totalSections': widget.topic.sections?.length ?? 0, // Context for section count
+        },
+      ),
+    );
+  }
+
+  void _showSectionReportSheet(int sectionIndex, String sectionTitle) {
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final stateProvider = Provider.of<StateProvider>(context, listen: false);
+    
+    final userState = authProvider.user?.state ?? stateProvider.selectedStateId;
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => ReportSheet(
+        contentType: 'theory_section',
+        contextData: {
+          'topicDocId': widget.topic.id,
+          'sectionIndex': sectionIndex,
+          'sectionTitle': sectionTitle.isNotEmpty ? sectionTitle : 'Section ${sectionIndex + 1}',
+          'language': languageProvider.language,
+          'state': userState,
+          'topicTitle': widget.topic.title, // Additional context for triage
+          'totalSections': widget.topic.sections?.length ?? 0, // Context for section count
+        },
+      ),
+    );
   }
 
   // Topic-based gradient selection
@@ -353,6 +405,40 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
     );
   }
 
+  // Section header with report button
+  Widget _buildSectionHeader(String title, int index) {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildSectionTitle(title, index),
+        ),
+        SizedBox(width: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.8),
+            borderRadius: BorderRadius.circular(6),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                spreadRadius: 0,
+                blurRadius: 2,
+                offset: Offset(0, 1),
+              ),
+            ],
+          ),
+          child: IconButton(
+            icon: Icon(Icons.warning_amber_rounded, size: 16),
+            onPressed: () => _showSectionReportSheet(index, title),
+            tooltip: 'Report Section Issue',
+            padding: EdgeInsets.all(4),
+            constraints: BoxConstraints(minWidth: 24, minHeight: 24),
+            color: Colors.grey.shade700,
+          ),
+        ),
+      ],
+    );
+  }
+
   // Enhanced content text
   Widget _buildSectionContent(String content) {
     // Process content for better formatting
@@ -397,9 +483,9 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Enhanced section title
+          // Enhanced section header with report button
           if (section.title != null && section.title.isNotEmpty)
-            _buildSectionTitle(section.title, index),
+            _buildSectionHeader(section.title, index),
           
           if (section.title != null && section.title.isNotEmpty)
             SizedBox(height: 16),
@@ -690,6 +776,11 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
           },
         ),
         actions: [
+          IconButton(
+            icon: Icon(Icons.warning_amber_rounded),
+            onPressed: _showTopicReportSheet,
+            tooltip: 'Report Issue',
+          ),
           IconButton(
             icon: Icon(Icons.search),
             onPressed: () {

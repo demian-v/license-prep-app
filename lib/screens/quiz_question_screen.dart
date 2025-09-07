@@ -9,6 +9,7 @@ import '../providers/state_provider.dart';
 import '../services/service_locator.dart';
 import '../services/analytics_service.dart';
 import '../localization/app_localizations.dart';
+import '../widgets/report_sheet.dart';
 import 'quiz_result_screen.dart';
 
 class QuizQuestionScreen extends StatefulWidget {
@@ -660,6 +661,29 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
     }
   }
   
+  void _showReportSheet(BuildContext context) {
+    if (questions.isEmpty) return;
+    
+    final currentQuestion = questions[currentQuestionIndex];
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final stateProvider = Provider.of<StateProvider>(context, listen: false);
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => ReportSheet(
+        contentType: 'quiz_question',
+        contextData: {
+          'questionId': currentQuestion.id,
+          'language': languageProvider.language,
+          'state': stateProvider.selectedStateId ?? 'ALL',
+          'topicId': currentQuestion.topicId,
+          'ruleReference': currentQuestion.ruleReference,
+        },
+      ),
+    );
+  }
+  
   @override
   Widget build(BuildContext context) {
     // Common AppBar for all states
@@ -746,9 +770,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
       actions: [
         IconButton(
           icon: Icon(Icons.warning_amber_rounded),
-          onPressed: () {
-            // Show report button functionality
-          },
+          onPressed: () => _showReportSheet(context),
         ),
         Consumer<ProgressProvider>(
           builder: (context, progressProvider, child) {

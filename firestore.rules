@@ -1,6 +1,12 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return request.auth != null &&
+             exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
     // Users can read/write their own user document
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
@@ -30,6 +36,25 @@ service cloud.firestore {
     
     match /practiceTests/{document} {
       allow read: if request.auth != null;
+    }
+    
+    // Reports collection - allow authenticated users to create, admins to manage
+    match /reports/{reportId} {
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasAll(['createdAt','reason','contentType','status'])
+        && request.resource.data.status == 'open'
+        && request.resource.data.reason in ['image','translation','other']
+        && (
+          (request.resource.data.contentType == 'quiz_question' &&
+           request.resource.data.entity.keys().hasAll(['questionId','path'])) ||
+          (request.resource.data.contentType == 'theory_section' &&
+           request.resource.data.entity.keys().hasAll(['topicDocId','sectionIndex','path']))
+        )
+        && (request.resource.data.reason != 'other' ||
+            (request.resource.data.message is string &&
+             request.resource.data.message.size() >= 10));
+
+      allow read, update, delete: if isAdmin();
     }
     
     // Default deny all other access

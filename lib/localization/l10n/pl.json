@@ -114,5 +114,13 @@
   "verification_failed_message": "Nie udało się zweryfikować e-maila. Spróbuj ponownie lub poproś o nowy e-mail weryfikacyjny.",
   "email_changed_success_title": "E-mail Zmieniony Pomyślnie!",
   "email_changed_success_message": "Twój e-mail został pomyślnie zmieniony! Zaloguj się używając nowego adresu e-mail.",
-  "go_to_signin": "Przejdź do Logowania"
+  "go_to_signin": "Przejdź do Logowania",
+  
+  "report_issue": "Zgłoś problem",
+  "issue_with_image": "Problem z obrazem",
+  "issue_with_text_translation": "Problem z tłumaczeniem tekstu",
+  "other_issue": "Inny problem",
+  "describe_issue": "Opisz problem (min 10 znaków)…",
+  "report_thanks": "Dziękujemy! Sprawdzimy to.",
+  "report_error": "Nie udało się wysłać zgłoszenia. Spróbuj ponownie."
 }

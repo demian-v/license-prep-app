@@ -9,6 +9,7 @@ import '../models/quiz_question.dart';
 import '../services/service_locator.dart';
 import '../services/analytics_service.dart';
 import '../localization/app_localizations.dart';
+import '../widgets/report_sheet.dart';
 import 'practice_result_screen.dart';
 
 class PracticeQuestionScreen extends StatefulWidget {
@@ -76,6 +77,32 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
       scrollOffset.clamp(0.0, _pillsScrollController.position.maxScrollExtent),
       duration: Duration(milliseconds: 300),
       curve: Curves.easeOut,
+    );
+  }
+
+  /// Show report sheet for current question
+  void _showReportSheet() {
+    final practiceProvider = Provider.of<PracticeProvider>(context, listen: false);
+    final currentQuestion = practiceProvider.getCurrentQuestion();
+    if (currentQuestion == null) return;
+    
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final stateProvider = Provider.of<StateProvider>(context, listen: false);
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => ReportSheet(
+        contentType: 'quiz_question',
+        contextData: {
+          'questionId': currentQuestion.id,
+          'language': languageProvider.language,
+          'state': authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'IL',
+          'topicId': currentQuestion.topicId,
+          'ruleReference': currentQuestion.ruleReference,
+        },
+      ),
     );
   }
 
@@ -446,9 +473,7 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
           actions: [
             IconButton(
               icon: Icon(Icons.warning_amber_rounded),
-              onPressed: () {
-                // Report issue functionality
-              },
+              onPressed: _showReportSheet,
             ),
             Consumer<ProgressProvider>(
               builder: (context, progressProvider, child) {

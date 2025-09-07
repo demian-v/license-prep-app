@@ -114,5 +114,13 @@
   "verification_failed_message": "No se pudo verificar el correo. Por favor, inténtelo de nuevo o solicite un nuevo correo de verificación.",
   "email_changed_success_title": "¡Correo Cambiado Exitosamente!",
   "email_changed_success_message": "¡Su correo ha sido cambiado exitosamente! Por favor inicie sesión con su nueva dirección de correo.",
-  "go_to_signin": "Ir a Iniciar Sesión"
+  "go_to_signin": "Ir a Iniciar Sesión",
+  
+  "report_issue": "Reportar un problema",
+  "issue_with_image": "Problema con imagen",
+  "issue_with_text_translation": "Problema con traducción de texto",
+  "other_issue": "Otro problema",
+  "describe_issue": "Describe el problema (mín 10 caracteres)…",
+  "report_thanks": "¡Gracias! Lo revisaremos.",
+  "report_error": "No se pudo enviar el reporte. Inténtalo de nuevo."
 }

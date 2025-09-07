@@ -19,6 +19,7 @@ import 'api/progress_api.dart';
 import 'api/subscription_api.dart';
 import 'theory_cache_service.dart';
 import 'quiz_cache_service.dart';
+import 'report_service.dart';
 
 /// ServiceLocator provides a centralized way to access all API services
 /// It follows the Singleton pattern to ensure only one instance exists
@@ -72,6 +73,9 @@ class ServiceLocator {
   // Quiz Cache Service
   late QuizCacheService _quizCacheService;
   
+  // Report Service
+  late ReportService _reportService;
+  
   bool _isInitialized = false;
 
   /// Initialize all services with default implementation (REST)
@@ -96,6 +100,7 @@ class ServiceLocator {
     _analyticsService = AnalyticsService();
     _theoryCacheService = TheoryCacheService();
     _quizCacheService = QuizCacheService();
+    _reportService = ReportService();
     
     // Initialize REST implementations
     _restAuthApi = AuthApi(_apiClient);
@@ -159,6 +164,12 @@ class ServiceLocator {
   QuizCacheService get quizCache {
     _checkInitialization();
     return _quizCacheService;
+  }
+  
+  /// Getter for Report Service
+  ReportService get report {
+    _checkInitialization();
+    return _reportService;
   }
   
   /// Getters for accessing interface-based services (recommended)

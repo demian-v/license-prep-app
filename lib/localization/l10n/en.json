@@ -118,5 +118,13 @@
   "verification_failed_message": "Failed to verify email. Please try again or request a new verification email.",
   "email_changed_success_title": "Email Changed Successfully!",
   "email_changed_success_message": "Your email has been changed successfully! Please sign in with your new email address.",
-  "go_to_signin": "Go to Sign In"
+  "go_to_signin": "Go to Sign In",
+  
+  "report_issue": "Report an issue",
+  "issue_with_image": "Issue with image",
+  "issue_with_text_translation": "Issue with text translation",
+  "other_issue": "Other issue",
+  "describe_issue": "Describe the issue (min 10 chars)…",
+  "report_thanks": "Thanks! We'll review this.",
+  "report_error": "Could not submit report. Please try again."
 }
