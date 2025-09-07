@@ -444,14 +444,8 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
             'subscription': 'Suscripción:',
             'active': 'Activa',
             'try_premium': 'Prueba premium',
-            'reset_statistics': 'Restablecer estadísticas',
-            'reset_desc': 'Devolver todo como estaba antes',
             'logout': 'Cerrar sesión',
-            'reset_stats_title': 'Restablecer estadísticas',
-            'reset_stats_confirm': '¿Estás seguro de que quieres restablecer todas tus estadísticas? Esto borrará todo tu progreso en pruebas y temas. Esta acción no se puede deshacer.',
             'cancel': 'Cancelar',
-            'reset': 'Restablecer',
-            'stats_reset_success': 'Estadísticas restablecidas con éxito',
             'language_changed': 'Idioma cambiado a',
             'state_changed': 'Estado cambiado a',
             'select_lang_dialog': 'Seleccionar idioma',
@@ -478,14 +472,8 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
             'subscription': 'Підписка:',
             'active': 'Активна',
             'try_premium': 'Спробуйте преміум',
-            'reset_statistics': 'Скинути статистику',
-            'reset_desc': 'Повернути все як було раніше',
             'logout': 'Вийти з акаунта',
-            'reset_stats_title': 'Скинути статистику',
-            'reset_stats_confirm': 'Ви впевнені, що хочете скинути всю вашу статистику? Це видалить весь ваш прогрес у тестах та темах. Цю дію неможливо скасувати.',
             'cancel': 'Скасувати',
-            'reset': 'Скинути',
-            'stats_reset_success': 'Статистику скинуто успішно',
             'language_changed': 'Мову змінено на',
             'state_changed': 'Штат змінено на',
             'select_lang_dialog': 'Виберіть мову',
@@ -512,14 +500,8 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
             'subscription': 'Подписка:',
             'active': 'Активна',
             'try_premium': 'Попробуйте премиум',
-            'reset_statistics': 'Сбросить статистику',
-            'reset_desc': 'Вернуть всё как было раньше',
             'logout': 'Выйти из аккаунта',
-            'reset_stats_title': 'Сбросить статистику',
-            'reset_stats_confirm': 'Вы уверены, что хотите сбросить всю вашу статистику? Это удалит весь ваш прогресс в тестах и темах. Это действие нельзя отменить.',
             'cancel': 'Отмена',
-            'reset': 'Сбросить',
-            'stats_reset_success': 'Статистика сброшена успешно',
             'language_changed': 'Язык изменён на',
             'state_changed': 'Штат изменён на',
             'select_lang_dialog': 'Выберите язык',
@@ -546,14 +528,8 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
             'subscription': 'Subskrypcja:',
             'active': 'Aktywna',
             'try_premium': 'Wypróbuj premium',
-            'reset_statistics': 'Zresetuj statystyki',
-            'reset_desc': 'Przywróć wszystko do pierwotnego stanu',
             'logout': 'Wyloguj się',
-            'reset_stats_title': 'Zresetuj statystyki',
-            'reset_stats_confirm': 'Czy na pewno chcesz zresetować wszystkie swoje statystyki? Spowoduje to usunięcie całego postępu w testach i tematach. Tej akcji nie można cofnąć.',
             'cancel': 'Anuluj',
-            'reset': 'Zresetuj',
-            'stats_reset_success': 'Statystyki zresetowane pomyślnie',
             'language_changed': 'Język zmieniony na',
             'state_changed': 'Stan zmieniony na',
             'select_lang_dialog': 'Wybierz język',
@@ -581,14 +557,8 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
             'subscription': 'Subscription:',
             'active': 'Active',
             'try_premium': 'Try premium',
-            'reset_statistics': 'Reset statistics',
-            'reset_desc': 'Return everything as it was before',
             'logout': 'Log out',
-            'reset_stats_title': 'Reset Statistics',
-            'reset_stats_confirm': 'Are you sure you want to reset all your statistics? This will delete all your progress in tests and topics. This action cannot be undone.',
             'cancel': 'Cancel',
-            'reset': 'Reset',
-            'stats_reset_success': 'Statistics reset successfully',
             'language_changed': 'Language changed to',
             'state_changed': 'State changed to',
             'select_lang_dialog': 'Select Language',
@@ -789,17 +759,6 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                     subscriptionProvider.isSubscriptionActive, // Highlight if active
                     () {
                       Navigator.pushNamed(context, '/subscription');
-                    },
-                  ),
-                  SizedBox(height: 16),
-                  _buildEnhancedMenuCard(
-                    _translate('reset_statistics', languageProvider),
-                    _translate('reset_desc', languageProvider),
-                    Icons.restart_alt,
-                    4, // Reset Statistics - Red
-                    false,
-                    () {
-                      _showResetProgressConfirmation(context, languageProvider);
                     },
                   ),
                   SizedBox(height: 24),
@@ -1301,40 +1260,4 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     );
   }
 
-  void _showResetProgressConfirmation(BuildContext context, LanguageProvider languageProvider) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(_translate('reset_stats_title', languageProvider)),
-        content: Text(_translate('reset_stats_confirm', languageProvider)),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: Text(_translate('cancel', languageProvider)),
-          ),
-          TextButton(
-            onPressed: () async {
-              final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
-              await progressProvider.resetProgress();
-              Navigator.pop(context);
-              
-              // Show confirmation
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(_translate('stats_reset_success', languageProvider)),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            },
-            child: Text(_translate('reset', languageProvider)),
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.red,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

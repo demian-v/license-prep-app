@@ -114,66 +114,6 @@ class ProgressProvider extends ChangeNotifier {
     }
   }
   
-  // For backwards compatibility with existing code
-  Future<void> resetProgress() async {
-    await resetProgressWithUserId('');
-  }
-
-  // New method with userId parameter
-  Future<void> resetProgressWithUserId(String userId) async {
-    try {
-      // Create a new empty progress object, keeping only the selected license
-      final updatedProgress = UserProgress(
-        completedModules: [],
-        testScores: {},
-        selectedLicense: progress.selectedLicense,
-        topicProgress: {}, // Reset topic progress to empty
-        savedQuestions: [], // Reset saved questions to empty
-      );
-      
-      progress = updatedProgress;
-      
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('progress', jsonEncode(updatedProgress.toJson()));
-      
-      // Try to sync with API after updating local state
-      try {
-        // Use the concrete implementation for this specialized method
-        await serviceLocator.progressApi.syncOfflineProgress(
-          userId, 
-          {
-            'completedModules': [],
-            'testScores': {},
-            'topicProgress': {},
-            'savedQuestions': [],
-          }
-        );
-      } catch (e) {
-        debugPrint('Error syncing reset progress to server: $e');
-        // Continue anyway since local state is already updated
-      }
-      
-      notifyListeners();
-    } catch (e) {
-      // Fallback to local implementation if something fails
-      debugPrint('Error in resetProgressWithUserId: $e');
-      
-      final updatedProgress = UserProgress(
-        completedModules: [],
-        testScores: {},
-        selectedLicense: progress.selectedLicense,
-        topicProgress: {}, // Reset topic progress to empty
-        savedQuestions: [], // Reset saved questions to empty
-      );
-      
-      progress = updatedProgress;
-      
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('progress', jsonEncode(updatedProgress.toJson()));
-      
-      notifyListeners();
-    }
-  }
   
   // For backwards compatibility with existing code
   Future<void> toggleSavedQuestion(String questionId) async {
