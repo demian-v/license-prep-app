@@ -25,6 +25,17 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
   late AnimationController _titleAnimationController;
   late Animation<double> _titlePulseAnimation;
   
+  // Animation controllers for entrance animations
+  late AnimationController _cardAnimationController;
+  late AnimationController _featuresAnimationController;
+  late AnimationController _buttonAnimationController;
+
+  // Entrance animations
+  late Animation<double> _cardSlideAnimation;
+  late Animation<double> _cardFadeAnimation;
+  late Animation<double> _buttonSlideAnimation;
+  late Animation<double> _buttonFadeAnimation;
+  
   // Auth state listener and timeout timer
   StreamSubscription<firebase_auth.User?>? _authStateSubscription;
   Timer? _loadingTimeoutTimer;
@@ -170,11 +181,23 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
     });
   }
 
+  void _startAnimations() {
+    Future.delayed(Duration(milliseconds: 200), () {
+      if (mounted) _cardAnimationController.forward();
+    });
+    Future.delayed(Duration(milliseconds: 400), () {
+      if (mounted) _featuresAnimationController.forward();
+    });
+    Future.delayed(Duration(milliseconds: 600), () {
+      if (mounted) _buttonAnimationController.forward();
+    });
+  }
+
   @override
   void initState() {
     super.initState();
     
-    // Initialize animation controller
+    // Initialize animation controller for title pulse
     _titleAnimationController = AnimationController(
       duration: Duration(seconds: 3),
       vsync: this,
@@ -188,8 +211,58 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
       curve: Curves.easeInOut,
     ));
     
-    // Start the animation
+    // Start the title animation
     _titleAnimationController.repeat(reverse: true);
+
+    // Initialize entrance animation controllers
+    _cardAnimationController = AnimationController(
+      duration: Duration(milliseconds: 500),
+      vsync: this,
+    );
+    _featuresAnimationController = AnimationController(
+      duration: Duration(milliseconds: 400),
+      vsync: this,
+    );
+    _buttonAnimationController = AnimationController(
+      duration: Duration(milliseconds: 300),
+      vsync: this,
+    );
+
+    // Setup entrance animations
+    _cardSlideAnimation = Tween<double>(
+      begin: 50.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(
+      parent: _cardAnimationController,
+      curve: Curves.easeOut,
+    ));
+
+    _cardFadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _cardAnimationController,
+      curve: Curves.easeIn,
+    ));
+
+    _buttonSlideAnimation = Tween<double>(
+      begin: 30.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(
+      parent: _buttonAnimationController,
+      curve: Curves.easeOut,
+    ));
+
+    _buttonFadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _buttonAnimationController,
+      curve: Curves.easeIn,
+    ));
+
+    // Start entrance animations with delays
+    _startAnimations();
     
     // Initialize with current user data
     final user = Provider.of<AuthProvider>(context, listen: false).user;
@@ -343,6 +416,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
     _authStateSubscription?.cancel();
     _loadingTimeoutTimer?.cancel();
     _titleAnimationController.dispose();
+    _cardAnimationController.dispose();
+    _featuresAnimationController.dispose();
+    _buttonAnimationController.dispose();
     _nameController.removeListener(() { setState(() {}); });
     _emailController.removeListener(() { setState(() {}); });
     _nameController.dispose();
@@ -834,10 +910,17 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
                             children: [
                               SizedBox(height: 8),
                               // Personal Data Section
-                              _buildEnhancedSectionCard(
-                                title: _translate('change_personal_data', languageProvider),
-                                sectionIndex: 0,
-                                children: [
+                              AnimatedBuilder(
+                                animation: _cardAnimationController,
+                                builder: (context, child) {
+                                  return Transform.translate(
+                                    offset: Offset(0, _cardSlideAnimation.value),
+                                    child: Opacity(
+                                      opacity: _cardFadeAnimation.value,
+                                      child: _buildEnhancedSectionCard(
+                                        title: _translate('change_personal_data', languageProvider),
+                                        sectionIndex: 0,
+                                        children: [
                                   // Name field
                                   _buildFormField(
                                     context,
@@ -932,16 +1015,27 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
                                       fieldIndex: 2,
                                     ),
                                   ],
-                                ],
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
                               
                               SizedBox(height: 16),
                               
                               // Delete Account Section
-                              _buildEnhancedSectionCard(
-                                title: _translate('delete_account_section', languageProvider),
-                                sectionIndex: 1,
-                                children: [
+                              AnimatedBuilder(
+                                animation: _featuresAnimationController,
+                                builder: (context, child) {
+                                  return Transform.translate(
+                                    offset: Offset(0, _cardSlideAnimation.value),
+                                    child: Opacity(
+                                      opacity: _cardFadeAnimation.value,
+                                      child: _buildEnhancedSectionCard(
+                                        title: _translate('delete_account_section', languageProvider),
+                                        sectionIndex: 1,
+                                        children: [
                                   Container(
                                     padding: EdgeInsets.all(12),
                                     decoration: BoxDecoration(
@@ -983,7 +1077,11 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
                                     onPressed: () => _showDeleteConfirmation(context, languageProvider),
                                     buttonType: 'delete',
                                   ),
-                                ],
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
                             ],
                           ),
@@ -994,13 +1092,24 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
                     // Bottom Save Button
                     Padding(
                       padding: const EdgeInsets.all(16.0),
-                      child: _buildEnhancedButton(
-                        text: _translate('save', languageProvider),
-                        onPressed: _isFormModified() 
-                          ? () => _saveChanges(context, languageProvider)
-                          : null,
-                        buttonType: 'save',
-                        height: 56,
+                      child: AnimatedBuilder(
+                        animation: _buttonAnimationController,
+                        builder: (context, child) {
+                          return Transform.translate(
+                            offset: Offset(0, _buttonSlideAnimation.value),
+                            child: Opacity(
+                              opacity: _buttonFadeAnimation.value,
+                              child: _buildEnhancedButton(
+                                text: _translate('save', languageProvider),
+                                onPressed: _isFormModified() 
+                                  ? () => _saveChanges(context, languageProvider)
+                                  : null,
+                                buttonType: 'save',
+                                height: 56,
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ],
