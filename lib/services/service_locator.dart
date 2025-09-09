@@ -19,6 +19,7 @@ import 'api/progress_api.dart';
 import 'api/subscription_api.dart';
 import 'theory_cache_service.dart';
 import 'quiz_cache_service.dart';
+import 'counter_service.dart';
 import 'report_service.dart';
 
 /// ServiceLocator provides a centralized way to access all API services
@@ -73,6 +74,9 @@ class ServiceLocator {
   // Quiz Cache Service
   late QuizCacheService _quizCacheService;
   
+  // Counter Service
+  late CounterService _counterService;
+  
   // Report Service
   late ReportService _reportService;
   
@@ -100,7 +104,8 @@ class ServiceLocator {
     _analyticsService = AnalyticsService();
     _theoryCacheService = TheoryCacheService();
     _quizCacheService = QuizCacheService();
-    _reportService = ReportService();
+    _counterService = CounterService();
+    _reportService = ReportService(counterService: _counterService);
     
     // Initialize REST implementations
     _restAuthApi = AuthApi(_apiClient);
@@ -164,6 +169,12 @@ class ServiceLocator {
   QuizCacheService get quizCache {
     _checkInitialization();
     return _quizCacheService;
+  }
+  
+  /// Getter for Counter Service
+  CounterService get counter {
+    _checkInitialization();
+    return _counterService;
   }
   
   /// Getter for Report Service

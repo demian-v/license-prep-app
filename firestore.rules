@@ -38,9 +38,21 @@ service cloud.firestore {
       allow read: if request.auth != null;
     }
     
-    // Reports collection - allow authenticated users to create, admins to manage
+    // User-specific report counters - each user can manage their own counter
+    match /counters/{counterId} {
+      allow read, write: if request.auth != null 
+        && counterId == ('user_' + request.auth.uid + '_reports');
+    }
+    
+    // Reports collection - allow authenticated users to create with custom IDs, admins to manage
     match /reports/{reportId} {
       allow create: if request.auth != null
+        && (
+          // Allow clean sequential IDs (preferred)
+          reportId.matches('user_' + request.auth.uid + '_report_[0-9]+') ||
+          // Allow fallback IDs with timestamps (temporary support)
+          reportId.matches('user_' + request.auth.uid + '_report_[0-9]+_[0-9]+_[0-9]+')
+        )
         && request.resource.data.keys().hasAll(['createdAt','reason','contentType','status'])
         && request.resource.data.status == 'open'
         && request.resource.data.reason in ['image','translation','other']
@@ -55,6 +67,11 @@ service cloud.firestore {
              request.resource.data.message.size() >= 10));
 
       allow read, update, delete: if isAdmin();
+    }
+    
+    // Legacy reports with random IDs - keep support for existing reports
+    match /reports/{reportId} {
+      allow read: if isAdmin() && !reportId.matches('user_.*_report_[0-9]+');
     }
     
     // Default deny all other access
