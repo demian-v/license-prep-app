@@ -767,8 +767,8 @@ class FirebaseAuthApi implements AuthApiInterface {
         if (result != null && result['success'] == true) {
           debugPrint('✅ [API] Account deleted successfully via Firebase function');
           
-          // Function succeeded, now delete Firebase Auth user
-          await _deleteFirebaseAuthUser();
+          // Function succeeded and already deleted everything including Firebase Auth user
+          // Just clear tokens - no need to delete Firebase Auth user again
           await _functionsClient.clearAuthToken();
           debugPrint('✅ [API] Account deletion completed via Firebase function');
           return;

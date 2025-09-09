@@ -10,6 +10,11 @@ class FunctionNameMapper {
     'loginUser': 'getUserData',
     'registerUser': 'createUserRecord',
     'createOrUpdateUserDocument': 'createOrUpdateUserDocument',
+    'deleteUserAccount': 'deleteUserAccount',
+    'updateProfile': 'updateProfile',
+    'updateUserLanguage': 'updateUserLanguage',
+    'updateUserState': 'updateUserState',
+    'getUserData': 'getUserData',
     
     // Content functions
     'getQuizTopics': 'getQuizTopics',
@@ -19,6 +24,12 @@ class FunctionNameMapper {
     'getRoadSigns': 'getRoadSigns',
     'getTheoryModules': 'getTheoryModules',
     'getPracticeTests': 'getPracticeTests',
+    
+    // Saved Questions functions
+    'addSavedQuestion': 'addSavedQuestion',
+    'removeSavedQuestion': 'removeSavedQuestion',
+    'getSavedQuestions': 'getSavedQuestions',
+    'getSavedQuestionsWithContent': 'getSavedQuestionsWithContent',
     
     // Progress functions
     'getUserProgress': 'progress-getUserProgress',

@@ -1249,3 +1249,122 @@ export const updateProfile = functions.https.onCall(async (data, context) => {
     );
   }
 });
+
+// Account Management Functions
+
+// Delete user account with comprehensive error handling and logging
+export const deleteUserAccount = functions.https.onCall(async (data, context) => {
+  try {
+    console.log('deleteUserAccount called with data:', data);
+    
+    // Step 1: Validate authentication
+    if (!context.auth) {
+      console.error('Unauthenticated request to deleteUserAccount');
+      throw new functions.https.HttpsError(
+        'unauthenticated',
+        'User must be authenticated to delete account'
+      );
+    }
+    
+    const userId = context.auth.uid;
+    const { userId: requestedUserId } = data;
+    
+    console.log(`Account deletion requested for user: ${userId}`);
+    
+    // Step 2: Security validation - ensure user can only delete their own account
+    if (requestedUserId && requestedUserId !== userId) {
+      console.error(`User ${userId} attempted to delete account ${requestedUserId}`);
+      throw new functions.https.HttpsError(
+        'permission-denied',
+        'Users can only delete their own account'
+      );
+    }
+    
+    // Step 3: Check if user document exists
+    console.log(`Checking if user document exists for: ${userId}`);
+    const userDoc = await db.collection('users').doc(userId).get();
+    
+    if (!userDoc.exists) {
+      console.warn(`User document not found for: ${userId}, but proceeding with auth deletion`);
+    } else {
+      console.log(`User document found for: ${userId}, proceeding with deletion`);
+    }
+    
+    // Step 4: Delete related user data
+    const batch = db.batch();
+    
+    // Delete user document
+    if (userDoc.exists) {
+      batch.delete(db.collection('users').doc(userId));
+      console.log(`Added user document deletion to batch for: ${userId}`);
+    }
+    
+    // Delete saved questions document if it exists
+    try {
+      const savedQuestionsDoc = await db.collection('savedQuestions').doc(userId).get();
+      if (savedQuestionsDoc.exists) {
+        batch.delete(db.collection('savedQuestions').doc(userId));
+        console.log(`Added saved questions deletion to batch for: ${userId}`);
+      }
+    } catch (savedQuestionsError) {
+      console.warn(`Error checking saved questions for user ${userId}:`, savedQuestionsError);
+      // Continue with account deletion even if saved questions check fails
+    }
+    
+    // Step 5: Execute Firestore batch deletion
+    try {
+      await batch.commit();
+      console.log(`Successfully deleted Firestore documents for user: ${userId}`);
+    } catch (firestoreError) {
+      console.error(`Failed to delete Firestore documents for user ${userId}:`, firestoreError);
+      throw new functions.https.HttpsError(
+        'internal',
+        'Failed to delete user data from database'
+      );
+    }
+    
+    // Step 6: Delete Firebase Auth user
+    try {
+      console.log(`Deleting Firebase Auth user: ${userId}`);
+      await admin.auth().deleteUser(userId);
+      console.log(`Successfully deleted Firebase Auth user: ${userId}`);
+    } catch (authError: unknown) {
+      console.error(`Failed to delete Firebase Auth user ${userId}:`, authError);
+      
+      // Check for specific auth errors
+      if (authError && typeof authError === 'object' && 'code' in authError && authError.code === 'auth/user-not-found') {
+        console.warn(`Firebase Auth user ${userId} not found, but Firestore data was deleted`);
+        // Continue - user data is cleaned up even if auth user doesn't exist
+      } else {
+        throw new functions.https.HttpsError(
+          'internal',
+          'Failed to delete user authentication record'
+        );
+      }
+    }
+    
+    console.log(`Account deletion completed successfully for user: ${userId}`);
+    
+    // Step 7: Return success response
+    return {
+      success: true,
+      message: 'Account deleted successfully',
+      userId: userId,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    
+  } catch (error) {
+    console.error('Error in deleteUserAccount:', error);
+    
+    // Re-throw HttpsError instances as-is
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    
+    // Wrap other errors
+    throw new functions.https.HttpsError(
+      'internal',
+      'Account deletion failed: ' + (error instanceof Error ? error.message : String(error))
+    );
+  }
+});
