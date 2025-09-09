@@ -41,16 +41,26 @@ service cloud.firestore {
     // User-specific report counters - each user can manage their own counter
     match /counters/{counterId} {
       allow read, write: if request.auth != null 
+        && counterId.matches('user_[^_]+_reports')
         && counterId == ('user_' + request.auth.uid + '_reports');
+    }
+    
+    // Global report counter - allow authenticated users to read and write
+    match /counters/global_report_counter {
+      allow read, write: if request.auth != null;
     }
     
     // Reports collection - allow authenticated users to create with custom IDs, admins to manage
     match /reports/{reportId} {
       allow create: if request.auth != null
         && (
-          // Allow clean sequential IDs (preferred)
+          // Allow new global format: {number}_user_{userId}_report_{number}
+          reportId.matches('[0-9]+_user_' + request.auth.uid + '_report_[0-9]+') ||
+          // Allow legacy format: user_{userId}_report_{number} (for backward compatibility)
           reportId.matches('user_' + request.auth.uid + '_report_[0-9]+') ||
-          // Allow fallback IDs with timestamps (temporary support)
+          // Allow global fallback IDs: {timestamp}_user_{userId}_report_fallback_{random}
+          reportId.matches('[0-9]+_user_' + request.auth.uid + '_report_fallback_[0-9]+') ||
+          // Allow legacy fallback IDs with timestamps (temporary support)
           reportId.matches('user_' + request.auth.uid + '_report_[0-9]+_[0-9]+_[0-9]+')
         )
         && request.resource.data.keys().hasAll(['createdAt','reason','contentType','status'])
