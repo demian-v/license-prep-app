@@ -626,7 +626,7 @@ class _SupportScreenState extends State<SupportScreen> with TickerProviderStateM
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: _canSubmit ? Colors.blue.shade700 : Colors.grey.shade500,
+                            color: _canSubmit ? Colors.black : Colors.grey.shade500,
                           ),
                         ),
                 ),
