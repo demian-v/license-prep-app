@@ -128,6 +128,10 @@
   "support_title": "Wsparcie",
   "support_message_placeholder": "Opisz swoje pytanie lub problem (min 10 znaków)...",
   "support_send": "Wyślij",
-  "support_thanks": "Dzięki! Odpowiemy wkrótce.",
-  "support_error": "Nie udało się wysłać wiadomości. Spróbuj ponownie."
+  "support_thanks": "Dzięki! Wkrótce się z Tobą skontaktujemy.",
+  "support_error": "Nie udało się wysłać wiadomości. Spróbuj ponownie.",
+  "contact_support": "Skontaktuj się z Pomocą",
+  "message_details": "Szczegóły Wiadomości:",
+  "character_counter": "{0}/10 minimum",
+  "support_response_info": "Zwykle odpowiadamy w ciągu 24 godzin. Twoja opinia pomaga nam ulepszyć aplikację."
 }

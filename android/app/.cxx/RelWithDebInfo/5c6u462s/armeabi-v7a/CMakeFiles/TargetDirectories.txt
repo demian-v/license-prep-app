@@ -1,0 +1,2 @@
+C:/Dev/flutter-project/license_prep_app/license_prep_app/android/app/.cxx/RelWithDebInfo/5c6u462s/armeabi-v7a/CMakeFiles/edit_cache.dir
+C:/Dev/flutter-project/license_prep_app/license_prep_app/android/app/.cxx/RelWithDebInfo/5c6u462s/armeabi-v7a/CMakeFiles/rebuild_cache.dir

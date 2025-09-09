@@ -133,5 +133,9 @@
   "support_message_placeholder": "Describe your question or issue (min 10 chars)...",
   "support_send": "Send",
   "support_thanks": "Thanks! We'll get back to you soon.",
-  "support_error": "Could not send message. Please try again."
+  "support_error": "Could not send message. Please try again.",
+  "contact_support": "Contact Support",
+  "message_details": "Message Details:",
+  "character_counter": "{0}/10 minimum",
+  "support_response_info": "We typically respond within 24 hours. Your feedback helps us improve the app."
 }
