@@ -480,9 +480,9 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> with TickerProv
               ),
             ),
             
-            // Action buttons
+            // Action buttons positioned like "Back to Theory" button
             Padding(
-              padding: EdgeInsets.all(16),
+              padding: EdgeInsets.only(left: 16, right: 16, bottom: 24, top: 4),
               child: isAnswerChecked
                   ? Container(
                       width: double.infinity,
