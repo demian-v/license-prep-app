@@ -171,31 +171,6 @@ class _TheoryScreenState extends State<TheoryScreen> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         foregroundColor: Colors.black,
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.refresh),
-            onPressed: () async {
-              // Clear cache for current state/language and force refresh
-              final contentProvider = Provider.of<ContentProvider>(context, listen: false);
-              await contentProvider.clearSpecificCache();
-              contentProvider.fetchContentAfterSelection(forceRefresh: true);
-              
-              // Show a snackbar to indicate refresh is happening
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Refreshing content...'),
-                  duration: Duration(seconds: 1),
-                ),
-              );
-            },
-          ),
-          IconButton(
-            icon: Icon(Icons.search),
-            onPressed: () {
-              // Search functionality (to be implemented)
-            },
-          ),
-        ],
       ),
       body: Consumer<ContentProvider>(
         builder: (context, contentProvider, child) {

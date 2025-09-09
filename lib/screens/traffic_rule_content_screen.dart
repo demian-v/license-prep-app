@@ -781,12 +781,6 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
             onPressed: _showTopicReportSheet,
             tooltip: 'Report Issue',
           ),
-          IconButton(
-            icon: Icon(Icons.search),
-            onPressed: () {
-              // Search functionality
-            },
-          ),
         ],
       ),
       body: Container(
