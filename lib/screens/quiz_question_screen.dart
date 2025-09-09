@@ -911,7 +911,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
           // Enhanced answer options and explanation in single scrollable area
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.all(16),
+              padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 24),
               child: Column(
                 children: [
                   // Answer options
@@ -1086,9 +1086,9 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
             ),
           ),
           
-          // Enhanced action buttons with REACTIVE TRANSLATION
+          // Enhanced action buttons positioned like "Back to Theory" button
           Padding(
-            padding: EdgeInsets.all(16),
+            padding: EdgeInsets.only(left: 16, right: 16, bottom: 24, top: 4),
             child: Row(
               children: [
                 Expanded(
@@ -1108,7 +1108,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
                           color: Colors.grey.withOpacity(0.2),
                           spreadRadius: 0,
                           blurRadius: 6,
-                          offset: Offset(0.0, 3.0),
+                          offset: Offset(0, 3),
                         ),
                       ],
                     ),
@@ -1179,49 +1179,6 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
               ],
             ),
           ),
-          
-          // Enhanced End Topic button with REACTIVE TRANSLATION
-          Container(
-            width: double.infinity,
-            margin: EdgeInsets.symmetric(horizontal: 16),
-            height: 48,
-            decoration: BoxDecoration(
-              gradient: _getGradientForButton(2),
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 0,
-                  blurRadius: 4,
-                  offset: Offset(0.0, 2.0),
-                ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () async {
-                  await _trackTopicTerminated('end_topic_button');
-                  Navigator.pop(context);
-                },
-                borderRadius: BorderRadius.circular(30),
-                child: Center(
-                  child: Consumer<LanguageProvider>(
-                    builder: (context, languageProvider, _) {
-                      return Text(
-                        _translate('finish_topic', languageProvider),
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ),
-          ),
-          SizedBox(height: 16),
         ],
       ),
     );
