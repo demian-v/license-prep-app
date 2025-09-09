@@ -171,13 +171,13 @@ class FirebaseAuthApi implements AuthApiInterface {
       // Create user document in Firestore and ensure it's created successfully
       try {
         // Explicitly set correct default values - language "en" and state null
+        // Note: Don't send FieldValue objects to Firebase Functions - let server handle timestamps
         final userData = {
           'userId': userCredential.user!.uid,
           'name': name,
           'email': email,
           'language': 'en', // Explicitly set to English
           'state': null,     // Explicitly set to null
-          'createdAt': FieldValue.serverTimestamp(),
         };
         
         debugPrint('🔄 [FirebaseAuthApi] Creating user document with data:');
