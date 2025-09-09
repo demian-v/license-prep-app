@@ -29,19 +29,25 @@ class IssueReport {
     this.platform,
   });
 
-  Map<String, dynamic> toMap() => {
-    'reason': reason,
-    'contentType': contentType,
-    'entity': entity,
-    'status': status,
-    'message': message,
-    'userId': userId,
-    'language': language,
-    'state': state,
-    'appVersion': appVersion,
-    'buildNumber': buildNumber,
-    'device': device,
-    'platform': platform,
-    'createdAt': FieldValue.serverTimestamp(),
-  };
+  Map<String, dynamic> toMap() {
+    final map = <String, dynamic>{
+      'reason': reason,
+      'contentType': contentType,
+      'entity': entity,
+      'status': status,
+      'createdAt': FieldValue.serverTimestamp(),
+    };
+    
+    // Only add non-null optional fields
+    if (message != null) map['message'] = message;
+    if (userId != null) map['userId'] = userId;
+    if (language != null) map['language'] = language;
+    if (state != null) map['state'] = state;
+    if (appVersion != null) map['appVersion'] = appVersion;
+    if (buildNumber != null) map['buildNumber'] = buildNumber;
+    if (device != null) map['device'] = device;
+    if (platform != null) map['platform'] = platform;
+    
+    return map;
+  }
 }

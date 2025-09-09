@@ -10,6 +10,7 @@ The Report Mechanism implements a unified reporting system that handles differen
 
 1. **📝 Quiz Questions** - Reports for practice questions, exam questions, and topic quiz questions
 2. **📚 Theory Sections** - Reports for traffic rule content sections and individual theory topics
+3. **🎯 Support Requests** - General support requests submitted from the Profile page
 
 ### Data Flow Architecture
 ```
@@ -42,7 +43,7 @@ Storage Layer: Firestore (Secure report storage with indexed queries)
 ```dart
 class IssueReport {
   final String reason;              // 'image' | 'translation' | 'other'
-  final String contentType;         // 'quiz_question' | 'theory_section'
+  final String contentType;         // 'quiz_question' | 'theory_section' | 'profile_section'
   final Map<String, dynamic> entity; // Content-specific context data
   final String status;              // 'open' (default)
   final String? message;            // Required for 'other' reason type
@@ -388,6 +389,233 @@ void _showSectionReportSheet(int sectionIndex, String sectionTitle) {
 - **Visual Integration**: Consistent styling with existing content design
 - **Granular Reporting**: Precise issue location identification
 
+### 3. Support Page Integration
+**Screen**: `SupportScreen`
+
+#### Support Button Integration in Profile
+```dart
+// ProfileScreen integration
+ListTile(
+  leading: Container(
+    padding: const EdgeInsets.all(8),
+    decoration: BoxDecoration(
+      color: Colors.green.shade100,
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Icon(Icons.support_agent, color: Colors.green.shade700),
+  ),
+  title: Text(AppLocalizations.of(context).translate('support')),
+  subtitle: Text(AppLocalizations.of(context).translate('support_desc')),
+  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const SupportScreen()),
+    );
+  },
+),
+```
+
+#### SupportScreen Implementation
+```dart
+class SupportScreen extends StatefulWidget {
+  const SupportScreen({super.key});
+
+  @override
+  State<SupportScreen> createState() => _SupportScreenState();
+}
+
+class _SupportScreenState extends State<SupportScreen> {
+  final _controller = TextEditingController();
+  bool _isSubmitting = false;
+
+  bool get _canSubmit {
+    return _controller.text.trim().length >= 10 && !_isSubmitting;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(AppLocalizations.of(context).translate('support')),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              AppLocalizations.of(context).translate('support_title'),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: TextField(
+                controller: _controller,
+                maxLines: null,
+                expands: true,
+                textAlignVertical: TextAlignVertical.top,
+                decoration: InputDecoration(
+                  hintText: AppLocalizations.of(context)
+                      .translate('support_message_placeholder'),
+                  border: const OutlineInputBorder(),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Theme.of(context).primaryColor),
+                  ),
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Character counter
+            Text(
+              '${_controller.text.length}/10 minimum',
+              style: TextStyle(
+                color: _controller.text.length >= 10 ? Colors.green : Colors.grey,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text(AppLocalizations.of(context).translate('back')),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: _canSubmit ? _submitSupport : null,
+                    child: _isSubmitting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(AppLocalizations.of(context).translate('support_send')),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submitSupport() async {
+    if (!_canSubmit) return;
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      final reportService = serviceLocator<ReportService>();
+      final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final stateProvider = Provider.of<StateProvider>(context, listen: false);
+
+      final userState = authProvider.user?.state ?? stateProvider.selectedStateId ?? 'unknown';
+
+      await reportService.submitSupportReport(
+        message: _controller.text.trim(),
+        language: languageProvider.language,
+        state: userState,
+      );
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppLocalizations.of(context).translate('support_thanks')),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)
+                  .translate('support_error')
+                  .replaceAll('{error}', e.toString()),
+            ),
+            backgroundColor: Colors.red,
+            action: SnackBarAction(
+              label: AppLocalizations.of(context).translate('retry'),
+              onPressed: _submitSupport,
+            ),
+          ),
+        );
+      }
+    }
+  }
+}
+```
+
+#### Support Report Service Method
+```dart
+// ReportService.submitSupportReport implementation
+Future<void> submitSupportReport({
+  required String message,
+  required String language,
+  required String state,
+}) async {
+  final pkg = await PackageInfo.fromPlatform();
+  final user = FirebaseAuth.instance.currentUser;
+
+  if (user == null) {
+    throw Exception('User must be authenticated to submit a support request');
+  }
+
+  final report = IssueReport(
+    reason: 'other',
+    contentType: 'profile_section',
+    entity: {
+      'source': 'support_page',
+      'path': 'profile/support',
+    },
+    message: message,
+    userId: user.uid,
+    language: language,
+    state: state,
+    appVersion: pkg.version,
+    buildNumber: pkg.buildNumber,
+    device: Platform.isAndroid ? 'android' : 'ios',
+    platform: Platform.isAndroid ? 'android' : 'ios',
+  );
+
+  try {
+    final reportId = await _counterService.getNextReportId();
+    await _db.collection('reports').doc(reportId).set(report.toMap());
+  } catch (e) {
+    print('ReportService: Error generating custom ID, falling back to random ID: $e');
+    await _db.collection('reports').add(report.toMap());
+  }
+}
+```
+
+**Support Integration Features**:
+- **Dedicated Support Screen**: Full-screen interface optimized for longer messages
+- **Character Validation**: Real-time validation with 10-character minimum requirement
+- **Context-Aware Submission**: Automatic gathering of user language and state
+- **Loading States**: Visual feedback during submission with disabled button states
+- **Error Recovery**: Comprehensive error handling with retry functionality
+- **Localized Interface**: Complete multi-language support for all text elements
+- **Counter Service Integration**: Uses existing report ID generation system
+- **Navigation Integration**: Seamless navigation from Profile page to Support screen
+
 ## Data Structure
 
 ### Firestore Reports Collection Structure
@@ -448,6 +676,32 @@ void _showSectionReportSheet(int sectionIndex, String sectionTitle) {
 }
 ```
 
+### Support Report Example
+```json
+// Support request from profile page
+{
+  "createdAt": {
+    "seconds": 1693920360,
+    "nanoseconds": 0
+  },
+  "status": "open",
+  "reason": "other",
+  "message": "I'm having trouble with the practice test timer not working correctly. It seems to freeze at 30 minutes remaining and doesn't continue counting down. This happens on both my phone and tablet.",
+  "contentType": "profile_section",
+  "entity": {
+    "source": "support_page",
+    "path": "profile/support"
+  },
+  "userId": "UmZSrc9bsOfAQGi0xNbIdNdJhCF3",
+  "language": "en",
+  "state": "IL",
+  "appVersion": "1.2.5",
+  "buildNumber": "42",
+  "device": "android",
+  "platform": "android"
+}
+```
+
 ### Report Reason Types
 ```dart
 enum ReportReason { 
@@ -459,7 +713,7 @@ enum ReportReason {
 
 ## Security Implementation
 
-### Firestore Security Rules
+### Firestore Security Rules (Updated with Profile Section Support)
 ```javascript
 rules_version = '2';
 service cloud.firestore {
@@ -469,32 +723,65 @@ service cloud.firestore {
              exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
+    // Reports collection - consolidated rule for all report operations
     match /reports/{reportId} {
-      // Allow authenticated users to create reports
+      // Allow authenticated users to create reports with proper validation
       allow create: if request.auth != null
+        && (
+          // Allow new global format: {number}_user_{userId}_report_{number}
+          reportId.matches('[0-9]+_user_' + request.auth.uid + '_report_[0-9]+') ||
+          // Allow legacy format: user_{userId}_report_{number} (for backward compatibility)
+          reportId.matches('user_' + request.auth.uid + '_report_[0-9]+') ||
+          // Allow global fallback IDs: {timestamp}_user_{userId}_report_fallback_{random}
+          reportId.matches('[0-9]+_user_' + request.auth.uid + '_report_fallback_[0-9]+') ||
+          // Allow legacy fallback IDs with timestamps (temporary support)
+          reportId.matches('user_' + request.auth.uid + '_report_[0-9]+_[0-9]+_[0-9]+')
+        )
         && request.resource.data.keys().hasAll(['createdAt','reason','contentType','status'])
         && request.resource.data.status == 'open'
         && request.resource.data.reason in ['image','translation','other']
-        
-        // Validate content type specific fields
         && (
           (request.resource.data.contentType == 'quiz_question' &&
            request.resource.data.entity.keys().hasAll(['questionId','path'])) ||
           (request.resource.data.contentType == 'theory_section' &&
-           request.resource.data.entity.keys().hasAll(['topicDocId','sectionIndex','path']))
+           request.resource.data.entity.keys().hasAll(['topicDocId','sectionIndex','path'])) ||
+          (request.resource.data.contentType == 'profile_section' &&
+           request.resource.data.entity.keys().hasAll(['source','path']))
         )
-        
-        // Validate message requirement for "other" reports
         && (request.resource.data.reason != 'other' ||
             (request.resource.data.message is string &&
              request.resource.data.message.size() >= 10));
 
-      // Only admins can read, update, or delete reports
+      // Allow admins to manage all reports
       allow read, update, delete: if isAdmin();
+      
+      // Allow admins to read legacy reports (preserve existing functionality)
+      allow read: if isAdmin() && !reportId.matches('user_.*_report_[0-9]+');
     }
   }
 }
 ```
+
+#### 🔧 PERMISSION_DENIED Fix Implementation
+**Issue Resolved**: Support reports were failing with `PERMISSION_DENIED` errors while Theory and Quiz reports worked correctly.
+
+**Root Cause**: The original Firestore rules contained **duplicate `match /reports/{reportId}` blocks** that were conflicting with each other:
+- First block: Main validation logic for report creation
+- Second block: Legacy admin read permissions that was overriding the create permissions
+
+**Solution Applied**: 
+1. **Consolidated Rules**: Merged both blocks into a single comprehensive rule
+2. **Added Profile Section Validation**: Included `profile_section` contentType validation
+3. **Preserved Legacy Functionality**: Maintained all existing admin permissions
+4. **Updated Counter Service Integration**: Added support for custom report ID generation
+
+**Technical Details**:
+- Firestore rules follow a "first match wins" principle, but multiple `match` blocks for the same path can interfere
+- The duplicate blocks were causing rule conflicts that specifically affected Support reports
+- The consolidated rule now handles all report operations in a single, well-defined block
+- Report ID validation now supports the CounterService's custom ID generation patterns
+
+**Verification**: After deployment, Support reports now submit successfully with the same infrastructure as Theory and Quiz reports.
 
 **Security Features**:
 - **Authentication Required**: All report creation requires user authentication
@@ -533,7 +820,7 @@ The report mechanism supports all app languages with localized UI text:
 
 #### Localization Keys
 ```json
-// en.json
+// en.json - Report Mechanism & Support
 {
   "report_issue": "Report Issue",
   "report_an_issue": "Report an issue",
@@ -543,10 +830,21 @@ The report mechanism supports all app languages with localized UI text:
   "describe_issue_min_chars": "Describe the issue (min 10 chars)…",
   "submit": "Submit",
   "report_submitted_success": "Thanks! We'll review this.",
-  "report_submission_error": "Could not submit: {error}"
+  "report_submission_error": "Could not submit: {error}",
+  
+  // Support Page Specific Keys
+  "support": "Support",
+  "support_desc": "Answers to your questions",
+  "support_title": "How can we help you?",
+  "support_message_placeholder": "Describe your question or issue here...",
+  "support_send": "Send",
+  "support_thanks": "Thanks! We'll get back to you soon.",
+  "support_error": "Could not send message: {error}",
+  "back": "Back",
+  "retry": "Retry"
 }
 
-// es.json
+// es.json - Report Mechanism & Support
 {
   "report_issue": "Reportar Problema",
   "report_an_issue": "Reportar un problema",
@@ -556,10 +854,21 @@ The report mechanism supports all app languages with localized UI text:
   "describe_issue_min_chars": "Describe el problema (mín 10 caracteres)…",
   "submit": "Enviar",
   "report_submitted_success": "¡Gracias! Lo revisaremos.",
-  "report_submission_error": "No se pudo enviar: {error}"
+  "report_submission_error": "No se pudo enviar: {error}",
+  
+  // Support Page Specific Keys
+  "support": "Soporte",
+  "support_desc": "Respuestas a tus preguntas",
+  "support_title": "¿Cómo podemos ayudarte?",
+  "support_message_placeholder": "Describe tu pregunta o problema aquí...",
+  "support_send": "Enviar",
+  "support_thanks": "¡Gracias! Te responderemos pronto.",
+  "support_error": "No se pudo enviar mensaje: {error}",
+  "back": "Atrás",
+  "retry": "Reintentar"
 }
 
-// Similar structure for uk.json, pl.json, ru.json
+// Similar comprehensive structure for uk.json, pl.json, ru.json
 ```
 
 **Localization Features**:

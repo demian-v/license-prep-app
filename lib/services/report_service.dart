@@ -129,4 +129,42 @@ class ReportService {
     
     return await _counterService.getCurrentCounterValue(user.uid);
   }
+
+  Future<void> submitSupportReport({
+    required String message,
+    required String language,
+    required String state,
+  }) async {
+    final pkg = await PackageInfo.fromPlatform();
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      throw Exception('User must be authenticated to submit a support request');
+    }
+
+    final report = IssueReport(
+      reason: 'other',
+      contentType: 'profile_section',
+      entity: {
+        'source': 'support_page',
+        'path': 'profile/support',
+      },
+      message: message,
+      userId: user.uid,
+      language: language,
+      state: state,
+      appVersion: pkg.version,
+      buildNumber: pkg.buildNumber,
+      device: Platform.isAndroid ? 'android' : 'ios',
+      platform: Platform.isAndroid ? 'android' : 'ios',
+    );
+
+    try {
+      final reportId = await _counterService.getNextReportId();
+      await _db.collection('reports').doc(reportId).set(report.toMap());
+    } catch (e) {
+      print('ReportService: Error generating custom ID, falling back to random ID: $e');
+      await _db.collection('reports').add(report.toMap());
+    }
+  }
 }

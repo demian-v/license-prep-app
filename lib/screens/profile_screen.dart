@@ -16,6 +16,7 @@ import '../models/user.dart';
 import '../data/state_data.dart';
 import '../widgets/enhanced_profile_card.dart';
 import 'personal_info_screen.dart';
+import 'support_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   @override
@@ -714,7 +715,14 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                     Icons.help_outline,
                     0, // Support - Green
                     false,
-                    () {},
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => SupportScreen(),
+                        ),
+                      );
+                    },
                   ),
                   SizedBox(height: 16),
                   _buildEnhancedMenuCard(

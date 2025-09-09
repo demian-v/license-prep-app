@@ -50,9 +50,8 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
     
-    // Reports collection - consolidated rule for all report operations
+    // Reports collection - allow authenticated users to create with custom IDs, admins to manage
     match /reports/{reportId} {
-      // Allow authenticated users to create reports with proper validation
       allow create: if request.auth != null
         && (
           // Allow new global format: {number}_user_{userId}_report_{number}
@@ -79,10 +78,11 @@ service cloud.firestore {
             (request.resource.data.message is string &&
              request.resource.data.message.size() >= 10));
 
-      // Allow admins to manage all reports
       allow read, update, delete: if isAdmin();
-      
-      // Allow admins to read legacy reports (preserve existing functionality)
+    }
+    
+    // Legacy reports with random IDs - keep support for existing reports
+    match /reports/{reportId} {
       allow read: if isAdmin() && !reportId.matches('user_.*_report_[0-9]+');
     }
     

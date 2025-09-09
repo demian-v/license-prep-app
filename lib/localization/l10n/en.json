@@ -126,5 +126,12 @@
   "other_issue": "Other issue",
   "describe_issue": "Describe the issue (min 10 chars)…",
   "report_thanks": "Thanks! We'll review this.",
-  "report_error": "Could not submit report. Please try again."
+  "report_error": "Could not submit report. Please try again.",
+  "support": "Support",
+  "support_desc": "Answers to your questions",
+  "support_title": "Support",
+  "support_message_placeholder": "Describe your question or issue (min 10 chars)...",
+  "support_send": "Send",
+  "support_thanks": "Thanks! We'll get back to you soon.",
+  "support_error": "Could not send message. Please try again."
 }

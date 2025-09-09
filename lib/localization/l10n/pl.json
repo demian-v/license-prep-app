@@ -117,10 +117,17 @@
   "go_to_signin": "Przejdź do Logowania",
   
   "report_issue": "Zgłoś problem",
-  "issue_with_image": "Problem z obrazem",
+  "issue_with_image": "Problem z obrazkiem",
   "issue_with_text_translation": "Problem z tłumaczeniem tekstu",
   "other_issue": "Inny problem",
   "describe_issue": "Opisz problem (min 10 znaków)…",
-  "report_thanks": "Dziękujemy! Sprawdzimy to.",
-  "report_error": "Nie udało się wysłać zgłoszenia. Spróbuj ponownie."
+  "report_thanks": "Dzięki! Sprawdzimy to.",
+  "report_error": "Nie udało się przesłać zgłoszenia. Spróbuj ponownie.",
+  "support": "Wsparcie",
+  "support_desc": "Odpowiedzi na twoje pytania",
+  "support_title": "Wsparcie",
+  "support_message_placeholder": "Opisz swoje pytanie lub problem (min 10 znaków)...",
+  "support_send": "Wyślij",
+  "support_thanks": "Dzięki! Odpowiemy wkrótce.",
+  "support_error": "Nie udało się wysłać wiadomości. Spróbuj ponownie."
 }
