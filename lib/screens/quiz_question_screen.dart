@@ -40,6 +40,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
   bool isLoading = true;
   String? errorMessage;
   ScrollController _pillsScrollController = ScrollController();
+  ScrollController _mainScrollController = ScrollController();
   late AnimationController _titleAnimationController;
   late Animation<double> _titlePulseAnimation;
   late String _sessionId;
@@ -77,6 +78,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
   void dispose() {
     _titleAnimationController.dispose();
     _pillsScrollController.dispose();
+    _mainScrollController.dispose();
     super.dispose();
   }
 
@@ -623,8 +625,9 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
         isCorrect = null;
       });
       
-      // Scroll to the current question pill
+      // Reset main scroll position and scroll to current pill
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        _resetMainScrollPosition();
         _scrollToCurrentPill();
       });
     } else {
@@ -655,6 +658,16 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
       
       _pillsScrollController.animateTo(
         scrollOffset.clamp(0.0, _pillsScrollController.position.maxScrollExtent),
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+  
+  void _resetMainScrollPosition() {
+    if (_mainScrollController.hasClients) {
+      _mainScrollController.animateTo(
+        0.0,
         duration: Duration(milliseconds: 300),
         curve: Curves.easeOut,
       );
@@ -870,50 +883,157 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
             ),
           ),
           
-          // Enhanced question image (if available)
-          if (question.imagePath != null)
-            Container(
-              margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.2),
-                    spreadRadius: 0,
-                    blurRadius: 6,
-                    offset: Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  width: double.infinity,
-                  height: 200,
-                  child: serviceLocator.storage.getImage(
-                    storagePath: 'quiz_images/${question.imagePath}',
-                    assetFallback: 'assets/images/quiz/default.png',
-                    fit: BoxFit.cover,
-                    placeholderIcon: Icons.broken_image,
-                    placeholderColor: Colors.grey[200],
-                  ),
-                ),
-              ),
-            ),
-          
-          // Enhanced question card
-          _buildEnhancedQuestionCard(
-            question,
-            currentQuestionIndex + 1,
-            questions.length,
-          ),
-          
-          // Enhanced answer options and explanation in single scrollable area
+          // Enhanced answer options, question content, and explanation in single scrollable area
           Expanded(
             child: SingleChildScrollView(
+              controller: _mainScrollController,
               padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 24),
               child: Column(
                 children: [
+                  // Enhanced question image (if available) - moved inside scroll view
+                  if (question.imagePath != null)
+                    Container(
+                      margin: EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.2),
+                            spreadRadius: 0,
+                            blurRadius: 6,
+                            offset: Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          width: double.infinity,
+                          height: 200,
+                          child: serviceLocator.storage.getImage(
+                            storagePath: 'quiz_images/${question.imagePath}',
+                            assetFallback: 'assets/images/quiz/default.png',
+                            fit: BoxFit.cover,
+                            placeholderIcon: Icons.broken_image,
+                            placeholderColor: Colors.grey[200],
+                          ),
+                        ),
+                      ),
+                    ),
+                  
+                  // Enhanced question card - moved inside scroll view
+                  Container(
+                    margin: EdgeInsets.only(bottom: 16),
+                    padding: EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: _getQuestionCardGradient(currentQuestionIndex + 1),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.2),
+                          spreadRadius: 0,
+                          blurRadius: 6,
+                          offset: Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Question number indicator
+                        Row(
+                          children: [
+                            Container(
+                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                AppLocalizations.of(context).translate('question_x_of_y')
+                                  .replaceAll('{0}', (currentQuestionIndex + 1).toString())
+                                  .replaceAll('{1}', questions.length.toString()),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black.withOpacity(0.7),
+                                ),
+                              ),
+                            ),
+                            if (question.type == QuestionType.multipleChoice) ...[
+                              SizedBox(width: 8),
+                              Container(
+                                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  AppLocalizations.of(context).translate('multiple_answers'),
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.blue.shade700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        SizedBox(height: 12),
+                        // Question text
+                        Text(
+                          question.questionText,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                            height: 1.4,
+                          ),
+                        ),
+                        if (question.type == QuestionType.multipleChoice)
+                          Padding(
+                            padding: EdgeInsets.only(top: 12),
+                            child: Container(
+                              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.blue.withOpacity(0.2),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.info_outline,
+                                    size: 16,
+                                    color: Colors.blue.shade700,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Expanded(
+                                    child: Consumer<LanguageProvider>(
+                                      builder: (context, languageProvider, _) {
+                                        return Text(
+                                          _translate('select_all_correct', languageProvider),
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.blue.shade700,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  
                   // Answer options
                   ...question.options.asMap().entries.map((entry) {
                     final index = entry.key;

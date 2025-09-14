@@ -22,6 +22,7 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
   bool isAnswerChecked = false;
   bool? isCorrect;
   ScrollController _pillsScrollController = ScrollController();
+  ScrollController _mainScrollController = ScrollController();
   late AnimationController _titleAnimationController;
   late Animation<double> _titlePulseAnimation;
   
@@ -56,6 +57,7 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
   void dispose() {
     _titleAnimationController.dispose();
     _pillsScrollController.dispose();
+    _mainScrollController.dispose();
     super.dispose();
   }
   
@@ -78,6 +80,16 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
       duration: Duration(milliseconds: 300),
       curve: Curves.easeOut,
     );
+  }
+
+  void _resetMainScrollPosition() {
+    if (_mainScrollController.hasClients) {
+      _mainScrollController.animateTo(
+        0.0,
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   /// Show report sheet for current question
@@ -581,98 +593,50 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
               ),
             ),
             
-            // Question image (if available) with rounded borders
-            if (currentQuestion.imagePath != null)
-              Container(
-                margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.2),
-                      spreadRadius: 0,
-                      blurRadius: 6,
-                      offset: Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    width: double.infinity,
-                    height: 200,
-                    child: serviceLocator.storage.getImage(
-                      storagePath: 'quiz_images/${currentQuestion.imagePath}',
-                      assetFallback: currentQuestion.imagePath,
-                      fit: BoxFit.cover,
-                      placeholderIcon: Icons.broken_image,
-                      placeholderColor: Colors.grey[200],
-                    ),
-                  ),
-                ),
-              ),
-            
-            // Enhanced question card
-            _buildEnhancedQuestionCard(
-              currentQuestion, 
-              practice.currentQuestionIndex + 1, 
-              practice.questionIds.length,
-            ),
-            
-            // Answer options with gradients
+            // Answer options, question content in single scrollable area
             Expanded(
-              child: ListView.builder(
+              child: SingleChildScrollView(
+                controller: _mainScrollController,
                 padding: EdgeInsets.all(16),
-                itemCount: currentQuestion.options.length,
-                itemBuilder: (context, index) {
-                  final option = currentQuestion.options[index];
-                  bool isSelected = selectedAnswer == option;
-                  bool showResult = isAnswerChecked;
-                  bool isCorrectOption = false;
-                  
-                  // Check if this option is a correct answer
-                  if (currentQuestion.correctAnswer is List<String>) {
-                    isCorrectOption = (currentQuestion.correctAnswer as List<String>).contains(option);
-                  } else {
-                    isCorrectOption = option == currentQuestion.correctAnswer.toString();
-                  }
-                  
-                  // Get gradient based on card state instead of solid color
-                  LinearGradient cardGradient = _getGradientForAnswerCard(isSelected, showResult, isCorrectOption, index);
-                  
-                  // Use circular indicators
-                  Widget selectionIndicator = Container(
-                    width: 24,
-                    height: 24,
-                    margin: EdgeInsets.only(right: 12),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.grey),
-                    ),
-                    child: isSelected
-                        ? Container(
-                            margin: EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.blue,
+                child: Column(
+                  children: [
+                    // Question image (if available) - moved inside scroll view
+                    if (currentQuestion.imagePath != null)
+                      Container(
+                        margin: EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.2),
+                              spreadRadius: 0,
+                              blurRadius: 6,
+                              offset: Offset(0, 3),
                             ),
-                          )
-                        : null,
-                  );
-                  
-                  return GestureDetector(
-                    onTap: isAnswerChecked 
-                        ? null 
-                        : () {
-                            setState(() {
-                              selectedAnswer = option;
-                            });
-                          },
-                    child: Container(
-                      margin: EdgeInsets.only(bottom: 12),
-                      padding: EdgeInsets.all(16),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            width: double.infinity,
+                            height: 200,
+                            child: serviceLocator.storage.getImage(
+                              storagePath: 'quiz_images/${currentQuestion.imagePath}',
+                              assetFallback: currentQuestion.imagePath,
+                              fit: BoxFit.cover,
+                              placeholderIcon: Icons.broken_image,
+                              placeholderColor: Colors.grey[200],
+                            ),
+                          ),
+                        ),
+                      ),
+                    
+                    // Enhanced question card - moved inside scroll view
+                    Container(
+                      margin: EdgeInsets.only(bottom: 16),
+                      padding: EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        gradient: cardGradient,
+                        gradient: _getQuestionCardGradient(practice.currentQuestionIndex + 1),
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
@@ -683,25 +647,181 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
                           ),
                         ],
                       ),
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          selectionIndicator,
-                          Expanded(
-                            child: Text(
-                              option,
-                              style: TextStyle(
-                                color: showResult && (isSelected || isCorrectOption)
-                                    ? (isSelected && !isCorrectOption) ? Colors.red.shade900 : Colors.green.shade900
-                                    : Colors.black,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          // Question number indicator
+                          Row(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  AppLocalizations.of(context).translate('question_x_of_y')
+                                      .replaceAll('{0}', (practice.currentQuestionIndex + 1).toString())
+                                      .replaceAll('{1}', practice.questionIds.length.toString()),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black.withOpacity(0.7),
+                                  ),
+                                ),
                               ),
+                              if (currentQuestion.type == QuestionType.multipleChoice) ...[
+                                SizedBox(width: 8),
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    AppLocalizations.of(context).translate('multiple_answers'),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.blue.shade700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          SizedBox(height: 12),
+                          // Question text
+                          Text(
+                            currentQuestion.questionText,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                              height: 1.4,
                             ),
                           ),
+                          if (currentQuestion.type == QuestionType.multipleChoice)
+                            Padding(
+                              padding: EdgeInsets.only(top: 12),
+                              child: Container(
+                                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Colors.blue.withOpacity(0.2),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.info_outline,
+                                      size: 16,
+                                      color: Colors.blue.shade700,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        AppLocalizations.of(context).translate('select_all_correct_answers'),
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.blue.shade700,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
-                  );
-                },
+                    
+                    // Answer options - converted from ListView.builder to Column
+                    ...currentQuestion.options.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final option = entry.value;
+                      bool isSelected = selectedAnswer == option;
+                      bool showResult = isAnswerChecked;
+                      bool isCorrectOption = false;
+                      
+                      // Check if this option is a correct answer
+                      if (currentQuestion.correctAnswer is List<String>) {
+                        isCorrectOption = (currentQuestion.correctAnswer as List<String>).contains(option);
+                      } else {
+                        isCorrectOption = option == currentQuestion.correctAnswer.toString();
+                      }
+                      
+                      // Get gradient based on card state instead of solid color
+                      LinearGradient cardGradient = _getGradientForAnswerCard(isSelected, showResult, isCorrectOption, index);
+                      
+                      // Use circular indicators
+                      Widget selectionIndicator = Container(
+                        width: 24,
+                        height: 24,
+                        margin: EdgeInsets.only(right: 12),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.grey),
+                        ),
+                        child: isSelected
+                            ? Container(
+                                margin: EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.blue,
+                                ),
+                              )
+                            : null,
+                      );
+                      
+                      return GestureDetector(
+                        onTap: isAnswerChecked 
+                            ? null 
+                            : () {
+                                setState(() {
+                                  selectedAnswer = option;
+                                });
+                              },
+                        child: Container(
+                          margin: EdgeInsets.only(bottom: 12),
+                          padding: EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            gradient: cardGradient,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.withOpacity(0.2),
+                                spreadRadius: 0,
+                                blurRadius: 6,
+                                offset: Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              selectionIndicator,
+                              Expanded(
+                                child: Text(
+                                  option,
+                                  style: TextStyle(
+                                    color: showResult && (isSelected || isCorrectOption)
+                                        ? (isSelected && !isCorrectOption) ? Colors.red.shade900 : Colors.green.shade900
+                                        : Colors.black,
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ],
+                ),
               ),
             ),
             
@@ -742,8 +862,9 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
                             
                             practiceProvider.goToNextQuestion();
                             
-                            // Scroll to the current pill after navigation
+                            // Reset main scroll position and scroll to current pill after navigation
                             WidgetsBinding.instance.addPostFrameCallback((_) {
+                              _resetMainScrollPosition();
                               _scrollToCurrentPill();
                             });
                           },
@@ -785,8 +906,9 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
                                   // Skip question
                                   practiceProvider.skipQuestion();
                                   
-                                  // Scroll to the current pill after navigation
+                                  // Reset main scroll position and scroll to current pill after navigation
                                   WidgetsBinding.instance.addPostFrameCallback((_) {
+                                    _resetMainScrollPosition();
                                     _scrollToCurrentPill();
                                   });
                                 },
