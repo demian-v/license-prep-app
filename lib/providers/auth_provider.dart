@@ -5,6 +5,7 @@ import 'dart:convert';
 import '../models/user.dart';
 import '../services/service_locator.dart';
 import '../services/email_sync_service.dart';
+import '../services/session_manager.dart';
 import '../data/state_data.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'language_provider.dart';
@@ -18,6 +19,9 @@ class AuthProvider extends ChangeNotifier {
   LanguageProvider? _languageProvider;
   SubscriptionProvider? _subscriptionProvider;
   StateProvider? _stateProvider;
+
+  // Callback for session conflict navigation
+  void Function()? onSessionConflict;
 
   AuthProvider(this.user);
 
@@ -151,6 +155,9 @@ class AuthProvider extends ChangeNotifier {
         
         // Sync user's state preference to StateProvider
         await _syncUserStateToProvider();
+        
+        // NOTE: Session conflict handler is set up in main.dart validateExistingSession()
+        // Don't override it here to avoid callback overwriting bug
         
         // Track successful login event
         try {
@@ -755,6 +762,40 @@ class AuthProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('⚠️ AuthProvider: Password reset confirmation error: $e');
       throw e;
+    }
+  }
+
+  /// Handle session conflicts (when user is logged in on another device)
+  Future<void> handleSessionConflict() async {
+    debugPrint('🚨 AuthProvider: Session conflict detected - logging out');
+    
+    try {
+      // Clear local data
+      user = null;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('user');
+      
+      // Stop session monitoring
+      sessionManager.stopSessionMonitoring();
+      
+      // Reset language to English when user logs out
+      await _resetLanguageToEnglish();
+      
+      // Reset state to null when user logs out
+      await _resetStateToNull();
+      
+      // Notify UI
+      notifyListeners();
+      
+      debugPrint('✅ AuthProvider: Session conflict handled - user logged out');
+      
+      // Trigger callback if set (for navigation)
+      onSessionConflict?.call();
+      
+    } catch (e) {
+      debugPrint('❌ AuthProvider: Error handling session conflict: $e');
+      // Still trigger callback to ensure user gets logged out
+      onSessionConflict?.call();
     }
   }
 

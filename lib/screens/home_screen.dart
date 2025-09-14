@@ -5,6 +5,7 @@ import '../screens/theory_screen.dart';
 import '../screens/profile_screen.dart';
 import '../widgets/super_enhanced_footer.dart';
 import '../services/service_locator_extensions.dart';
+import '../services/session_validation_service.dart';
 import '../providers/language_provider.dart';
 import '../providers/content_provider.dart';
 import '../providers/state_provider.dart';
@@ -96,6 +97,12 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   }
 
   void _onTabTapped(int index) {
+    // Validate session before allowing navigation
+    if (!SessionValidationService.validateBeforeActionSafely(context)) {
+      print('🚨 HomeScreen: Session invalid, blocking tab navigation');
+      return; // User will be logged out by the validation service
+    }
+    
     setState(() {
       _currentIndex = index;
       // Persist the tab selection to survive widget rebuilds (like during language changes)

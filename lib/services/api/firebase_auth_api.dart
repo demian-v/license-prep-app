@@ -5,6 +5,7 @@ import 'base/auth_api_interface.dart';
 import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth, FirebaseAuthException, EmailAuthProvider, ActionCodeSettings;
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseFirestore, FieldValue, SetOptions;
 import '../../data/state_data.dart';
+import '../session_manager.dart';
 
 class FirebaseAuthApi implements AuthApiInterface {
   final FirebaseFunctionsClient _functionsClient;
@@ -67,7 +68,26 @@ class FirebaseAuthApi implements AuthApiInterface {
           }
         }
         
-        return User.fromJson(userData);
+        // Create User object from userData
+        final user = User.fromJson(userData);
+        
+        // Add session management
+        try {
+          debugPrint('🔐 FirebaseAuthApi: Creating session for user: ${userId}');
+          final sessionId = await sessionManager.createSession(userId);
+          
+          // Start session monitoring
+          await sessionManager.startSessionMonitoring(userId);
+          
+          debugPrint('✅ FirebaseAuthApi: Session created and monitoring started');
+          
+          // Return user with session ID
+          return user.copyWith(currentSessionId: sessionId);
+        } catch (sessionError) {
+          debugPrint('⚠️ FirebaseAuthApi: Session creation failed: $sessionError');
+          // Still return user even if session creation fails
+          return user;
+        }
       } catch (firestoreError) {
         debugPrint('Warning: Failed to get user data from function: $firestoreError');
         
@@ -605,6 +625,17 @@ class FirebaseAuthApi implements AuthApiInterface {
   @override
   Future<void> logout() async {
     try {
+      // Get current user for session cleanup
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        debugPrint('🚪 FirebaseAuthApi: Invalidating session for user: ${currentUser.uid}');
+        try {
+          await sessionManager.invalidateSession(currentUser.uid);
+        } catch (sessionError) {
+          debugPrint('⚠️ FirebaseAuthApi: Session invalidation error: $sessionError');
+        }
+      }
+      
       // Sign out from Firebase Auth first
       await FirebaseAuth.instance.signOut();
       

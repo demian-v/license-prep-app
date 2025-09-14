@@ -147,5 +147,7 @@
   "contact_support": "Contact Support",
   "message_details": "Message Details:",
   "character_counter": "{0}/10 minimum",
-  "support_response_info": "We typically respond within 24 hours. Your feedback helps us improve the app."
+  "support_response_info": "We typically respond within 24 hours. Your feedback helps us improve the app.",
+  "sessionConflictMessage": "You have been logged out because you signed in on another device.",
+  "sessionConflictButton": "OK"
 }

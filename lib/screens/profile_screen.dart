@@ -12,9 +12,12 @@ import '../examples/api_switcher_example.dart';
 import '../examples/function_name_mapping_example.dart';
 import '../services/email_sync_service.dart';
 import '../services/analytics_service.dart';
+import '../services/session_notification_service.dart';
+import 'package:flutter/foundation.dart';
 import '../models/user.dart';
 import '../data/state_data.dart';
 import '../widgets/enhanced_profile_card.dart';
+import '../main.dart';
 import 'personal_info_screen.dart';
 import 'support_screen.dart';
 
@@ -1203,6 +1206,35 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     });
   }
 
+  /// Test method to simulate session conflict flow
+  void _testFullSessionConflictFlow(BuildContext context) {
+    debugPrint('🧪 ProfileScreen: Testing full session conflict flow');
+    
+    try {
+      // Import the session validation service and session manager
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // Simulate session becoming invalid by directly calling the global handler
+      debugPrint('🧪 ProfileScreen: Simulating session conflict by calling global handler');
+      
+      // Import the main.dart function
+      handleGlobalSessionConflict(authProvider);
+      
+      debugPrint('✅ ProfileScreen: Session conflict flow test initiated');
+      
+    } catch (e) {
+      debugPrint('❌ ProfileScreen: Error testing session conflict flow: $e');
+      
+      // Show error to user
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Test failed: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   void _showDeveloperOptions(BuildContext context, LanguageProvider languageProvider) {
     showModalBottomSheet(
       context: context,
@@ -1259,6 +1291,28 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                       Navigator.pushNamed(context, '/settings/reset');
                     },
                   ),
+                  // Debug option for testing session conflict notifications
+                  if (kDebugMode)
+                    ListTile(
+                      leading: Icon(Icons.logout, color: Colors.orange),
+                      title: Text('Test Session Conflict Notification'),
+                      subtitle: Text('Show session conflict notification for testing'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        SessionNotificationService.showTestNotification(context);
+                      },
+                    ),
+                  // Debug option for testing full session conflict flow
+                  if (kDebugMode)
+                    ListTile(
+                      leading: Icon(Icons.security, color: Colors.red),
+                      title: Text('Test Full Session Conflict Flow'),
+                      subtitle: Text('Simulate session conflict with immediate logout'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _testFullSessionConflictFlow(context);
+                      },
+                    ),
                 ],
               ),
             ),

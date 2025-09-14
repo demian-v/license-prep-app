@@ -7,6 +7,7 @@ import '../providers/auth_provider.dart';
 import '../providers/progress_provider.dart';
 import '../services/service_locator.dart';
 import '../services/analytics_service.dart';
+import '../services/session_validation_service.dart';
 import '../screens/quiz_question_screen.dart';
 
 class TopicQuizScreen extends StatefulWidget {
@@ -345,6 +346,12 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> with TickerProviderSt
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () async {
+            // Session validation - validate before starting topic quiz
+            if (!SessionValidationService.validateBeforeActionSafely(context)) {
+              print('🚨 TopicQuizScreen: Session invalid, blocking topic selection: ${topic.title}');
+              return; // User will be logged out by the validation service
+            }
+            
             try {
               // Track topic started analytics event
               final stateProvider = Provider.of<StateProvider>(context, listen: false);

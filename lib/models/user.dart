@@ -4,6 +4,7 @@ class User {
   final String email;
   final String? language;
   final String? state;
+  final String? currentSessionId;
 
   User({
     required this.id,
@@ -11,6 +12,7 @@ class User {
     required this.email,
     this.language,
     this.state,
+    this.currentSessionId,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -20,6 +22,7 @@ class User {
       email: json['email'],
       language: json['language'],
       state: json['state'],
+      currentSessionId: json['currentSessionId'],
     );
   }
 
@@ -30,6 +33,7 @@ class User {
       'email': email,
       'language': language,
       'state': state,
+      'currentSessionId': currentSessionId,
     };
   }
 
@@ -37,7 +41,9 @@ class User {
     String? name,
     String? language,
     String? state,
+    String? currentSessionId,
     bool clearState = false,
+    bool clearSessionId = false,
   }) {
     return User(
       id: this.id,
@@ -45,6 +51,7 @@ class User {
       email: this.email,
       language: language ?? this.language,
       state: clearState ? null : (state ?? this.state),
+      currentSessionId: clearSessionId ? null : (currentSessionId ?? this.currentSessionId),
     );
   }
 }

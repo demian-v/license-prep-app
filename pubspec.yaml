@@ -27,6 +27,8 @@ dependencies:
   cached_network_image: ^3.3.0
   connectivity_plus: ^4.0.2
   package_info_plus: ^4.2.0
+  uuid: ^4.1.0
+  device_info_plus: ^9.1.0
 
 # Removing overrides as they may be causing conflicts
 

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../models/user.dart' as app_models;
 import '../services/api/base/auth_api_interface.dart';
+import 'session_manager.dart';
 
 /// A service class that directly interacts with Firebase Auth and Firestore
 /// without any abstractions or complex mappings
@@ -466,11 +467,40 @@ class DirectAuthService implements AuthApiInterface {
       throw Exception('Login succeeded but failed to get user details');
     }
     
-    return appUser;
+    try {
+      // Create a new session (this will invalidate any existing sessions on other devices)
+      debugPrint('🔐 DirectAuthService: Creating session for user: ${appUser.id}');
+      final sessionId = await sessionManager.createSession(appUser.id);
+      
+      // Start session monitoring
+      await sessionManager.startSessionMonitoring(appUser.id);
+      
+      debugPrint('✅ DirectAuthService: Session created and monitoring started');
+      
+      // Return user with session ID
+      return appUser.copyWith(currentSessionId: sessionId);
+      
+    } catch (e) {
+      debugPrint('⚠️ DirectAuthService: Error creating session: $e');
+      // Still return the user even if session creation fails
+      // This ensures the user can still log in
+      return appUser;
+    }
   }
   
   /// Logout user
   Future<void> logout() async {
+    try {
+      // Get current user ID for session cleanup
+      final currentUser = _auth.currentUser;
+      if (currentUser != null) {
+        debugPrint('🚪 DirectAuthService: Invalidating session for user: ${currentUser.uid}');
+        await sessionManager.invalidateSession(currentUser.uid);
+      }
+    } catch (e) {
+      debugPrint('⚠️ DirectAuthService: Error invalidating session during logout: $e');
+    }
+    
     await signOut();
   }
   

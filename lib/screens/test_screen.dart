@@ -10,6 +10,7 @@ import '../providers/state_provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/service_locator.dart';
 import '../services/analytics_service.dart';
+import '../services/session_validation_service.dart';
 import 'topic_quiz_screen.dart';
 import 'saved_items_screen.dart';
 import 'exam_question_screen.dart';
@@ -284,6 +285,12 @@ class _TestScreenState extends State<TestScreen> {
                     _translate('take_exam', languageProvider),
                     _translate('dmv_exam_desc', languageProvider),
                     () {
+                      // Session validation - validate before starting exam
+                      if (!SessionValidationService.validateBeforeActionSafely(context)) {
+                        print('🚨 TestScreen: Session invalid, blocking Take Exam action');
+                        return; // User will be logged out by the validation service
+                      }
+                      
                       // Track exam start FIRST
                       _logExamStartedAnalytics(languageProvider);
                       
@@ -323,6 +330,12 @@ class _TestScreenState extends State<TestScreen> {
                     _translate('learn_by_topics', languageProvider),
                     _translate('questions_by_topics', languageProvider),
                     () {
+                      // Session validation - validate before starting Learn by Topics
+                      if (!SessionValidationService.validateBeforeActionSafely(context)) {
+                        print('🚨 TestScreen: Session invalid, blocking Learn by Topics action');
+                        return; // User will be logged out by the validation service
+                      }
+                      
                       // Track Learn by Topics start FIRST
                       _logLearnByTopicsStartedAnalytics(languageProvider);
                       
@@ -348,6 +361,12 @@ class _TestScreenState extends State<TestScreen> {
                     _translate('practice_tickets', languageProvider),
                     _translate('random_questions_no_limit', languageProvider),
                     () {
+                      // Session validation - validate before starting Practice Tickets
+                      if (!SessionValidationService.validateBeforeActionSafely(context)) {
+                        print('🚨 TestScreen: Session invalid, blocking Practice Tickets action');
+                        return; // User will be logged out by the validation service
+                      }
+                      
                       // Track practice start FIRST
                       _logPracticeStartedAnalytics(languageProvider);
                       
@@ -386,6 +405,12 @@ class _TestScreenState extends State<TestScreen> {
                     _translate('saved', languageProvider),
                     _translate('saved_questions_desc', languageProvider),
                     () {
+                      // Session validation - validate before navigating to Saved questions
+                      if (!SessionValidationService.validateBeforeActionSafely(context)) {
+                        print('🚨 TestScreen: Session invalid, blocking Saved action');
+                        return; // User will be logged out by the validation service
+                      }
+                      
                       // Navigate to saved questions
                       Navigator.push(
                         context,

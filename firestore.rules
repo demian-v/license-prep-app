@@ -10,6 +10,11 @@ service cloud.firestore {
     // Users can read/write their own user document
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Users can read/write their own session documents
+      match /sessions/{sessionDoc} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
     }
     
     // Users can read/write their own saved questions (Updated for single-document structure)

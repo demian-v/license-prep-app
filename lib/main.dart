@@ -15,6 +15,7 @@ import 'services/api/api_implementation.dart';
 import 'services/content_loading_manager.dart';
 import 'services/email_sync_service.dart';
 import 'services/analytics_service.dart';
+import 'services/session_manager.dart';
 
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
@@ -47,6 +48,95 @@ import 'providers/state_provider.dart';
 import 'localization/app_localizations.dart';
 import 'services/email_verification_handler.dart';
 import 'services/action_code_router.dart';
+import 'services/session_notification_service.dart';
+
+// Global navigator key for session-based navigation
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+/// Global session conflict handler with user feedback and navigation
+void handleGlobalSessionConflict(AuthProvider authProvider) {
+  debugPrint('🚨 Global Session Conflict: Handling logout with user feedback');
+  
+  try {
+    // 1. Show user notification
+    SessionNotificationService.showSessionConflictNotification(null);
+    
+    // 2. Handle logout in AuthProvider  
+    authProvider.handleSessionConflict();
+    
+    // 3. Navigate to login screen with slight delay to allow notification to show
+    Future.delayed(Duration(milliseconds: 800), () {
+      navigatorKey.currentState?.pushNamedAndRemoveUntil(
+        '/login', 
+        (route) => false,
+      );
+    });
+    
+    debugPrint('✅ Global Session Conflict: Handled successfully');
+    
+  } catch (e) {
+    debugPrint('❌ Global Session Conflict: Error handling: $e');
+    
+    // Fallback: Still navigate to login even if notification fails
+    Future.delayed(Duration(milliseconds: 500), () {
+      navigatorKey.currentState?.pushNamedAndRemoveUntil(
+        '/login', 
+        (route) => false,
+      );
+    });
+  }
+}
+
+// Validate existing user sessions on app startup
+Future<void> validateExistingSession(AuthProvider authProvider) async {
+  final user = authProvider.user;
+  if (user == null) {
+    debugPrint('🔍 Session Validation: No user logged in, skipping');
+    return;
+  }
+  
+  debugPrint('🔍 Session Validation: Checking session for user: ${user.id}');
+  
+  try {
+    // CRITICAL: Set up session conflict handler BEFORE starting monitoring
+    debugPrint('🔗 Session Validation: Setting up session conflict callback');
+    sessionManager.onSessionConflict = () {
+      debugPrint('🎯 Session Validation Callback: Session conflict triggered from SessionManager');
+      handleGlobalSessionConflict(authProvider);
+    };
+    debugPrint('✅ Session Validation: Session conflict callback set successfully');
+    
+    // Check if current session is valid
+    final isValid = await sessionManager.isSessionValid(user.id);
+    
+    if (!isValid) {
+      debugPrint('🚨 Session Validation: Invalid session detected - logging out');
+      // Use global handler for consistent behavior
+      handleGlobalSessionConflict(authProvider);
+      return;
+    }
+    
+    // Session is valid, start monitoring
+    debugPrint('✅ Session Validation: Session valid, starting monitoring');
+    await sessionManager.startSessionMonitoring(user.id);
+    
+    // Double-check that callback is still set after starting monitoring
+    if (sessionManager.onSessionConflict == null) {
+      debugPrint('⚠️ Session Validation: Callback was cleared after monitoring start, resetting');
+      sessionManager.onSessionConflict = () {
+        debugPrint('🎯 Session Validation Callback (Reset): Session conflict triggered');
+        handleGlobalSessionConflict(authProvider);
+      };
+    }
+    
+    debugPrint('🔒 Session Validation: Complete - monitoring active with callback ready');
+    
+  } catch (e) {
+    debugPrint('❌ Session Validation Error: $e');
+    // On error, use global handler for consistent behavior
+    handleGlobalSessionConflict(authProvider);
+  }
+}
 
 // Setup auth listener to detect changes to the user's email
 void setupAuthListener() {
@@ -91,22 +181,56 @@ void setupAuthListener() {
 
 class AppLifecycleObserver extends WidgetsBindingObserver {
   DateTime? _lastResumeSync;
+  AuthProvider? _authProvider;
+  
+  // Set auth provider reference for session validation
+  void setAuthProvider(AuthProvider authProvider) {
+    _authProvider = authProvider;
+  }
   
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // When app resumes from background, sync emails
+    // When app resumes from background, sync emails and validate session
     if (state == AppLifecycleState.resumed) {
       // Only sync if app was backgrounded for more than 30 seconds
       if (_lastResumeSync == null || 
           DateTime.now().difference(_lastResumeSync!) > Duration(seconds: 30)) {
-        debugPrint('🔄 App resumed from background - running sync check');
+        debugPrint('🔄 App resumed from background - running sync and session validation');
         _lastResumeSync = DateTime.now();
         
         // Simple email sync on app resume
         emailSyncService.smartSync();
+        
+        // Validate session on app resume
+        _validateSessionOnResume();
       } else {
         debugPrint('⏭️ App resume sync skipped - too recent');
       }
+    }
+  }
+  
+  /// Validate session when app resumes from background
+  void _validateSessionOnResume() async {
+    try {
+      final user = _authProvider?.user;
+      
+      if (user != null) {
+        debugPrint('🔍 App Resume: Validating session for user: ${user.id}');
+        
+        final isValid = await sessionManager.isSessionValid(user.id);
+        if (!isValid) {
+          debugPrint('🚨 App Resume: Invalid session detected - logging out');
+          // Use global handler for consistent UX
+          handleGlobalSessionConflict(_authProvider!);
+        } else {
+          debugPrint('✅ App Resume: Session is valid');
+        }
+      } else {
+        debugPrint('ℹ️ App Resume: No user logged in, skipping session validation');
+      }
+    } catch (e) {
+      debugPrint('❌ App Resume: Session validation error: $e');
+      // Don't trigger logout on validation errors during resume
     }
   }
 }
@@ -224,6 +348,9 @@ void main() async {
   final subscriptionProvider = SubscriptionProvider(subscription);
   final progressProvider = ProgressProvider(progress);
   
+  // Connect lifecycle observer to auth provider
+  lifecycleObserver.setAuthProvider(authProvider);
+  
   
   // Create language provider - only force English for non-registered users
   // For registered users, load their saved language preference
@@ -292,6 +419,11 @@ void main() async {
     Future.microtask(() async {
       await progressProvider.migrateSavedQuestionsIfNeeded(userId);
     });
+    
+    // Validate existing sessions for logged-in users
+    Future.microtask(() async {
+      await validateExistingSession(authProvider);
+    });
   }
   
   // Set up initial user properties for analytics
@@ -355,6 +487,7 @@ class MyApp extends StatelessWidget {
         final currentLang = languageProvider.language;
         
         return MaterialApp(
+          navigatorKey: navigatorKey,
           title: 'USA License Prep',
           theme: ThemeData(
             primarySwatch: Colors.blue,

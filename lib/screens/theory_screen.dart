@@ -8,6 +8,7 @@ import '../providers/progress_provider.dart';
 import '../providers/state_provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/analytics_service.dart';
+import '../services/session_validation_service.dart';
 import '../widgets/module_card.dart';
 import 'theory_module_screen.dart';
 import 'traffic_rule_content_screen.dart';
@@ -325,6 +326,12 @@ class _TheoryScreenState extends State<TheoryScreen> {
                   module: module,
                   isCompleted: isCompleted,
                   onSelect: () async {
+                    // Session validation - validate before module selection
+                    if (!SessionValidationService.validateBeforeActionSafely(context)) {
+                      print('🚨 TheoryScreen: Session invalid, blocking module selection');
+                      return; // User will be logged out by the validation service
+                    }
+                    
                     // Track module selection
                     _trackModuleSelected(module);
                     
