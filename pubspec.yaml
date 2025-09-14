@@ -39,9 +39,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
-    - assets/images/signs/
-    - assets/images/signs/examples/
-    - assets/images/traffic_lights/
+    - assets/images/topic_icons/
     - assets/images/quiz/
     - lib/localization/l10n/
   fonts:

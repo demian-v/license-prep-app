@@ -387,7 +387,7 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> with TickerProviderSt
             padding: EdgeInsets.all(20),
             child: Row(
               children: [
-                // Enhanced topic icon
+                // Enhanced topic icon with Firebase Storage support
                 Container(
                   width: 50,
                   height: 50,
@@ -407,12 +407,35 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> with TickerProviderSt
                       ),
                     ],
                   ),
-                  child: Center(
-                    child: Icon(
-                      _getTopicIcon(topic.title),
-                      color: Colors.black54,
-                      size: 24,
-                    ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(25),
+                    child: topic.iconAsset != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(25),
+                            child: Image.asset(
+                              topic.iconAsset!,
+                              width: 50,
+                              height: 50,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                // Fallback to default icon if asset fails to load
+                                return Center(
+                                  child: Icon(
+                                    _getTopicIcon(topic.title),
+                                    color: Colors.black54,
+                                    size: 24,
+                                  ),
+                                );
+                              },
+                            ),
+                          )
+                        : Center(
+                            child: Icon(
+                              _getTopicIcon(topic.title),
+                              color: Colors.black54,
+                              size: 24,
+                            ),
+                          ),
                   ),
                 ),
                 SizedBox(width: 16),

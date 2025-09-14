@@ -27,6 +27,123 @@ class FirebaseContentApi implements ContentApiInterface {
   
   FirebaseContentApi(this._functionsClient);
   
+  /// Map topic IDs and titles to their local asset paths with multilingual support
+  String? _getTopicIconAsset(String topicId, String topicTitle) {
+    final id = topicId.toLowerCase();
+    final title = topicTitle.toLowerCase();
+    
+    // Primary method: Language-agnostic ID pattern matching
+    if (id.endsWith('_01')) return 'assets/images/topic_icons/1_general_provision.png';
+    if (id.endsWith('_02')) return 'assets/images/topic_icons/2_traffic_laws.png';
+    if (id.endsWith('_03')) return 'assets/images/topic_icons/3_passenger_safety.png';
+    if (id.endsWith('_04')) return 'assets/images/topic_icons/4_pedestrian_rights.png';
+    if (id.endsWith('_05')) return 'assets/images/topic_icons/5_bicycles_and_motorcycles.png';
+    if (id.endsWith('_06')) return 'assets/images/topic_icons/6_special_transportation_vehicles.png';
+    if (id.endsWith('_07')) return 'assets/images/topic_icons/7_driving_difficult_conditions.png';
+    if (id.endsWith('_08')) return 'assets/images/topic_icons/8_impaired_driving.png';
+    if (id.endsWith('_09')) return 'assets/images/topic_icons/9_road_signs_markings.png';
+    if (id.endsWith('_10')) return 'assets/images/topic_icons/10_insurance_responsibility.png';
+    
+    // Fallback: Multilingual keyword matching
+    return _getIconByKeywords(id, title);
+  }
+  
+  /// Fallback method for multilingual keyword-based icon matching
+  String? _getIconByKeywords(String id, String title) {
+    // Topic 1: General Provisions
+    if (_matchesKeywords(id, title, [
+      'general', 'provision', 'disposiciones', 'generales', 'загальн', 'положення',
+      'ogólne', 'przepisy', 'общие', 'положения'
+    ])) {
+      return 'assets/images/topic_icons/1_general_provision.png';
+    }
+    
+    // Topic 2: Traffic Laws
+    if (_matchesKeywords(id, title, [
+      'traffic', 'law', 'leyes', 'tránsito', 'transito', 'правила', 'дорожн',
+      'prawo', 'ruchu', 'дорожного', 'движения'
+    ])) {
+      return 'assets/images/topic_icons/2_traffic_laws.png';
+    }
+    
+    // Topic 3: Passenger Safety
+    if (_matchesKeywords(id, title, [
+      'passenger', 'safety', 'seguridad', 'pasajeros', 'безпека', 'пасажир',
+      'bezpieczeństwo', 'pasażer', 'безопасность', 'пассажир'
+    ])) {
+      return 'assets/images/topic_icons/3_passenger_safety.png';
+    }
+    
+    // Topic 4: Pedestrian Rights
+    if (_matchesKeywords(id, title, [
+      'pedestrian', 'right', 'derechos', 'peatones', 'пішохід', 'права',
+      'piesi', 'prawa', 'пешеход', 'права'
+    ])) {
+      return 'assets/images/topic_icons/4_pedestrian_rights.png';
+    }
+    
+    // Topic 5: Bicycles and Motorcycles
+    if (_matchesKeywords(id, title, [
+      'bicycle', 'motorcycle', 'bicicletas', 'motocicletas', 'велосипед', 'мотоцикл',
+      'rower', 'motocykl', 'велосипед', 'мотоцикл'
+    ])) {
+      return 'assets/images/topic_icons/5_bicycles_and_motorcycles.png';
+    }
+    
+    // Topic 6: Special Transportation Vehicles
+    if (_matchesKeywords(id, title, [
+      'special', 'transport', 'vehículos', 'transporte', 'especiales',
+      'спеціальн', 'транспорт', 'specjalne', 'pojazdy', 'специальн', 'транспорт'
+    ])) {
+      return 'assets/images/topic_icons/6_special_transportation_vehicles.png';
+    }
+    
+    // Topic 7: Driving in Difficult Conditions
+    if (_matchesKeywords(id, title, [
+      'driving', 'difficult', 'conducir', 'condiciones', 'difíciles',
+      'водіння', 'складн', 'prowadzenie', 'trudnych', 'вождение', 'сложн'
+    ])) {
+      return 'assets/images/topic_icons/7_driving_difficult_conditions.png';
+    }
+    
+    // Topic 8: Impaired Driving
+    if (_matchesKeywords(id, title, [
+      'impaired', 'alcohol', 'conducir', 'efectos', 'alcohol',
+      'сп\'янілий', 'алкоголь', 'prowadzenie', 'alkohol', 'пьяный', 'алкоголь'
+    ])) {
+      return 'assets/images/topic_icons/8_impaired_driving.png';
+    }
+    
+    // Topic 9: Road Signs and Markings
+    if (_matchesKeywords(id, title, [
+      'road', 'sign', 'marking', 'señales', 'marcas', 'viales',
+      'дорожн', 'знак', 'розмітка', 'znaki', 'oznakowanie', 'дорожные', 'знаки'
+    ])) {
+      return 'assets/images/topic_icons/9_road_signs_markings.png';
+    }
+    
+    // Topic 10: Insurance and Responsibility
+    if (_matchesKeywords(id, title, [
+      'insurance', 'responsibility', 'seguros', 'responsabilidad',
+      'страхування', 'відповідальність', 'ubezpieczenia', 'odpowiedzialność',
+      'страхование', 'ответственность'
+    ])) {
+      return 'assets/images/topic_icons/10_insurance_responsibility.png';
+    }
+    
+    return null; // No match found
+  }
+  
+  /// Helper method to check if any keywords match in ID or title
+  bool _matchesKeywords(String id, String title, List<String> keywords) {
+    for (String keyword in keywords) {
+      if (id.contains(keyword) || title.contains(keyword)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  
   /// Helper method to convert Firebase Functions data to Firestore-compatible format
   /// This allows us to reuse the working Firestore processing logic
   Map<String, dynamic> _convertFirebaseFunctionData(Map<dynamic, dynamic> rawData) {
@@ -180,6 +297,7 @@ class FirebaseContentApi implements ContentApiInterface {
                 questionCount: questionCount,
                 progress: progress,
                 questionIds: questionIds,
+                iconAsset: _getTopicIconAsset(topicId, title),
               );
               
               processedTopics.add(topic);
@@ -269,6 +387,7 @@ class FirebaseContentApi implements ContentApiInterface {
                   questionCount: questionCount,
                   progress: progress,
                   questionIds: questionIds,
+                  iconAsset: _getTopicIconAsset(topicId, title),
                 );
                 
                 firestoreTopics.add(topic);

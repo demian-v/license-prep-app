@@ -4,6 +4,7 @@ class QuizTopic {
   final int questionCount;
   final double progress;
   final List<String> questionIds;
+  final String? iconAsset;
 
   QuizTopic({
     required this.id,
@@ -11,5 +12,6 @@ class QuizTopic {
     required this.questionCount,
     this.progress = 0.0,
     required this.questionIds,
+    this.iconAsset,
   });
 }

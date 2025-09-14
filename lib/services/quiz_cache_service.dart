@@ -122,6 +122,7 @@ class QuizCacheService {
         'questionCount': t.questionCount,
         'progress': t.progress,
         'questionIds': t.questionIds,
+        'iconAsset': t.iconAsset,
       }).toList();
       
       await prefs.setString(cacheKey, jsonEncode(topicsData));
@@ -166,6 +167,7 @@ class QuizCacheService {
           questionCount: data['questionCount'] ?? 0,
           progress: (data['progress'] ?? 0.0).toDouble(),
           questionIds: List<String>.from(data['questionIds'] ?? []),
+          iconAsset: data['iconAsset'],
         );
       }).toList();
       

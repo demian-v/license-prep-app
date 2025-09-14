@@ -306,7 +306,7 @@ void main() async {
     // Log user configured event
     await analyticsService.logEvent('user_configured', {
       'subscription_type': subscription.planType,
-      'is_trial': subscription.planType == 'trial',
+      'is_trial': (subscription.planType == 'trial').toString(),
     });
   } else {
     // For anonymous users, set basic properties
