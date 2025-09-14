@@ -139,29 +139,14 @@ class _EnhancedTestCardState extends State<EnhancedTestCard> with TickerProvider
                           ),
                         ],
                       ),
-                      // Info chip row
+                      // Responsive info chip row
                       if (widget.leftInfoText != null || widget.rightInfoText != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 16.0),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (widget.leftInfoText != null)
-                                Flexible(
-                                  child: _buildInfoChip(
-                                    Icons.timer,
-                                    widget.leftInfoText!,
-                                  ),
-                                ),
-                              if (widget.rightInfoText != null)
-                                Flexible(
-                                  child: _buildInfoChip(
-                                    Icons.quiz,
-                                    widget.rightInfoText!,
-                                  ),
-                                ),
-                            ],
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              return _buildResponsiveInfoRow(constraints);
+                            },
                           ),
                         ),
                     ],
@@ -175,28 +160,110 @@ class _EnhancedTestCardState extends State<EnhancedTestCard> with TickerProvider
     );
   }
 
-  Widget _buildInfoChip(IconData icon, String text) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          icon,
-          size: 14,
-          color: Colors.grey.shade600,
-        ),
-        SizedBox(width: 4),
-        Flexible(
-          child: Text(
-            text,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade600,
+  // Build responsive info row based on available width
+  Widget _buildResponsiveInfoRow(BoxConstraints constraints) {
+    final availableWidth = constraints.maxWidth;
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    // Use available container width rather than screen width for better responsiveness
+    final isVerySmallContainer = availableWidth < 300;
+    final isSmallContainer = availableWidth < 350;
+    final isMediumContainer = availableWidth >= 350 && availableWidth < 500;
+
+    // For extremely narrow containers, use vertical layout to prevent any overflow
+    if (isVerySmallContainer && availableWidth < 280) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (widget.leftInfoText != null)
+            _buildInfoChip(Icons.timer, widget.leftInfoText!, isSmallScreen: true),
+          if (widget.leftInfoText != null && widget.rightInfoText != null)
+            SizedBox(height: 4),
+          if (widget.rightInfoText != null)
+            _buildInfoChip(Icons.quiz, widget.rightInfoText!, isSmallScreen: true, allowFullText: false),
+        ],
+      );
+    }
+
+    // For small containers, use constrained horizontal layout with flex
+    if (isSmallContainer) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (widget.leftInfoText != null)
+            Flexible(
+              flex: 1,
+              child: _buildInfoChip(Icons.timer, widget.leftInfoText!, isSmallScreen: true),
             ),
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
+          if (widget.leftInfoText != null && widget.rightInfoText != null)
+            SizedBox(width: 8),
+          if (widget.rightInfoText != null)
+            Flexible(
+              flex: 2,
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: _buildInfoChip(Icons.quiz, widget.rightInfoText!, isSmallScreen: true, allowFullText: false),
+              ),
+            ),
+        ],
+      );
+    }
+
+    // For medium and large containers, use spaceBetween layout
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        if (widget.leftInfoText != null)
+          Flexible(
+            child: _buildInfoChip(Icons.timer, widget.leftInfoText!, isSmallScreen: false),
           ),
-        ),
+        if (widget.rightInfoText != null)
+          Flexible(
+            child: _buildInfoChip(
+              Icons.quiz, 
+              widget.rightInfoText!, 
+              isSmallScreen: false,
+              allowFullText: !isMediumContainer || availableWidth > 380,
+            ),
+          ),
       ],
+    );
+  }
+
+  Widget _buildInfoChip(IconData icon, String text, {bool isSmallScreen = false, bool allowFullText = false}) {
+    final fontSize = isSmallScreen ? 10.0 : 12.0;
+    final iconSize = isSmallScreen ? 12.0 : 14.0;
+    
+    // For very small screens, truncate text more aggressively
+    String displayText = text;
+    if (isSmallScreen && text.length > 15) {
+      displayText = text.length > 15 ? '${text.substring(0, 12)}...' : text;
+    }
+
+    return Flexible(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: iconSize,
+            color: Colors.grey.shade600,
+          ),
+          SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              displayText,
+              style: TextStyle(
+                fontSize: fontSize,
+                color: Colors.grey.shade600,
+              ),
+              maxLines: allowFullText ? 2 : 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: allowFullText,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

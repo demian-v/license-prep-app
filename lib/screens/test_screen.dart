@@ -170,7 +170,7 @@ class _TestScreenState extends State<TestScreen> {
             'time_60_minutes': '60 minutos',
             'questions_40': '40 preguntas',
             'time_unlimited': 'Tiempo ilimitado',
-            'questions_100_sorted': '100+ preguntas por temas',
+            'questions_100_sorted': '100+ preguntas por tema',
           }[key] ?? key;
         case 'uk':
           return {
@@ -188,7 +188,7 @@ class _TestScreenState extends State<TestScreen> {
             'time_60_minutes': '60 хвилин',
             'questions_40': '40 запитань',
             'time_unlimited': 'Необмежений час',
-            'questions_100_sorted': '100+ запитань за темами',
+            'questions_100_sorted': '100+ питань по темах',
           }[key] ?? key;
         case 'ru':
           return {
@@ -206,7 +206,7 @@ class _TestScreenState extends State<TestScreen> {
             'time_60_minutes': '60 минут',
             'questions_40': '40 вопросов',
             'time_unlimited': 'Неограниченное время',
-            'questions_100_sorted': '100+ вопросов по темам',
+            'questions_100_sorted': '100+ вопросов по темах',
           }[key] ?? key;
         case 'pl':
           return {
@@ -224,7 +224,7 @@ class _TestScreenState extends State<TestScreen> {
             'time_60_minutes': '60 minut',
             'questions_40': '40 pytań',
             'time_unlimited': 'Nieograniczony czas',
-            'questions_100_sorted': '100+ pytań według tematów',
+            'questions_100_sorted': '100+ pytań na tematy',
           }[key] ?? key;
         case 'en':
         default:
@@ -243,7 +243,7 @@ class _TestScreenState extends State<TestScreen> {
             'time_60_minutes': '60 minutes',
             'questions_40': '40 questions',
             'time_unlimited': 'Unlimited time',
-            'questions_100_sorted': '100+ questions sorted by topics',
+            'questions_100_sorted': '100+ topic questions',
           }[key] ?? key;
       }
     } catch (e) {
