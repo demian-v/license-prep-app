@@ -178,16 +178,19 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
               children: [
                 Icon(
                   Icons.fitness_center,
-                  size: 18,
+                  size: 16,
                   color: Colors.black,
                 ),
-                SizedBox(width: 8),
-                Text(
-                  AppLocalizations.of(context).translate('practice_training'),
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
+                SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    AppLocalizations.of(context).translate('practice_training'),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
