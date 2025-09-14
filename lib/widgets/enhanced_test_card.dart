@@ -145,16 +145,21 @@ class _EnhancedTestCardState extends State<EnhancedTestCard> with TickerProvider
                           padding: const EdgeInsets.only(top: 16.0),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               if (widget.leftInfoText != null)
-                                _buildInfoChip(
-                                  Icons.timer,
-                                  widget.leftInfoText!,
+                                Flexible(
+                                  child: _buildInfoChip(
+                                    Icons.timer,
+                                    widget.leftInfoText!,
+                                  ),
                                 ),
                               if (widget.rightInfoText != null)
-                                _buildInfoChip(
-                                  Icons.quiz,
-                                  widget.rightInfoText!,
+                                Flexible(
+                                  child: _buildInfoChip(
+                                    Icons.quiz,
+                                    widget.rightInfoText!,
+                                  ),
                                 ),
                             ],
                           ),
@@ -172,18 +177,23 @@ class _EnhancedTestCardState extends State<EnhancedTestCard> with TickerProvider
 
   Widget _buildInfoChip(IconData icon, String text) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
           icon,
-          size: 16,
+          size: 14,
           color: Colors.grey.shade600,
         ),
         SizedBox(width: 4),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey.shade600,
+        Flexible(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+            ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
         ),
       ],

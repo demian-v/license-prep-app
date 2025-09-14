@@ -269,28 +269,10 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Question number indicator
-          Row(
-            children: [
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  AppLocalizations.of(context).translate('question_x_of_y')
-                    .replaceAll('{0}', currentQuestionNumber.toString())
-                    .replaceAll('{1}', totalQuestions.toString()),
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black.withOpacity(0.7),
-                  ),
-                ),
-              ),
-              if (currentQuestion.type == QuestionType.multipleChoice) ...[
-                SizedBox(width: 8),
+          // Multiple choice indicator (if applicable)
+          if (currentQuestion.type == QuestionType.multipleChoice) ...[
+            Row(
+              children: [
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
@@ -307,9 +289,9 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
                   ),
                 ),
               ],
-            ],
-          ),
-          SizedBox(height: 12),
+            ),
+            SizedBox(height: 12),
+          ],
           // Question text
           Text(
             currentQuestion.questionText,
