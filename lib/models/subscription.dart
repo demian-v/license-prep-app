@@ -1,3 +1,8 @@
+enum SubscriptionType {
+  monthly,
+  yearly
+}
+
 class SubscriptionStatus {
   final bool isActive;
   final DateTime? trialEndsAt;
