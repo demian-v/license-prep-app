@@ -143,5 +143,20 @@
   "contact_support": "Contactar Soporte",
   "message_details": "Detalles del Mensaje:",
   "character_counter": "{0}/10 mínimo",
-  "support_response_info": "Normalmente respondemos en 24 horas. Tus comentarios nos ayudan a mejorar la aplicación."
+  "support_response_info": "Normalmente respondemos en 24 horas. Tus comentarios nos ayudan a mejorar la aplicación.",
+  "sessionConflictMessage": "Has sido desconectado porque iniciaste sesión en otro dispositivo.",
+  "sessionConflictButton": "OK",
+  
+  "trial_active": "Prueba Gratuita Activa",
+  "trial_expires_soon": "¡La Prueba Expira Pronto!",
+  "trial_expired": "Prueba Expirada",
+  "days_remaining": "días restantes",
+  "upgrade_now": "Actualizar Ahora",
+  "subscription_required": "Suscripción requerida para continuar",
+  "purchase_processing": "Procesando compra...",
+  "premium_feature_blocked": "Función Premium Bloqueada",
+  "premium_feature_blocked_message": "Esta función requiere una suscripción activa. Actualiza ahora para continuar usando todas las funciones premium.",
+  "trial_expired_message": "Tu prueba gratuita ha terminado. Suscríbete ahora para continuar usando las funciones premium.",
+  "subscription_expired_message": "Tu suscripción ha expirado. Renueva ahora para continuar accediendo a las funciones premium.",
+  "close": "Cerrar"
 }

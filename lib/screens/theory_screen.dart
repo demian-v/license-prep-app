@@ -13,6 +13,9 @@ import '../widgets/module_card.dart';
 import 'theory_module_screen.dart';
 import 'traffic_rule_content_screen.dart';
 import '../widgets/trial_status_widget.dart';
+import '../widgets/premium_block_dialog.dart';
+import '../utils/subscription_checker.dart';
+import '../providers/subscription_provider.dart';
 
 class TheoryScreen extends StatefulWidget {
   @override
@@ -140,6 +143,25 @@ class _TheoryScreenState extends State<TheoryScreen> {
     );
     
     debugPrint('📊 Analytics: theory_module_selected logged (module: ${module.title}, time_on_list: ${timeOnList}s)');
+  }
+
+  /// Shows premium block dialog when user tries to access premium features without valid subscription
+  void _showPremiumBlockDialog(BuildContext context, String featureName) {
+    debugPrint('🚫 TheoryScreen: Showing premium block dialog for feature: $featureName');
+    
+    PremiumBlockDialog.show(
+      context,
+      featureName: featureName,
+      onUpgradePressed: () {
+        debugPrint('🔄 TheoryScreen: User clicked Upgrade Now from premium block dialog');
+        Navigator.of(context).pop(); // Close dialog
+        Navigator.pushNamed(context, '/subscription'); // Navigate to subscription screen
+      },
+      onClosePressed: () {
+        debugPrint('❌ TheoryScreen: User closed premium block dialog');
+        Navigator.of(context).pop();
+      },
+    );
   }
 
   @override
@@ -337,6 +359,15 @@ class _TheoryScreenState extends State<TheoryScreen> {
                     if (!SessionValidationService.validateBeforeActionSafely(context)) {
                       print('🚨 TheoryScreen: Session invalid, blocking module selection');
                       return; // User will be logged out by the validation service
+                    }
+                    
+                    // NEW: Subscription validation - check if user has valid subscription
+                    final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+                    if (SubscriptionChecker.shouldBlockPremiumFeature(subscriptionProvider)) {
+                      print('🚫 TheoryScreen: Subscription invalid, blocking module selection: ${module.title}');
+                      print('   - Block reason: ${SubscriptionChecker.getBlockReason(subscriptionProvider)}');
+                      _showPremiumBlockDialog(context, module.title);
+                      return;
                     }
                     
                     // Track module selection

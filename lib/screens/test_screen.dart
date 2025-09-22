@@ -17,6 +17,9 @@ import 'exam_question_screen.dart';
 import 'practice_question_screen.dart';
 import '../localization/app_localizations.dart';
 import '../widgets/trial_status_widget.dart';
+import '../widgets/premium_block_dialog.dart';
+import '../utils/subscription_checker.dart';
+import '../providers/subscription_provider.dart';
 
 class TestScreen extends StatefulWidget {
   @override
@@ -122,6 +125,25 @@ class _TestScreenState extends State<TestScreen> {
       print('❌ Analytics error: $e');
       // Don't block user flow if analytics fails
     }
+  }
+  
+  /// Shows premium block dialog when user tries to access premium features without valid subscription
+  void _showPremiumBlockDialog(BuildContext context, String featureName) {
+    debugPrint('🚫 TestScreen: Showing premium block dialog for feature: $featureName');
+    
+    PremiumBlockDialog.show(
+      context,
+      featureName: featureName,
+      onUpgradePressed: () {
+        debugPrint('🔄 TestScreen: User clicked Upgrade Now from premium block dialog');
+        Navigator.of(context).pop(); // Close dialog
+        Navigator.pushNamed(context, '/subscription'); // Navigate to subscription screen
+      },
+      onClosePressed: () {
+        debugPrint('❌ TestScreen: User closed premium block dialog');
+        Navigator.of(context).pop();
+      },
+    );
   }
   
   /// Analytics method for Learn by Topics started event
@@ -298,6 +320,15 @@ class _TestScreenState extends State<TestScreen> {
                         return; // User will be logged out by the validation service
                       }
                       
+                      // NEW: Subscription validation - check if user has valid subscription
+                      final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+                      if (SubscriptionChecker.shouldBlockPremiumFeature(subscriptionProvider)) {
+                        print('🚫 TestScreen: Subscription invalid, blocking Take Exam action');
+                        print('   - Block reason: ${SubscriptionChecker.getBlockReason(subscriptionProvider)}');
+                        _showPremiumBlockDialog(context, _translate('take_exam', languageProvider));
+                        return;
+                      }
+                      
                       // Track exam start FIRST
                       _logExamStartedAnalytics(languageProvider);
                       
@@ -343,6 +374,15 @@ class _TestScreenState extends State<TestScreen> {
                         return; // User will be logged out by the validation service
                       }
                       
+                      // NEW: Subscription validation - check if user has valid subscription
+                      final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+                      if (SubscriptionChecker.shouldBlockPremiumFeature(subscriptionProvider)) {
+                        print('🚫 TestScreen: Subscription invalid, blocking Learn by Topics action');
+                        print('   - Block reason: ${SubscriptionChecker.getBlockReason(subscriptionProvider)}');
+                        _showPremiumBlockDialog(context, _translate('learn_by_topics', languageProvider));
+                        return;
+                      }
+                      
                       // Track Learn by Topics start FIRST
                       _logLearnByTopicsStartedAnalytics(languageProvider);
                       
@@ -372,6 +412,15 @@ class _TestScreenState extends State<TestScreen> {
                       if (!SessionValidationService.validateBeforeActionSafely(context)) {
                         print('🚨 TestScreen: Session invalid, blocking Practice Tickets action');
                         return; // User will be logged out by the validation service
+                      }
+                      
+                      // NEW: Subscription validation - check if user has valid subscription
+                      final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+                      if (SubscriptionChecker.shouldBlockPremiumFeature(subscriptionProvider)) {
+                        print('🚫 TestScreen: Subscription invalid, blocking Practice Tickets action');
+                        print('   - Block reason: ${SubscriptionChecker.getBlockReason(subscriptionProvider)}');
+                        _showPremiumBlockDialog(context, _translate('practice_tickets', languageProvider));
+                        return;
                       }
                       
                       // Track practice start FIRST
@@ -416,6 +465,15 @@ class _TestScreenState extends State<TestScreen> {
                       if (!SessionValidationService.validateBeforeActionSafely(context)) {
                         print('🚨 TestScreen: Session invalid, blocking Saved action');
                         return; // User will be logged out by the validation service
+                      }
+                      
+                      // NEW: Subscription validation - check if user has valid subscription
+                      final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+                      if (SubscriptionChecker.shouldBlockPremiumFeature(subscriptionProvider)) {
+                        print('🚫 TestScreen: Subscription invalid, blocking Saved action');
+                        print('   - Block reason: ${SubscriptionChecker.getBlockReason(subscriptionProvider)}');
+                        _showPremiumBlockDialog(context, _translate('saved', languageProvider));
+                        return;
                       }
                       
                       // Navigate to saved questions

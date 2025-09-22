@@ -143,5 +143,20 @@
   "contact_support": "Skontaktuj się z Pomocą",
   "message_details": "Szczegóły Wiadomości:",
   "character_counter": "{0}/10 minimum",
-  "support_response_info": "Zwykle odpowiadamy w ciągu 24 godzin. Twoja opinia pomaga nam ulepszyć aplikację."
+  "support_response_info": "Zwykle odpowiadamy w ciągu 24 godzin. Twoja opinia pomaga nam ulepszyć aplikację.",
+  "sessionConflictMessage": "Zostałeś wylogowany, ponieważ zalogowałeś się na innym urządzeniu.",
+  "sessionConflictButton": "OK",
+  
+  "trial_active": "Bezpłatny okres próbny aktywny",
+  "trial_expires_soon": "Okres próbny wkrótce wygaśnie!",
+  "trial_expired": "Okres próbny wygasł",
+  "days_remaining": "dni pozostało",
+  "upgrade_now": "Uaktualnij teraz",
+  "subscription_required": "Wymagana subskrypcja, aby kontynuować",
+  "purchase_processing": "Przetwarzanie zakupu...",
+  "premium_feature_blocked": "Funkcja Premium Zablokowana",
+  "premium_feature_blocked_message": "Ta funkcja wymaga aktywnej subskrypcji. Uaktualnij teraz, aby kontynuować korzystanie z wszystkich funkcji premium.",
+  "trial_expired_message": "Twój bezpłatny okres próbny się skończył. Subskrybuj teraz, aby kontynuować korzystanie z funkcji premium.",
+  "subscription_expired_message": "Twoja subskrypcja wygasła. Odnów teraz, aby kontynuować dostęp do funkcji premium.",
+  "close": "Zamknij"
 }

@@ -157,5 +157,10 @@
   "days_remaining": "days remaining",
   "upgrade_now": "Upgrade Now",
   "subscription_required": "Subscription required to continue",
-  "purchase_processing": "Processing purchase..."
+  "purchase_processing": "Processing purchase...",
+  "premium_feature_blocked": "Premium Feature Blocked",
+  "premium_feature_blocked_message": "This feature requires an active subscription. Upgrade now to continue using all premium features.",
+  "trial_expired_message": "Your free trial has ended. Subscribe now to continue using premium features.",
+  "subscription_expired_message": "Your subscription has expired. Renew now to continue accessing premium features.",
+  "close": "Close"
 }
