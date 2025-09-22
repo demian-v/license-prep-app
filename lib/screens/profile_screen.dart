@@ -20,6 +20,7 @@ import '../widgets/enhanced_profile_card.dart';
 import '../main.dart';
 import 'personal_info_screen.dart';
 import 'support_screen.dart';
+import '../widgets/trial_status_widget.dart';
 
 class ProfileScreen extends StatefulWidget {
   @override
@@ -150,12 +151,8 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                 debugPrint('✅ ProfileScreen: Found saved name in preferences: $savedName');
                 
                 // Update user with the saved name from preferences
-                final updatedUser = User(
-                  id: user.id,
+                final updatedUser = user.copyWith(
                   name: savedName,
-                  email: user.email,
-                  language: user.language,
-                  state: user.state,
                 );
                 
                 // Update AuthProvider
@@ -205,12 +202,8 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                 debugPrint('🔄 ProfileScreen: User name mismatch - Firebase: $firestoreName, Local: ${user.name}');
                 
                 // Update local user object with name from Firestore
-                final updatedUser = User(
-                  id: user.id,
+                final updatedUser = user.copyWith(
                   name: firestoreName.toString(),
-                  email: user.email,
-                  language: user.language,
-                  state: user.state,
                 );
                 
                 // Update AuthProvider
@@ -300,11 +293,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                   debugPrint('🔄 ProfileScreen: State mismatch - Firebase: $firestoreState, Local: ${user.state}');
                   
                   // Update local user object with state from Firestore
-                  final updatedUser = User(
-                    id: user.id,
-                    name: user.name,
-                    email: user.email,
-                    language: user.language,
+                  final updatedUser = user.copyWith(
                     state: firestoreState.toString(),
                   );
                   
@@ -615,11 +604,16 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
             centerTitle: true,
           ),
           body: SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  Container(
+            child: Column(
+              children: [
+                // Add TrialStatusWidget here - under "My Profile" title, above profile card
+                TrialStatusWidget(),
+                
+                Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      Container(
                     padding: EdgeInsets.symmetric(vertical: 24, horizontal: 20),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -846,8 +840,10 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                       ),
                     ),
                   ),
-                ],
-              ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         );

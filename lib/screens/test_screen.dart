@@ -16,6 +16,7 @@ import 'saved_items_screen.dart';
 import 'exam_question_screen.dart';
 import 'practice_question_screen.dart';
 import '../localization/app_localizations.dart';
+import '../widgets/trial_status_widget.dart';
 
 class TestScreen extends StatefulWidget {
   @override
@@ -272,12 +273,18 @@ class _TestScreenState extends State<TestScreen> {
             centerTitle: true,
           ),
           body: SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildSectionHeader(_translate('testing', languageProvider)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Add TrialStatusWidget here - under "Tests" title, above "Testing" section
+                TrialStatusWidget(),
+                
+                Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildSectionHeader(_translate('testing', languageProvider)),
                   // Take Exam card with left and right info
                   _buildTestItem(
                     context,
@@ -421,8 +428,10 @@ class _TestScreenState extends State<TestScreen> {
                     },
                     cardType: 3,
                   ),
-                ],
-              ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         );

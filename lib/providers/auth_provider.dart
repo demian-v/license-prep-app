@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:provider/provider.dart';
 import 'dart:convert';
 import '../models/user.dart';
 import '../services/service_locator.dart';
 import '../services/email_sync_service.dart';
 import '../services/session_manager.dart';
+import '../services/subscription_management_service.dart';
 import '../data/state_data.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'language_provider.dart';
@@ -112,6 +114,11 @@ class AuthProvider extends ChangeNotifier {
             email: loggedInUser.email,
             language: savedLanguage ?? loggedInUser.language,
             state: savedState ?? loggedInUser.state,
+            createdAt: loggedInUser.createdAt,
+            lastLoginAt: DateTime.now(),
+            status: loggedInUser.status,
+            lastBillingDate: loggedInUser.lastBillingDate,
+            nextBillingDate: loggedInUser.nextBillingDate,
           );
           
           // Store the updated user
@@ -199,7 +206,7 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> signup(String name, String email, String password) async {
+  Future<bool> signup(String name, String email, String password, {BuildContext? context}) async {
     try {
       debugPrint('🔍 [AuthProvider] Creating user with name: $name, email: $email');
       
@@ -220,6 +227,11 @@ class AuthProvider extends ChangeNotifier {
             email: registeredUser.email,
             language: 'en',    // Explicitly set to English
             state: null,       // Explicitly set to null
+            createdAt: registeredUser.createdAt,
+            lastLoginAt: DateTime.now(),
+            status: registeredUser.status,
+            lastBillingDate: registeredUser.lastBillingDate,
+            nextBillingDate: registeredUser.nextBillingDate,
           );
           
           // Store the corrected user
@@ -242,6 +254,42 @@ class AuthProvider extends ChangeNotifier {
           // Store the user as is since default values are correct
           user = registeredUser;
           debugPrint('✅ [AuthProvider] User created with correct default values');
+        }
+        
+        // NEW: Initialize 3-day trial for new user
+        debugPrint('🆓 [AuthProvider] Initializing 3-day trial for new user: ${user!.id}');
+        try {
+          final subscriptionService = SubscriptionManagementService();
+          final trialSubscription = await subscriptionService.initializeTrial(user!.id);
+          
+          // Update user with trial dates
+          final now = DateTime.now();
+          final updatedUser = user!.copyWith(
+            lastBillingDate: now,
+            nextBillingDate: trialSubscription.trialEndsAt,
+            lastLoginAt: now,
+          );
+          
+          user = updatedUser;
+          debugPrint('✅ [AuthProvider] Trial initialized successfully. Trial ends: ${trialSubscription.trialEndsAt}');
+          
+          // CRITICAL FIX: Initialize SubscriptionProvider for new user
+          if (context != null) {
+            debugPrint('🔄 [AuthProvider] Initializing SubscriptionProvider for new user');
+            try {
+              final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+              await subscriptionProvider.initialize(user!.id);
+              debugPrint('✅ [AuthProvider] SubscriptionProvider initialized successfully');
+            } catch (e) {
+              debugPrint('⚠️ [AuthProvider] SubscriptionProvider initialization failed: $e');
+              // Non-critical error - continue with signup
+            }
+          } else {
+            debugPrint('⚠️ [AuthProvider] Context not provided, SubscriptionProvider will be initialized later');
+          }
+        } catch (e) {
+          debugPrint('⚠️ [AuthProvider] Trial initialization failed (non-critical): $e');
+          // Continue with registration even if trial initialization fails
         }
         
         // Run email sync immediately to ensure consistency and fix any potential issues
@@ -467,6 +515,11 @@ class AuthProvider extends ChangeNotifier {
           email: verifiedEmail, // Use the verified email from Firebase Auth
           language: user!.language,
           state: user!.state,
+          createdAt: user!.createdAt,
+          lastLoginAt: user!.lastLoginAt,
+          status: user!.status,
+          lastBillingDate: user!.lastBillingDate,
+          nextBillingDate: user!.nextBillingDate,
         );
         
         // Update the provider's user object

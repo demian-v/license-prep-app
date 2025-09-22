@@ -135,7 +135,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
       debugPrint('🔍 [SignupScreen] Attempting signup with name=$name, email=$email');
       
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final success = await authProvider.signup(name, email, password);
+      final success = await authProvider.signup(name, email, password, context: context);
       
       if (success) {
         debugPrint('✅ [SignupScreen] Signup successful');

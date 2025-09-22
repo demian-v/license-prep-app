@@ -61,7 +61,7 @@ class _LicenseSelectionScreenState extends State<LicenseSelectionScreen> {
     final progressProvider = Provider.of<ProgressProvider>(context);
     final subscriptionProvider = Provider.of<SubscriptionProvider>(context);
     final showTrialBanner = subscriptionProvider.trialDaysLeft > 0 && 
-                           subscriptionProvider.subscription.nextBillingDate == null;
+                           subscriptionProvider.subscription?.nextBillingDate == null;
 
     void handleSelectLicense(String licenseId) {
       progressProvider.selectLicense(licenseId);

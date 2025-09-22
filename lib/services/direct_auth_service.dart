@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../models/user.dart' as app_models;
 import '../services/api/base/auth_api_interface.dart';
 import 'session_manager.dart';
+import 'billing_calculator.dart';
 
 /// A service class that directly interacts with Firebase Auth and Firestore
 /// without any abstractions or complex mappings
@@ -97,7 +98,10 @@ class DirectAuthService implements AuthApiInterface {
   /// Create Firestore documents for a new user
   Future<void> createUserDocuments(String userId, String name, String email) async {
     try {
-      // Create user document with explicit default values
+      final now = DateTime.now();
+      final trialEndDate = BillingCalculator.calculateTrialEndDate(now);
+      
+      // Create user document with explicit default values including billing fields
       final userData = {
         'name': name,
         'email': email,
@@ -105,6 +109,10 @@ class DirectAuthService implements AuthApiInterface {
         'lastLoginAt': FieldValue.serverTimestamp(),
         'language': 'en',    // Explicitly set to English 
         'state': null,       // Explicitly set to null
+        // Billing fields for subscription management
+        'status': 'active',  // Active subscription status
+        'lastBillingDate': FieldValue.serverTimestamp(), // Registration date as first billing
+        'nextBillingDate': Timestamp.fromDate(trialEndDate), // Trial end date
       };
       
       debugPrint('🔄 [DirectAuthService] Creating user document with data:');
@@ -113,9 +121,14 @@ class DirectAuthService implements AuthApiInterface {
       debugPrint('    - Email: $email');
       debugPrint('    - Language: ${userData['language']}');
       debugPrint('    - State: ${userData['state']}');
+      debugPrint('    - Status: ${userData['status']}');
+      debugPrint('    - Trial ends: $trialEndDate');
       
       await _firestore.collection('users').doc(userId).set(userData);
-      debugPrint('✅ [DirectAuthService] Created Firestore user document');
+      debugPrint('✅ [DirectAuthService] Created Firestore user document with billing fields');
+      
+      // Create initial trial subscription record
+      await _createInitialTrialSubscription(userId, trialEndDate);
       
       // Create progress document
       await _firestore.collection('progress').doc(userId).set({
@@ -129,6 +142,34 @@ class DirectAuthService implements AuthApiInterface {
     } catch (e) {
       debugPrint('DirectAuthService: Error creating Firestore documents: $e');
       // Continue even if this fails, since the Auth user is already created
+    }
+  }
+  
+  /// Create initial trial subscription record for new user
+  Future<void> _createInitialTrialSubscription(String userId, DateTime trialEndDate) async {
+    try {
+      debugPrint('🆓 [DirectAuthService] Creating initial trial subscription for user: $userId');
+      
+      final subscriptionData = {
+        'createdAt': FieldValue.serverTimestamp(),
+        'isActive': true,
+        'updatedAt': FieldValue.serverTimestamp(),
+        'status': 'active',
+        'trialEndsAt': Timestamp.fromDate(trialEndDate),
+        'trialUsed': 0, // 0 during trial period
+        'packageId': 3, // Trial package ID (from your specification)
+        'duration': BillingCalculator.TRIAL_DAYS, // 3 days trial
+        'userId': userId,
+        'nextBillingDate': Timestamp.fromDate(trialEndDate), // MATCHES user table
+      };
+      
+      await _firestore.collection('subscriptions').add(subscriptionData);
+      debugPrint('✅ [DirectAuthService] Created initial trial subscription');
+      debugPrint('    - Trial ends: $trialEndDate');
+      debugPrint('    - NextBillingDate matches user table: ✅');
+    } catch (e) {
+      debugPrint('⚠️ [DirectAuthService] Error creating trial subscription: $e');
+      // Don't throw error - user creation should succeed even if subscription fails
     }
   }
 
@@ -417,13 +458,29 @@ class DirectAuthService implements AuthApiInterface {
       
       final userData = userDoc.data() as Map<String, dynamic>;
       
-      // Create app user model
+      // Parse billing dates from Firestore timestamps
+      DateTime? lastBillingDate;
+      DateTime? nextBillingDate;
+      
+      if (userData['lastBillingDate'] != null) {
+        lastBillingDate = (userData['lastBillingDate'] as Timestamp).toDate();
+      }
+      
+      if (userData['nextBillingDate'] != null) {
+        nextBillingDate = (userData['nextBillingDate'] as Timestamp).toDate();
+      }
+      
+      // Create app user model with all fields including billing
       return app_models.User(
         id: userId,
         name: userData['name'] ?? firebaseUser.displayName ?? '',
         email: userData['email'] ?? firebaseUser.email ?? '',
         language: userData['language'],
         state: userData['state'],
+        status: userData['status'] ?? 'active',
+        lastBillingDate: lastBillingDate,
+        nextBillingDate: nextBillingDate,
+        createdAt: DateTime.now(),
       );
     } catch (e) {
       debugPrint('DirectAuthService: Error getting current user: $e');
@@ -451,6 +508,7 @@ class DirectAuthService implements AuthApiInterface {
       email: email,
       language: 'en', // Default language
       state: null,    // Default state is null
+      createdAt: DateTime.now(),
     );
   }
   

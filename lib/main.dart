@@ -308,25 +308,8 @@ void main() async {
     user = User.fromJson(jsonDecode(userString));
   }
   
-  // Load subscription data
-  SubscriptionStatus subscription;
-  final subscriptionString = prefs.getString('subscription');
-  if (subscriptionString != null) {
-    subscription = SubscriptionStatus.fromJson(jsonDecode(subscriptionString));
-  } else {
-    // Default subscription with 3-day trial
-    final trialEndDate = DateTime.now().add(Duration(days: 3));
-    final now = DateTime.now();
-    subscription = SubscriptionStatus(
-      isActive: true,
-      trialEndsAt: trialEndDate,
-      nextBillingDate: null,
-      planType: 'trial',
-      createdAt: now,
-      updatedAt: now,
-    );
-    prefs.setString('subscription', jsonEncode(subscription.toJson()));
-  }
+  // NOTE: Subscription data is now handled by SubscriptionProvider initialization
+  // No need to load subscription data here - it will be loaded when provider initializes
   
   // Load progress data
   UserProgress progress;
@@ -345,7 +328,7 @@ void main() async {
   
   // Create providers
   final authProvider = AuthProvider(user);
-  final subscriptionProvider = SubscriptionProvider(subscription);
+  final subscriptionProvider = SubscriptionProvider();
   final progressProvider = ProgressProvider(progress);
   
   // Connect lifecycle observer to auth provider
@@ -426,30 +409,36 @@ void main() async {
     });
   }
   
-  // Set up initial user properties for analytics
+  // Initialize subscription provider for logged-in users
   if (user != null) {
+    // Initialize subscription provider with user data
+    Future.microtask(() async {
+      await subscriptionProvider.initialize(user!.id);
+    });
+    
+    // Set up initial user properties for analytics
     await analyticsService.setUserProperties(
       userId: user.id,
       state: user.state,
       language: user.language ?? languageProvider.language,
-      subscriptionStatus: subscription.planType,
+      subscriptionStatus: 'trial', // Default to trial, will be updated when subscription loads
     );
     
     // Log user configured event
     await analyticsService.logEvent('user_configured', {
-      'subscription_type': subscription.planType,
-      'is_trial': (subscription.planType == 'trial').toString(),
+      'subscription_type': 'trial',
+      'is_trial': 'true',
     });
   } else {
     // For anonymous users, set basic properties
     await analyticsService.setUserProperties(
       language: languageProvider.language,
-      subscriptionStatus: subscription.planType,
+      subscriptionStatus: 'trial',
     );
     
     // Log anonymous user configured event
     await analyticsService.logEvent('anonymous_user_configured', {
-      'subscription_type': subscription.planType,
+      'subscription_type': 'trial',
     });
   }
   

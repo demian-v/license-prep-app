@@ -9,6 +9,8 @@ import '../services/session_validation_service.dart';
 import '../providers/language_provider.dart';
 import '../providers/content_provider.dart';
 import '../providers/state_provider.dart';
+import '../providers/auth_provider.dart';
+import '../providers/subscription_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -80,6 +82,23 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       await _syncContentLanguageAndState();
       
       print('🏠 HomeScreen: Preferences synced successfully - ready to show navigation');
+      
+      // BACKUP: Ensure SubscriptionProvider is initialized for logged-in users
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+      
+      if (authProvider.user != null && subscriptionProvider.subscription == null && !subscriptionProvider.isLoading) {
+        print('🔄 HomeScreen: SubscriptionProvider not initialized, initializing now...');
+        try {
+          await subscriptionProvider.initialize(authProvider.user!.id);
+          print('✅ HomeScreen: SubscriptionProvider backup initialization successful');
+        } catch (e) {
+          print('⚠️ HomeScreen: SubscriptionProvider backup initialization failed: $e');
+          // Non-critical - continue with app initialization
+        }
+      } else if (subscriptionProvider.subscription != null) {
+        print('✅ HomeScreen: SubscriptionProvider already initialized');
+      }
       
       // NOTE: We don't load theory/practice content here anymore!
       // Each screen (TheoryScreen, TestScreen) will load its own content when accessed

@@ -80,6 +80,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
                       period: AppLocalizations.of(context).translate('per_year'),
                       subscription: subscription,
                       subscriptionProvider: subscriptionProvider,
+                      packageId: 2, // Yearly package ID from Firebase
                       showBestValue: true,
                     ),
                   ),
@@ -92,6 +93,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
                       period: AppLocalizations.of(context).translate('per_month'),
                       subscription: subscription,
                       subscriptionProvider: subscriptionProvider,
+                      packageId: 1, // Monthly package ID from Firebase
                       showBestValue: false,
                     ),
                   ),

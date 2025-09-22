@@ -100,10 +100,11 @@ class FirebaseAuthApi implements AuthApiInterface {
             debugPrint('Retrieved user data directly from Firestore');
             return User(
               id: userId,
-              name: docSnapshot.data()?['name'],
+              name: userCredential.user?.displayName ?? email.split('@')[0],
               email: email,
-              language: docSnapshot.data()?['language'] ?? 'en',
-              state: docSnapshot.data()?['state'],
+              language: 'en',
+              state: null,
+              createdAt: DateTime.now(),
             );
           }
         } catch (directFirestoreError) {
@@ -127,6 +128,7 @@ class FirebaseAuthApi implements AuthApiInterface {
           email: email,
           language: 'en', // Updated to English
           state: null,    // No default state
+          createdAt: DateTime.now(),
         );
       }
     } catch (e) {
@@ -254,6 +256,7 @@ class FirebaseAuthApi implements AuthApiInterface {
         email: email,
         language: 'en', // Explicitly set to English
         state: null,    // Explicitly set to null
+        createdAt: DateTime.now(),
       );
     } catch (e) {
       if (e is FirebaseAuthException) {
@@ -356,6 +359,7 @@ class FirebaseAuthApi implements AuthApiInterface {
         email: currentAuth.email ?? "",
         language: language,
         state: null, // State will be handled separately by the calling methods
+        createdAt: DateTime.now(),
       );
     }
     throw 'No authenticated user found';
@@ -372,6 +376,7 @@ class FirebaseAuthApi implements AuthApiInterface {
         email: currentAuth.email ?? "",
         language: 'en', // Default language - will be preserved by calling method
         state: stateId,
+        createdAt: DateTime.now(),
       );
     }
     throw 'No authenticated user found';
@@ -492,6 +497,7 @@ class FirebaseAuthApi implements AuthApiInterface {
               email: currentAuth.email ?? "",
               language: currentLanguage,
               state: stateId,
+              createdAt: DateTime.now(),
             );
           }
           return _createUserWithState(userId, stateId);
@@ -535,6 +541,7 @@ class FirebaseAuthApi implements AuthApiInterface {
             email: currentAuth.email ?? "",
             language: currentLanguage,
             state: stateId,
+            createdAt: DateTime.now(),
           );
         }
       }

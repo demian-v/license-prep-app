@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/subscription.dart';
+import '../models/user_subscription.dart';
 import '../providers/subscription_provider.dart';
 import '../localization/app_localizations.dart';
 
@@ -7,8 +8,9 @@ class EnhancedSubscriptionCard extends StatefulWidget {
   final SubscriptionType subscriptionType;
   final String price;
   final String period;
-  final SubscriptionStatus subscription;
+  final UserSubscription? subscription;
   final SubscriptionProvider subscriptionProvider;
+  final int packageId;
   final bool showBestValue;
 
   const EnhancedSubscriptionCard({
@@ -18,6 +20,7 @@ class EnhancedSubscriptionCard extends StatefulWidget {
     required this.period,
     required this.subscription,
     required this.subscriptionProvider,
+    required this.packageId,
     this.showBestValue = false,
   }) : super(key: key);
 
@@ -186,7 +189,9 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
 
   @override
   Widget build(BuildContext context) {
-    final isActive = widget.subscription.isActive && widget.subscription.nextBillingDate != null;
+    final isPaidSubscription = widget.subscription?.isPaidSubscription == true;
+    final isActiveTrial = widget.subscription?.isTrial == true && 
+                         widget.subscription?.isTrialActive == true;
 
     return AnimatedBuilder(
       animation: _cardAnimationController,
@@ -261,7 +266,7 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
                         ],
                         
                         // Enhanced button/active indicator
-                        _buildEnhancedActionArea(isActive),
+                        _buildEnhancedActionArea(isPaidSubscription, isActiveTrial),
                         
                         SizedBox(height: 12),
                         
@@ -375,18 +380,45 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
             ),
           ],
           SizedBox(height: 8),
-          if (widget.subscription.trialEndsAt != null)
+          // NEW: Trial countdown display
+          if (widget.subscription?.isTrial == true) ...[
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade100,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade300),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.access_time, size: 16, color: Colors.orange.shade700),
+                  SizedBox(width: 4),
+                  Text(
+                    '${widget.subscriptionProvider.trialDaysRemaining} days left in trial',
+                    style: TextStyle(
+                      color: Colors.orange.shade700,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 4),
+          ],
+          if (widget.subscription?.trialEndsAt != null)
             Text(
-              '${AppLocalizations.of(context).translate('plan_ends')}: ${formatDate(widget.subscription.trialEndsAt)}',
+              '${AppLocalizations.of(context).translate('plan_ends')}: ${formatDate(widget.subscription!.trialEndsAt)}',
               style: TextStyle(color: Colors.grey.shade700),
             ),
-          if (widget.subscription.nextBillingDate != null)
+          if (widget.subscription?.nextBillingDate != null)
             Text(
-              'Next Billing: ${formatDate(widget.subscription.nextBillingDate)}',
+              'Next Billing: ${formatDate(widget.subscription!.nextBillingDate)}',
               style: TextStyle(color: Colors.grey.shade700),
             ),
           Text(
-            '${AppLocalizations.of(context).translate('plan_type')}: ${widget.subscription.planType.toUpperCase() == 'TRIAL' ? AppLocalizations.of(context).translate('trial') : widget.subscription.planType.toUpperCase()}',
+            '${AppLocalizations.of(context).translate('plan_type')}: ${widget.subscription?.planType?.toUpperCase() == 'TRIAL' ? AppLocalizations.of(context).translate('trial') : widget.subscription?.planType?.toUpperCase() ?? 'TRIAL'}',
             style: TextStyle(color: Colors.grey.shade700),
           ),
         ],
@@ -486,7 +518,7 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
     );
   }
 
-  Widget _buildEnhancedActionArea(bool isActive) {
+  Widget _buildEnhancedActionArea(bool isPaidSubscription, bool isActiveTrial) {
     return AnimatedBuilder(
       animation: _buttonAnimationController,
       builder: (context, child) {
@@ -494,9 +526,11 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
           offset: Offset(0, _buttonSlideAnimation.value),
           child: Opacity(
             opacity: _buttonFadeAnimation.value,
-            child: isActive 
+            child: isPaidSubscription 
               ? _buildEnhancedActiveIndicator()
-              : _buildEnhancedSubscribeButton(),
+              : isActiveTrial
+                ? _buildTrialStatusIndicator()
+                : _buildEnhancedSubscribeButton(),
           ),
         );
       },
@@ -554,6 +588,185 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
     );
   }
 
+  Widget _buildTrialStatusIndicator() {
+    return Column(
+      children: [
+        // Trial Status Container
+        Container(
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Colors.white, Colors.orange.shade50.withOpacity(0.6)],
+            ),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.orange.shade200),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.2),
+                spreadRadius: 0,
+                blurRadius: 6,
+                offset: Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Colors.white, Colors.orange.shade100],
+                  ),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.orange.shade300, width: 2),
+                ),
+                child: Icon(Icons.access_time, color: Colors.orange.shade700, size: 24),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      AppLocalizations.of(context).translate('trial_active'),
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text(
+                      '${widget.subscriptionProvider.trialDaysRemaining} ${AppLocalizations.of(context).translate('days_remaining')}',
+                      style: TextStyle(
+                        color: Colors.orange.shade700,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 12),
+        // Upgrade Button
+        _buildUpgradeFromTrialButton(),
+      ],
+    );
+  }
+
+  Widget _buildUpgradeFromTrialButton() {
+    Future<void> handleUpgrade() async {
+      setState(() {
+        _isProcessing = true;
+        _errorMessage = null;
+      });
+      
+      try {
+        String productId = widget.subscriptionType == SubscriptionType.yearly 
+            ? 'yearly_subscription' 
+            : 'monthly_subscription';
+        
+        final success = await widget.subscriptionProvider.mockPurchaseSubscription(
+          productId, 
+          widget.packageId
+        );
+        
+        if (!success && mounted) {
+          setState(() {
+            _errorMessage = widget.subscriptionProvider.errorMessage ?? 
+                AppLocalizations.of(context).translate('subscription_failed');
+          });
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(AppLocalizations.of(context).translate('subscription_successful')),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+        }
+      } catch (e) {
+        debugPrint('❌ Upgrade Button: Error: $e');
+        if (mounted) {
+          setState(() {
+            _errorMessage = AppLocalizations.of(context).translate('subscription_error');
+          });
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isProcessing = false;
+          });
+        }
+      }
+    }
+
+    return GestureDetector(
+      onTapDown: (_) => _scaleController.forward(),
+      onTapUp: (_) => _scaleController.reverse(),
+      onTapCancel: () => _scaleController.reverse(),
+      child: ScaleTransition(
+        scale: _buttonScaleAnimation,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Colors.orange.shade400, Colors.orange.shade600],
+            ),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.orange.withOpacity(0.3),
+                spreadRadius: 0,
+                blurRadius: 6,
+                offset: Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _isProcessing ? null : handleUpgrade,
+              borderRadius: BorderRadius.circular(12),
+              splashColor: Colors.white.withOpacity(0.3),
+              highlightColor: Colors.white.withOpacity(0.2),
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Center(
+                  child: _isProcessing
+                      ? SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 3,
+                          ),
+                        )
+                      : Text(
+                          '${AppLocalizations.of(context).translate('upgrade_now')} - \$${widget.price}${widget.period}',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildEnhancedSubscribeButton() {
     Future<void> handleSubscribe() async {
       setState(() {
@@ -562,11 +775,19 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
       });
       
       try {
-        final success = await widget.subscriptionProvider.subscribe();
+        String productId = widget.subscriptionType == SubscriptionType.yearly 
+            ? 'yearly_subscription' 
+            : 'monthly_subscription';
+        
+        final success = await widget.subscriptionProvider.mockPurchaseSubscription(
+          productId, 
+          widget.packageId
+        );
         
         if (!success && mounted) {
           setState(() {
-            _errorMessage = AppLocalizations.of(context).translate('subscription_failed');
+            _errorMessage = widget.subscriptionProvider.errorMessage ?? 
+                AppLocalizations.of(context).translate('subscription_failed');
           });
         } else if (mounted) {
           // Show success message
@@ -577,10 +798,11 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
             ),
           );
           
-          // Go back to licenses screen
+          // Go back to home screen
           Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
         }
       } catch (e) {
+        debugPrint('❌ Subscription Button: Error: $e');
         if (mounted) {
           setState(() {
             _errorMessage = AppLocalizations.of(context).translate('subscription_error');

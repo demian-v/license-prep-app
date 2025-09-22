@@ -149,5 +149,13 @@
   "character_counter": "{0}/10 minimum",
   "support_response_info": "We typically respond within 24 hours. Your feedback helps us improve the app.",
   "sessionConflictMessage": "You have been logged out because you signed in on another device.",
-  "sessionConflictButton": "OK"
+  "sessionConflictButton": "OK",
+  
+  "trial_active": "Free Trial Active",
+  "trial_expires_soon": "Trial Expires Soon!",
+  "trial_expired": "Trial Expired",
+  "days_remaining": "days remaining",
+  "upgrade_now": "Upgrade Now",
+  "subscription_required": "Subscription required to continue",
+  "purchase_processing": "Processing purchase..."
 }

@@ -12,6 +12,7 @@ import '../services/session_validation_service.dart';
 import '../widgets/module_card.dart';
 import 'theory_module_screen.dart';
 import 'traffic_rule_content_screen.dart';
+import '../widgets/trial_status_widget.dart';
 
 class TheoryScreen extends StatefulWidget {
   @override
@@ -173,8 +174,14 @@ class _TheoryScreenState extends State<TheoryScreen> {
         foregroundColor: Colors.black,
         centerTitle: true,
       ),
-      body: Consumer<ContentProvider>(
-        builder: (context, contentProvider, child) {
+      body: Column(
+        children: [
+          // Add TrialStatusWidget here - under "Theory" title, above content
+          TrialStatusWidget(),
+          
+          Expanded(
+            child: Consumer<ContentProvider>(
+              builder: (context, contentProvider, child) {
           if (contentProvider.isLoading) {
             return Center(
               child: CircularProgressIndicator(),
@@ -413,7 +420,10 @@ class _TheoryScreenState extends State<TheoryScreen> {
               );
             },
           );
-        },
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

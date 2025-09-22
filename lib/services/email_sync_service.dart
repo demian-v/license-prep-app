@@ -327,13 +327,7 @@ class EmailSyncService {
         debugPrint('📱 EmailSyncService: Updating AuthProvider user email from ${currentAppUser.email} to $authEmail');
         
         // Create a new user with the updated email
-        final updatedUser = app_models.User(
-          id: currentAppUser.id,
-          name: currentAppUser.name,
-          email: authEmail, // Use the auth email
-          language: currentAppUser.language,
-          state: currentAppUser.state,
-        );
+        final updatedUser = currentAppUser.copyWith();
         
         // Update the user in the provider
         authProvider.user = updatedUser;
