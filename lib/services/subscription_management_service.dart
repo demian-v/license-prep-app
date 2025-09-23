@@ -119,7 +119,7 @@ class SubscriptionManagementService {
         duration: selectedPackage.duration,
         planType: selectedPackage.planType,
         nextBillingDate: nextBillingDate,
-        clearTrialEndsAt: true, // Clear trial end date
+        // Keep trialEndsAt for historical purposes - do not clear it
       );
       
       // Save to Firebase
@@ -127,6 +127,9 @@ class SubscriptionManagementService {
       
       // Save to local cache
       await _saveSubscriptionToCache(updatedSubscription);
+      
+      // Sync billing dates between user and subscription tables
+      await _syncUserBillingDates(userId, now, nextBillingDate);
       
       debugPrint('✅ SubscriptionManagementService: Trial converted to paid successfully');
       debugPrint('📅 Next billing date: ${nextBillingDate.toIso8601String()}');
