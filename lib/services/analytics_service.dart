@@ -255,7 +255,7 @@ class AnalyticsService {
       'signup_method': signupMethod ?? 'email',
       'trial_type': trialType ?? '3_day_free_trial',
       'trial_duration_days': trialDays ?? 3,
-      'trial_price_after': '2.50',
+      'trial_price_after': '9.99',
       'currency': 'USD',
       'timestamp': DateTime.now().millisecondsSinceEpoch,
     });

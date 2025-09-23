@@ -526,7 +526,478 @@ final updatedUser = User(
 
 ## Integration with Existing Systems
 
-### 1. Enhanced Trial Status System
+### 1. Premium Function Block System
+**Purpose**: Comprehensive premium feature blocking system that prevents users with expired trials/subscriptions from accessing premium content
+
+#### Premium Block Architecture
+```
+Premium Feature Access Request → Subscription Validation → Block/Allow Decision → User Experience
+            ↓                           ↓                        ↓                    ↓
+    [User Action]              [SubscriptionChecker]        [Block Dialog]      [Upgrade Flow]
+            ↓                           ↓                        ↓                    ↓
+    [Feature Click]            [Subscription Status]        [Modal Display]     [Subscription Screen]
+            ↓                           ↓                        ↓                    ↓
+    [Validation Check]         [Expired Detection]          [Upgrade CTA]       [Purchase Flow]
+```
+
+#### Core Components Implementation
+
+##### SubscriptionChecker Utility (`lib/utils/subscription_checker.dart`)
+```dart
+class SubscriptionChecker {
+  /// Check if a premium feature should be blocked due to invalid subscription
+  static bool shouldBlockPremiumFeature(SubscriptionProvider subscriptionProvider) {
+    debugPrint('🔍 SubscriptionChecker: Checking premium feature access');
+    
+    // Get subscription status
+    final isTrialActive = subscriptionProvider.isTrialActive;
+    final hasExpiredTrial = subscriptionProvider.hasExpiredTrial;
+    final isSubscriptionActive = subscriptionProvider.subscription?.isActive ?? false;
+    final subscriptionStatus = subscriptionProvider.subscription?.status ?? 'inactive';
+    
+    debugPrint('   - Trial active: $isTrialActive');
+    debugPrint('   - Expired trial: $hasExpiredTrial');
+    debugPrint('   - Subscription active: $isSubscriptionActive');
+    debugPrint('   - Subscription status: $subscriptionStatus');
+    
+    // Block if trial expired or subscription inactive
+    final shouldBlock = hasExpiredTrial || 
+                       (subscriptionStatus == 'inactive' && !isTrialActive);
+    
+    debugPrint('   - Should block: $shouldBlock');
+    return shouldBlock;
+  }
+  
+  /// Get detailed reason for blocking premium feature
+  static String getBlockReason(SubscriptionProvider subscriptionProvider) {
+    if (subscriptionProvider.hasExpiredTrial) {
+      final trialEndDate = subscriptionProvider.subscription?.trialEndsAt;
+      return 'Trial expired on ${trialEndDate?.toIso8601String()}';
+    }
+    
+    if (subscriptionProvider.subscription?.status == 'inactive') {
+      return 'Subscription status is inactive';
+    }
+    
+    return 'Unknown subscription issue';
+  }
+}
+```
+
+**SubscriptionChecker Features**:
+- **Centralized Logic**: Single source of truth for premium feature access decisions
+- **Comprehensive Validation**: Checks trial status, subscription status, and active state
+- **Detailed Logging**: Debug output for troubleshooting access issues
+- **Reason Tracking**: Provides specific reasons for blocking decisions
+- **Performance Optimized**: Lightweight validation with minimal overhead
+
+##### PremiumBlockDialog Widget (`lib/widgets/premium_block_dialog.dart`)
+```dart
+class PremiumBlockDialog extends StatelessWidget {
+  final String featureName;
+  final VoidCallback onUpgradePressed;
+  final VoidCallback onClosePressed;
+
+  const PremiumBlockDialog({
+    Key? key,
+    required this.featureName,
+    required this.onUpgradePressed,
+    required this.onClosePressed,
+  }) : super(key: key);
+
+  static void show(
+    BuildContext context, {
+    required String featureName,
+    required VoidCallback onUpgradePressed,
+    required VoidCallback onClosePressed,
+  }) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return PremiumBlockDialog(
+          featureName: featureName,
+          onUpgradePressed: onUpgradePressed,
+          onClosePressed: onClosePressed,
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<SubscriptionProvider>(
+      builder: (context, subscriptionProvider, child) {
+        // Determine dialog state based on subscription status
+        final hasExpiredTrial = subscriptionProvider.hasExpiredTrial;
+        final isTrialExpired = hasExpiredTrial;
+        
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Container(
+            padding: EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: Colors.white,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Close button
+                Align(
+                  alignment: Alignment.topRight,
+                  child: IconButton(
+                    onPressed: onClosePressed,
+                    icon: Icon(Icons.close, color: Colors.grey),
+                    padding: EdgeInsets.zero,
+                    constraints: BoxConstraints(),
+                  ),
+                ),
+                
+                SizedBox(height: 8),
+                
+                // Status icon
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: isTrialExpired ? Colors.red.shade50 : Colors.blue.shade50,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isTrialExpired ? Icons.lock : Icons.diamond,
+                    size: 40,
+                    color: isTrialExpired ? Colors.red.shade600 : Colors.blue.shade600,
+                  ),
+                ),
+                
+                SizedBox(height: 20),
+                
+                // Title
+                Text(
+                  AppLocalizations.of(context).translate(
+                    isTrialExpired ? 'trial_expired' : 'premium_feature_blocked'
+                  ),
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                
+                SizedBox(height: 8),
+                
+                // Feature name
+                RichText(
+                  textAlign: TextAlign.center,
+                  text: TextSpan(
+                    style: TextStyle(fontSize: 16, color: Colors.black87),
+                    children: [
+                      TextSpan(
+                        text: featureName,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: isTrialExpired ? Colors.red.shade700 : Colors.blue.shade700,
+                        ),
+                      ),
+                      TextSpan(
+                        text: ' ${AppLocalizations.of(context).translate('subscription_required')}',
+                      ),
+                    ],
+                  ),
+                ),
+                
+                SizedBox(height: 12),
+                
+                // Description message
+                Text(
+                  AppLocalizations.of(context).translate(
+                    isTrialExpired 
+                        ? 'trial_expired_message'
+                        : 'premium_feature_blocked_message'
+                  ),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade700,
+                    height: 1.4,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                
+                SizedBox(height: 24),
+                
+                // Upgrade Now button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: onUpgradePressed,
+                    icon: Icon(Icons.star, size: 20),
+                    label: Text(
+                      AppLocalizations.of(context).translate('upgrade_now'),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isTrialExpired ? Colors.red.shade600 : Colors.blue.shade600,
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+                
+                SizedBox(height: 12),
+                
+                // Close button
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: onClosePressed,
+                    child: Text(
+                      AppLocalizations.of(context).translate('close'),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+```
+
+**PremiumBlockDialog Features**:
+- **Professional Design**: Clean, modern modal dialog with appropriate colors and spacing
+- **Context-Aware**: Different styling and messaging for trial vs. subscription issues
+- **Feature-Specific**: Shows which specific feature requires subscription
+- **Action-Oriented**: Prominent "Upgrade Now" button with clear call-to-action
+- **Accessible**: High contrast colors and clear visual hierarchy
+- **Multi-Language**: All text properly localized using AppLocalizations
+
+#### Protected Feature Integration
+
+##### Tests Screen Implementation (`lib/screens/test_screen.dart`)
+```dart
+class _TestScreenState extends State<TestScreen> {
+  /// Shows premium block dialog when user tries to access premium features
+  void _showPremiumBlockDialog(BuildContext context, String featureName) {
+    debugPrint('🚫 TestScreen: Showing premium block dialog for feature: $featureName');
+    
+    PremiumBlockDialog.show(
+      context,
+      featureName: featureName,
+      onUpgradePressed: () {
+        debugPrint('🔄 TestScreen: User clicked Upgrade Now from premium block dialog');
+        Navigator.of(context).pop(); // Close dialog
+        Navigator.pushNamed(context, '/subscription'); // Navigate to subscription screen
+      },
+      onClosePressed: () {
+        debugPrint('❌ TestScreen: User closed premium block dialog');
+        Navigator.of(context).pop();
+      },
+    );
+  }
+
+  // Enhanced "Take Exam" button with subscription validation
+  onPressed: () {
+    // Session validation (existing)
+    if (!SessionValidationService.validateBeforeActionSafely(context)) {
+      return;
+    }
+    
+    // NEW: Subscription validation
+    final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+    if (SubscriptionChecker.shouldBlockPremiumFeature(subscriptionProvider)) {
+      print('🚫 TestScreen: Subscription invalid, blocking Take Exam action');
+      print('   - Block reason: ${SubscriptionChecker.getBlockReason(subscriptionProvider)}');
+      _showPremiumBlockDialog(context, _translate('take_exam', languageProvider));
+      return;
+    }
+    
+    // Continue with existing exam functionality...
+  }
+}
+```
+
+**Protected Features in Tests Screen**:
+- **Take Exam** - DMV exam simulation (40 questions, 60 minutes)
+- **Learn by Topics** - Categorized learning with 100+ questions  
+- **Practice Tickets** - Random practice questions with unlimited time
+- **Saved** - Access to saved questions from different sections
+
+##### Theory Screen Implementation (`lib/screens/theory_screen.dart`)
+```dart
+class _TheoryScreenState extends State<TheoryScreen> {
+  /// Shows premium block dialog for theory modules
+  void _showPremiumBlockDialog(BuildContext context, String featureName) {
+    debugPrint('🚫 TheoryScreen: Showing premium block dialog for feature: $featureName');
+    
+    PremiumBlockDialog.show(
+      context,
+      featureName: featureName,
+      onUpgradePressed: () {
+        debugPrint('🔄 TheoryScreen: User clicked Upgrade Now from premium block dialog');
+        Navigator.of(context).pop();
+        Navigator.pushNamed(context, '/subscription');
+      },
+      onClosePressed: () {
+        debugPrint('❌ TheoryScreen: User closed premium block dialog');
+        Navigator.of(context).pop();
+      },
+    );
+  }
+
+  // Enhanced module selection with subscription validation
+  onSelect: () async {
+    // Session validation (existing)
+    if (!SessionValidationService.validateBeforeActionSafely(context)) {
+      return;
+    }
+    
+    // NEW: Subscription validation
+    final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+    if (SubscriptionChecker.shouldBlockPremiumFeature(subscriptionProvider)) {
+      print('🚫 TheoryScreen: Subscription invalid, blocking module selection: ${module.title}');
+      print('   - Block reason: ${SubscriptionChecker.getBlockReason(subscriptionProvider)}');
+      _showPremiumBlockDialog(context, module.title);
+      return;
+    }
+    
+    // Continue with existing module navigation...
+  }
+}
+```
+
+**Protected Features in Theory Screen**:
+- **General Provisions** - Types of licenses, age requirements, application process
+- **Traffic Rules** - Compliance with signs, speed limits, police stops
+- **Passenger Safety** - Seat belts, child safety seats, airbags
+- **Pedestrian Rights** - Rules for pedestrians, persons with disabilities
+- **Bicycles and Motorcycles** - Special rules and safety requirements
+
+#### Premium Block User Experience Flow
+
+##### User Journey States
+```
+Valid Subscription → Feature Access → Normal Functionality
+       ↓                  ↓                 ↓
+   [All Features]     [Unrestricted]    [Full Experience]
+
+Expired Trial/Subscription → Feature Block → Upgrade Dialog → Conversion
+            ↓                     ↓              ↓              ↓
+      [Premium Blocked]      [Modal Display]  [Subscription]  [Feature Access]
+            ↓                     ↓              ↓              ↓
+      [Upgrade CTA]         [Professional UI] [Payment Flow]  [Full Experience]
+```
+
+##### Premium Block Dialog Experience
+```dart
+// Dialog Appearance Based on Subscription State
+if (hasExpiredTrial) {
+  // RED STYLING - Urgent expired trial state
+  - Background: Red gradient (Colors.red.shade50)
+  - Icon: Lock icon (Colors.red.shade600)
+  - Title: "Trial Expired"
+  - Message: "Your free trial has ended. Subscribe now to continue using premium features."
+  - Button: "Upgrade Now" (red background)
+  - Urgency: High - user has already experienced the app
+  
+} else {
+  // BLUE STYLING - General premium block state  
+  - Background: Blue gradient (Colors.blue.shade50)
+  - Icon: Diamond icon (Colors.blue.shade600)
+  - Title: "Premium Feature Blocked"
+  - Message: "This feature requires an active subscription. Upgrade now to continue using all premium features."
+  - Button: "Upgrade Now" (blue background)
+  - Urgency: Medium - user exploring premium features
+}
+```
+
+**User Experience Features**:
+- **Context-Aware Messaging**: Different messages for expired trials vs. general premium blocks
+- **Feature-Specific Details**: Shows exactly which feature requires subscription (e.g., "Take Exam subscription required to continue")
+- **Visual Hierarchy**: Clear progression from problem → solution → action
+- **Consistent Branding**: Matches existing app design and trial status widget styling
+- **Conversion Optimized**: Strategic use of color psychology and urgency indicators
+- **Accessible Design**: High contrast ratios and clear call-to-action buttons
+
+#### Multi-Language Premium Block Support
+
+##### Localization Keys Added (`lib/localization/l10n/*.json`)
+```json
+{
+  "premium_feature_blocked": "Premium Feature Blocked",
+  "premium_feature_blocked_message": "This feature requires an active subscription. Upgrade now to continue using all premium features.",
+  "trial_expired_message": "Your free trial has ended. Subscribe now to continue using premium features.",
+  "subscription_expired_message": "Your subscription has expired. Renew now to continue access to premium features.",
+  "close": "Close"
+}
+```
+
+**Languages Supported**:
+- **English** - Premium Feature Blocked, subscription required messaging
+- **Spanish** - Función Premium Bloqueada, suscripción requerida
+- **Ukrainian** - Преміум функцію заблоковано, підписка потрібна
+- **Russian** - Премиум функция заблокирована, подписка необходима
+- **Polish** - Funkcja Premium Zablokowana, wymagana subskrypcja
+
+#### Expected Debug Output for Premium Blocking
+
+##### Successful Premium Block Detection
+```
+🔍 SubscriptionChecker: Checking premium feature access
+   - Trial active: false
+   - Expired trial: true
+   - Subscription active: true
+   - Subscription status: active
+   - Should block: true
+🚫 TestScreen: Subscription invalid, blocking Take Exam action
+   - Block reason: Trial expired on 2025-09-19T21:57:22.394
+🚫 TestScreen: Showing premium block dialog for feature: Take Exam
+```
+
+##### User Interaction Tracking
+```
+🔄 TestScreen: User clicked Upgrade Now from premium block dialog
+🚀 Navigation: Navigating to subscription screen
+❌ TestScreen: User closed premium block dialog
+📊 Analytics: Premium block dialog dismissed for feature: Take Exam
+```
+
+##### Premium Feature Access Granted
+```
+🔍 SubscriptionChecker: Checking premium feature access
+   - Trial active: true
+   - Expired trial: false
+   - Subscription active: true
+   - Subscription status: active
+   - Should block: false
+✅ TestScreen: Subscription valid, allowing Take Exam access
+🚀 Navigation: Starting exam with valid subscription
+```
+
+**Debug Output Features**:
+- **Clear Access Decisions**: Detailed logging of why features are blocked or allowed
+- **User Action Tracking**: Logs user interactions with premium block dialogs
+- **Conversion Tracking**: Records when users click upgrade vs. close buttons
+- **Performance Monitoring**: Validates that blocking checks complete quickly
+- **Error Detection**: Comprehensive logging for troubleshooting access issues
+
+### 2. Enhanced Trial Status System
 **Purpose**: Comprehensive trial status display including active and expired trial states
 
 #### Core SubscriptionProvider Enhancements (`lib/providers/subscription_provider.dart`)

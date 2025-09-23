@@ -76,7 +76,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
                     padding: EdgeInsets.all(16.0),
                     child: EnhancedSubscriptionCard(
                       subscriptionType: SubscriptionType.yearly,
-                      price: "40",
+                      price: "79.99",
                       period: AppLocalizations.of(context).translate('per_year'),
                       subscription: subscription,
                       subscriptionProvider: subscriptionProvider,
@@ -89,7 +89,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
                     padding: EdgeInsets.all(16.0),
                     child: EnhancedSubscriptionCard(
                       subscriptionType: SubscriptionType.monthly,
-                      price: "2.50",
+                      price: "9.99",
                       period: AppLocalizations.of(context).translate('per_month'),
                       subscription: subscription,
                       subscriptionProvider: subscriptionProvider,
