@@ -1,5 +1,16 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
+import { 
+  processExpiredSubscriptions, 
+  testSubscriptionProcessing,
+  getSubscriptionStatistics 
+} from './subscription-manager';
+import {
+  generateAllTestData,
+  cleanupTestData,
+  createQuickTestScenario,
+  verifyTestData
+} from './test-data-generator';
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -1365,6 +1376,456 @@ export const deleteUserAccount = functions.https.onCall(async (data, context) =>
     throw new functions.https.HttpsError(
       'internal',
       'Account deletion failed: ' + (error instanceof Error ? error.message : String(error))
+    );
+  }
+});
+
+// =============================================================================
+// SUBSCRIPTION MANAGEMENT FUNCTIONS
+// =============================================================================
+
+/**
+ * Scheduled function that runs every hour to check for expired subscriptions
+ * This is the main server-side subscription management function
+ */
+export const checkExpiredSubscriptions = functions.pubsub
+  .schedule('every 1 hours')
+  .timeZone('America/Chicago')
+  .onRun(async (context) => {
+    try {
+      console.log('🔄 Scheduled subscription check started at:', new Date().toISOString());
+      
+      const result = await processExpiredSubscriptions();
+      
+      console.log('✅ Scheduled subscription check completed successfully');
+      console.log(`📊 Summary: ${result.totalProcessed} subscriptions processed`);
+      console.log(`📧 Emails sent: ${result.emailsSent}`);
+      console.log(`❌ Errors: ${result.errors.length}`);
+      
+      if (result.errors.length > 0) {
+        console.warn('⚠️ Some errors occurred during processing:', result.errors);
+      }
+      
+      return {
+        success: true,
+        result: result,
+        timestamp: admin.firestore.FieldValue.serverTimestamp()
+      };
+      
+    } catch (error) {
+      console.error('❌ Critical error in scheduled subscription check:', error);
+      
+      // Log error to Firestore for monitoring
+      try {
+        await db.collection('systemLogs').add({
+          type: 'scheduled_subscription_check_error',
+          error: error instanceof Error ? error.message : String(error),
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          context: context
+        });
+      } catch (logError) {
+        console.error('Failed to log error to Firestore:', logError);
+      }
+      
+      throw error;
+    }
+  });
+
+/**
+ * Manual trigger function for testing subscription processing
+ * Can be called directly from Firebase Console or client app (admin only)
+ */
+export const processSubscriptionsManualy = functions.https.onCall(async (data, context) => {
+  try {
+    console.log('🧪 Manual subscription processing triggered');
+    
+    // Optional: Add admin authentication check here
+    // For now, we'll allow any authenticated user to trigger this for testing
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        'unauthenticated',
+        'Authentication required for manual subscription processing'
+      );
+    }
+    
+    console.log(`Manual trigger by user: ${context.auth.uid}`);
+    
+    const result = await testSubscriptionProcessing();
+    
+    console.log('✅ Manual subscription processing completed');
+    
+    return {
+      success: true,
+      result: result,
+      triggeredBy: context.auth.uid,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    };
+    
+  } catch (error) {
+    console.error('❌ Error in manual subscription processing:', error);
+    
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    
+    throw new functions.https.HttpsError(
+      'internal',
+      'Manual subscription processing failed: ' + (error instanceof Error ? error.message : String(error))
+    );
+  }
+});
+
+/**
+ * Get subscription statistics for monitoring dashboard
+ * Returns information about upcoming expirations
+ */
+export const getSubscriptionStats = functions.https.onCall(async (data, context) => {
+  try {
+    console.log('📊 Getting subscription statistics');
+    
+    // Optional: Add admin authentication check here
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        'unauthenticated',
+        'Authentication required for subscription statistics'
+      );
+    }
+    
+    const stats = await getSubscriptionStatistics();
+    
+    console.log('✅ Subscription statistics retrieved successfully');
+    
+    return {
+      success: true,
+      statistics: stats,
+      retrievedBy: context.auth.uid,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    };
+    
+  } catch (error) {
+    console.error('❌ Error getting subscription statistics:', error);
+    
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    
+    throw new functions.https.HttpsError(
+      'internal',
+      'Failed to get subscription statistics: ' + (error instanceof Error ? error.message : String(error))
+    );
+  }
+});
+
+/**
+ * Mock payment webhook handler for testing subscription events
+ * Simulates webhooks from App Store and Google Play
+ */
+export const handleMockPaymentWebhook = functions.https.onRequest(async (req, res) => {
+  try {
+    console.log('🎭 Mock payment webhook received');
+    console.log('Method:', req.method);
+    console.log('Headers:', req.headers);
+    console.log('Body:', req.body);
+    
+    if (req.method !== 'POST') {
+      res.status(405).json({
+        error: 'Method not allowed',
+        message: 'This endpoint only accepts POST requests'
+      });
+      return;
+    }
+    
+    const { eventType, userId, subscriptionData } = req.body;
+    
+    if (!eventType || !userId) {
+      res.status(400).json({
+        error: 'Missing required fields',
+        message: 'eventType and userId are required'
+      });
+      return;
+    }
+    
+    console.log(`Processing mock webhook: ${eventType} for user ${userId}`);
+    
+    // Log the mock webhook event
+    await db.collection('mockWebhookEvents').add({
+      eventType: eventType,
+      userId: userId,
+      subscriptionData: subscriptionData || {},
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      source: 'mock_webhook'
+    });
+    
+    // Here you would normally process different event types:
+    // - subscription_purchased
+    // - subscription_renewed  
+    // - subscription_cancelled
+    // - trial_started
+    // - trial_expired
+    
+    console.log(`✅ Mock webhook processed: ${eventType}`);
+    
+    res.status(200).json({
+      success: true,
+      message: `Mock webhook ${eventType} processed successfully`,
+      eventType: eventType,
+      userId: userId,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ Error processing mock webhook:', error);
+    
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+/**
+ * Health check function for subscription management system
+ * Returns system status and recent activity
+ */
+export const subscriptionSystemHealth = functions.https.onCall(async (data, context) => {
+  try {
+    console.log('🏥 Health check for subscription system');
+    
+    // Optional: Add admin authentication check
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        'unauthenticated',
+        'Authentication required for system health check'
+      );
+    }
+    
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    
+    // Check recent system logs
+    const recentLogs = await db.collection('systemLogs')
+      .where('timestamp', '>', admin.firestore.Timestamp.fromDate(oneHourAgo))
+      .orderBy('timestamp', 'desc')
+      .limit(10)
+      .get();
+    
+    // Check recent subscription logs
+    const recentSubscriptionLogs = await db.collection('subscriptionLogs')
+      .where('timestamp', '>', admin.firestore.Timestamp.fromDate(oneHourAgo))
+      .orderBy('timestamp', 'desc')
+      .limit(20)
+      .get();
+    
+    // Get subscription statistics
+    const stats = await getSubscriptionStatistics();
+    
+    const healthReport = {
+      status: 'healthy',
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      systemLogs: {
+        count: recentLogs.docs.length,
+        recentErrors: recentLogs.docs.filter(doc => doc.data().type?.includes('error')).length
+      },
+      subscriptionActivity: {
+        recentChanges: recentSubscriptionLogs.docs.length,
+        upcomingExpirations: stats
+      },
+      lastCheckedBy: context.auth.uid
+    };
+    
+    console.log('✅ System health check completed');
+    
+    return {
+      success: true,
+      health: healthReport
+    };
+    
+  } catch (error) {
+    console.error('❌ Error in system health check:', error);
+    
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    
+    throw new functions.https.HttpsError(
+      'internal',
+      'System health check failed: ' + (error instanceof Error ? error.message : String(error))
+    );
+  }
+});
+
+// =============================================================================
+// TEST DATA MANAGEMENT FUNCTIONS
+// =============================================================================
+
+/**
+ * Generate comprehensive test data for subscription management testing
+ * Creates users and subscriptions with various expiration scenarios
+ */
+export const generateSubscriptionTestData = functions.https.onCall(async (data, context) => {
+  try {
+    console.log('🧪 Generating subscription test data');
+    
+    // Optional: Add admin authentication check
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        'unauthenticated',
+        'Authentication required to generate test data'
+      );
+    }
+    
+    console.log(`Test data generation triggered by user: ${context.auth.uid}`);
+    
+    const result = await generateAllTestData();
+    
+    console.log('✅ Test data generation completed successfully');
+    
+    return {
+      success: true,
+      result: result,
+      generatedBy: context.auth.uid,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    };
+    
+  } catch (error) {
+    console.error('❌ Error generating test data:', error);
+    
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    
+    throw new functions.https.HttpsError(
+      'internal',
+      'Test data generation failed: ' + (error instanceof Error ? error.message : String(error))
+    );
+  }
+});
+
+/**
+ * Clean up all test data from the database
+ * Removes all users and subscriptions marked as test data
+ */
+export const cleanupSubscriptionTestData = functions.https.onCall(async (data, context) => {
+  try {
+    console.log('🧹 Cleaning up subscription test data');
+    
+    // Optional: Add admin authentication check
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        'unauthenticated',
+        'Authentication required to clean up test data'
+      );
+    }
+    
+    console.log(`Test data cleanup triggered by user: ${context.auth.uid}`);
+    
+    const result = await cleanupTestData();
+    
+    console.log('✅ Test data cleanup completed successfully');
+    
+    return {
+      success: true,
+      result: result,
+      cleanedBy: context.auth.uid,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    };
+    
+  } catch (error) {
+    console.error('❌ Error cleaning up test data:', error);
+    
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    
+    throw new functions.https.HttpsError(
+      'internal',
+      'Test data cleanup failed: ' + (error instanceof Error ? error.message : String(error))
+    );
+  }
+});
+
+/**
+ * Create a quick test scenario for immediate testing
+ * Creates 1 user with 1 expired trial for quick verification
+ */
+export const createQuickSubscriptionTest = functions.https.onCall(async (data, context) => {
+  try {
+    console.log('🚀 Creating quick subscription test scenario');
+    
+    // Optional: Add admin authentication check
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        'unauthenticated',
+        'Authentication required to create test scenario'
+      );
+    }
+    
+    console.log(`Quick test scenario creation triggered by user: ${context.auth.uid}`);
+    
+    const result = await createQuickTestScenario();
+    
+    console.log('✅ Quick test scenario created successfully');
+    
+    return {
+      success: true,
+      result: result,
+      createdBy: context.auth.uid,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    };
+    
+  } catch (error) {
+    console.error('❌ Error creating quick test scenario:', error);
+    
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    
+    throw new functions.https.HttpsError(
+      'internal',
+      'Quick test scenario creation failed: ' + (error instanceof Error ? error.message : String(error))
+    );
+  }
+});
+
+/**
+ * Verify current test data in the database
+ * Returns statistics about existing test data
+ */
+export const verifySubscriptionTestData = functions.https.onCall(async (data, context) => {
+  try {
+    console.log('🔍 Verifying subscription test data');
+    
+    // Optional: Add admin authentication check
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        'unauthenticated',
+        'Authentication required to verify test data'
+      );
+    }
+    
+    console.log(`Test data verification triggered by user: ${context.auth.uid}`);
+    
+    const result = await verifyTestData();
+    
+    console.log('✅ Test data verification completed successfully');
+    
+    return {
+      success: true,
+      statistics: result,
+      verifiedBy: context.auth.uid,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    };
+    
+  } catch (error) {
+    console.error('❌ Error verifying test data:', error);
+    
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    
+    throw new functions.https.HttpsError(
+      'internal',
+      'Test data verification failed: ' + (error instanceof Error ? error.message : String(error))
     );
   }
 });
