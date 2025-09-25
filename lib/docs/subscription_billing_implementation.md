@@ -214,6 +214,194 @@ static bool areBillingDatesInSync(DateTime? userNextBillingDate, DateTime? subsc
 - **Synchronization Validation**: Ensures billing consistency across tables
 - **Extensible Design**: Easy to modify durations or add new plan types
 
+## Trial Days Preservation Fix
+
+### Problem Description
+**Issue**: Users were losing remaining trial days when upgrading from trial to paid subscriptions. The original billing calculation used the upgrade date as the base for the next billing cycle, effectively discarding any unused trial time.
+
+**Impact**: Users who upgraded early in their trial period lost the value of their remaining trial days, creating an unfair billing experience and potential revenue loss.
+
+### Root Cause Analysis
+The original `convertTrialToPaid` method in `SubscriptionManagementService` used this problematic logic:
+
+```dart
+// PROBLEMATIC CODE (before fix)
+final now = DateTime.now();
+final nextBillingDate = now.add(Duration(days: selectedPackage.duration));
+```
+
+**Example of Problem**:
+- User starts 3-day trial on Sept 24, trial ends Sept 27
+- User upgrades to monthly plan on Sept 24 (same day as trial start)
+- Old system: Next billing = Sept 24 + 30 days = Oct 24
+- **Lost value**: 3 full days of trial period (Sept 24-27)
+
+### Solution Implementation
+
+#### Enhanced BillingCalculator Method
+Added new `calculateTrialToPaidBillingDate` method that preserves remaining trial days:
+
+```dart
+/// Calculate next billing date when converting trial to paid subscription
+/// Ensures remaining trial days are preserved by using trial end date as base
+static DateTime calculateTrialToPaidBillingDate(
+  DateTime trialEndDate, 
+  String planType,
+  {DateTime? currentDate}
+) {
+  final now = currentDate ?? DateTime.now();
+  
+  // If trial hasn't ended yet, start billing from trial end date
+  // This preserves the remaining trial days for the user
+  if (now.isBefore(trialEndDate)) {
+    return calculateNextBillingDate(trialEndDate, planType);
+  }
+  
+  // If trial already ended, start billing immediately from current date
+  return calculateNextBillingDate(now, planType);
+}
+```
+
+#### Updated Subscription Conversion Logic
+Modified `convertTrialToPaid` method in `SubscriptionManagementService`:
+
+```dart
+/// Convert trial to paid subscription - ENHANCED VERSION
+Future<UserSubscription> convertTrialToPaid(String userId, int packageId) async {
+  // ... existing code for getting subscription and package ...
+  
+  final now = DateTime.now();
+
+  // NEW: Calculate next billing date preserving remaining trial days
+  final nextBillingDate = currentSubscription.trialEndsAt != null
+      ? BillingCalculator.calculateTrialToPaidBillingDate(
+          currentSubscription.trialEndsAt!,
+          selectedPackage.planType,
+          currentDate: now,
+        )
+      : now.add(Duration(days: selectedPackage.duration)); // Fallback for edge cases
+
+  // Enhanced debug logging
+  debugPrint('💳 Trial conversion billing calculation:');
+  debugPrint('📅 Trial ends at: ${currentSubscription.trialEndsAt?.toIso8601String()}');
+  debugPrint('📅 Upgrade date: ${now.toIso8601String()}');
+  debugPrint('📅 Next billing date: ${nextBillingDate.toIso8601String()}');
+  if (currentSubscription.trialEndsAt != null) {
+    final remainingDays = currentSubscription.trialEndsAt!.difference(now).inDays;
+    debugPrint('📊 Remaining trial days preserved: $remainingDays');
+  }
+  
+  // ... rest of existing conversion logic ...
+}
+```
+
+### Fix Examples
+
+#### Example 1: Monthly Subscription with 3 Days Remaining
+```dart
+// Scenario
+Trial Start: September 24, 2025
+Trial End: September 27, 2025  
+Upgrade Date: September 24, 2025 (same day, 3 days remaining)
+
+// Before Fix (PROBLEMATIC)
+nextBillingDate = September 24 + 30 days = October 24, 2025
+Lost Value: 3 days of trial period
+
+// After Fix (CORRECT)
+nextBillingDate = September 27 + 30 days = October 27, 2025
+Preserved Value: Full 3 days of trial + complete 30-day subscription
+```
+
+#### Example 2: Yearly Subscription with 1 Day Remaining
+```dart
+// Scenario
+Trial Start: September 24, 2025
+Trial End: September 27, 2025
+Upgrade Date: September 26, 2025 (1 day remaining)
+
+// Before Fix (PROBLEMATIC)  
+nextBillingDate = September 26 + 360 days = September 21, 2026
+Lost Value: 1 day of trial period
+
+// After Fix (CORRECT)
+nextBillingDate = September 27 + 360 days = September 22, 2026  
+Preserved Value: Full 1 day of trial + complete 360-day subscription
+```
+
+#### Example 3: Upgrade After Trial Expired (Edge Case)
+```dart
+// Scenario
+Trial Start: September 20, 2025
+Trial End: September 23, 2025
+Upgrade Date: September 26, 2025 (3 days after trial expired)
+
+// Both Before and After (SAME - no trial days to preserve)
+nextBillingDate = September 26 + 30 days = October 26, 2025
+Behavior: No trial days remaining, billing starts immediately
+```
+
+### Implementation Benefits
+
+#### User Experience Improvements
+- **Fair Billing**: Users receive full value of their trial period regardless of upgrade timing
+- **Trust Building**: Transparent billing builds user confidence in the subscription system
+- **Conversion Optimization**: Users more likely to upgrade knowing they won't lose trial value
+
+#### Technical Advantages
+- **Backward Compatible**: Fallback logic handles edge cases and missing trial data
+- **Plan Agnostic**: Works identically for monthly and yearly subscriptions
+- **Testable**: Clear, deterministic logic easy to unit test and validate
+- **Debug Friendly**: Comprehensive logging for troubleshooting billing issues
+
+### Testing and Validation
+
+#### Unit Test Coverage
+Test file: `test_trial_billing_fix.dart` validates all scenarios:
+
+```dart
+// Test Case 1: Monthly subscription with 3 days remaining
+final trialEndDate = DateTime(2025, 9, 27);
+final upgradeDate = DateTime(2025, 9, 24);
+final result = BillingCalculator.calculateTrialToPaidBillingDate(
+  trialEndDate, 'monthly', currentDate: upgradeDate);
+// Expected: October 27, 2025 (preserves 3 trial days)
+
+// Test Case 2: Yearly subscription with 3 days remaining  
+final result = BillingCalculator.calculateTrialToPaidBillingDate(
+  trialEndDate, 'yearly', currentDate: upgradeDate);
+// Expected: September 22, 2026 (preserves 3 trial days)
+
+// Test Case 3: Trial already expired
+final expiredTrialDate = DateTime(2025, 9, 20);
+final lateUpgradeDate = DateTime(2025, 9, 24);
+final result = BillingCalculator.calculateTrialToPaidBillingDate(
+  expiredTrialDate, 'monthly', currentDate: lateUpgradeDate);
+// Expected: October 24, 2025 (no trial days to preserve)
+```
+
+#### Expected Debug Output
+```
+💳 Trial conversion billing calculation:
+📅 Trial ends at: 2025-09-27T00:00:00.000
+📅 Upgrade date: 2025-09-24T10:30:00.000
+📅 Next billing date: 2025-10-27T00:00:00.000
+📊 Remaining trial days preserved: 3
+✅ SubscriptionManagementService: Trial converted to paid successfully
+```
+
+### Deployment Considerations
+
+#### Data Migration
+- **No Migration Required**: Enhancement works with existing subscription data
+- **Graceful Fallback**: Handles subscriptions with missing `trialEndsAt` data
+- **Immediate Effect**: New logic applies to all future trial conversions
+
+#### Monitoring
+- **Conversion Tracking**: Monitor trial-to-paid conversion rates for improvement
+- **Billing Accuracy**: Validate that billing dates correctly preserve trial days  
+- **Error Handling**: Track any fallback cases for data quality assessment
+
 ### 2. Enhanced User Model (`lib/models/user.dart`)
 **Purpose**: Updated User model with consistent billing field names
 
@@ -1913,6 +2101,223 @@ Recovery Procedures:
 - Billing date synchronization validation and repair
 - Subscription state reconstruction from audit logs  
 - Trial period restoration for affected users
+```
+
+## Subscription Screen UI Enhancements
+
+### "Free Trial Active" Container Removal
+**Date**: September 24, 2025  
+**Objective**: Remove redundant "Free Trial Active" container from subscription screen while preserving essential trial information
+
+#### Problem Statement
+The subscription screen displayed duplicate trial information:
+1. **Trial counter** in the pricing section (showing "X days left in trial")
+2. **"Free Trial Active" container** above the upgrade button (showing same information)
+
+This redundancy created visual clutter and took up valuable screen space without providing additional value to users.
+
+#### Solution Implementation
+
+##### Enhanced Action Area Logic
+**File**: `lib/widgets/enhanced_subscription_card.dart`
+
+**Before** (Problematic):
+```dart
+Widget _buildEnhancedActionArea(bool isPaidSubscription, bool isActiveTrial) {
+  return AnimatedBuilder(
+    animation: _buttonAnimationController,
+    builder: (context, child) {
+      return Transform.translate(
+        offset: Offset(0, _buttonSlideAnimation.value),
+        child: Opacity(
+          opacity: _buttonFadeAnimation.value,
+          child: isPaidSubscription 
+            ? _buildEnhancedActiveIndicator()
+            : isActiveTrial
+              ? _buildTrialStatusIndicator()  // ← REMOVED THIS BRANCH
+              : _buildEnhancedSubscribeButton(),
+        ),
+      );
+    },
+  );
+}
+```
+
+**After** (Streamlined):
+```dart
+Widget _buildEnhancedActionArea(bool isPaidSubscription, bool isActiveTrial) {
+  return AnimatedBuilder(
+    animation: _buttonAnimationController,
+    builder: (context, child) {
+      return Transform.translate(
+        offset: Offset(0, _buttonSlideAnimation.value),
+        child: Opacity(
+          opacity: _buttonFadeAnimation.value,
+          child: isPaidSubscription 
+            ? _buildEnhancedActiveIndicator()
+            : _buildEnhancedSubscribeButton(isActiveTrial), // ← DIRECT TO UPGRADE BUTTON
+        ),
+      );
+    },
+  );
+}
+```
+
+##### Enhanced Button Text Logic
+```dart
+Widget _buildEnhancedSubscribeButton(bool isActiveTrial) {
+  // ... existing button implementation ...
+  
+  child: Text(
+    '${isActiveTrial ? AppLocalizations.of(context).translate('upgrade_now') : AppLocalizations.of(context).translate('subscribe_now')} - \$${widget.price}${widget.period}',
+    style: TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.bold,
+      color: Colors.black,
+    ),
+  ),
+}
+```
+
+##### Code Cleanup
+**Removed Methods** (130+ lines):
+- `_buildTrialStatusIndicator()` - No longer needed
+- `_buildUpgradeFromTrialButton()` - Functionality consolidated into main button
+
+#### Preserved Trial Information
+
+##### Trial Counter in Pricing Section (PRESERVED)
+```dart
+// THIS REMAINS INTACT - Shows trial countdown in pricing area
+if (widget.subscription?.isTrial == true) ...[
+  Container(
+    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    decoration: BoxDecoration(
+      color: Colors.orange.shade100,
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: Colors.orange.shade300),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.access_time, size: 16, color: Colors.orange.shade700),
+        SizedBox(width: 4),
+        Text(
+          '${widget.subscriptionProvider.trialDaysRemaining} days left in trial',
+          style: TextStyle(
+            color: Colors.orange.shade700,
+            fontWeight: FontWeight.w600,
+            fontSize: 12,
+          ),
+        ),
+      ],
+    ),
+  ),
+],
+```
+
+#### UI Flow Comparison
+
+##### Before Enhancement (Redundant)
+```
+┌─────────────────────────────────────┐
+│ Yearly Subscription                 │
+├─────────────────────────────────────┤
+│ $79.99/year                        │
+│ Save $10 per year                  │
+│ ⏰ 3 days left in trial           │ ← Trial Counter
+├─────────────────────────────────────┤
+│ Features Include:                   │
+│ ✓ Unlimited access                 │
+│ ✓ Full practice suite              │
+│ ✓ Progress tracking                │
+│ ✓ Performance analytics            │
+├─────────────────────────────────────┤
+│ ┌─────────────────────────────────┐ │
+│ │ ⏰ Free Trial Active           │ │ ← REDUNDANT!
+│ │    3 days remaining            │ │
+│ └─────────────────────────────────┘ │
+│ ┌─────────────────────────────────┐ │
+│ │     Upgrade Now - $79.99/year  │ │
+│ └─────────────────────────────────┘ │
+└─────────────────────────────────────┘
+```
+
+##### After Enhancement (Streamlined)
+```
+┌─────────────────────────────────────┐
+│ Yearly Subscription                 │
+├─────────────────────────────────────┤
+│ $79.99/year                        │
+│ Save $10 per year                  │
+│ ⏰ 3 days left in trial           │ ← Trial Counter (PRESERVED)
+├─────────────────────────────────────┤
+│ Features Include:                   │
+│ ✓ Unlimited access                 │
+│ ✓ Full practice suite              │
+│ ✓ Progress tracking                │
+│ ✓ Performance analytics            │
+├─────────────────────────────────────┤
+│ ┌─────────────────────────────────┐ │
+│ │     Upgrade Now - $79.99/year  │ │ ← DIRECT UPGRADE
+│ └─────────────────────────────────┘ │
+└─────────────────────────────────────┘
+```
+
+#### Benefits Achieved
+
+##### User Experience Improvements
+- **Cleaner Design**: Eliminated visual clutter and redundant information
+- **Focused Action**: Single, clear upgrade path without distracting containers  
+- **Better Hierarchy**: Trial information integrated naturally into pricing section
+- **Faster Decisions**: Users see pricing and trial status together, then immediate upgrade option
+
+##### Technical Benefits
+- **Code Cleanup**: Removed 130+ lines of unused code
+- **Simplified Logic**: Fewer conditional branches in UI rendering
+- **Better Maintainability**: Less complex widget tree structure
+- **Performance**: Slightly faster rendering due to fewer widgets
+
+##### Conversion Optimization
+- **Reduced Friction**: One-click upgrade path instead of nested containers
+- **Clear Value**: Trial days remaining shown alongside pricing benefits
+- **Consistent Experience**: Same upgrade flow for both yearly and monthly plans
+- **Mobile Friendly**: Better space utilization on smaller screens
+
+#### Implementation Details
+
+##### Files Modified
+1. **`lib/widgets/enhanced_subscription_card.dart`**: 
+   - Updated `_buildEnhancedActionArea()` method
+   - Enhanced `_buildEnhancedSubscribeButton()` with trial parameter
+   - Removed `_buildTrialStatusIndicator()` method
+   - Removed `_buildUpgradeFromTrialButton()` method
+   - Fixed `_buildBestValueBadge()` gradient
+
+##### Preserved Functionality
+- ✅ Trial counter in pricing section shows remaining days
+- ✅ Button text changes to "Upgrade Now" for trial users
+- ✅ Button text shows "Subscribe Now" for new users  
+- ✅ All subscription logic remains identical
+- ✅ Payment processing unchanged
+- ✅ Analytics tracking preserved
+
+##### Testing Verification
+- ✅ Trial users see "Upgrade Now" button directly
+- ✅ New users see "Subscribe Now" button  
+- ✅ Trial countdown visible in pricing section
+- ✅ All payment flows function correctly
+- ✅ No visual regressions in subscription cards
+- ✅ Responsive design maintained across screen sizes
+
+#### Expected Debug Output
+```
+// Enhanced subscription card rendering
+🔍 EnhancedSubscriptionCard: Building for trial user
+📅 Trial days remaining: 3
+🎯 Action area: Showing direct upgrade button
+✅ Button text: "Upgrade Now - $79.99/year"
+🎨 UI: Clean, streamlined design without redundant containers
 ```
 
 ## Summary
