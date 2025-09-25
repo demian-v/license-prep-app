@@ -214,78 +214,71 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
                   ),
                 ],
               ),
-              child: Stack(
-                children: [
-                  // Best Value Badge
-                  if (widget.showBestValue) _buildBestValueBadge(),
-                  
-                  Padding(
-                    padding: EdgeInsets.all(24.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        
-                        // Title
-                        Text(
-                          widget.subscriptionType == SubscriptionType.yearly
-                              ? AppLocalizations.of(context).translate('yearly_subscription')
-                              : AppLocalizations.of(context).translate('monthly_subscription'),
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        SizedBox(height: 24),
-                        
-                        // Enhanced pricing section
-                        _buildEnhancedPricingSection(),
-                        
-                        SizedBox(height: 24),
-                        
-                        // Features section
-                        Text(
-                          AppLocalizations.of(context).translate('features_include'),
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 12),
-                        
-                        // Enhanced features list
-                        _buildEnhancedFeaturesList(),
-                        
-                        SizedBox(height: 24),
-                        
-                        // Error message
-                        if (_errorMessage != null) ...[
-                          _buildEnhancedErrorMessage(),
-                          SizedBox(height: 16),
-                        ],
-                        
-                        // Enhanced button/active indicator
-                        _buildEnhancedActionArea(isPaidSubscription, isActiveTrial),
-                        
-                        SizedBox(height: 12),
-                        
-                        // Fine print
-                        Text(
-                          widget.subscriptionType == SubscriptionType.yearly
-                              ? AppLocalizations.of(context).translate('yearly_auto_renew_text')
-                              : AppLocalizations.of(context).translate('auto_renew_text'),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade700,
-                            fontStyle: FontStyle.italic,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
+              child: Padding(
+                padding: EdgeInsets.all(24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    
+                    // Title
+                    Text(
+                      widget.subscriptionType == SubscriptionType.yearly
+                          ? AppLocalizations.of(context).translate('yearly_subscription')
+                          : AppLocalizations.of(context).translate('monthly_subscription'),
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                  ),
-                ],
+                    SizedBox(height: 24),
+                    
+                    // Enhanced pricing section
+                    _buildEnhancedPricingSection(),
+                    
+                    SizedBox(height: 24),
+                    
+                    // Features section
+                    Text(
+                      AppLocalizations.of(context).translate('features_include'),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 12),
+                    
+                    // Enhanced features list
+                    _buildEnhancedFeaturesList(),
+                    
+                    SizedBox(height: 24),
+                    
+                    // Error message
+                    if (_errorMessage != null) ...[
+                      _buildEnhancedErrorMessage(),
+                      SizedBox(height: 16),
+                    ],
+                    
+                    // Enhanced button/active indicator
+                    _buildEnhancedActionArea(isPaidSubscription, isActiveTrial),
+                    
+                    SizedBox(height: 12),
+                    
+                    // Fine print
+                    Text(
+                      widget.subscriptionType == SubscriptionType.yearly
+                          ? AppLocalizations.of(context).translate('yearly_auto_renew_text')
+                          : AppLocalizations.of(context).translate('auto_renew_text'),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade700,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -294,10 +287,10 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
     );
   }
 
-  Widget _buildBestValueBadge() {
+  Widget _buildBestValueBadgeForPriceContainer() {
     return Positioned(
-      top: 8,
-      right: 8,
+      top: -8,
+      right: -8,
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
@@ -346,81 +339,88 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                '\$${widget.price}',
-                style: TextStyle(
-                  fontSize: 36,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              Text(
-                widget.period,
-                style: TextStyle(
-                  fontSize: 18,
-                  color: Colors.grey.shade700,
-                ),
-              ),
-            ],
-          ),
-          if (widget.subscriptionType == SubscriptionType.yearly) ...[
-            SizedBox(height: 4),
-            Text(
-              AppLocalizations.of(context).translate('save_per_year'),
-              style: TextStyle(
-                color: Colors.green.shade700,
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-              ),
-            ),
-          ],
-          SizedBox(height: 8),
-          // NEW: Trial countdown display
-          if (widget.subscription?.isTrial == true) ...[
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.orange.shade100,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange.shade300),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
+              Row(
                 children: [
-                  Icon(Icons.access_time, size: 16, color: Colors.orange.shade700),
-                  SizedBox(width: 4),
                   Text(
-                    '${widget.subscriptionProvider.trialDaysRemaining} days left in trial',
+                    '\$${widget.price}',
                     style: TextStyle(
-                      color: Colors.orange.shade700,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
+                      fontSize: 36,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                  Text(
+                    widget.period,
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.grey.shade700,
                     ),
                   ),
                 ],
               ),
-            ),
-            SizedBox(height: 4),
-          ],
-          if (widget.subscription?.trialEndsAt != null)
-            Text(
-              '${AppLocalizations.of(context).translate('plan_ends')}: ${formatDate(widget.subscription!.trialEndsAt)}',
-              style: TextStyle(color: Colors.grey.shade700),
-            ),
-          if (widget.subscription?.nextBillingDate != null)
-            Text(
-              'Next Billing: ${formatDate(widget.subscription!.nextBillingDate)}',
-              style: TextStyle(color: Colors.grey.shade700),
-            ),
-          Text(
-            '${AppLocalizations.of(context).translate('plan_type')}: ${widget.subscription?.planType?.toUpperCase() == 'TRIAL' ? AppLocalizations.of(context).translate('trial') : widget.subscription?.planType?.toUpperCase() ?? 'TRIAL'}',
-            style: TextStyle(color: Colors.grey.shade700),
+              if (widget.subscriptionType == SubscriptionType.yearly) ...[
+                SizedBox(height: 4),
+                Text(
+                  AppLocalizations.of(context).translate('save_per_year'),
+                  style: TextStyle(
+                    color: Colors.green.shade700,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+              SizedBox(height: 8),
+              // NEW: Trial countdown display
+              if (widget.subscription?.isTrial == true) ...[
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.shade300),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.access_time, size: 16, color: Colors.orange.shade700),
+                      SizedBox(width: 4),
+                      Text(
+                        '${widget.subscriptionProvider.trialDaysRemaining} days left in trial',
+                        style: TextStyle(
+                          color: Colors.orange.shade700,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 4),
+              ],
+              if (widget.subscription?.trialEndsAt != null)
+                Text(
+                  '${AppLocalizations.of(context).translate('plan_ends')}: ${formatDate(widget.subscription!.trialEndsAt)}',
+                  style: TextStyle(color: Colors.grey.shade700),
+                ),
+              if (widget.subscription?.nextBillingDate != null)
+                Text(
+                  'Next Billing: ${formatDate(widget.subscription!.nextBillingDate)}',
+                  style: TextStyle(color: Colors.grey.shade700),
+                ),
+              Text(
+                '${AppLocalizations.of(context).translate('plan_type')}: ${widget.subscription?.planType?.toUpperCase() == 'TRIAL' ? AppLocalizations.of(context).translate('trial') : widget.subscription?.planType?.toUpperCase() ?? 'TRIAL'}',
+                style: TextStyle(color: Colors.grey.shade700),
+              ),
+            ],
           ),
+          // Best Value Badge positioned in price container
+          if (widget.showBestValue) _buildBestValueBadgeForPriceContainer(),
         ],
       ),
     );
