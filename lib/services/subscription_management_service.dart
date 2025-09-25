@@ -107,7 +107,25 @@ class SubscriptionManagementService {
       );
       
       final now = DateTime.now();
-      final nextBillingDate = now.add(Duration(days: selectedPackage.duration));
+
+      // Calculate next billing date preserving remaining trial days
+      // Use trial end date as base to ensure user gets full value of remaining trial
+      final nextBillingDate = currentSubscription.trialEndsAt != null
+          ? BillingCalculator.calculateTrialToPaidBillingDate(
+              currentSubscription.trialEndsAt!,
+              selectedPackage.planType,
+              currentDate: now,
+            )
+          : now.add(Duration(days: selectedPackage.duration)); // Fallback for edge cases
+
+      debugPrint('💳 Trial conversion billing calculation:');
+      debugPrint('📅 Trial ends at: ${currentSubscription.trialEndsAt?.toIso8601String()}');
+      debugPrint('📅 Upgrade date: ${now.toIso8601String()}');
+      debugPrint('📅 Next billing date: ${nextBillingDate.toIso8601String()}');
+      if (currentSubscription.trialEndsAt != null) {
+        final remainingDays = currentSubscription.trialEndsAt!.difference(now).inDays;
+        debugPrint('📊 Remaining trial days preserved: $remainingDays');
+      }
       
       // Create updated subscription
       final updatedSubscription = currentSubscription.copyWith(

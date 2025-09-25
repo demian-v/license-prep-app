@@ -92,6 +92,30 @@ class BillingCalculator {
     return trialEndDate.difference(now).inDays + 1; // +1 to include current day
   }
   
+  /// Calculate next billing date when converting trial to paid subscription
+  /// Ensures remaining trial days are preserved by using trial end date as base
+  /// 
+  /// @param trialEndDate The original trial end date
+  /// @param planType The plan type ('monthly' or 'yearly')
+  /// @param currentDate Optional current date for testing (defaults to now)
+  /// @return DateTime when the first paid billing should occur
+  static DateTime calculateTrialToPaidBillingDate(
+    DateTime trialEndDate, 
+    String planType,
+    {DateTime? currentDate}
+  ) {
+    final now = currentDate ?? DateTime.now();
+    
+    // If trial hasn't ended yet, start billing from trial end date
+    // This preserves the remaining trial days for the user
+    if (now.isBefore(trialEndDate)) {
+      return calculateNextBillingDate(trialEndDate, planType);
+    }
+    
+    // If trial already ended, start billing immediately from current date
+    return calculateNextBillingDate(now, planType);
+  }
+
   /// Validate that user and subscription billing dates are in sync
   static bool areBillingDatesInSync(DateTime? userNextBillingDate, DateTime? subscriptionNextBillingDate) {
     if (userNextBillingDate == null || subscriptionNextBillingDate == null) {
