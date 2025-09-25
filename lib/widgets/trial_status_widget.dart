@@ -38,27 +38,29 @@ class TrialStatusWidget extends StatelessWidget {
           padding: EdgeInsets.all(16),
           decoration: BoxDecoration(
             gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
               colors: isExpiring 
-                  ? [Colors.red.shade100, Colors.red.shade50]
+                  ? [Colors.white, Colors.red.shade50.withOpacity(0.3)]
                   : isUrgent 
-                      ? [Colors.orange.shade100, Colors.orange.shade50]
-                      : [Colors.blue.shade100, Colors.blue.shade50],
+                      ? [Colors.white, Colors.orange.shade50.withOpacity(0.3)]
+                      : [Colors.white, Colors.blue.shade50.withOpacity(0.3)],
             ),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isExpiring 
-                  ? Colors.red.shade300 
+                  ? Colors.red.shade200.withOpacity(0.5) 
                   : isUrgent 
-                      ? Colors.orange.shade300 
-                      : Colors.blue.shade300,
+                      ? Colors.orange.shade200.withOpacity(0.5) 
+                      : Colors.blue.shade200.withOpacity(0.5),
               width: 1,
             ),
             boxShadow: [
               BoxShadow(
                 color: Colors.grey.withOpacity(0.2),
-                spreadRadius: 1,
-                blurRadius: 4,
-                offset: Offset(0, 2),
+                spreadRadius: 0,
+                blurRadius: 8,
+                offset: Offset(0, 4),
               ),
             ],
           ),
@@ -69,12 +71,24 @@ class TrialStatusWidget extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: isExpiring 
-                      ? Colors.red.shade600 
-                      : isUrgent 
-                          ? Colors.orange.shade600 
-                          : Colors.blue.shade600,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: isExpiring 
+                        ? [Colors.white, Colors.red.shade50.withOpacity(0.4)]
+                        : isUrgent 
+                            ? [Colors.white, Colors.orange.shade50.withOpacity(0.4)]
+                            : [Colors.white, Colors.blue.shade50.withOpacity(0.4)],
+                  ),
                   shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isExpiring 
+                        ? Colors.red.shade200
+                        : isUrgent 
+                            ? Colors.orange.shade200
+                            : Colors.blue.shade200,
+                    width: 1,
+                  ),
                 ),
                 child: Icon(
                   isExpiring 
@@ -82,7 +96,11 @@ class TrialStatusWidget extends StatelessWidget {
                       : isUrgent 
                           ? Icons.access_time 
                           : Icons.star,
-                  color: Colors.white,
+                  color: isExpiring 
+                      ? Colors.red.shade600 
+                      : isUrgent 
+                          ? Colors.orange.shade600 
+                          : Colors.blue.shade600,
                   size: 20,
                 ),
               ),
@@ -103,10 +121,10 @@ class TrialStatusWidget extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
                         color: isExpiring 
-                            ? Colors.red.shade800 
+                            ? Colors.red.shade700 
                             : isUrgent 
-                                ? Colors.orange.shade800 
-                                : Colors.blue.shade800,
+                                ? Colors.orange.shade700 
+                                : Colors.blue.shade700,
                       ),
                     ),
                     SizedBox(height: 2),
@@ -117,10 +135,10 @@ class TrialStatusWidget extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         color: isExpiring 
-                            ? Colors.red.shade700 
+                            ? Colors.red.shade600 
                             : isUrgent 
-                                ? Colors.orange.shade700 
-                                : Colors.blue.shade700,
+                                ? Colors.orange.shade600 
+                                : Colors.blue.shade600,
                       ),
                     ),
                   ],
@@ -128,27 +146,51 @@ class TrialStatusWidget extends StatelessWidget {
               ),
               
               // Upgrade button
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pushNamed(context, '/subscription');
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isExpiring 
-                      ? Colors.red.shade600 
-                      : isUrgent 
-                          ? Colors.orange.shade600 
-                          : Colors.blue.shade600,
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: isExpiring 
+                        ? [Colors.white, Colors.red.shade50.withOpacity(0.4)]
+                        : isUrgent 
+                            ? [Colors.white, Colors.orange.shade50.withOpacity(0.4)]
+                            : [Colors.white, Colors.blue.shade50.withOpacity(0.4)],
                   ),
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.2),
+                      spreadRadius: 0,
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
                 ),
-                child: Text(
-                  AppLocalizations.of(context).translate('upgrade_now'),
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.pushNamed(context, '/subscription');
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    splashColor: Colors.white.withOpacity(0.3),
+                    highlightColor: Colors.white.withOpacity(0.2),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Text(
+                        AppLocalizations.of(context).translate('upgrade_now'),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: isExpiring 
+                              ? Colors.red.shade700 
+                              : isUrgent 
+                                  ? Colors.orange.shade700 
+                                  : Colors.blue.shade700,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
