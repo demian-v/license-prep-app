@@ -240,30 +240,28 @@ class _EnhancedTestCardState extends State<EnhancedTestCard> with TickerProvider
       displayText = text.length > 15 ? '${text.substring(0, 12)}...' : text;
     }
 
-    return Flexible(
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: iconSize,
-            color: Colors.grey.shade600,
-          ),
-          SizedBox(width: 4),
-          Flexible(
-            child: Text(
-              displayText,
-              style: TextStyle(
-                fontSize: fontSize,
-                color: Colors.grey.shade600,
-              ),
-              maxLines: allowFullText ? 2 : 1,
-              overflow: TextOverflow.ellipsis,
-              softWrap: allowFullText,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          icon,
+          size: iconSize,
+          color: Colors.grey.shade600,
+        ),
+        SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            displayText,
+            style: TextStyle(
+              fontSize: fontSize,
+              color: Colors.grey.shade600,
             ),
+            maxLines: allowFullText ? 2 : 1,
+            overflow: TextOverflow.ellipsis,
+            softWrap: allowFullText,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
