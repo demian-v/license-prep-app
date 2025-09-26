@@ -158,5 +158,9 @@
   "premium_feature_blocked_message": "Esta función requiere una suscripción activa. Actualiza ahora para continuar usando todas las funciones premium.",
   "trial_expired_message": "Tu prueba gratuita ha terminado. Suscríbete ahora para continuar usando las funciones premium.",
   "subscription_expired_message": "Tu suscripción ha expirado. Renueva ahora para continuar accediendo a las funciones premium.",
+  "subscription_expired": "Suscripción Expirada",
+  "upgrade_to_continue": "Actualiza para continuar usando las funciones premium",
+  "renew_to_continue": "Renueva para continuar usando las funciones premium",
+  "renew_now": "Renovar Ahora",
   "close": "Cerrar"
 }

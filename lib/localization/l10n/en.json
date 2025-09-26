@@ -162,5 +162,9 @@
   "premium_feature_blocked_message": "This feature requires an active subscription. Upgrade now to continue using all premium features.",
   "trial_expired_message": "Your free trial has ended. Subscribe now to continue using premium features.",
   "subscription_expired_message": "Your subscription has expired. Renew now to continue accessing premium features.",
+  "subscription_expired": "Subscription Expired",
+  "upgrade_to_continue": "Upgrade to continue using premium features",
+  "renew_to_continue": "Renew to continue using premium features",
+  "renew_now": "Renew Now",
   "close": "Close"
 }

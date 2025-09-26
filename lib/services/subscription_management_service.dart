@@ -159,13 +159,14 @@ class SubscriptionManagementService {
     }
   }
 
-  /// Get user's current subscription
+  /// Get user's current subscription - Enhanced to load expired trials and paid subscriptions
   Future<UserSubscription?> getUserSubscription(String userId) async {
     debugPrint('📋 SubscriptionManagementService: Getting subscription for user: $userId');
     
     try {
-      // Try to get from Firebase first
-      final query = await _firestore
+      // STEP 1: Try to get active subscription first (preserves current behavior for active users)
+      debugPrint('🔍 Step 1: Searching for active subscriptions...');
+      final activeQuery = await _firestore
           .collection('subscriptions')
           .where('userId', isEqualTo: userId)
           .where('status', isEqualTo: 'active')
@@ -173,22 +174,50 @@ class SubscriptionManagementService {
           .limit(1)
           .get();
 
-      if (query.docs.isNotEmpty) {
-        final doc = query.docs.first;
+      if (activeQuery.docs.isNotEmpty) {
+        final doc = activeQuery.docs.first;
         final data = doc.data();
-        data['id'] = doc.id; // Ensure we have the document ID
+        data['id'] = doc.id;
         
         final subscription = UserSubscription.fromJson(data);
-        
-        // Cache the subscription
         await _saveSubscriptionToCache(subscription);
         
-        debugPrint('✅ SubscriptionManagementService: Subscription loaded from Firebase');
+        debugPrint('✅ Found active subscription: ${subscription.planType} (${subscription.status})');
+        debugPrint('📅 Next billing: ${subscription.nextBillingDate?.toIso8601String()}');
         return subscription;
       }
       
-      // If not found in Firebase, try cache
-      debugPrint('ℹ️ SubscriptionManagementService: No subscription found in Firebase, checking cache');
+      // STEP 2: If no active subscription, get most recent subscription (any status)
+      // This catches expired trials and expired paid subscriptions
+      debugPrint('🔍 Step 2: No active subscription found, searching for any subscription...');
+      final anyQuery = await _firestore
+          .collection('subscriptions')
+          .where('userId', isEqualTo: userId)
+          .orderBy('createdAt', descending: true)
+          .limit(1)
+          .get();
+
+      if (anyQuery.docs.isNotEmpty) {
+        final doc = anyQuery.docs.first;
+        final data = doc.data();
+        data['id'] = doc.id;
+        
+        final subscription = UserSubscription.fromJson(data);
+        await _saveSubscriptionToCache(subscription);
+        
+        debugPrint('✅ Found subscription: ${subscription.planType} (${subscription.status})');
+        if (subscription.isTrial) {
+          debugPrint('📅 Trial ends at: ${subscription.trialEndsAt?.toIso8601String()}');
+          debugPrint('⏰ Is trial active: ${subscription.isTrialActive}');
+        } else {
+          debugPrint('📅 Next billing: ${subscription.nextBillingDate?.toIso8601String()}');
+          debugPrint('💳 Is paid subscription active: ${subscription.isValidSubscription}');
+        }
+        return subscription;
+      }
+      
+      // STEP 3: If not found in Firebase, try cache
+      debugPrint('ℹ️ No subscription found in Firebase, checking cache');
       return await _getSubscriptionFromCache(userId);
       
     } catch (e) {
@@ -196,6 +225,7 @@ class SubscriptionManagementService {
       
       // Fallback to cache
       try {
+        debugPrint('🔄 Attempting cache fallback...');
         return await _getSubscriptionFromCache(userId);
       } catch (cacheError) {
         debugPrint('❌ SubscriptionManagementService: Cache fallback failed: $cacheError');

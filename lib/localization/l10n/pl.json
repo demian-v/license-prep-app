@@ -158,5 +158,9 @@
   "premium_feature_blocked_message": "Ta funkcja wymaga aktywnej subskrypcji. Uaktualnij teraz, aby kontynuować korzystanie z wszystkich funkcji premium.",
   "trial_expired_message": "Twój bezpłatny okres próbny się skończył. Subskrybuj teraz, aby kontynuować korzystanie z funkcji premium.",
   "subscription_expired_message": "Twoja subskrypcja wygasła. Odnów teraz, aby kontynuować dostęp do funkcji premium.",
+  "subscription_expired": "Subskrypcja wygasła",
+  "upgrade_to_continue": "Uaktualnij, aby kontynuować korzystanie z funkcji premium",
+  "renew_to_continue": "Odnów, aby kontynuować korzystanie z funkcji premium",
+  "renew_now": "Odnów teraz",
   "close": "Zamknij"
 }

@@ -79,6 +79,25 @@ class SubscriptionProvider extends ChangeNotifier {
     return result;
   }
   
+  // Check if user has an expired paid subscription
+  bool get hasExpiredPaidSubscription {
+    if (_subscription == null) return false;
+    
+    // Expired paid subscription: not a trial AND (status inactive OR past billing date)
+    final isExpiredPaid = !_subscription!.isTrial && 
+                         (_subscription!.status == 'inactive' || 
+                          (_subscription!.nextBillingDate != null && 
+                           DateTime.now().isAfter(_subscription!.nextBillingDate!)));
+    
+    debugPrint('💳 SubscriptionProvider.hasExpiredPaidSubscription: $isExpiredPaid');
+    debugPrint('   - Is trial: ${_subscription!.isTrial}');
+    debugPrint('   - Status: ${_subscription!.status}');
+    debugPrint('   - Plan type: ${_subscription!.planType}');
+    debugPrint('   - Next billing: ${_subscription!.nextBillingDate?.toIso8601String()}');
+    
+    return isExpiredPaid;
+  }
+  
   // SUBSCRIPTION STATUS (for backward compatibility)
   bool get isSubscriptionActive => hasValidSubscription;
   int get trialDaysLeft => trialDaysRemaining; // For backward compatibility
@@ -92,13 +111,50 @@ class SubscriptionProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       await _loadPackages();
-      await _loadUserSubscription(userId);
+      await _loadUserSubscriptionWithRetry(userId);
+      
+      // Enhanced validation and logging
+      if (_subscription != null) {
+        debugPrint('✅ SubscriptionProvider: Loaded subscription: ${_subscription!.planType} (${_subscription!.status})');
+        
+        if (_subscription!.isTrial) {
+          debugPrint('📅 Trial ends at: ${_subscription!.trialEndsAt?.toIso8601String()}');
+          debugPrint('⏰ Trial active: ${_subscription!.isTrialActive}');
+          debugPrint('🔄 Has expired trial: $hasExpiredTrial');
+        } else {
+          debugPrint('📅 Next billing: ${_subscription!.nextBillingDate?.toIso8601String()}');
+          debugPrint('💳 Has valid paid subscription: $hasValidSubscription');
+          debugPrint('💳 Has expired paid subscription: $hasExpiredPaidSubscription');
+        }
+      } else {
+        debugPrint('⚠️ SubscriptionProvider: No subscription found for user - this should not happen!');
+      }
+      
       debugPrint('✅ SubscriptionProvider: Initialized successfully');
     } catch (e) {
       debugPrint('❌ SubscriptionProvider: Initialization error: $e');
       _setError('Failed to initialize: $e');
     } finally {
       _setLoading(false);
+    }
+  }
+
+  // Add retry logic method
+  Future<void> _loadUserSubscriptionWithRetry(String userId, {int maxRetries = 2}) async {
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        _subscription = await _subscriptionService.getUserSubscription(userId);
+        _clearTrialCache();
+        debugPrint('📋 SubscriptionProvider: Loaded subscription on attempt $attempt');
+        notifyListeners();
+        return;
+      } catch (e) {
+        debugPrint('❌ SubscriptionProvider: Attempt $attempt failed: $e');
+        if (attempt == maxRetries) {
+          throw e;
+        }
+        await Future.delayed(Duration(seconds: attempt)); // Progressive delay
+      }
     }
   }
 
