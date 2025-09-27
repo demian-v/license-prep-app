@@ -156,6 +156,7 @@
   "trial_expired": "Trial Expired",
   "days_remaining": "days remaining",
   "days_left": "Days left",
+  "trial_days_left": "Trial days left",
   "next_billing": "Next Billing",
   "upgrade_now": "Upgrade",
   "subscription_required": "Subscription required to continue",

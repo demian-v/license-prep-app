@@ -187,6 +187,16 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
     }
   }
 
+  // Helper method to get gradient for trial countdown widget
+  LinearGradient _getTrialCountdownGradient() {
+    return LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [Colors.white, Colors.orange.shade50.withOpacity(0.4)],
+      stops: [0.0, 1.0],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isPaidSubscription = widget.subscription?.isPaidSubscription == true;
@@ -376,26 +386,50 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
                 ),
               ],
               SizedBox(height: 8),
-              // NEW: Trial countdown display
+              // NEW: Enhanced trial countdown display
               if (widget.subscription?.isTrial == true) ...[
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: Colors.orange.shade100,
+                    gradient: _getTrialCountdownGradient(),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange.shade300),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.orange.withOpacity(0.15),
+                        spreadRadius: 0,
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.access_time, size: 16, color: Colors.orange.shade700),
-                      SizedBox(width: 4),
+                      Container(
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Colors.white, Colors.orange.shade100],
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.access_time, 
+                          size: 14, 
+                          color: Colors.orange.shade700
+                        ),
+                      ),
+                      SizedBox(width: 6),
                       Text(
-                        '${AppLocalizations.of(context).translate('days_left')}: ${widget.subscriptionProvider.trialDaysRemaining}',
+                        '${AppLocalizations.of(context).translate('trial_days_left')}: ${widget.subscriptionProvider.trialDaysRemaining}',
                         style: TextStyle(
-                          color: Colors.orange.shade700,
+                          color: Colors.orange.shade800,
                           fontWeight: FontWeight.w600,
                           fontSize: 12,
+                          letterSpacing: 0.2,
                         ),
                       ),
                     ],

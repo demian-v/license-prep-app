@@ -150,6 +150,7 @@
   "trial_expired": "Пробный период закончился",
   "days_remaining": "дней осталось",
   "days_left": "Дней осталось",
+  "trial_days_left": "Дней пробного периода",
   "next_billing": "Следующее списание",
   "upgrade_now": "Обновить",
   "subscription_required": "Требуется подписка для продолжения",
