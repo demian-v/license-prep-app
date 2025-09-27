@@ -165,5 +165,10 @@
   "upgrade_to_continue": "Uaktualnij, aby kontynuować korzystanie z funkcji premium",
   "renew_to_continue": "Odnów, aby kontynuować korzystanie z funkcji premium",
   "renew_now": "Odnów",
-  "close": "Zamknij"
+  "close": "Zamknij",
+  "cancel_subscription": "Anuluj Subskrypcję",
+  "cancel_subscription_title": "Anulować subskrypcję?",
+  "cancel_subscription_message": "Jeśli anulujesz subskrypcję, stracisz dostęp do funkcji premium na koniec bieżącego okresu rozliczeniowego.",
+  "cancel_subscription_confirm": "Anuluj",
+  "keep_subscription": "Zachowaj"
 }

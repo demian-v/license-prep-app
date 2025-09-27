@@ -165,5 +165,10 @@
   "upgrade_to_continue": "Actualiza para continuar usando las funciones premium",
   "renew_to_continue": "Renueva para continuar usando las funciones premium",
   "renew_now": "Renovar",
-  "close": "Cerrar"
+  "close": "Cerrar",
+  "cancel_subscription": "Cancelar Suscripción",
+  "cancel_subscription_title": "¿Cancelar suscripción?",
+  "cancel_subscription_message": "Si cancelas tu suscripción, perderás el acceso a las funciones premium al final de tu período de facturación actual.",
+  "cancel_subscription_confirm": "Cancelar",
+  "keep_subscription": "Mantener"
 }

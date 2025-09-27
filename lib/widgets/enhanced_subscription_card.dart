@@ -570,53 +570,59 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
   }
 
   Widget _buildEnhancedActiveIndicator() {
-    return Container(
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Colors.white, Colors.green.shade50.withOpacity(0.6)],
+    return Column(
+      children: [
+        Container(
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Colors.white, Colors.green.shade50.withOpacity(0.6)],
+            ),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.2),
+                spreadRadius: 0,
+                blurRadius: 6,
+                offset: Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Colors.white, Colors.green.shade100],
+                  ),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.green.shade300, width: 2),
+                ),
+                child: Icon(Icons.check_circle, color: Colors.green.shade700, size: 24),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  AppLocalizations.of(context).translate('subscribed_success'),
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 0,
-            blurRadius: 6,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Colors.white, Colors.green.shade100],
-              ),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.green.shade300, width: 2),
-            ),
-            child: Icon(Icons.check_circle, color: Colors.green.shade700, size: 24),
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              AppLocalizations.of(context).translate('subscribed_success'),
-              style: TextStyle(
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-          ),
-        ],
-      ),
+        SizedBox(height: 12),
+        _buildCancelSubscriptionButton(),
+      ],
     );
   }
 
@@ -724,5 +730,182 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
         ),
       ),
     );
+  }
+
+  Widget _buildCancelSubscriptionButton() {
+    return GestureDetector(
+      onTapDown: (_) => _scaleController.forward(),
+      onTapUp: (_) => _scaleController.reverse(),
+      onTapCancel: () => _scaleController.reverse(),
+      child: ScaleTransition(
+        scale: _buttonScaleAnimation,
+        child: Container(
+          height: 40,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Colors.white, Colors.red.shade50.withOpacity(0.4)],
+            ),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.2),
+                spreadRadius: 0,
+                blurRadius: 4,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => _showCancelConfirmation(context),
+              borderRadius: BorderRadius.circular(20),
+              splashColor: Colors.white.withOpacity(0.3),
+              highlightColor: Colors.white.withOpacity(0.2),
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Center(
+                    child: Text(
+                      AppLocalizations.of(context).translate('cancel_subscription'),
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.normal,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showCancelConfirmation(BuildContext context) async {
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(AppLocalizations.of(context).translate('cancel_subscription_title')),
+        content: Text(
+          AppLocalizations.of(context).translate('cancel_subscription_message'),
+        ),
+        actions: [
+          // Cancel subscription button (red gradient)
+          Container(
+            height: 40,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Colors.white, Colors.red.shade50.withOpacity(0.4)],
+              ),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () async {
+                  Navigator.of(context).pop(); // Close dialog
+                  await _handleCancelSubscription();
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Center(
+                    child: Text(
+                      AppLocalizations.of(context).translate('cancel_subscription_confirm'),
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Keep subscription button (green gradient)
+          Container(
+            height: 40,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Colors.white, Colors.green.shade50.withOpacity(0.4)],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.2),
+                  spreadRadius: 0,
+                  blurRadius: 4,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  Navigator.of(context).pop(); // Close dialog
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Center(
+                    child: Text(
+                      AppLocalizations.of(context).translate('keep_subscription'),
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleCancelSubscription() async {
+    // Placeholder for future cancellation logic
+    // Show loading state while processing (UI only for now)
+    setState(() {
+      _isProcessing = true;
+      _errorMessage = null;
+    });
+    
+    try {
+      // Simulate processing delay
+      await Future.delayed(Duration(seconds: 2));
+      
+      if (mounted) {
+        // Show success message (placeholder)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Cancellation request processed (UI only)'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Cancellation failed. Please try again.';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+      }
+    }
   }
 }
