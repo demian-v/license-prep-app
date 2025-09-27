@@ -155,7 +155,9 @@
   "trial_expires_soon": "Trial Expires Soon!",
   "trial_expired": "Trial Expired",
   "days_remaining": "days remaining",
-  "upgrade_now": "Upgrade Now",
+  "days_left": "Days left",
+  "next_billing": "Next Billing",
+  "upgrade_now": "Upgrade",
   "subscription_required": "Subscription required to continue",
   "purchase_processing": "Processing purchase...",
   "premium_feature_blocked": "Premium Feature Blocked",
@@ -165,6 +167,6 @@
   "subscription_expired": "Subscription Expired",
   "upgrade_to_continue": "Upgrade to continue using premium features",
   "renew_to_continue": "Renew to continue using premium features",
-  "renew_now": "Renew Now",
+  "renew_now": "Renew",
   "close": "Close"
 }

@@ -245,7 +245,7 @@ class TrialStatusWidget extends StatelessWidget {
                 Text(
                   isExpired 
                       ? AppLocalizations.of(context).translate('subscription_required')
-                      : '$daysRemaining ${AppLocalizations.of(context).translate('days_remaining')}',
+                      : '${AppLocalizations.of(context).translate('days_left')}: $daysRemaining',
                   style: TextStyle(
                     fontSize: 12,
                     color: isExpired 

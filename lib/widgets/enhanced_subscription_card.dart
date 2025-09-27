@@ -391,7 +391,7 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
                       Icon(Icons.access_time, size: 16, color: Colors.orange.shade700),
                       SizedBox(width: 4),
                       Text(
-                        '${widget.subscriptionProvider.trialDaysRemaining} days left in trial',
+                        '${AppLocalizations.of(context).translate('days_left')}: ${widget.subscriptionProvider.trialDaysRemaining}',
                         style: TextStyle(
                           color: Colors.orange.shade700,
                           fontWeight: FontWeight.w600,
@@ -410,7 +410,7 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
                 ),
               if (widget.subscription?.nextBillingDate != null)
                 Text(
-                  'Next Billing: ${formatDate(widget.subscription!.nextBillingDate)}',
+                  '${AppLocalizations.of(context).translate('next_billing')}: ${formatDate(widget.subscription!.nextBillingDate)}',
                   style: TextStyle(color: Colors.grey.shade700),
                 ),
               Text(

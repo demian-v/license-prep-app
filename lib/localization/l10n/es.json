@@ -151,7 +151,9 @@
   "trial_expires_soon": "¡La Prueba Expira Pronto!",
   "trial_expired": "Prueba Expirada",
   "days_remaining": "días restantes",
-  "upgrade_now": "Actualizar Ahora",
+  "days_left": "Días restantes",
+  "next_billing": "Próxima facturación",
+  "upgrade_now": "Actualizar",
   "subscription_required": "Suscripción requerida para continuar",
   "purchase_processing": "Procesando compra...",
   "premium_feature_blocked": "Función Premium Bloqueada",
@@ -161,6 +163,6 @@
   "subscription_expired": "Suscripción Expirada",
   "upgrade_to_continue": "Actualiza para continuar usando las funciones premium",
   "renew_to_continue": "Renueva para continuar usando las funciones premium",
-  "renew_now": "Renovar Ahora",
+  "renew_now": "Renovar",
   "close": "Cerrar"
 }
