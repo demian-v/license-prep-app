@@ -38,7 +38,6 @@ interface SubscriptionData {
 interface ProcessingResult {
   totalProcessed: number;
   expiredTrials: number;
-  expiredPaidSubscriptions: number;
   expiredCanceledSubscriptions: number;
   emailsSent: number;
   errors: string[];
@@ -61,7 +60,6 @@ export async function processExpiredSubscriptions(): Promise<ProcessingResult> {
   const result: ProcessingResult = {
     totalProcessed: 0,
     expiredTrials: 0,
-    expiredPaidSubscriptions: 0,
     expiredCanceledSubscriptions: 0,
     emailsSent: 0,
     errors: []
@@ -74,19 +72,13 @@ export async function processExpiredSubscriptions(): Promise<ProcessingResult> {
     result.emailsSent += trialResult.emailsSent;
     result.errors = result.errors.concat(trialResult.errors);
 
-    // Process expired paid subscriptions
-    const paidResult = await checkExpiredPaidSubscriptions();
-    result.expiredPaidSubscriptions = paidResult.processed;
-    result.emailsSent += paidResult.emailsSent;
-    result.errors = result.errors.concat(paidResult.errors);
-
     // Process expired canceled subscriptions
     const canceledResult = await checkExpiredCanceledSubscriptions();
     result.expiredCanceledSubscriptions = canceledResult.processed;
     result.emailsSent += canceledResult.emailsSent;
     result.errors = result.errors.concat(canceledResult.errors);
 
-    result.totalProcessed = result.expiredTrials + result.expiredPaidSubscriptions + result.expiredCanceledSubscriptions;
+    result.totalProcessed = result.expiredTrials + result.expiredCanceledSubscriptions;
 
     const duration = Date.now() - startTime;
     console.log(`✅ Subscription check completed in ${duration}ms`);
@@ -155,60 +147,6 @@ async function checkExpiredTrials(): Promise<{processed: number, emailsSent: num
   }
 }
 
-/**
- * Check and process expired paid subscriptions
- */
-async function checkExpiredPaidSubscriptions(): Promise<{processed: number, emailsSent: number, errors: string[]}> {
-  console.log('💳 Checking expired paid subscriptions...');
-  const result: {processed: number, emailsSent: number, errors: string[]} = { processed: 0, emailsSent: 0, errors: [] };
-
-  try {
-    const now = admin.firestore.Timestamp.now();
-    
-    // Query expired paid subscriptions
-    const db = getDb();
-    const expiredPaidQuery = await db.collection('subscriptions')
-      .where('nextBillingDate', '<=', now)
-      .where('trialUsed', '==', 1)
-      .where('status', '==', 'active')
-      .limit(100) // Process in batches
-      .get();
-
-    console.log(`Found ${expiredPaidQuery.docs.length} expired paid subscriptions to process`);
-
-    // Process each expired paid subscription
-    for (const doc of expiredPaidQuery.docs) {
-      try {
-        const subscriptionData = { id: doc.id, ...doc.data() } as SubscriptionData;
-        
-        // Update subscription status
-        await updateExpiredPaidSubscription(subscriptionData);
-        
-        // Send notification email
-        const emailSent = await sendSubscriptionExpiredNotification(subscriptionData.userId);
-        if (emailSent) result.emailsSent++;
-        
-        // Log the change
-        await logSubscriptionChange(subscriptionData, 'subscription_expired');
-        
-        result.processed++;
-        console.log(`✅ Processed expired subscription for user: ${subscriptionData.userId}`);
-        
-      } catch (error) {
-        const errorMsg = `Error processing subscription ${doc.id}: ${error instanceof Error ? error.message : String(error)}`;
-        console.error(`❌ ${errorMsg}`);
-        result.errors.push(errorMsg);
-      }
-    }
-
-    return result;
-  } catch (error) {
-    const errorMsg = `Error in checkExpiredPaidSubscriptions: ${error instanceof Error ? error.message : String(error)}`;
-    console.error(`❌ ${errorMsg}`);
-    result.errors.push(errorMsg);
-    return result;
-  }
-}
 
 /**
  * Check and process expired canceled subscriptions
@@ -282,22 +220,6 @@ async function updateExpiredTrial(subscriptionData: SubscriptionData): Promise<v
   console.log(`✅ Trial subscription ${subscriptionData.id} marked as expired`);
 }
 
-/**
- * Update expired paid subscription in database
- */
-async function updateExpiredPaidSubscription(subscriptionData: SubscriptionData): Promise<void> {
-  console.log(`📝 Updating expired paid subscription: ${subscriptionData.id}`);
-  
-  const db = getDb();
-  await db.collection('subscriptions').doc(subscriptionData.id).update({
-    isActive: false,
-    status: 'inactive',
-    // Note: trialUsed stays as 1 (already used trial)
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
-  });
-  
-  console.log(`✅ Paid subscription ${subscriptionData.id} marked as expired`);
-}
 
 /**
  * Update expired canceled subscription in database
@@ -453,8 +375,6 @@ export async function testSubscriptionProcessing(): Promise<ProcessingResult> {
 export async function getSubscriptionStatistics(): Promise<{
   trialsExpiringToday: number;
   trialsExpiringTomorrow: number;
-  subscriptionsExpiringToday: number;
-  subscriptionsExpiringTomorrow: number;
   canceledExpiringToday: number;
   canceledExpiringTomorrow: number;
 }> {
@@ -479,21 +399,6 @@ export async function getSubscriptionStatistics(): Promise<{
       .where('status', '==', 'active')
       .get();
 
-    // Count subscriptions expiring today
-    const subscriptionsToday = await db.collection('subscriptions')
-      .where('nextBillingDate', '<=', today)
-      .where('trialUsed', '==', 1)
-      .where('status', '==', 'active')
-      .get();
-
-    // Count subscriptions expiring tomorrow
-    const subscriptionsTomorrow = await db.collection('subscriptions')
-      .where('nextBillingDate', '<=', tomorrow)
-      .where('nextBillingDate', '>', today)
-      .where('trialUsed', '==', 1)
-      .where('status', '==', 'active')
-      .get();
-
     // Count canceled subscriptions expiring today
     const canceledToday = await db.collection('subscriptions')
       .where('nextBillingDate', '<=', today)
@@ -512,8 +417,6 @@ export async function getSubscriptionStatistics(): Promise<{
     return {
       trialsExpiringToday: trialsToday.docs.length,
       trialsExpiringTomorrow: trialsTomorrow.docs.length,
-      subscriptionsExpiringToday: subscriptionsToday.docs.length,
-      subscriptionsExpiringTomorrow: subscriptionsTomorrow.docs.length,
       canceledExpiringToday: canceledToday.docs.length,
       canceledExpiringTomorrow: canceledTomorrow.docs.length
     };
@@ -522,8 +425,6 @@ export async function getSubscriptionStatistics(): Promise<{
     return {
       trialsExpiringToday: 0,
       trialsExpiringTomorrow: 0,
-      subscriptionsExpiringToday: 0,
-      subscriptionsExpiringTomorrow: 0,
       canceledExpiringToday: 0,
       canceledExpiringTomorrow: 0
     };
