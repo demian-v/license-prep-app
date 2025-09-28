@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/subscription.dart';
 import '../models/user_subscription.dart';
 import '../providers/subscription_provider.dart';
+import '../providers/auth_provider.dart';
 import '../localization/app_localizations.dart';
 
 class EnhancedSubscriptionCard extends StatefulWidget {
@@ -561,11 +563,216 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
           child: Opacity(
             opacity: _buttonFadeAnimation.value,
             child: isPaidSubscription 
-              ? _buildEnhancedActiveIndicator()
+              ? _buildSubscriptionStatusIndicator()
               : _buildEnhancedSubscribeButton(isActiveTrial),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildSubscriptionStatusIndicator() {
+    final isCanceled = widget.subscription?.status == 'canceled';
+    final isStillActive = widget.subscription?.isActive == true;
+    
+    if (isCanceled && isStillActive) {
+      return _buildCanceledButActiveIndicator();
+    } else if (isCanceled) {
+      return _buildCanceledExpiredIndicator();
+    } else {
+      return _buildActiveSubscriptionIndicator();
+    }
+  }
+
+  Widget _buildCanceledButActiveIndicator() {
+    final expiryDate = widget.subscriptionProvider.canceledExpiryDateFormatted;
+    final daysRemaining = widget.subscriptionProvider.daysUntilCanceledExpiry;
+    
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.white, Colors.orange.shade50.withOpacity(0.6)],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.shade200),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Colors.white, Colors.orange.shade100],
+                  ),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.orange.shade300, width: 2),
+                ),
+                child: Icon(Icons.schedule, color: Colors.orange.shade700, size: 24),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Subscription Canceled',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text(
+                      'Access until $expiryDate ($daysRemaining days)',
+                      style: TextStyle(
+                        color: Colors.orange.shade700,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 12),
+          Container(
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              'Your subscription has been canceled. You\'ll continue to have access to premium features until your current billing period ends.',
+              style: TextStyle(
+                color: Colors.orange.shade800,
+                fontSize: 12,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCanceledExpiredIndicator() {
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.white, Colors.red.shade50.withOpacity(0.6)],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.red.shade200),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Colors.white, Colors.red.shade100],
+              ),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.red.shade300, width: 2),
+            ),
+            child: Icon(Icons.cancel, color: Colors.red.shade700, size: 24),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Subscription Expired',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                Text(
+                  'Renew to continue access',
+                  style: TextStyle(
+                    color: Colors.red.shade700,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActiveSubscriptionIndicator() {
+    return Column(
+      children: [
+        Container(
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Colors.white, Colors.green.shade50.withOpacity(0.6)],
+            ),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.2),
+                spreadRadius: 0,
+                blurRadius: 6,
+                offset: Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Colors.white, Colors.green.shade100],
+                  ),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.green.shade300, width: 2),
+                ),
+                child: Icon(Icons.check_circle, color: Colors.green.shade700, size: 24),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  AppLocalizations.of(context).translate('subscribed_success'),
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 12),
+        _buildCancelSubscriptionButton(),
+      ],
     );
   }
 
@@ -874,27 +1081,39 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
   }
 
   Future<void> _handleCancelSubscription() async {
-    // Placeholder for future cancellation logic
-    // Show loading state while processing (UI only for now)
     setState(() {
       _isProcessing = true;
       _errorMessage = null;
     });
     
     try {
-      // Simulate processing delay
-      await Future.delayed(Duration(seconds: 2));
+      // Get user ID from auth provider
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final userId = authProvider.user?.id;
       
-      if (mounted) {
-        // Show success message (placeholder)
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
+      
+      // Call the subscription provider's cancel method
+      final success = await widget.subscriptionProvider.cancelSubscription(userId);
+      
+      if (success && mounted) {
+        // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Cancellation request processed (UI only)'),
+            content: Text(AppLocalizations.of(context).translate('subscription_canceled_success')),
             backgroundColor: Colors.orange,
           ),
         );
+      } else if (mounted) {
+        setState(() {
+          _errorMessage = widget.subscriptionProvider.errorMessage ?? 
+              'Failed to cancel subscription';
+        });
       }
     } catch (e) {
+      debugPrint('❌ Subscription Card: Cancellation error: $e');
       if (mounted) {
         setState(() {
           _errorMessage = 'Cancellation failed. Please try again.';

@@ -282,6 +282,60 @@ class SubscriptionManagementService {
     }
   }
 
+  /// Cancel subscription while preserving access until billing period ends
+  Future<UserSubscription> cancelSubscription(String userId) async {
+    debugPrint('❌ SubscriptionManagementService: Canceling subscription for user: $userId');
+    
+    try {
+      final currentSubscription = await getUserSubscription(userId);
+      if (currentSubscription == null) {
+        throw Exception('No current subscription found');
+      }
+      
+      final now = DateTime.now();
+      
+      // Calculate if subscription should remain active
+      // Active if: nextBillingDate exists AND current time < nextBillingDate
+      final shouldStayActive = currentSubscription.nextBillingDate != null && 
+                              now.isBefore(currentSubscription.nextBillingDate!);
+      
+      debugPrint('📅 Current time: ${now.toIso8601String()}');
+      debugPrint('📅 Next billing: ${currentSubscription.nextBillingDate?.toIso8601String()}');
+      debugPrint('✅ Should stay active: $shouldStayActive');
+      
+      // Create updated subscription with canceled status
+      final canceledSubscription = currentSubscription.copyWith(
+        status: 'canceled',
+        isActive: shouldStayActive,
+        updatedAt: now,
+        // Keep nextBillingDate unchanged - user gets full value
+      );
+      
+      // Save to Firebase
+      await _saveSubscriptionToFirebase(canceledSubscription);
+      
+      // Save to local cache
+      await _saveSubscriptionToCache(canceledSubscription);
+      
+      // Sync billing dates (keep existing dates)
+      await _syncUserBillingDates(
+        userId, 
+        currentSubscription.createdAt ?? now,
+        currentSubscription.nextBillingDate ?? now
+      );
+      
+      debugPrint('✅ SubscriptionManagementService: Subscription canceled successfully');
+      debugPrint('📊 Status: ${currentSubscription.status} → canceled');
+      debugPrint('📊 IsActive: ${currentSubscription.isActive} → $shouldStayActive');
+      
+      return canceledSubscription;
+      
+    } catch (e) {
+      debugPrint('❌ SubscriptionManagementService: Error canceling subscription: $e');
+      throw Exception('Failed to cancel subscription: $e');
+    }
+  }
+
   /// Update subscription status (e.g., when billing fails or subscription is canceled)
   /// Enhanced version for SessionManager integration with proper Firebase document handling
   Future<UserSubscription> updateSubscriptionStatus(
@@ -383,7 +437,7 @@ class SubscriptionManagementService {
           .doc(subscription.id)
           .set(subscription.toJson());
       
-      debugPrint('💾 SubscriptionManagementService: Subscription saved to Firebase');
+      debugPrint('� SubscriptionManagementService: Subscription saved to Firebase');
     } catch (e) {
       debugPrint('❌ SubscriptionManagementService: Error saving to Firebase: $e');
       throw e;
@@ -495,7 +549,7 @@ class SubscriptionManagementService {
     try {
       debugPrint('� SubscriptionManagementService: Syncing billing dates for user: $userId');
       debugPrint('📅 Last billing date: ${lastBillingDate.toIso8601String()}');
-      debugPrint('📅 Next billing date: ${nextBillingDate.toIso8601String()}');
+      debugPrint('� Next billing date: ${nextBillingDate.toIso8601String()}');
       
       await _firestore.collection('users').doc(userId).update({
         'lastBillingDate': Timestamp.fromDate(lastBillingDate),
@@ -577,9 +631,9 @@ class SubscriptionManagementService {
         subscription.nextBillingDate
       );
       
-      debugPrint('🔍 Billing sync validation result: $isInSync');
+      debugPrint('� Billing sync validation result: $isInSync');
       debugPrint('📅 User nextBillingDate: ${userNextBilling?.toIso8601String()}');
-      debugPrint('📅 Subscription nextBillingDate: ${subscription.nextBillingDate?.toIso8601String()}');
+      debugPrint('� Subscription nextBillingDate: ${subscription.nextBillingDate?.toIso8601String()}');
       
       // If not in sync, fix it
       if (!isInSync && subscription.nextBillingDate != null) {

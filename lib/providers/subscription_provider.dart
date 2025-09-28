@@ -224,17 +224,13 @@ class SubscriptionProvider extends ChangeNotifier {
     }
   }
 
-  // CANCEL SUBSCRIPTION
+  // CANCEL SUBSCRIPTION - Updated to use dedicated service method
   Future<bool> cancelSubscription(String userId) async {
     debugPrint('❌ SubscriptionProvider: Canceling subscription for user: $userId');
     _setLoading(true);
     try {
       if (_subscription != null) {
-        _subscription = await _subscriptionService.updateSubscriptionStatus(
-          userId, 
-          'inactive',
-          isActive: false
-        );
+        _subscription = await _subscriptionService.cancelSubscription(userId);
         _clearTrialCache(); // Clear cache when subscription changes
         notifyListeners();
         debugPrint('✅ SubscriptionProvider: Subscription canceled successfully');
@@ -312,6 +308,27 @@ class SubscriptionProvider extends ChangeNotifier {
   String? get trialEndDateFormatted {
     if (_subscription?.trialEndsAt == null) return null;
     final date = _subscription!.trialEndsAt!;
+    return '${date.month}/${date.day}/${date.year}';
+  }
+
+  // Check if subscription is canceled but still active
+  bool get isCanceledButActive {
+    return _subscription?.status == 'canceled' && _subscription?.isActive == true;
+  }
+
+  // Get days remaining until canceled subscription expires
+  int get daysUntilCanceledExpiry {
+    if (!isCanceledButActive || _subscription?.nextBillingDate == null) return 0;
+    
+    final now = DateTime.now();
+    final daysRemaining = _subscription!.nextBillingDate!.difference(now).inDays + 1;
+    return daysRemaining > 0 ? daysRemaining : 0;
+  }
+
+  // Get formatted expiry date for canceled subscription
+  String? get canceledExpiryDateFormatted {
+    if (!isCanceledButActive || _subscription?.nextBillingDate == null) return null;
+    final date = _subscription!.nextBillingDate!;
     return '${date.month}/${date.day}/${date.year}';
   }
 }
