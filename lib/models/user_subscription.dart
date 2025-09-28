@@ -143,15 +143,18 @@ class UserSubscription {
     return trialEndsAt!.difference(now).inDays + 1;
   }
 
-  // Check if subscription is currently valid (either trial or paid)
+  // Check if subscription is currently valid (either trial, paid, or canceled but still active)
   bool get isValidSubscription {
-    if (status != 'active' || !isActive) return false;
+    if (!isActive) return false;
+    
+    // Active and canceled subscriptions are valid until expiry
+    if (status != 'active' && status != 'canceled') return false;
     
     if (isTrial) {
       return isTrialActive;
     }
     
-    // For paid subscriptions, check if next billing date hasn't passed
+    // For paid and canceled subscriptions, check billing date
     if (nextBillingDate != null) {
       return DateTime.now().isBefore(nextBillingDate!);
     }

@@ -175,5 +175,7 @@
   "cancel_subscription_message": "If you cancel your subscription, you will lose access to premium features at the end of your current billing period.",
   "cancel_subscription_confirm": "Cancel",
   "keep_subscription": "Keep",
-  "subscription_canceled_success": "Subscription canceled successfully"
+  "subscription_canceled_success": "Subscription canceled successfully",
+  "plan_type_monthly": "Monthly",
+  "plan_type_yearly": "Yearly"
 }

@@ -24,6 +24,9 @@ class SubscriptionChecker {
     if (provider.hasExpiredTrial) {
       return 'trial_expired';
     }
+    if (provider.subscription?.status == 'canceled' && !provider.hasValidSubscription) {
+      return 'canceled_subscription_expired';
+    }
     if (!provider.hasValidSubscription && !provider.isTrialActive) {
       return 'no_valid_subscription';
     }

@@ -173,5 +173,8 @@
   "cancel_subscription_title": "Скасувати підписку?",
   "cancel_subscription_message": "Якщо ви скасуєте підписку, ви втратите доступ до преміум-функцій наприкінці поточного розрахункового періоду.",
   "cancel_subscription_confirm": "Скасувати",
-  "keep_subscription": "Залишити"
+  "keep_subscription": "Залишити",
+  "subscription_canceled_success": "Підписку скасовано успішно",
+  "plan_type_monthly": "Місячний",
+  "plan_type_yearly": "Річний"
 }

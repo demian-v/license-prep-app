@@ -241,7 +241,7 @@ class TrialStatusWidget extends StatelessWidget {
                     color: textColor,
                   ),
                 ),
-                SizedBox(height: 2),
+                SizedBox(height: 6),
                 Text(
                   isExpired 
                       ? AppLocalizations.of(context).translate('subscription_required')
@@ -258,6 +258,8 @@ class TrialStatusWidget extends StatelessWidget {
               ],
             ),
           ),
+          
+          SizedBox(width: 12),
           
           // Keep exact same button design
           Container(
@@ -373,7 +375,7 @@ class TrialStatusWidget extends StatelessWidget {
                     color: Colors.red.shade700,
                   ),
                 ),
-                SizedBox(height: 2),
+                SizedBox(height: 6),
                 Text(
                   AppLocalizations.of(context).translate('renew_to_continue'),
                   style: TextStyle(
@@ -384,6 +386,8 @@ class TrialStatusWidget extends StatelessWidget {
               ],
             ),
           ),
+          
+          SizedBox(width: 12),
           
           // Renew button (same design as upgrade button)
           Container(

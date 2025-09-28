@@ -150,6 +150,7 @@ export async function processExpiredSubscriptions(): Promise<ProcessingResult> {
     totalProcessed: 0,
     expiredTrials: 0,
     expiredPaidSubscriptions: 0,
+    expiredCanceledSubscriptions: 0,
     emailsSent: 0,
     errors: []
   };
@@ -167,7 +168,13 @@ export async function processExpiredSubscriptions(): Promise<ProcessingResult> {
     result.emailsSent += paidResult.emailsSent;
     result.errors = result.errors.concat(paidResult.errors);
 
-    result.totalProcessed = result.expiredTrials + result.expiredPaidSubscriptions;
+    // Process expired canceled subscriptions (status: canceled, nextBillingDate <= now, isActive: true)
+    const canceledResult = await checkExpiredCanceledSubscriptions();
+    result.expiredCanceledSubscriptions = canceledResult.processed;
+    result.emailsSent += canceledResult.emailsSent;
+    result.errors = result.errors.concat(canceledResult.errors);
+
+    result.totalProcessed = result.expiredTrials + result.expiredPaidSubscriptions + result.expiredCanceledSubscriptions;
     
     return result;
   } catch (error) {
@@ -233,6 +240,61 @@ async function checkExpiredTrials(): Promise<{processed: number, emailsSent: num
 }
 ```
 
+#### Expired Canceled Subscription Processing
+```typescript
+async function checkExpiredCanceledSubscriptions(): Promise<{processed: number, emailsSent: number, errors: string[]}> {
+  console.log('❌ Checking expired canceled subscriptions...');
+  const result = { processed: 0, emailsSent: 0, errors: [] };
+
+  try {
+    const now = admin.firestore.Timestamp.now();
+    
+    // Query expired canceled subscriptions: nextBillingDate <= now, status = canceled, isActive = true
+    const db = getDb();
+    const expiredCanceledQuery = await db.collection('subscriptions')
+      .where('nextBillingDate', '<=', now)
+      .where('status', '==', 'canceled')
+      .where('isActive', '==', true)
+      .limit(100) // Process in batches
+      .get();
+
+    console.log(`Found ${expiredCanceledQuery.docs.length} expired canceled subscriptions to process`);
+
+    // Process each expired canceled subscription
+    for (const doc of expiredCanceledQuery.docs) {
+      try {
+        const subscriptionData = { id: doc.id, ...doc.data() } as SubscriptionData;
+        
+        // 1. Update subscription status to inactive
+        await updateExpiredCanceledSubscription(subscriptionData);
+        
+        // 2. Send notification email (MOCK IMPLEMENTATION)
+        const emailSent = await sendCanceledSubscriptionExpiredNotification(subscriptionData.userId);
+        if (emailSent) result.emailsSent++;
+        
+        // 3. Log the change for audit trail
+        await logSubscriptionChange(subscriptionData, 'canceled_subscription_expired');
+        
+        result.processed++;
+        console.log(`✅ Processed expired canceled subscription for user: ${subscriptionData.userId}`);
+        
+      } catch (error) {
+        const errorMsg = `Error processing canceled subscription ${doc.id}: ${error instanceof Error ? error.message : String(error)}`;
+        console.error(`❌ ${errorMsg}`);
+        result.errors.push(errorMsg);
+      }
+    }
+
+    return result;
+  } catch (error) {
+    const errorMsg = `Error in checkExpiredCanceledSubscriptions: ${error instanceof Error ? error.message : String(error)}`;
+    console.error(`❌ ${errorMsg}`);
+    result.errors.push(errorMsg);
+    return result;
+  }
+}
+```
+
 #### Database Update Functions
 ```typescript
 // Update expired trial subscription
@@ -263,6 +325,21 @@ async function updateExpiredPaidSubscription(subscriptionData: SubscriptionData)
   });
   
   console.log(`✅ Paid subscription ${subscriptionData.id} marked as expired`);
+}
+
+// Update expired canceled subscription
+async function updateExpiredCanceledSubscription(subscriptionData: SubscriptionData): Promise<void> {
+  console.log(`📝 Updating expired canceled subscription: ${subscriptionData.id}`);
+  
+  const db = getDb();
+  await db.collection('subscriptions').doc(subscriptionData.id).update({
+    isActive: false,           // Mark as inactive
+    status: 'inactive',        // Change status from 'canceled' to 'inactive'
+    // Note: Keep original trialUsed value and other fields unchanged
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  
+  console.log(`✅ Canceled subscription ${subscriptionData.id} marked as expired`);
 }
 ```
 
@@ -1276,6 +1353,17 @@ async function logSubscriptionChange(
     { fieldPath: "nextBillingDate", order: "ASCENDING" },
     { fieldPath: "trialUsed", order: "ASCENDING" },
     { fieldPath: "status", order: "ASCENDING" }
+  ]
+}
+
+// Index 3: Expired canceled subscriptions query
+{
+  collectionGroup: "subscriptions",
+  queryScope: "COLLECTION",
+  fields: [
+    { fieldPath: "nextBillingDate", order: "ASCENDING" },
+    { fieldPath: "status", order: "ASCENDING" },
+    { fieldPath: "isActive", order: "ASCENDING" }
   ]
 }
 

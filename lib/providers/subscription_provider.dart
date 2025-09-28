@@ -79,11 +79,11 @@ class SubscriptionProvider extends ChangeNotifier {
     return result;
   }
   
-  // Check if user has an expired paid subscription
+  // Check if user has an expired paid subscription (including canceled subscriptions)
   bool get hasExpiredPaidSubscription {
     if (_subscription == null) return false;
     
-    // Expired paid subscription: not a trial AND (status inactive OR past billing date)
+    // Expired paid subscription: not a trial AND (status inactive OR canceled with past billing date OR active with past billing date)
     final isExpiredPaid = !_subscription!.isTrial && 
                          (_subscription!.status == 'inactive' || 
                           (_subscription!.nextBillingDate != null && 

@@ -2919,6 +2919,207 @@ After Enhancement:
 
 The enhanced subscription loading system ensures that users always see appropriate subscription status information regardless of cache state, significantly improving conversion opportunities and user experience quality.
 
+## Canceled Subscription Processing
+
+### Overview
+The billing system now includes comprehensive support for canceled subscription processing, enabling proper management of subscriptions that have been canceled but still have remaining service time.
+
+### Canceled Subscription Lifecycle
+**Purpose**: Handle subscriptions that users have canceled but are still active until their billing period ends
+
+#### Canceled Subscription States
+```dart
+// Subscription in canceled state but still active
+{
+  status: 'canceled',        // User has requested cancellation
+  isActive: true,           // Still providing service until billing period ends
+  nextBillingDate: '2025-10-01T00:00:00Z',  // When service actually ends
+  // ... other fields remain unchanged
+}
+
+// After billing period expires, becomes inactive
+{
+  status: 'inactive',       // No longer providing service
+  isActive: false,         // Service terminated
+  nextBillingDate: '2025-10-01T00:00:00Z',  // Historical record
+  // ... other fields remain unchanged
+}
+```
+
+#### Server-Side Processing
+**Purpose**: Automatically deactivate canceled subscriptions when their service period expires
+
+##### Processing Logic
+```typescript
+// Server-side monitoring checks for canceled subscriptions
+export async function checkExpiredCanceledSubscriptions(): Promise<ProcessingResult> {
+  // Query: nextBillingDate <= now, status = 'canceled', isActive = true
+  const expiredCanceledQuery = await db.collection('subscriptions')
+    .where('nextBillingDate', '<=', now)
+    .where('status', '==', 'canceled')
+    .where('isActive', '==', true)
+    .limit(100)
+    .get();
+
+  // Process each expired canceled subscription
+  for (const doc of expiredCanceledQuery.docs) {
+    // 1. Update status from 'canceled' to 'inactive'
+    // 2. Set isActive to false
+    // 3. Send final service notification email
+    // 4. Log change for audit trail
+  }
+}
+```
+
+##### Database Updates
+```typescript
+// Update expired canceled subscription
+async function updateExpiredCanceledSubscription(subscriptionData: SubscriptionData): Promise<void> {
+  await db.collection('subscriptions').doc(subscriptionData.id).update({
+    isActive: false,           // Mark as inactive
+    status: 'inactive',        // Change status from 'canceled' to 'inactive'
+    // Note: Keep original trialUsed value and other fields unchanged
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+}
+```
+
+#### Client-Side Integration
+**Purpose**: Ensure canceled subscriptions are properly handled in the Flutter app
+
+##### SubscriptionProvider Updates
+```dart
+/// Check if subscription is canceled but still active
+bool get isCanceledButActive {
+  return _subscription?.status == 'canceled' && 
+         _subscription?.isActive == true;
+}
+
+/// Check if subscription should show cancellation notice
+bool get shouldShowCancellationNotice {
+  return isCanceledButActive && _subscription?.nextBillingDate != null;
+}
+
+/// Get remaining service days for canceled subscription
+int get daysUntilServiceEnds {
+  if (!isCanceledButActive || _subscription?.nextBillingDate == null) {
+    return 0;
+  }
+  
+  final now = DateTime.now();
+  final serviceEndDate = _subscription!.nextBillingDate!;
+  
+  if (now.isAfter(serviceEndDate)) return 0;
+  
+  return serviceEndDate.difference(now).inDays;
+}
+```
+
+##### SubscriptionChecker Updates
+```dart
+class SubscriptionChecker {
+  /// Check if premium features should be blocked
+  static bool shouldBlockPremiumFeature(SubscriptionProvider subscriptionProvider) {
+    final isTrialActive = subscriptionProvider.isTrialActive;
+    final hasExpiredTrial = subscriptionProvider.hasExpiredTrial;
+    final isSubscriptionActive = subscriptionProvider.subscription?.isActive ?? false;
+    final subscriptionStatus = subscriptionProvider.subscription?.status ?? 'inactive';
+    
+    // Allow access for active subscriptions (including canceled but still active)
+    if (isSubscriptionActive && (subscriptionStatus == 'active' || subscriptionStatus == 'canceled')) {
+      return false;
+    }
+    
+    // Block if trial expired or subscription inactive
+    return hasExpiredTrial || !isTrialActive;
+  }
+}
+```
+
+#### Required Database Index
+**Purpose**: Optimize queries for expired canceled subscription processing
+
+```javascript
+// Composite index for canceled subscription queries
+{
+  collectionGroup: "subscriptions",
+  queryScope: "COLLECTION",
+  fields: [
+    { fieldPath: "nextBillingDate", order: "ASCENDING" },
+    { fieldPath: "status", order: "ASCENDING" },
+    { fieldPath: "isActive", order: "ASCENDING" }
+  ]
+}
+```
+
+#### User Experience Features
+**Purpose**: Inform users about canceled subscription status and remaining service time
+
+##### Cancellation Notice Widget
+```dart
+class CancellationNoticeWidget extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<SubscriptionProvider>(
+      builder: (context, subscriptionProvider, child) {
+        if (!subscriptionProvider.shouldShowCancellationNotice) {
+          return SizedBox.shrink();
+        }
+        
+        final daysRemaining = subscriptionProvider.daysUntilServiceEnds;
+        
+        return Container(
+          margin: EdgeInsets.all(16),
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.orange.shade100, Colors.orange.shade50],
+            ),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.orange.shade300),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.info, color: Colors.orange.shade700),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Subscription Canceled',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange.shade800,
+                      ),
+                    ),
+                    Text(
+                      'Service continues for $daysRemaining more days',
+                      style: TextStyle(color: Colors.orange.shade700),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pushNamed(context, '/subscription'),
+                child: Text('Reactivate'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+```
+
+### Benefits of Canceled Subscription Processing
+- **Fair Service**: Users receive full service for the time they've paid
+- **Clear Communication**: Transparent about when service will actually end  
+- **Reactivation Opportunity**: Chance to win back customers before service ends
+- **Proper Cleanup**: Automatic deactivation when service period expires
+- **Audit Trail**: Complete record of subscription lifecycle changes
+
 ## Summary
 
 The Subscription Billing System implementation provides a comprehensive, production-ready billing framework with the following key achievements:
@@ -2934,6 +3135,7 @@ The Subscription Billing System implementation provides a comprehensive, product
 - **Performance Optimized**: Smart caching reduces calculations from 70+ to 1 per session
 - **Expired Trial Conversion**: Persistent upgrade prompts for expired trial users
 - **Multi-Tab Banner Integration**: Consistent trial banners across Tests, Theory, and Profile tabs
+- **Canceled Subscription Processing**: Complete lifecycle management for canceled subscriptions
 - **Error Resilience**: Comprehensive error handling and recovery mechanisms
 
 ### ✅ **Technical Achievements:**

@@ -170,5 +170,8 @@
   "cancel_subscription_title": "Anulować subskrypcję?",
   "cancel_subscription_message": "Jeśli anulujesz subskrypcję, stracisz dostęp do funkcji premium na koniec bieżącego okresu rozliczeniowego.",
   "cancel_subscription_confirm": "Anuluj",
-  "keep_subscription": "Zachowaj"
+  "keep_subscription": "Zachowaj",
+  "subscription_canceled_success": "Subskrypcja anulowana pomyślnie",
+  "plan_type_monthly": "Miesięczny",
+  "plan_type_yearly": "Roczny"
 }

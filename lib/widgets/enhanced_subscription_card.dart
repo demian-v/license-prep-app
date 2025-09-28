@@ -199,6 +199,22 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
     );
   }
 
+  // Helper method to get localized plan type
+  String _getLocalizedPlanType(BuildContext context, String? planType) {
+    if (planType == null) return AppLocalizations.of(context).translate('trial');
+    
+    switch (planType.toUpperCase()) {
+      case 'MONTHLY':
+        return AppLocalizations.of(context).translate('plan_type_monthly');
+      case 'YEARLY':
+        return AppLocalizations.of(context).translate('plan_type_yearly');
+      case 'TRIAL':
+        return AppLocalizations.of(context).translate('trial');
+      default:
+        return AppLocalizations.of(context).translate('trial');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isPaidSubscription = widget.subscription?.isPaidSubscription == true;
@@ -450,7 +466,7 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
                   style: TextStyle(color: Colors.grey.shade700),
                 ),
               Text(
-                '${AppLocalizations.of(context).translate('plan_type')}: ${widget.subscription?.planType?.toUpperCase() == 'TRIAL' ? AppLocalizations.of(context).translate('trial') : widget.subscription?.planType?.toUpperCase() ?? 'TRIAL'}',
+                '${AppLocalizations.of(context).translate('plan_type')}: ${_getLocalizedPlanType(context, widget.subscription?.planType)}',
                 style: TextStyle(color: Colors.grey.shade700),
               ),
             ],

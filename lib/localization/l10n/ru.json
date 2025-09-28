@@ -171,5 +171,8 @@
   "cancel_subscription_title": "Отменить подписку?",
   "cancel_subscription_message": "Если вы отмените подписку, вы потеряете доступ к премиум-функциям в конце текущего расчетного периода.",
   "cancel_subscription_confirm": "Отменить",
-  "keep_subscription": "Оставить"
+  "keep_subscription": "Оставить",
+  "subscription_canceled_success": "Подписка отменена успешно",
+  "plan_type_monthly": "Месячный",
+  "plan_type_yearly": "Годовой"
 }
