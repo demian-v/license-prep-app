@@ -23,10 +23,11 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.verifySubscriptionTestData = exports.createQuickSubscriptionTest = exports.cleanupSubscriptionTestData = exports.generateSubscriptionTestData = exports.subscriptionSystemHealth = exports.handleMockPaymentWebhook = exports.getSubscriptionStats = exports.processSubscriptionsManualy = exports.checkExpiredSubscriptions = exports.deleteUserAccount = exports.updateProfile = exports.getSavedQuestionsWithContent = exports.getSavedQuestions = exports.removeSavedQuestion = exports.addSavedQuestion = exports.createOrUpdateUserDocument = exports.getUserData = exports.updateUserState = exports.updateUserLanguage = exports.getPracticeTests = exports.getPracticeQuestions = exports.getTheoryModules = exports.getTrafficRuleTopics = exports.getQuizQuestions = exports.contentGetQuizTopics = exports.getQuizTopics = void 0;
+exports.getRenewalStats = exports.renewActiveSubscriptions = exports.verifySubscriptionTestData = exports.createQuickSubscriptionTest = exports.cleanupSubscriptionTestData = exports.generateSubscriptionTestData = exports.subscriptionSystemHealth = exports.handleMockPaymentWebhook = exports.getSubscriptionStats = exports.processSubscriptionsManualy = exports.checkExpiredSubscriptions = exports.deleteUserAccount = exports.updateProfile = exports.getSavedQuestionsWithContent = exports.getSavedQuestions = exports.removeSavedQuestion = exports.addSavedQuestion = exports.createOrUpdateUserDocument = exports.getUserData = exports.updateUserState = exports.updateUserLanguage = exports.getPracticeTests = exports.getPracticeQuestions = exports.getTheoryModules = exports.getTrafficRuleTopics = exports.getQuizQuestions = exports.contentGetQuizTopics = exports.getQuizTopics = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const subscription_manager_1 = require("./subscription-manager");
+const subscription_renewal_manager_1 = require("./subscription-renewal-manager");
 const test_data_generator_1 = require("./test-data-generator");
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -1353,6 +1354,79 @@ exports.verifySubscriptionTestData = functions.https.onCall(async (data, context
             throw error;
         }
         throw new functions.https.HttpsError('internal', 'Test data verification failed: ' + (error instanceof Error ? error.message : String(error)));
+    }
+});
+// =============================================================================
+// SUBSCRIPTION RENEWAL FUNCTIONS
+// =============================================================================
+/**
+ * Scheduled function that runs every 6 hours to renew active subscriptions
+ * This is the main server-side subscription renewal function
+ */
+exports.renewActiveSubscriptions = functions.pubsub
+    .schedule('every 6 hours')
+    .timeZone('America/Chicago')
+    .onRun(async (context) => {
+    try {
+        console.log('🔄 Scheduled subscription renewal started at:', new Date().toISOString());
+        const result = await (0, subscription_renewal_manager_1.processActiveSubscriptionRenewals)();
+        console.log('✅ Scheduled subscription renewal completed successfully');
+        console.log(`📊 Summary: ${result.totalProcessed} subscriptions processed`);
+        console.log(`💳 Successful renewals: ${result.successfulRenewals}`);
+        console.log(`❌ Failed renewals: ${result.failedRenewals}`);
+        console.log(`📧 Emails sent: ${result.emailsSent}`);
+        if (result.errors.length > 0) {
+            console.warn('⚠️ Some errors occurred during renewal processing:', result.errors);
+        }
+        return {
+            success: true,
+            result: result,
+            timestamp: admin.firestore.FieldValue.serverTimestamp()
+        };
+    }
+    catch (error) {
+        console.error('❌ Critical error in scheduled subscription renewal:', error);
+        // Log error to Firestore for monitoring
+        try {
+            await db.collection('systemLogs').add({
+                type: 'scheduled_subscription_renewal_error',
+                error: error instanceof Error ? error.message : String(error),
+                timestamp: admin.firestore.FieldValue.serverTimestamp(),
+                context: context
+            });
+        }
+        catch (logError) {
+            console.error('Failed to log error to Firestore:', logError);
+        }
+        throw error;
+    }
+});
+/**
+ * Get renewal statistics for monitoring dashboard
+ * Returns information about upcoming renewals
+ */
+exports.getRenewalStats = functions.https.onCall(async (data, context) => {
+    try {
+        console.log('📊 Getting renewal statistics');
+        // Optional: Add admin authentication check here
+        if (!context.auth) {
+            throw new functions.https.HttpsError('unauthenticated', 'Authentication required for renewal statistics');
+        }
+        const stats = await (0, subscription_renewal_manager_1.getRenewalStatistics)();
+        console.log('✅ Renewal statistics retrieved successfully');
+        return {
+            success: true,
+            statistics: stats,
+            retrievedBy: context.auth.uid,
+            timestamp: admin.firestore.FieldValue.serverTimestamp()
+        };
+    }
+    catch (error) {
+        console.error('❌ Error getting renewal statistics:', error);
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
+        throw new functions.https.HttpsError('internal', 'Failed to get renewal statistics: ' + (error instanceof Error ? error.message : String(error)));
     }
 });
 //# sourceMappingURL=index.js.map

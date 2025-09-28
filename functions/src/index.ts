@@ -5,6 +5,10 @@ import {
   testSubscriptionProcessing,
   getSubscriptionStatistics 
 } from './subscription-manager';
+import { 
+  processActiveSubscriptionRenewals,
+  getRenewalStatistics 
+} from './subscription-renewal-manager';
 import {
   generateAllTestData,
   cleanupTestData,
@@ -1826,6 +1830,99 @@ export const verifySubscriptionTestData = functions.https.onCall(async (data, co
     throw new functions.https.HttpsError(
       'internal',
       'Test data verification failed: ' + (error instanceof Error ? error.message : String(error))
+    );
+  }
+});
+
+// =============================================================================
+// SUBSCRIPTION RENEWAL FUNCTIONS
+// =============================================================================
+
+/**
+ * Scheduled function that runs every 6 hours to renew active subscriptions
+ * This is the main server-side subscription renewal function
+ */
+export const renewActiveSubscriptions = functions.pubsub
+  .schedule('every 6 hours')
+  .timeZone('America/Chicago')
+  .onRun(async (context) => {
+    try {
+      console.log('🔄 Scheduled subscription renewal started at:', new Date().toISOString());
+      
+      const result = await processActiveSubscriptionRenewals();
+      
+      console.log('✅ Scheduled subscription renewal completed successfully');
+      console.log(`📊 Summary: ${result.totalProcessed} subscriptions processed`);
+      console.log(`💳 Successful renewals: ${result.successfulRenewals}`);
+      console.log(`❌ Failed renewals: ${result.failedRenewals}`);
+      console.log(`📧 Emails sent: ${result.emailsSent}`);
+      
+      if (result.errors.length > 0) {
+        console.warn('⚠️ Some errors occurred during renewal processing:', result.errors);
+      }
+      
+      return {
+        success: true,
+        result: result,
+        timestamp: admin.firestore.FieldValue.serverTimestamp()
+      };
+      
+    } catch (error) {
+      console.error('❌ Critical error in scheduled subscription renewal:', error);
+      
+      // Log error to Firestore for monitoring
+      try {
+        await db.collection('systemLogs').add({
+          type: 'scheduled_subscription_renewal_error',
+          error: error instanceof Error ? error.message : String(error),
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          context: context
+        });
+      } catch (logError) {
+        console.error('Failed to log error to Firestore:', logError);
+      }
+      
+      throw error;
+    }
+  });
+
+/**
+ * Get renewal statistics for monitoring dashboard
+ * Returns information about upcoming renewals
+ */
+export const getRenewalStats = functions.https.onCall(async (data, context) => {
+  try {
+    console.log('📊 Getting renewal statistics');
+    
+    // Optional: Add admin authentication check here
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        'unauthenticated',
+        'Authentication required for renewal statistics'
+      );
+    }
+    
+    const stats = await getRenewalStatistics();
+    
+    console.log('✅ Renewal statistics retrieved successfully');
+    
+    return {
+      success: true,
+      statistics: stats,
+      retrievedBy: context.auth.uid,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    };
+    
+  } catch (error) {
+    console.error('❌ Error getting renewal statistics:', error);
+    
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    
+    throw new functions.https.HttpsError(
+      'internal',
+      'Failed to get renewal statistics: ' + (error instanceof Error ? error.message : String(error))
     );
   }
 });
