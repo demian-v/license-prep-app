@@ -1,39 +1,56 @@
 # Server-Side Subscription Management Implementation
 
 ## Overview
-This document describes the comprehensive implementation of the server-side subscription management system for the License Prep App. The implementation provides automated subscription expiration processing, email notifications, audit logging, and comprehensive monitoring through Firebase Cloud Functions.
+This document describes the comprehensive implementation of the server-side subscription management system for the License Prep App. The system is divided into two main components: **Expiration Processing** for truly expired subscriptions and **Renewal Processing** for active subscription renewals. The implementation provides automated processing, multi-language email notifications, audit logging, and comprehensive monitoring through Firebase Cloud Functions.
 
 ## Architecture Overview
 
-### Server-Side Components
-The Server-Side Subscription Management system implements a robust architecture that handles subscription lifecycle management automatically:
+### 🔄 Dual System Architecture
+The Server-Side Subscription Management system implements a robust dual-component architecture that separates concerns between expiration and renewal:
 
-1. **⏰ Scheduled Processing**: Automated hourly checks for expired subscriptions
-2. **📧 Email Notifications**: Multi-language email alerts for subscription changes
-3. **📊 Audit Logging**: Comprehensive tracking of all subscription changes
-4. **🔍 Monitoring**: System health checks and statistics
-5. **🧪 Testing Framework**: Comprehensive test data generation and validation
-6. **🎭 Mock Payment System**: Webhook simulation for development and testing
+#### **Component 1: Expiration System** (`firebase-schedule-checkExpiredSubscriptions-us-central1`)
+1. **⏰ Scheduled Processing**: Automated hourly checks for expired trials and canceled subscriptions
+2. **🆓 Trial Expiration**: Processes expired free trials → marks as inactive
+3. **❌ Canceled Subscription Cleanup**: Processes canceled subscriptions after grace period → marks as inactive
+4. **📧 Expiration Notifications**: Multi-language email alerts for expired subscriptions
+5. **📊 Audit Logging**: Comprehensive tracking of expiration changes
+
+#### **Component 2: Renewal System** (`firebase-schedule-renewActiveSubscriptions-us-central1`)
+1. **🔄 Scheduled Renewals**: Automated every-6-hours checks for subscriptions due for renewal
+2. **💳 Active Subscription Processing**: Finds and renews active subscriptions with expired billing dates
+3. **🔄 Billing Date Updates**: Updates both `subscriptions` and `users` collections with new billing dates
+4. **💰 Mock Payment Processing**: Simulates payment processing with 80% success rate
+5. **📧 Renewal Notifications**: Success/failure email notifications in multiple languages
 
 ### Data Flow Architecture
 ```
-Scheduled Function → Subscription Processing → Database Updates → Email Notifications → Audit Logging
-       ↓                      ↓                     ↓                    ↓                ↓
-[Every Hour]           [Expired Detection]      [Status Updates]    [User Alerts]    [System Logs]
-       ↓                      ↓                     ↓                    ↓                ↓
-[Auto Trigger]         [Trial/Paid Logic]       [Firebase Write]    [Mock Emails]    [Firestore]
-       ↓                      ↓                     ↓                    ↓                ↓
-[Cloud Scheduler]      [User Segmentation]      [Status: inactive]  [Multi-Language] [Monitoring]
+┌─── EXPIRATION SYSTEM ────┐         ┌─── RENEWAL SYSTEM ────┐
+│                          │         │                      │
+│ Cloud Scheduler (1hr)    │         │ Cloud Scheduler (6hr)│
+│         ↓                │         │         ↓            │
+│ Check Expired Trials     │         │ Check Active Subs    │
+│ Check Expired Canceled   │         │ Due for Renewal      │
+│         ↓                │         │         ↓            │
+│ Mark as INACTIVE         │         │ Mock Payment         │
+│         ↓                │         │         ↓            │
+│ Send Expiration Emails   │         │ Update Billing Date  │
+│         ↓                │         │         ↓            │
+│ Log to Audit Trail       │         │ Send Renewal Emails  │
+└──────────────────────────┘         └──────────────────────┘
 ```
 
 ### Multi-Tier Server Architecture
 ```
-Cloud Scheduler: Automated triggers every hour
+Cloud Scheduler: Automated triggers (1hr expiration, 6hr renewal)
                ↓
-Firebase Cloud Functions: Processing logic and business rules
+Firebase Cloud Functions: Separate processing logic
                ↓
-Subscription Manager: Core expiration detection and processing
-               ↓
+┌─────────────────┐    ┌─────────────────────┐
+│ Expiration Mgr  │    │  Renewal Manager    │
+│ - Trials        │    │  - Active Subs      │
+│ - Canceled      │    │  - Payment Sim      │
+└─────────────────┘    └─────────────────────┘
+               ↓                     ↓
 Email Templates: Multi-language notification system
                ↓
 Database Layer: Firestore updates and audit logging
@@ -137,10 +154,10 @@ handleMockPaymentWebhook: {
 - **Monitoring**: Built-in Firebase monitoring and logging
 - **Cloud Scheduler Integration**: Automatic scheduling with timezone support
 
-### 2. Core Subscription Processing Logic (`functions/src/subscription-manager.ts`)
-**Purpose**: Main processing engine for detecting and handling expired subscriptions
+### 2. Expiration Processing Logic (`functions/src/subscription-manager.ts`)
+**Purpose**: Processing engine for handling truly expired subscriptions (trials and canceled subscriptions only)
 
-#### Main Processing Function
+#### Main Processing Function (UPDATED - Active Subscription Processing Removed)
 ```typescript
 export async function processExpiredSubscriptions(): Promise<ProcessingResult> {
   console.log('🔍 Starting subscription expiration check...');
@@ -149,8 +166,7 @@ export async function processExpiredSubscriptions(): Promise<ProcessingResult> {
   const result: ProcessingResult = {
     totalProcessed: 0,
     expiredTrials: 0,
-    expiredPaidSubscriptions: 0,
-    expiredCanceledSubscriptions: 0,
+    expiredCanceledSubscriptions: 0,  // ✅ UPDATED: Removed expiredPaidSubscriptions
     emailsSent: 0,
     errors: []
   };
@@ -162,11 +178,8 @@ export async function processExpiredSubscriptions(): Promise<ProcessingResult> {
     result.emailsSent += trialResult.emailsSent;
     result.errors = result.errors.concat(trialResult.errors);
 
-    // Process expired paid subscriptions (trialUsed: 1, nextBillingDate <= now, status: active)  
-    const paidResult = await checkExpiredPaidSubscriptions();
-    result.expiredPaidSubscriptions = paidResult.processed;
-    result.emailsSent += paidResult.emailsSent;
-    result.errors = result.errors.concat(paidResult.errors);
+    // ❌ REMOVED: checkExpiredPaidSubscriptions() - Now handled by renewal system
+    // Active subscriptions with expired billing dates are now RENEWED, not EXPIRED
 
     // Process expired canceled subscriptions (status: canceled, nextBillingDate <= now, isActive: true)
     const canceledResult = await checkExpiredCanceledSubscriptions();
@@ -174,13 +187,168 @@ export async function processExpiredSubscriptions(): Promise<ProcessingResult> {
     result.emailsSent += canceledResult.emailsSent;
     result.errors = result.errors.concat(canceledResult.errors);
 
-    result.totalProcessed = result.expiredTrials + result.expiredPaidSubscriptions + result.expiredCanceledSubscriptions;
+    // ✅ UPDATED: Only trials + canceled subscriptions
+    result.totalProcessed = result.expiredTrials + result.expiredCanceledSubscriptions;
     
     return result;
   } catch (error) {
     console.error('❌ Critical error in processExpiredSubscriptions:', error);
     result.errors.push(`Critical error: ${error instanceof Error ? error.message : String(error)}`);
     return result;
+  }
+}
+```
+
+### 3. Renewal Processing Logic (`functions/src/subscription-renewal-manager.ts`) ✨ NEW
+**Purpose**: Separate processing engine for handling active subscription renewals
+
+#### Main Renewal Function
+```typescript
+export async function processActiveSubscriptionRenewals(): Promise<RenewalResult> {
+  console.log('🔄 Starting subscription renewal check...');
+  const startTime = Date.now();
+  
+  const result: RenewalResult = {
+    totalProcessed: 0,
+    successfulRenewals: 0,
+    failedRenewals: 0,
+    emailsSent: 0,
+    errors: []
+  };
+
+  try {
+    // Find and process active subscriptions due for renewal
+    const renewalResult = await checkSubscriptionRenewals();
+    result.totalProcessed = renewalResult.processed;
+    result.successfulRenewals = renewalResult.successful;
+    result.failedRenewals = renewalResult.failed;
+    result.emailsSent = renewalResult.emailsSent;
+    result.errors = renewalResult.errors;
+
+    const duration = Date.now() - startTime;
+    console.log(`✅ Subscription renewal check completed in ${duration}ms`);
+    console.log(`📊 Results: ${result.totalProcessed} processed, ${result.successfulRenewals} renewed`);
+    
+    return result;
+  } catch (error) {
+    console.error('❌ Critical error in processActiveSubscriptionRenewals:', error);
+    result.errors.push(`Critical error: ${error instanceof Error ? error.message : String(error)}`);
+    return result;
+  }
+}
+```
+
+#### Renewal Processing Logic
+```typescript
+async function checkSubscriptionRenewals(): Promise<{processed: number, successful: number, failed: number, emailsSent: number, errors: string[]}> {
+  console.log('🔄 Checking subscriptions due for renewal...');
+  
+  try {
+    const now = admin.firestore.Timestamp.now();
+    
+    // Query active subscriptions due for renewal
+    const db = getDb();
+    const subscriptionsDueQuery = await db.collection('subscriptions')
+      .where('nextBillingDate', '<=', now)
+      .where('status', '==', 'active')          // ✅ Only active subscriptions
+      .where('isActive', '==', true)
+      .where('trialUsed', '==', 1)              // ✅ Past trial period
+      .limit(100) // Process in batches
+      .get();
+
+    console.log(`Found ${subscriptionsDueQuery.docs.length} subscriptions due for renewal`);
+
+    // Process each subscription for renewal
+    for (const doc of subscriptionsDueQuery.docs) {
+      try {
+        const subscriptionData = { id: doc.id, ...doc.data() } as SubscriptionData;
+        
+        // 1. Attempt renewal (mock payment + date update)
+        const renewalSuccess = await renewSubscription(subscriptionData);
+        
+        if (renewalSuccess) {
+          // 2. Send success notification
+          const emailSent = await sendRenewalSuccessNotification(subscriptionData.userId);
+          if (emailSent) result.emailsSent++;
+          
+          // 3. Log successful renewal
+          await logRenewalActivity(subscriptionData, 'subscription_renewed', true);
+        } else {
+          // 2. Send failure notification
+          const emailSent = await sendRenewalFailureNotification(subscriptionData.userId);
+          if (emailSent) result.emailsSent++;
+          
+          // 3. Log failed renewal
+          await logRenewalActivity(subscriptionData, 'subscription_renewal_failed', false);
+        }
+        
+        result.processed++;
+        console.log(`✅ Processed renewal for user: ${subscriptionData.userId}, success: ${renewalSuccess}`);
+        
+      } catch (error) {
+        const errorMsg = `Error processing renewal ${doc.id}: ${error instanceof Error ? error.message : String(error)}`;
+        console.error(`❌ ${errorMsg}`);
+        result.errors.push(errorMsg);
+      }
+    }
+
+    return result;
+  } catch (error) {
+    const errorMsg = `Error in checkSubscriptionRenewals: ${error instanceof Error ? error.message : String(error)}`;
+    console.error(`❌ ${errorMsg}`);
+    result.errors.push(errorMsg);
+    return result;
+  }
+}
+```
+
+#### Renewal Function with Dual Collection Updates
+```typescript
+async function renewSubscription(subscriptionData: SubscriptionData): Promise<boolean> {
+  try {
+    console.log(`💳 Processing renewal for subscription: ${subscriptionData.id}`);
+    
+    // 1. Mock payment processing (80% success rate)
+    const paymentResult = await mockRenewalPayment(subscriptionData);
+    
+    if (paymentResult.success) {
+      // 2. Calculate new billing date
+      const currentBillingDate = subscriptionData.nextBillingDate.toDate();
+      const newBillingDate = calculateNextBillingDate(currentBillingDate, subscriptionData.planType);
+      const newBillingTimestamp = admin.firestore.Timestamp.fromDate(newBillingDate);
+      
+      // 3. ✨ UPDATE BOTH COLLECTIONS using batch operation
+      const db = getDb();
+      const batch = db.batch();
+      
+      // Update subscription document
+      const subscriptionRef = db.collection('subscriptions').doc(subscriptionData.id);
+      batch.update(subscriptionRef, {
+        nextBillingDate: newBillingTimestamp,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      
+      // Update user document with same nextBillingDate
+      const userRef = db.collection('users').doc(subscriptionData.userId);
+      batch.update(userRef, {
+        nextBillingDate: newBillingTimestamp,
+        lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+      });
+      
+      // Commit both updates atomically
+      await batch.commit();
+      
+      console.log(`✅ Subscription ${subscriptionData.id} renewed successfully. Next billing: ${newBillingDate.toISOString()}`);
+      console.log(`✅ User ${subscriptionData.userId} nextBillingDate updated to: ${newBillingDate.toISOString()}`);
+      return true;
+    } else {
+      console.log(`❌ Payment failed for subscription ${subscriptionData.id}: ${paymentResult.failureReason}`);
+      return false;
+    }
+    
+  } catch (error) {
+    console.error(`❌ Error renewing subscription ${subscriptionData.id}:`, error);
+    return false;
   }
 }
 ```
@@ -1699,6 +1867,50 @@ describe('Subscription Manager', () => {
       });
 
       // Execute processing
+
+## 🔄 **SYSTEM UPDATE SUMMARY** (Latest Changes)
+
+### ✅ **Active Subscription Processing Removal**
+**Date**: September 28, 2025  
+**Impact**: Critical system architecture change
+
+#### **Changes Made to Expiration System** (`firebase-schedule-checkExpiredSubscriptions-us-central1`):
+
+1. **✅ REMOVED**: `checkExpiredPaidSubscriptions()` function
+2. **✅ REMOVED**: `updateExpiredPaidSubscription()` function  
+3. **✅ UPDATED**: `ProcessingResult` interface - removed `expiredPaidSubscriptions` field
+4. **✅ UPDATED**: Main processing function - removed active subscription processing logic
+5. **✅ UPDATED**: Statistics function - removed active subscription queries
+
+#### **Current System Behavior**:
+
+**Expiration System** now processes **ONLY**:
+- ✅ **Expired Trials** (`trialUsed: 0`, `trialEndsAt <= now`, `status: active`)
+- ✅ **Expired Canceled Subscriptions** (`status: canceled`, `nextBillingDate <= now`, `isActive: true`)
+
+**Renewal System** handles:
+- ✅ **Active Subscriptions Due for Renewal** (`status: active`, `nextBillingDate <= now`, `trialUsed: 1`)
+
+#### **Clean Separation of Concerns**:
+```typescript
+// EXPIRATION SYSTEM - Only processes truly expired subscriptions
+result.totalProcessed = result.expiredTrials + result.expiredCanceledSubscriptions;
+
+// RENEWAL SYSTEM - Only processes active subscriptions for renewal
+result.totalProcessed = result.successfulRenewals + result.failedRenewals;
+```
+
+#### **Database Impact**:
+- **No data loss**: Only processing logic changed, data structures remain intact
+- **Enhanced protection**: Active subscriptions can no longer be accidentally expired
+- **Clear audit trail**: All changes logged with appropriate action types
+
+#### **Production Status**: 
+- ✅ TypeScript compiles successfully 
+- ✅ No breaking changes to existing workflows
+- ✅ Safe for deployment: `firebase deploy --only functions:checkExpiredSubscriptions`
+
+**This update ensures active subscriptions are properly renewed instead of being incorrectly expired.**
       const result = await processExpiredSubscriptions();
 
       // Verify results
