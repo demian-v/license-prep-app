@@ -38,7 +38,21 @@ class _EnhancedLanguageCardState extends State<EnhancedLanguageCard> with Single
     super.dispose();
   }
   
-  // Helper method to get icon for each language
+  // Helper method to get language icon asset path
+  String? _getLanguageIconAsset(String languageCode) {
+    // Map language codes to their corresponding asset paths
+    final Map<String, String> languageIcons = {
+      'en': 'assets/images/languages/EN.png',
+      'es': 'assets/images/languages/ES.png',
+      'uk': 'assets/images/languages/UA.png',  // Ukrainian uses UA file
+      'pl': 'assets/images/languages/PL.png',
+      'ru': 'assets/images/languages/RU.png',
+    };
+    
+    return languageIcons[languageCode];
+  }
+  
+  // Helper method to get icon for each language (kept for fallback)
   IconData _getLanguageIcon(String code) {
     // Language-specific icons that better represent each language
     final Map<String, IconData> languageIcons = {
@@ -162,32 +176,66 @@ class _EnhancedLanguageCardState extends State<EnhancedLanguageCard> with Single
                   padding: EdgeInsets.all(16.0),
                   child: Row(
                     children: [
-                      // Language code label with moderately visible background (20% more visible than original)
+                      // Language icon with fallback to current design
                       Container(
                         width: 42,
                         height: 42,
                         decoration: BoxDecoration(
-                          // Use softer pastel colors for language icons
-                          color: _getSofterPastelColor(widget.languageCode),
                           borderRadius: BorderRadius.circular(6),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.25),
-                              spreadRadius: 1,
-                              blurRadius: 3,
-                              offset: Offset(0, 1),
-                            ),
-                          ],
                         ),
-                        child: Center(
-                          child: Text(
-                            widget.languageCode.toUpperCase(),
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: _getLanguageIconAsset(widget.languageCode) != null
+                              ? Center(
+                                  child: Image.asset(
+                                    _getLanguageIconAsset(widget.languageCode)!,
+                                    width: 28,
+                                    height: 28,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      // Fallback to current colored container design
+                                      return Container(
+                                        width: 28,
+                                        height: 28,
+                                        decoration: BoxDecoration(
+                                          color: _getSofterPastelColor(widget.languageCode),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            widget.languageCode.toUpperCase(),
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                )
+                              : Center(
+                                  child: Container(
+                                    // Fallback when no icon asset is defined
+                                    width: 28,
+                                    height: 28,
+                                    decoration: BoxDecoration(
+                                      color: _getSofterPastelColor(widget.languageCode),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        widget.languageCode.toUpperCase(),
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
                         ),
                       ),
                       SizedBox(width: 16),

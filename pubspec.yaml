@@ -46,6 +46,7 @@ flutter:
   assets:
     - assets/images/
     - assets/images/topic_icons/
+    - assets/images/languages/
     - assets/images/quiz/
     - lib/localization/l10n/
   fonts:
