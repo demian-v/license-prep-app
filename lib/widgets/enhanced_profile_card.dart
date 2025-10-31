@@ -7,6 +7,7 @@ class EnhancedProfileCard extends StatefulWidget {
   final VoidCallback onTap;
   final int cardType; // For determining the gradient color
   final bool isHighlighted; // For highlighting the subtitle text if needed
+  final String? iconAsset; // For custom asset icons
 
   const EnhancedProfileCard({
     Key? key,
@@ -16,6 +17,7 @@ class EnhancedProfileCard extends StatefulWidget {
     required this.onTap,
     this.cardType = 0,
     this.isHighlighted = false,
+    this.iconAsset,
   }) : super(key: key);
 
   @override
@@ -130,10 +132,30 @@ class _EnhancedProfileCardState extends State<EnhancedProfileCard> with TickerPr
                   padding: EdgeInsets.symmetric(vertical: 16.0, horizontal: 20.0),
                   child: Row(
                     children: [
-                      Icon(
-                        widget.icon,
-                        color: _getIconColor(widget.cardType),
-                        size: 28,
+                      Container(
+                        width: 50,
+                        height: 50,
+                        child: widget.iconAsset != null
+                            ? Image.asset(
+                                widget.iconAsset!,
+                                width: 50,
+                                height: 50,
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) {
+                                  // Fallback to Material icon if asset fails to load
+                                  debugPrint('❌ ProfileCard: Failed to load icon asset: ${widget.iconAsset}');
+                                  return Icon(
+                                    widget.icon,
+                                    color: _getIconColor(widget.cardType),
+                                    size: 40,
+                                  );
+                                },
+                              )
+                            : Icon(
+                                widget.icon,
+                                color: _getIconColor(widget.cardType),
+                                size: 40,
+                              ),
                       ),
                       SizedBox(width: 20),
                       Expanded(

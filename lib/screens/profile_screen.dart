@@ -358,6 +358,17 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     return stateInfo?.name ?? stateCode; // Return full name or code if not found
   }
 
+  // Helper method to get profile icon asset path based on card type
+  String? _getProfileIconAsset(int cardType) {
+    switch (cardType) {
+      case 0: return 'assets/images/profile/2_support.png';      // Support
+      case 1: return 'assets/images/profile/3_language.png';     // Language  
+      case 2: return 'assets/images/profile/4_state.png';        // State
+      case 3: return 'assets/images/profile/5_subscription.png'; // Subscription
+      default: return null;
+    }
+  }
+
   // Simplified method to check email verification status
   Future<void> _checkEmailVerificationStatus() async {
     if (mounted) {
@@ -634,16 +645,28 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                     ),
                     child: Row(
                       children: [
-                        CircleAvatar(
-                          radius: 30,
-                          backgroundColor: Colors.indigo.shade400,
-                          child: Text(
-                            user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
+                        ClipOval(
+                          child: Image.asset(
+                            'assets/images/profile/1_user_avatar.png',
+                            width: 60,
+                            height: 60,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              debugPrint('❌ ProfileScreen: Failed to load avatar asset: $error');
+                              // Show CircleAvatar with text only as fallback
+                              return CircleAvatar(
+                                radius: 30,
+                                backgroundColor: Colors.indigo.shade400,
+                                child: Text(
+                                  user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         ),
                         SizedBox(width: 16),
@@ -720,6 +743,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                         ),
                       );
                     },
+                    iconAsset: _getProfileIconAsset(0),
                   ),
                   SizedBox(height: 16),
                   _buildEnhancedMenuCard(
@@ -731,6 +755,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                     () {
                       _showLanguageSelector(context, languageProvider);
                     },
+                    iconAsset: _getProfileIconAsset(1),
                   ),
                   SizedBox(height: 16),
                   _buildEnhancedMenuCard(
@@ -752,6 +777,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                         _showStateSelector(context, languageProvider);
                       });
                     },
+                    iconAsset: _getProfileIconAsset(2),
                   ),
                   SizedBox(height: 16),
                   _buildEnhancedMenuCard(
@@ -765,6 +791,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                     () {
                       Navigator.pushNamed(context, '/subscription');
                     },
+                    iconAsset: _getProfileIconAsset(3),
                   ),
                   SizedBox(height: 24),
                   // Custom logout button with centered text
@@ -858,6 +885,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     int cardType,
     bool isHighlighted,
     VoidCallback onTap,
+    {String? iconAsset}
   ) {
     return EnhancedProfileCard(
       title: title,
@@ -866,6 +894,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
       cardType: cardType,
       isHighlighted: isHighlighted,
       onTap: onTap,
+      iconAsset: iconAsset,
     );
   }
 
