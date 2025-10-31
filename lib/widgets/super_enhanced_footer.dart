@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:math' as math;
 import '../providers/language_provider.dart';
 
 class SuperEnhancedFooter extends StatefulWidget {
@@ -126,10 +127,16 @@ class _SuperEnhancedFooterState extends State<SuperEnhancedFooter> with TickerPr
 
   @override
   Widget build(BuildContext context) {
+    // Get device-specific bottom safe area padding
+    final bottomSafeArea = MediaQuery.of(context).padding.bottom;
+    
     return Consumer<LanguageProvider>(
       builder: (context, languageProvider, _) {
         return Container(
-          height: 80,
+          height: math.max(
+            72.0,  // Minimum usable height
+            60.0 + bottomSafeArea + 8.0  // Content + safe area + buffer
+          ),
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [

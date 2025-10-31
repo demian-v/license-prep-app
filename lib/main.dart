@@ -483,7 +483,7 @@ class MyApp extends StatelessWidget {
             colorScheme: ColorScheme.light(secondary: Colors.green),
             fontFamily: 'Roboto',
             scaffoldBackgroundColor: Color(0xFFF5F7FA),
-            cardTheme: CardTheme(
+            cardTheme: CardThemeData(
               elevation: 2,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
