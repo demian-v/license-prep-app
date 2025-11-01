@@ -53,6 +53,7 @@ flutter:
     - assets/images/success_fail/
     - assets/images/logo/
     - assets/images/quiz/
+    - assets/images/states/
     - lib/localization/l10n/
   fonts:
     - family: Roboto
