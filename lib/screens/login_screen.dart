@@ -42,10 +42,10 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   // Helper method to build app logo with fallback
   Widget _buildAppLogo() {
     return Container(
-      height: 160,
+      height: 80,
       child: Image.asset(
         'assets/images/logo/logo.png',
-        height: 160,
+        height: 80,
         fit: BoxFit.contain,
         errorBuilder: (context, error, stackTrace) {
           debugPrint('❌ LoginScreen: Failed to load logo asset: $error');
@@ -147,7 +147,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               children: [
                 SizedBox(height: 0),
                 _buildAppLogo(),
-                SizedBox(height: 0),
+                SizedBox(height: 20),
                 GestureDetector(
                   onTapDown: (_) => _animationController.forward(),
                   onTapUp: (_) => _animationController.reverse(),
