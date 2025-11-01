@@ -1,6 +1,6 @@
 {
-    "name": "license_prep_app",
-    "short_name": "license_prep_app",
+    "name": "Drive USA",
+    "short_name": "Drive USA",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
