@@ -16,7 +16,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   http: ^1.1.0
-  flutter_secure_storage: ^8.0.0
+  flutter_secure_storage: ^9.2.4
   dio: ^5.3.2
   firebase_core: ^4.0.0
   firebase_auth: ^6.0.1
@@ -25,10 +25,10 @@ dependencies:
   firebase_storage: ^13.0.0
   firebase_analytics: ^12.0.0
   cached_network_image: ^3.3.0
-  connectivity_plus: ^4.0.2
-  package_info_plus: ^4.2.0
+  connectivity_plus: ^7.0.0
+  package_info_plus: ^9.0.0
   uuid: ^4.1.0
-  device_info_plus: ^9.1.0
+  device_info_plus: ^12.2.0
   # In-app purchase dependencies for Google Play Billing and Apple In-App Purchase
   in_app_purchase: ^3.1.11
   in_app_purchase_android: ^0.3.0+11

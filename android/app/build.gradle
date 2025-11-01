@@ -13,7 +13,7 @@ android.buildFeatures.buildConfig = true
 
 android {
     namespace = "com.example.license_prep_app"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
