@@ -642,6 +642,15 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
            _emailController.text != _initialEmail;
   }
 
+  // Helper method to get custom icon asset path based on field type
+  String? _getEditProfileIconAsset(String fieldType) {
+    switch (fieldType) {
+      case 'name': return 'assets/images/edit_profile/1_name.png';
+      case 'email': return 'assets/images/edit_profile/2_email.png';
+      default: return null;
+    }
+  }
+
   // Helper methods for gradients and shadows
   LinearGradient _getSectionCardGradient(int sectionIndex) {
     Color startColor = Colors.white;
@@ -936,6 +945,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
                                     },
                                     fieldIndex: 0,
                                     showEditIcon: true,
+                                    iconAsset: _getEditProfileIconAsset('name'),
                                   ),
                                   SizedBox(height: 16),
                                   
@@ -957,6 +967,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
                                     },
                                     fieldIndex: 1,
                                     showEditIcon: true,
+                                    iconAsset: _getEditProfileIconAsset('email'),
                                   ),
                                   
                                   // Password field (conditional)
@@ -1127,7 +1138,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
     Color iconColor,
     TextEditingController controller,
     String? Function(String?) validator,
-    {bool isPassword = false, String? errorText, int fieldIndex = 0, bool showEditIcon = false}
+    {bool isPassword = false, String? errorText, int fieldIndex = 0, bool showEditIcon = false, String? iconAsset}
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1161,11 +1172,27 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
                       ),
                     ],
                   ),
-                  child: Icon(
-                    icon,
-                    color: iconColor,
-                    size: 20,
-                  ),
+                  child: iconAsset != null
+                      ? Image.asset(
+                          iconAsset,
+                          width: 32,
+                          height: 32,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) {
+                            // Fallback to Material icon if asset fails to load
+                            debugPrint('❌ PersonalInfoScreen: Failed to load icon asset: $iconAsset');
+                            return Icon(
+                              icon,
+                              color: iconColor,
+                              size: 20,
+                            );
+                          },
+                        )
+                      : Icon(
+                          icon,
+                          color: iconColor,
+                          size: 20,
+                        ),
                 ),
                 SizedBox(width: 16),
                 Expanded(

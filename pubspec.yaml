@@ -48,6 +48,7 @@ flutter:
     - assets/images/topic_icons/
     - assets/images/languages/
     - assets/images/profile/
+    - assets/images/edit_profile/
     - assets/images/quiz/
     - lib/localization/l10n/
   fonts:
