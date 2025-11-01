@@ -39,6 +39,30 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     super.dispose();
   }
 
+  // Helper method to build app logo with fallback
+  Widget _buildAppLogo() {
+    return Container(
+      height: 160,
+      child: Image.asset(
+        'assets/images/logo/logo.png',
+        height: 160,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint('❌ LoginScreen: Failed to load logo asset: $error');
+          return Text(
+            'USA License Prep',
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: Colors.indigo.shade400,
+            ),
+            textAlign: TextAlign.center,
+          );
+        },
+      ),
+    );
+  }
+
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -118,19 +142,12 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           child: SingleChildScrollView(
             padding: EdgeInsets.all(24.0),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  'USA License Prep',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.indigo.shade400,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: 40),
+                SizedBox(height: 0),
+                _buildAppLogo(),
+                SizedBox(height: 0),
                 GestureDetector(
                   onTapDown: (_) => _animationController.forward(),
                   onTapUp: (_) => _animationController.reverse(),

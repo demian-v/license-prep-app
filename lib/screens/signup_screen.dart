@@ -48,6 +48,30 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
     _animationController.dispose();
     super.dispose();
   }
+
+  // Helper method to build app logo with fallback
+  Widget _buildAppLogo() {
+    return Container(
+      height: 160,
+      child: Image.asset(
+        'assets/images/logo/logo.png',
+        height: 160,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint('❌ SignupScreen: Failed to load logo asset: $error');
+          return Text(
+            'USA License Prep',
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: Colors.indigo.shade400,
+            ),
+            textAlign: TextAlign.center,
+          );
+        },
+      ),
+    );
+  }
   
   // Analytics tracking methods
   void _onFormStarted() {
@@ -276,19 +300,12 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
           child: SingleChildScrollView(
             padding: EdgeInsets.all(24.0),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  'USA License Prep',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.indigo.shade400,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: 40),
+                SizedBox(height: 0),
+                _buildAppLogo(),
+                SizedBox(height: 0),
                 GestureDetector(
                   onTapDown: (_) => _animationController.forward(),
                   onTapUp: (_) => _animationController.reverse(),

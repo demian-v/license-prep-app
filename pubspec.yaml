@@ -50,6 +50,7 @@ flutter:
     - assets/images/profile/
     - assets/images/edit_profile/
     - assets/images/success_fail/
+    - assets/images/logo/
     - assets/images/quiz/
     - lib/localization/l10n/
   fonts:
