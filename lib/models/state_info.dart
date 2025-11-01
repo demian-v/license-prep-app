@@ -17,12 +17,16 @@ class StateInfo {
   /// Optional localized/display version of the state name
   final String? displayName;
   
+  /// Whether this state should be visible in the UI (defaults to true)
+  final bool isVisible;
+  
   /// Creates a new StateInfo instance
   const StateInfo({
     required this.id,
     required this.name,
     this.abbreviation,
     this.displayName,
+    this.isVisible = true,
   });
   
   /// Helper to get display name or fallback to name if not available

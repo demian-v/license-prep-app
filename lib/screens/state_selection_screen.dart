@@ -37,8 +37,8 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> with Ticker
   String? _stateBeforeChange;
   String? _stateNameBeforeChange;
 
-  // Get states from hardcoded data in StateData class
-  final List<String> _allStates = StateData.getAllStateNames();
+  // Get only visible states from hardcoded data in StateData class
+  final List<String> _allStates = StateData.getVisibleStateNames();
 
   @override
   void initState() {
