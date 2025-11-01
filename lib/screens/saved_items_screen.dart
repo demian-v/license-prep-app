@@ -140,20 +140,13 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> with TickerProvider
       builder: (context, child) {
         return Transform.scale(
           scale: _titlePulseAnimation.value,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.favorite, size: 16, color: Colors.red.shade400),
-              SizedBox(width: 6),
-              Text(
-                AppLocalizations.of(context).translate('saved'),
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-            ],
+          child: Text(
+            AppLocalizations.of(context).translate('saved'),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
           ),
         );
       },

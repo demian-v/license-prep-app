@@ -147,19 +147,12 @@ class PremiumBlockDialog extends StatelessWidget {
                           ),
                           elevation: 2,
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.star, size: 20),
-                            SizedBox(width: 8),
-                            Text(
-                              AppLocalizations.of(context).translate('upgrade_now'),
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          AppLocalizations.of(context).translate('upgrade_now'),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
