@@ -81,6 +81,13 @@ class _PracticeResultScreenState extends State<PracticeResultScreen> with Ticker
     super.dispose();
   }
 
+  // Helper method to get custom result icon asset path based on result state
+  String? _getResultIconAsset(bool isPassed) {
+    return isPassed 
+      ? 'assets/images/success_fail/success.png'
+      : 'assets/images/success_fail/fail.png';
+  }
+
   // Helper method to get gradient for result
   LinearGradient _getResultGradient(bool isPassed) {
     if (isPassed) {
@@ -347,11 +354,27 @@ class _PracticeResultScreenState extends State<PracticeResultScreen> with Ticker
                   ),
                 ],
               ),
-              child: Icon(
-                isPassed ? Icons.emoji_events : Icons.block,
-                color: isPassed ? Colors.amber.shade700 : Colors.red.shade600,
-                size: 80,
-              ),
+              child: _getResultIconAsset(isPassed) != null
+                  ? Image.asset(
+                      _getResultIconAsset(isPassed)!,
+                      width: 100,
+                      height: 100,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) {
+                        // Fallback to Material icon if asset fails to load
+                        debugPrint('❌ PracticeResultScreen: Failed to load result icon: ${_getResultIconAsset(isPassed)}');
+                        return Icon(
+                          isPassed ? Icons.emoji_events : Icons.block,
+                          color: isPassed ? Colors.amber.shade700 : Colors.red.shade600,
+                          size: 80,
+                        );
+                      },
+                    )
+                  : Icon(
+                      isPassed ? Icons.emoji_events : Icons.block,
+                      color: isPassed ? Colors.amber.shade700 : Colors.red.shade600,
+                      size: 80,
+                    ),
             ),
           );
         },
