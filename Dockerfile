@@ -1,5 +1,5 @@
 # Stage 1: Build the Flutter web app
-FROM cirrusci/flutter:3.24.3 AS build-env
+FROM ghcr.io/cirruslabs/flutter:latest AS build-env
 
 # Set working directory
 WORKDIR /app
