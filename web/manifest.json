@@ -5,7 +5,7 @@
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Drive USA - A subscription-based license preparation application",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
