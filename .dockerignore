@@ -21,7 +21,7 @@ Thumbs.db
 
 # Test files
 test/
-**/*_test.dart
+test/**/*_test.dart
 
 # Development files
 android/
