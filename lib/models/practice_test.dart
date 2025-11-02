@@ -1,3 +1,4 @@
+/// Model class representing a practice test
 class PracticeTest {
   final String id;
   final String licenseId;
