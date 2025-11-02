@@ -15,7 +15,7 @@ COPY . .
 
 # Enable web support and build for web
 RUN flutter config --enable-web
-RUN flutter build web --release --web-renderer html
+RUN flutter build web --release
 
 # Stage 2: Create the runtime image with nginx
 FROM nginx:alpine
