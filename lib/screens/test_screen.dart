@@ -255,7 +255,7 @@ class _TestScreenState extends State<TestScreen> {
           return {
             'tests': 'Tests',
             'testing': 'Testing',
-            'take_exam': 'Take Exam!',
+            'take_exam': 'Take Exam!!',
             'dmv_exam_desc': 'Exam Simulation',
             'working_on_mistakes': 'Working on Mistakes',
             'saved': 'Saved',
