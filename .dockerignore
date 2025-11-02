@@ -1,0 +1,60 @@
+# Build artifacts
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files
+test/
+**/*_test.dart
+
+# Development files
+android/
+ios/
+linux/
+macos/
+windows/
+
+# Documentation and examples
+lib/docs/
+lib/examples/
+*.md
+EMAIL_VERIFICATION_TEST_PLAN.md
+ACCOUNT_DELETION_IMPLEMENTATION_SUMMARY.md
+GLOBAL_COUNTER_IMPLEMENTATION.md
+
+# Test and development scripts
+test_*.dart
+*.bat
+*.sh
+
+# Functions (if not needed for web build)
+functions/
+
+# Temporary files
+*.tmp
+*.log
+.env*
+
+# Firebase local files (if any)
+firebase-debug.log
+firestore-debug.log
+
+# Other unnecessary files for web build
+devtools_options.yaml
+analysis_options.yaml
