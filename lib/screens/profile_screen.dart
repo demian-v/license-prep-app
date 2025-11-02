@@ -8,8 +8,7 @@ import '../localization/app_localizations.dart';
 import '../providers/subscription_provider.dart';
 import '../providers/progress_provider.dart';
 import '../providers/state_provider.dart';
-import '../examples/api_switcher_example.dart';
-import '../examples/function_name_mapping_example.dart';
+// Removed developer example imports for production build
 import '../services/email_sync_service.dart';
 import '../services/analytics_service.dart';
 import '../services/session_notification_service.dart';
@@ -1279,34 +1278,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
             Expanded(
               child: ListView(
                 children: [
-                  ListTile(
-                    leading: Icon(Icons.api),
-                    title: Text(_translate('api_switcher', languageProvider)),
-                    subtitle: Text(_translate('api_switcher_desc', languageProvider)),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ApiSwitcherExample(),
-                        ),
-                      );
-                    },
-                  ),
-                  ListTile(
-                    leading: Icon(Icons.functions),
-                    title: Text(_translate('function_mapping', languageProvider)),
-                    subtitle: Text(_translate('function_mapping_desc', languageProvider)),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => FunctionNameMappingExample(),
-                        ),
-                      );
-                    },
-                  ),
+                  // Removed developer example navigation options for production build
                   ListTile(
                     leading: Icon(Icons.settings_applications),
                     title: Text(_translate('app_settings_reset', languageProvider)),
