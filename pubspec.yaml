@@ -51,6 +51,7 @@ flutter:
     - assets/images/profile/
     - assets/images/edit_profile/
     - assets/images/success_fail/
+    - assets/images/trial/
     - assets/images/logo/
     - assets/images/quiz/
     - assets/images/states/

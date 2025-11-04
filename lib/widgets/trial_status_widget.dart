@@ -4,6 +4,13 @@ import '../providers/subscription_provider.dart';
 import '../localization/app_localizations.dart';
 
 class TrialStatusWidget extends StatelessWidget {
+  // Helper method to get custom trial icon asset path
+  String? _getTrialIconAsset(bool isExpired) {
+    return isExpired 
+        ? 'assets/images/trial/warning.png'
+        : 'assets/images/trial/star.png';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<SubscriptionProvider>(
@@ -212,15 +219,35 @@ class TrialStatusWidget extends StatelessWidget {
                 width: 1,
               ),
             ),
-            child: Icon(
-              isExpired 
-                  ? Icons.warning 
-                  : isUrgent 
-                      ? Icons.access_time 
-                      : Icons.star,
-              color: iconColor,
-              size: 20,
-            ),
+            child: _getTrialIconAsset(isExpired) != null
+                ? Image.asset(
+                    _getTrialIconAsset(isExpired)!,
+                    width: 20,
+                    height: 20,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      // Fallback to Material icon if custom asset fails to load
+                      debugPrint('❌ TrialStatusWidget: Failed to load trial icon: ${_getTrialIconAsset(isExpired)}');
+                      return Icon(
+                        isExpired 
+                            ? Icons.warning 
+                            : isUrgent 
+                                ? Icons.access_time 
+                                : Icons.star,
+                        color: iconColor,
+                        size: 20,
+                      );
+                    },
+                  )
+                : Icon(
+                    isExpired 
+                        ? Icons.warning 
+                        : isUrgent 
+                            ? Icons.access_time 
+                            : Icons.star,
+                    color: iconColor,
+                    size: 20,
+                  ),
           ),
           SizedBox(width: 12),
           
