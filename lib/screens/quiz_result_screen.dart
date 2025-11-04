@@ -140,6 +140,11 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
     }
   }
 
+  // Helper method to get custom result icon asset path for Learn by Topics
+  String? _getLearnByTopicsIconAsset() {
+    return 'assets/images/success_fail/learn_by_topics.png';
+  }
+
   // Helper method to get gradient for result (always green for quiz success)
   LinearGradient _getResultGradient() {
     return LinearGradient(
@@ -356,11 +361,27 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
                   ),
                 ],
               ),
-              child: Icon(
-                Icons.emoji_events,
-                color: Colors.amber.shade700,
-                size: 80,
-              ),
+              child: _getLearnByTopicsIconAsset() != null
+                  ? Image.asset(
+                      _getLearnByTopicsIconAsset()!,
+                      width: 100,
+                      height: 100,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) {
+                        // Fallback to trophy icon if custom asset fails to load
+                        debugPrint('❌ QuizResultScreen: Failed to load learn_by_topics icon: ${_getLearnByTopicsIconAsset()}');
+                        return Icon(
+                          Icons.emoji_events,
+                          color: Colors.amber.shade700,
+                          size: 80,
+                        );
+                      },
+                    )
+                  : Icon(
+                      Icons.emoji_events,
+                      color: Colors.amber.shade700,
+                      size: 80,
+                    ),
             ),
           );
         },
