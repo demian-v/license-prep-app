@@ -65,11 +65,26 @@ class PremiumBlockDialog extends StatelessWidget {
                     color: isExpiredTrial ? Colors.red.shade100 : Colors.orange.shade100,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
-                    isExpiredTrial ? Icons.lock_outlined : Icons.diamond_outlined,
-                    size: 40,
-                    color: isExpiredTrial ? Colors.red.shade600 : Colors.orange.shade600,
-                  ),
+                  child: isExpiredTrial 
+                    ? Image.asset(
+                        'assets/images/trial/locker.png',
+                        width: 40,
+                        height: 40,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          // Fallback to material icon if asset fails to load
+                          return Icon(
+                            Icons.lock_outlined,
+                            size: 40,
+                            color: Colors.red.shade600,
+                          );
+                        },
+                      )
+                    : Icon(
+                        Icons.diamond_outlined,
+                        size: 40,
+                        color: Colors.orange.shade600,
+                      ),
                 ),
                 
                 SizedBox(height: 24),
