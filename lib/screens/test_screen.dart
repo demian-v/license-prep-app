@@ -302,7 +302,7 @@ class _TestScreenState extends State<TestScreen> {
                 TrialStatusWidget(),
                 
                 Padding(
-                  padding: EdgeInsets.all(16.0),
+                  padding: EdgeInsets.only(left: 16, right: 16, bottom: 0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
