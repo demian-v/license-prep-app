@@ -100,7 +100,7 @@
   "per_month": "/месяц",
   "auto_renew_text": "Ваша подписка будет автоматически продлеваться каждый месяц до отмены.",
   "subscribed_success": "Вы подписаны! Наслаждайтесь полным доступом ко всему контенту.",
-  "subscription_failed": "Подписка не удалась. Пожалуйста, попробуйте еще раз.",
+  "subscription_failed": "Мы не можем обработать ваш платеж в данный момент. Пожалуйста, проверьте способ оплаты и попробуйте снова.",
   "subscription_error": "Произошла ошибка. Пожалуйста, попробуйте еще раз.",
   "subscription_successful": "Подписка успешна!",
   "yearly_subscription": "Годовая Подписка",
@@ -174,5 +174,18 @@
   "keep_subscription": "Оставить",
   "subscription_canceled_success": "Подписка отменена успешно",
   "plan_type_monthly": "Месячный",
-  "plan_type_yearly": "Годовой"
+  "plan_type_yearly": "Годовой",
+  "upgrade_benefit": "Преимущества обновления",
+  "get_days_total": "Получите {0} дней всего",
+  "days_remaining_plus_new": "{0} осталось + {1} новых дней",
+  "upgrade_to_yearly": "Обновить до Годового",
+  "upgrade_to_yearly_price": "Обновить до Годового - ${0}",
+  "upgrade_confirmation_title": "Обновить до Годовой Подписки",
+  "upgrade_confirmation_intro": "Вы получите:",
+  "upgrade_days_remaining_from_current": "• {0} дней осталось с текущего плана",
+  "upgrade_additional_days_yearly": "• {1} дополнительных дней от годовой подписки",
+  "upgrade_total_days_access": "• Итого: {0} дней доступа",
+  "upgrade_cost": "Стоимость: ${0}",
+  "upgrade_success_message": "Успешно обновлено до годовой подписки!",
+  "upgrade_failed_message": "Обновление не удалось. Пожалуйста, попробуйте еще раз."
 }

@@ -7,6 +7,7 @@ import '../models/user_subscription.dart';
 import '../models/subscription_package.dart';
 import '../models/user.dart';
 import 'billing_calculator.dart';
+import 'upgrade_calculator.dart';
 
 class SubscriptionManagementService {
   static const int trialDurationDays = 3;
@@ -156,6 +157,96 @@ class SubscriptionManagementService {
     } catch (e) {
       debugPrint('❌ SubscriptionManagementService: Error converting trial to paid: $e');
       throw Exception('Failed to convert trial to paid: $e');
+    }
+  }
+
+  /// Upgrade subscription from monthly to yearly preserving remaining days
+  Future<UserSubscription> upgradeSubscription(
+    String userId, 
+    int newPackageId,
+    String targetPlanType,
+  ) async {
+    debugPrint('⬆️ SubscriptionManagementService: Upgrading subscription for user: $userId');
+    debugPrint('📊 Target plan: $targetPlanType, Package ID: $newPackageId');
+    
+    try {
+      final currentSubscription = await getUserSubscription(userId);
+      if (currentSubscription == null) {
+        throw Exception('No current subscription found');
+      }
+      
+      // Validate upgrade eligibility
+      if (!currentSubscription.isUpgradeEligible(targetPlanType)) {
+        throw Exception('Subscription is not eligible for upgrade to $targetPlanType');
+      }
+      
+      // Validate upgrade using UpgradeCalculator
+      if (!UpgradeCalculator.isUpgradeValid(
+        currentSubscription.planType,
+        targetPlanType,
+        currentSubscription.isValidSubscription,
+      )) {
+        throw Exception('Upgrade validation failed');
+      }
+      
+      final packages = await getSubscriptionPackages();
+      final newPackage = packages.firstWhere(
+        (pkg) => pkg.id == newPackageId,
+        orElse: () => throw Exception('Package not found'),
+      );
+      
+      final now = DateTime.now();
+      
+      // Calculate new billing date preserving remaining days
+      final newBillingDate = currentSubscription.nextBillingDate != null
+          ? UpgradeCalculator.calculateUpgradeBillingDate(
+              currentSubscription.nextBillingDate!,
+              currentSubscription.planType,
+              targetPlanType,
+              currentDate: now,
+            )
+          : now.add(Duration(days: newPackage.duration)); // Fallback
+      
+      debugPrint('⬆️ Upgrade billing calculation:');
+      debugPrint('📅 Current billing date: ${currentSubscription.nextBillingDate?.toIso8601String()}');
+      debugPrint('📅 Upgrade date: ${now.toIso8601String()}');
+      debugPrint('📅 New billing date: ${newBillingDate.toIso8601String()}');
+      
+      final remainingDays = currentSubscription.getDaysRemainingInCurrentPlan();
+      final totalDaysAfterUpgrade = UpgradeCalculator.calculateTotalDaysAfterUpgrade(
+        currentSubscription.nextBillingDate!,
+        currentSubscription.planType,
+        targetPlanType,
+        currentDate: now,
+      );
+      
+      debugPrint('📊 Days remaining in current plan: $remainingDays');
+      debugPrint('📊 Total days after upgrade: $totalDaysAfterUpgrade');
+      
+      // Create upgraded subscription
+      final upgradedSubscription = currentSubscription.copyWith(
+        packageId: newPackageId,
+        planType: targetPlanType,
+        duration: newPackage.duration,
+        nextBillingDate: newBillingDate,
+        updatedAt: now,
+        status: 'active',
+        isActive: true,
+      );
+      
+      // Save to Firebase and cache
+      await _saveSubscriptionToFirebase(upgradedSubscription);
+      await _saveSubscriptionToCache(upgradedSubscription);
+      await _syncUserBillingDates(userId, now, newBillingDate);
+      
+      debugPrint('✅ SubscriptionManagementService: Subscription upgraded successfully');
+      debugPrint('📊 Plan: ${currentSubscription.planType} → $targetPlanType');
+      debugPrint('📅 New billing date: ${newBillingDate.toIso8601String()}');
+      
+      return upgradedSubscription;
+    } catch (e) {
+      debugPrint('❌ SubscriptionManagementService: Error upgrading subscription: $e');
+      throw Exception('Failed to upgrade subscription: $e');
     }
   }
 

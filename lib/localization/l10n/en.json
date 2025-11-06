@@ -104,7 +104,7 @@
   "per_month": "/month",
   "auto_renew_text": "Your subscription will automatically renew each month until canceled.",
   "subscribed_success": "You're subscribed! Enjoy full access to all content.",
-  "subscription_failed": "Subscription failed. Please try again.",
+  "subscription_failed": "We're unable to process your payment at this time. Please check your payment method and try again.",
   "subscription_error": "An error occurred. Please try again.",
   "subscription_successful": "Subscription successful!",
   "yearly_subscription": "Yearly Subscription",
@@ -177,5 +177,18 @@
   "keep_subscription": "Keep",
   "subscription_canceled_success": "Subscription canceled successfully",
   "plan_type_monthly": "Monthly",
-  "plan_type_yearly": "Yearly"
+  "plan_type_yearly": "Yearly",
+  "upgrade_benefit": "Upgrade Benefit",
+  "get_days_total": "Get {0} days total",
+  "days_remaining_plus_new": "{0} remaining + {1} new days",
+  "upgrade_to_yearly": "Upgrade to Yearly",
+  "upgrade_to_yearly_price": "Upgrade to Yearly - ${0}",
+  "upgrade_confirmation_title": "Upgrade to Yearly Subscription",
+  "upgrade_confirmation_intro": "You will get:",
+  "upgrade_days_remaining_from_current": "• {0} days remaining from current plan",
+  "upgrade_additional_days_yearly": "• {1} additional days from yearly subscription",
+  "upgrade_total_days_access": "• Total: {0} days of access",
+  "upgrade_cost": "Cost: ${0}",
+  "upgrade_success_message": "Successfully upgraded to yearly subscription!",
+  "upgrade_failed_message": "Upgrade failed. Please try again."
 }

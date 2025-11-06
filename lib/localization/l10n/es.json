@@ -100,7 +100,7 @@
   "per_month": "/mes",
   "auto_renew_text": "Tu suscripción se renovará automáticamente cada mes hasta que la canceles.",
   "subscribed_success": "¡Estás suscrito! Disfruta del acceso completo a todo el contenido.",
-  "subscription_failed": "La suscripción falló. Por favor, inténtalo de nuevo.",
+  "subscription_failed": "No podemos procesar su pago en este momento. Por favor, verifique su método de pago e inténtelo de nuevo.",
   "subscription_error": "Ocurrió un error. Por favor, inténtalo de nuevo.",
   "subscription_successful": "¡Suscripción exitosa!",
   "yearly_subscription": "Suscripción Anual",
@@ -173,5 +173,18 @@
   "keep_subscription": "Mantener",
   "subscription_canceled_success": "Suscripción cancelada exitosamente",
   "plan_type_monthly": "Mensual",
-  "plan_type_yearly": "Anual"
+  "plan_type_yearly": "Anual",
+  "upgrade_benefit": "Beneficio de Actualización",
+  "get_days_total": "Obtén {0} días en total",
+  "days_remaining_plus_new": "{0} restantes + {1} días nuevos",
+  "upgrade_to_yearly": "Actualizar a Anual",
+  "upgrade_to_yearly_price": "Actualizar a Anual - ${0}",
+  "upgrade_confirmation_title": "Actualizar a Suscripción Anual",
+  "upgrade_confirmation_intro": "Obtendrás:",
+  "upgrade_days_remaining_from_current": "• {0} días restantes del plan actual",
+  "upgrade_additional_days_yearly": "• {1} días adicionales de la suscripción anual",
+  "upgrade_total_days_access": "• Total: {0} días de acceso",
+  "upgrade_cost": "Costo: ${0}",
+  "upgrade_success_message": "¡Actualización exitosa a suscripción anual!",
+  "upgrade_failed_message": "La actualización falló. Por favor, inténtalo de nuevo."
 }

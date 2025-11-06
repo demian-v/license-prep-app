@@ -102,7 +102,7 @@
   "per_month": "/місяць",
   "auto_renew_text": "Ваша підписка буде автоматично продовжена щомісяця до скасування.",
   "subscribed_success": "Ви підписані! Насолоджуйтесь повним доступом до всього контенту.",
-  "subscription_failed": "Підписка не вдалася. Будь ласка, спробуйте ще раз.",
+  "subscription_failed": "Ми не можемо обробити ваш платіж зараз. Будь ласка, перевірте спосіб оплати та спробуйте знову.",
   "subscription_error": "Сталася помилка. Будь ласка, спробуйте ще раз.",
   "subscription_successful": "Підписка успішна!",
   "yearly_subscription": "Річна Підписка",
@@ -176,5 +176,18 @@
   "keep_subscription": "Залишити",
   "subscription_canceled_success": "Підписку скасовано успішно",
   "plan_type_monthly": "Місячний",
-  "plan_type_yearly": "Річний"
+  "plan_type_yearly": "Річний",
+  "upgrade_benefit": "Переваги оновлення",
+  "get_days_total": "Отримайте {0} днів загалом",
+  "days_remaining_plus_new": "{0} залишилось + {1} нових днів",
+  "upgrade_to_yearly": "Оновити до Річного",
+  "upgrade_to_yearly_price": "Оновити до Річного - ${0}",
+  "upgrade_confirmation_title": "Оновити до Річної Підписки",
+  "upgrade_confirmation_intro": "Ви отримаєте:",
+  "upgrade_days_remaining_from_current": "• {0} днів залишилось з поточного плану",
+  "upgrade_additional_days_yearly": "• {1} додаткових днів від річної підписки",
+  "upgrade_total_days_access": "• Загалом: {0} днів доступу",
+  "upgrade_cost": "Вартість: ${0}",
+  "upgrade_success_message": "Успішно оновлено до річної підписки!",
+  "upgrade_failed_message": "Оновлення не вдалося. Будь ласка, спробуйте ще раз."
 }

@@ -5,6 +5,7 @@ import 'dart:math';
 import '../models/user_subscription.dart';
 import '../models/subscription_package.dart';
 import '../services/subscription_management_service.dart';
+import '../services/upgrade_calculator.dart';
 
 class SubscriptionProvider extends ChangeNotifier {
   // STATE MANAGEMENT
@@ -101,6 +102,80 @@ class SubscriptionProvider extends ChangeNotifier {
   // SUBSCRIPTION STATUS (for backward compatibility)
   bool get isSubscriptionActive => hasValidSubscription;
   int get trialDaysLeft => trialDaysRemaining; // For backward compatibility
+
+  // UPGRADE FUNCTIONALITY
+  // Check if user can upgrade to yearly
+  bool get canUpgradeToYearly {
+    return _subscription?.canUpgradeToYearly() ?? false;
+  }
+
+  // Get days remaining in current plan
+  int get daysRemainingInCurrentPlan {
+    return _subscription?.getDaysRemainingInCurrentPlan() ?? 0;
+  }
+
+  // Calculate total days after upgrade
+  int calculateTotalDaysAfterUpgrade(String targetPlanType) {
+    if (_subscription?.nextBillingDate == null) return 0;
+    
+    return UpgradeCalculator.calculateTotalDaysAfterUpgrade(
+      _subscription!.nextBillingDate!,
+      _subscription!.planType,
+      targetPlanType,
+    );
+  }
+
+  // Get upgrade description for UI
+  String getUpgradeDescription(String targetPlanType) {
+    if (_subscription?.nextBillingDate == null) return '';
+    
+    final remainingDays = daysRemainingInCurrentPlan;
+    final totalDays = calculateTotalDaysAfterUpgrade(targetPlanType);
+    
+    return UpgradeCalculator.getUpgradeDescription(
+      _subscription!.planType,
+      targetPlanType,
+      remainingDays,
+      totalDays,
+    );
+  }
+
+  // Upgrade subscription
+  Future<bool> upgradeSubscription(String targetPlanType, int packageId) async {
+    debugPrint('⬆️ SubscriptionProvider: Upgrading to $targetPlanType');
+    _setLoading(true);
+    _clearError();
+    
+    try {
+      if (_subscription == null) {
+        _setError('No current subscription found');
+        return false;
+      }
+      
+      debugPrint('📊 Current plan: ${_subscription!.planType}');
+      debugPrint('📊 Target plan: $targetPlanType');
+      debugPrint('📊 Package ID: $packageId');
+      debugPrint('📊 Days remaining: $daysRemainingInCurrentPlan');
+      debugPrint('📊 Total days after upgrade: ${calculateTotalDaysAfterUpgrade(targetPlanType)}');
+      
+      _subscription = await _subscriptionService.upgradeSubscription(
+        _subscription!.userId,
+        packageId,
+        targetPlanType,
+      );
+      
+      _clearTrialCache();
+      notifyListeners();
+      debugPrint('✅ SubscriptionProvider: Subscription upgraded successfully');
+      return true;
+    } catch (e) {
+      debugPrint('❌ SubscriptionProvider: Upgrade error: $e');
+      _setError('Upgrade failed: $e');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
 
   // CONSTRUCTOR
   SubscriptionProvider();
@@ -212,7 +287,7 @@ class SubscriptionProvider extends ChangeNotifier {
           return false;
         }
       } else {
-        _setError('Mock purchase failed (simulated 10% failure rate)');
+        _setError('We\'re unable to process your payment at this time. Please check your payment method and try again.');
         return false;
       }
     } catch (e) {
