@@ -7,6 +7,25 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:987638335534:android:4a3c520893b3e6f67937bf",
+        "android_client_info": {
+          "package_name": "com.driveusa.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB3NFSey7JrJHEAejCKrzBWSqrpJg6HMoY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:987638335534:android:f641ffe1a4f736717937bf",
         "android_client_info": {
           "package_name": "com.example.license_prep_app"

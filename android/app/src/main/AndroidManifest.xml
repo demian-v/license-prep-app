@@ -29,8 +29,8 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <!-- Accepts URIs that begin with "licenseprep://" -->
-                <data android:scheme="licenseprep" />
+                <!-- Accepts URIs that begin with "driveusa://" -->
+                <data android:scheme="driveusa" />
             </intent-filter>
                 <!-- Handle links from Firebase Auth -->
             <intent-filter>
@@ -67,27 +67,20 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="licenseprep" android:host="email-verified" />
-                <data android:scheme="licenseprep" android:host="emailVerified" />
-                <data android:scheme="licenseprep" android:path="/email-verified" />
-                <data android:scheme="licenseprep" android:path="/emailVerified" />
+                <data android:scheme="driveusa" android:host="email-verified" />
+                <data android:scheme="driveusa" android:host="emailVerified" />
+                <data android:scheme="driveusa" android:path="/email-verified" />
+                <data android:scheme="driveusa" android:path="/emailVerified" />
             </intent-filter>
             <!-- Handle resetPassword deep links with specific paths -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="licenseprep" android:host="resetPassword" />
-                <data android:scheme="licenseprep" android:host="reset-password" />
-                <data android:scheme="licenseprep" android:path="/resetPassword" />
-                <data android:scheme="licenseprep" android:path="/reset-password" />
-            </intent-filter>
-            <!-- Handle alternative URI scheme -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="licenseprepapp" />
+                <data android:scheme="driveusa" android:host="resetPassword" />
+                <data android:scheme="driveusa" android:host="reset-password" />
+                <data android:scheme="driveusa" android:path="/resetPassword" />
+                <data android:scheme="driveusa" android:path="/reset-password" />
             </intent-filter>
         </activity>
         <meta-data

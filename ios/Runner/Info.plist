@@ -52,20 +52,10 @@
                         <key>CFBundleTypeRole</key>
                         <string>Editor</string>
                         <key>CFBundleURLName</key>
-                        <string>com.example.licenseprep</string>
+                        <string>com.driveusa.app</string>
                         <key>CFBundleURLSchemes</key>
                         <array>
-                                <string>licenseprep</string>
-                        </array>
-                </dict>
-                <dict>
-                        <key>CFBundleTypeRole</key>
-                        <string>Editor</string>
-                        <key>CFBundleURLName</key>
-                        <string>com.example.licenseprepapp</string>
-                        <key>CFBundleURLSchemes</key>
-                        <array>
-                                <string>licenseprepapp</string>
+                                <string>driveusa</string>
                         </array>
                 </dict>
         </array>

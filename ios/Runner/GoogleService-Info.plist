@@ -9,7 +9,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.example.licensePrepApp</string>
+	<string>com.driveusa.app</string>
 	<key>PROJECT_ID</key>
 	<string>licenseprepapp</string>
 	<key>STORAGE_BUCKET</key>
@@ -17,7 +17,7 @@
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
-	<true></true>
+	<false></false>
 	<key>IS_APPINVITE_ENABLED</key>
 	<true></true>
 	<key>IS_GCM_ENABLED</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:987638335534:ios:da18bab6faa1b2187937bf</string>
+	<string>1:987638335534:ios:5906bcc4cfcac9337937bf</string>
 </dict>
 </plist>

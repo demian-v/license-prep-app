@@ -52,20 +52,19 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyB3NFSey7JrJHEAejCKrzBWSqrpJg6HMoY',
-    appId: '1:987638335534:android:f641ffe1a4f736717937bf',
+    appId: '1:987638335534:android:4a3c520893b3e6f67937bf',
     messagingSenderId: '987638335534',
     projectId: 'licenseprepapp',
     storageBucket: 'licenseprepapp.firebasestorage.app',
-    measurementId: 'G-8TTZX72V8P',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyCQ3RikKC1X7bRvVYYUM6qAVfTdfm0cz9k',
-    appId: '1:987638335534:ios:da18bab6faa1b2187937bf',
+    appId: '1:987638335534:ios:5906bcc4cfcac9337937bf',
     messagingSenderId: '987638335534',
     projectId: 'licenseprepapp',
     storageBucket: 'licenseprepapp.firebasestorage.app',
-    iosBundleId: 'com.example.licensePrepApp',
+    iosBundleId: 'com.driveusa.app',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
