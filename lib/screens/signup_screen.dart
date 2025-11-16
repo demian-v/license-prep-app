@@ -504,7 +504,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
                                       SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
-                                          'By signing up, you agree to our Terms of Service and start your 3-day free trial. After the trial ends, you\'ll be charged \$2.50/month.',
+                                          'By signing up, you agree to our Terms of Service and start your 3-day free trial. After the trial ends, you\'ll lose access to premium features. You can subscribe for \$9.99/month or \$79.99/year.',
                                           style: TextStyle(
                                             fontSize: 12,
                                             color: Colors.blue.shade800,
