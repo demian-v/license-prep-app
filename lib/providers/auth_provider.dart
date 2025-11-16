@@ -302,11 +302,14 @@ class AuthProvider extends ChangeNotifier {
         
         notifyListeners();
         return true;
+      } else {
+        // Throw exception for empty parameters so SignupScreen can show appropriate error
+        throw Exception('Please fill in all required fields');
       }
-      return false;
     } catch (e) {
       debugPrint('AuthProvider: Signup error: $e');
-      return false;
+      // Re-throw the exception so SignupScreen can handle it with detailed messages
+      rethrow;
     }
   }
   

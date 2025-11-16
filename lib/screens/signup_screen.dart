@@ -130,6 +130,29 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
     }
   }
 
+  /// Parse technical error messages into user-friendly messages
+  String _parseErrorMessage(String errorMessage) {
+    final errorLower = errorMessage.toLowerCase();
+    
+    if (errorLower.contains('email-already-in-use') || 
+        errorLower.contains('email address is already in use')) {
+      return 'This email is already in use. Please try a different email or log in.';
+    } else if (errorLower.contains('weak-password') || 
+               errorLower.contains('password is too weak')) {
+      return 'Password is too weak. Please use a stronger password.';
+    } else if (errorLower.contains('invalid-email')) {
+      return 'Invalid email format. Please check your email address.';
+    } else if (errorLower.contains('network')) {
+      return 'Network error. Please check your connection and try again.';
+    } else {
+      // Extract the meaningful part after "Registration failed:" if present
+      if (errorMessage.contains('Registration failed:')) {
+        return errorMessage.split('Registration failed:').last.trim();
+      }
+      return 'An error occurred during signup. Please try again.';
+    }
+  }
+
   Future<void> _signup() async {
     // Reset error tracking
     _hasFormErrors = false;
@@ -217,7 +240,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
         
         if (mounted) {
           setState(() {
-            _errorMessage = 'Signup failed. Please try again.';
+            _errorMessage = 'Signup failed. Please check your information and try again.';
           });
         }
       }
@@ -231,20 +254,8 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
         signupMethod: 'email',
       );
       
-      // Check if this is a Firebase-specific error that we can handle
-      if (e.toString().contains('email-already-in-use')) {
-        setState(() {
-          _errorMessage = 'This email is already in use. Please try a different email or log in.';
-        });
-      } else if (e.toString().contains('weak-password')) {
-        setState(() {
-          _errorMessage = 'Password is too weak. Please use a stronger password.';
-        });
-      } else if (e.toString().contains('invalid-email')) {
-        setState(() {
-          _errorMessage = 'Invalid email format. Please check your email address.';
-        });
-      } else if (e.toString().contains('createUserDocument')) {
+      // Check if this is a document creation error (special handling)
+      if (e.toString().contains('createUserDocument')) {
         // User was created in Firebase Auth but document creation failed
         // This is a non-critical error, so we can still proceed
         debugPrint('SignupScreen: User created but document creation failed: $e');
@@ -276,10 +287,10 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
           );
         }
       } else {
-        // For other errors, show generic message
+        // For other errors, parse and show user-friendly message
         if (mounted) {
           setState(() {
-            _errorMessage = 'An error occurred: ${e.toString().split(':').last}';
+            _errorMessage = _parseErrorMessage(e.toString());
           });
         }
       }
