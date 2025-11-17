@@ -270,24 +270,19 @@ class SubscriptionProvider extends ChangeNotifier {
       // Simulate network delay
       await Future.delayed(Duration(seconds: 2));
       
-      // Simulate 90% success rate for testing
-      if (Random().nextDouble() < 0.9) {
-        if (_subscription != null) {
-          debugPrint('💳 SubscriptionProvider: Converting trial to paid subscription');
-          _subscription = await _subscriptionService.convertTrialToPaid(
-            _subscription!.userId, 
-            packageId
-          );
-          _clearTrialCache(); // Clear cache when subscription changes
-          notifyListeners();
-          debugPrint('✅ SubscriptionProvider: Mock purchase successful');
-          return true;
-        } else {
-          _setError('No subscription found to convert');
-          return false;
-        }
+      // Always succeed for better user experience (removed artificial failures)
+      if (_subscription != null) {
+        debugPrint('💳 SubscriptionProvider: Converting trial to paid subscription');
+        _subscription = await _subscriptionService.convertTrialToPaid(
+          _subscription!.userId, 
+          packageId
+        );
+        _clearTrialCache(); // Clear cache when subscription changes
+        notifyListeners();
+        debugPrint('✅ SubscriptionProvider: Mock purchase successful');
+        return true;
       } else {
-        _setError('We\'re unable to process your payment at this time. Please check your payment method and try again.');
+        _setError('No subscription found to convert');
         return false;
       }
     } catch (e) {
