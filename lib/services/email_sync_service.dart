@@ -22,7 +22,7 @@ class EmailSyncService {
   
   // Sync intervals
   static const Duration _minSyncInterval = Duration(minutes: 2);
-  static const Duration _periodicSyncInterval = Duration(minutes: 10);
+  static const Duration _periodicSyncInterval = Duration(minutes: 30);
   
   // Smart sync with debouncing - simplified without verification checks
   Future<void> smartSync({bool force = false}) async {
@@ -73,7 +73,7 @@ class EmailSyncService {
     
     // If we haven't checked Firestore recently, need to check
     if (_lastStatusCheck == null || 
-        DateTime.now().difference(_lastStatusCheck!) > Duration(minutes: 5)) {
+        DateTime.now().difference(_lastStatusCheck!) > Duration(minutes: 15)) {
       debugPrint('🔍 EmailSyncService: Status check needed - last check: $_lastStatusCheck');
       return true;
     }
