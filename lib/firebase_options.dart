@@ -73,7 +73,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '987638335534',
     projectId: 'licenseprepapp',
     storageBucket: 'licenseprepapp.firebasestorage.app',
-    iosBundleId: 'com.example.licensePrepApp',
+    iosBundleId: 'com.driveusa.app',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
