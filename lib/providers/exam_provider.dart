@@ -4,9 +4,11 @@ import 'dart:math' show min;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import '../models/exam.dart';
 import '../models/quiz_question.dart';
 import '../services/service_locator.dart';
+import 'exam_timer_provider.dart';
 
 class ExamProvider extends ChangeNotifier {
   Exam? _currentExam;
@@ -14,11 +16,17 @@ class ExamProvider extends ChangeNotifier {
   Map<String, QuizQuestion> _loadedQuestions = {};
   bool _isLoading = false;
   String? _errorMessage;
+  ExamTimerProvider? _timerProvider;
   
   Exam? get currentExam => _currentExam;
   bool get isExamInProgress => _currentExam != null && !_currentExam!.isCompleted;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  
+  // Set timer provider reference for coordination
+  void setTimerProvider(ExamTimerProvider timerProvider) {
+    _timerProvider = timerProvider;
+  }
   
   // Start a new exam with 40 random questions
   Future<void> startNewExam({
@@ -392,23 +400,32 @@ class ExamProvider extends ChangeNotifier {
     
     if (_currentExam!.isTimeLimitExceeded) {
       completeExam();
+      // Only notify when exam actually completes, not every second
     }
-    
-    // Always notify listeners every second so timer display updates in real-time
-    notifyListeners();
+    // Removed notifyListeners() - timer updates now handled by ExamTimerProvider
   }
   
   // Start a timer for UI updates
   void _startTimer() {
+    // Start the internal timer for time limit checking (no UI updates)
     _timer = Timer.periodic(Duration(seconds: 1), (timer) {
       _checkTimeLimit();
     });
+    
+    // Start the UI timer provider if available
+    if (_timerProvider != null && _currentExam != null) {
+      _timerProvider!.startTimer(_currentExam!.remainingTime);
+    }
   }
   
   // Stop the timer
   void _stopTimer() {
+    // Stop internal timer
     _timer?.cancel();
     _timer = null;
+    
+    // Stop UI timer provider if available
+    _timerProvider?.stopTimer();
   }
   
   @override

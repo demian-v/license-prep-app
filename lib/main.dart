@@ -42,6 +42,7 @@ import 'providers/subscription_provider.dart';
 import 'providers/progress_provider.dart';
 import 'providers/language_provider.dart';
 import 'providers/exam_provider.dart';
+import 'providers/exam_timer_provider.dart';
 import 'providers/practice_provider.dart';
 import 'providers/content_provider.dart';
 import 'providers/state_provider.dart';
@@ -378,7 +379,11 @@ void main() async {
 
   // Create exam and practice providers
   final examProvider = ExamProvider();
+  final examTimerProvider = ExamTimerProvider();
   final practiceProvider = PracticeProvider();
+  
+  // Connect ExamProvider with ExamTimerProvider for coordination
+  examProvider.setTimerProvider(examTimerProvider);
   
   // Create content provider
   final contentProvider = ContentProvider();
@@ -450,6 +455,7 @@ void main() async {
         ChangeNotifierProvider.value(value: progressProvider),
         ChangeNotifierProvider.value(value: languageProvider),
         ChangeNotifierProvider.value(value: examProvider),
+        ChangeNotifierProvider.value(value: examTimerProvider),
         ChangeNotifierProvider.value(value: practiceProvider),
         ChangeNotifierProvider.value(value: contentProvider),
         ChangeNotifierProvider.value(value: stateProvider),

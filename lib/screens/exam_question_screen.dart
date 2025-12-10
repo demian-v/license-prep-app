@@ -10,6 +10,7 @@ import '../services/service_locator.dart';
 import '../localization/app_localizations.dart';
 import '../services/analytics_service.dart';
 import '../widgets/report_sheet.dart';
+import '../widgets/animated_exam_timer.dart';
 import 'exam_result_screen.dart';
 
 class ExamQuestionScreen extends StatefulWidget {
@@ -17,35 +18,16 @@ class ExamQuestionScreen extends StatefulWidget {
   _ExamQuestionScreenState createState() => _ExamQuestionScreenState();
 }
 
-class _ExamQuestionScreenState extends State<ExamQuestionScreen> with TickerProviderStateMixin {
+class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
   dynamic selectedAnswer;
   bool isAnswerChecked = false;
   bool? isCorrect;
   ScrollController _pillsScrollController = ScrollController();
   ScrollController _mainScrollController = ScrollController();
-  late AnimationController _timerAnimationController;
-  late Animation<double> _timerPulseAnimation;
   
   @override
   void initState() {
     super.initState();
-    
-    // Initialize timer animation
-    _timerAnimationController = AnimationController(
-      duration: Duration(seconds: 2),
-      vsync: this,
-    );
-    
-    _timerPulseAnimation = Tween<double>(
-      begin: 1.0,
-      end: 1.05,
-    ).animate(CurvedAnimation(
-      parent: _timerAnimationController,
-      curve: Curves.easeInOut,
-    ));
-    
-    // Start the pulse animation
-    _timerAnimationController.repeat(reverse: true);
     
     // Scroll to current pill when screen initializes
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -55,7 +37,6 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> with TickerProv
   
   @override
   void dispose() {
-    _timerAnimationController.dispose();
     _pillsScrollController.dispose();
     _mainScrollController.dispose();
     super.dispose();
@@ -118,79 +99,6 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> with TickerProv
     );
   }
 
-  // Helper method to get timer gradient based on remaining time
-  LinearGradient _getTimerGradient(Duration remainingTime) {
-    Color startColor = Colors.white;
-    Color endColor;
-    
-    if (remainingTime.inMinutes > 30) {
-      // Safe zone - green gradient
-      endColor = Colors.green.shade50.withOpacity(0.6);
-    } else if (remainingTime.inMinutes > 10) {
-      // Caution zone - orange gradient
-      endColor = Colors.orange.shade50.withOpacity(0.6);
-    } else {
-      // Critical zone - red gradient
-      endColor = Colors.red.shade50.withOpacity(0.8);
-    }
-    
-    return LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [startColor, endColor],
-      stops: [0.0, 1.0],
-    );
-  }
-
-  // Enhanced timer widget
-  Widget _buildEnhancedTimer(Duration remainingTime, String timeText) {
-    bool isCritical = remainingTime.inMinutes < 5;
-    
-    return AnimatedBuilder(
-      animation: _timerPulseAnimation,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: isCritical ? _timerPulseAnimation.value : 1.0,
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              gradient: _getTimerGradient(remainingTime),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
-                  spreadRadius: 0,
-                  blurRadius: 6,
-                  offset: Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.schedule,
-                  size: 16,
-                  color: Colors.black,
-                ),
-                SizedBox(width: 4),
-                Text(
-                  timeText,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                    fontFamily: 'monospace',
-                    letterSpacing: 1.0,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -216,16 +124,6 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> with TickerProv
     
     // Format remaining time
     final remainingTime = exam.remainingTime;
-    final minutes = remainingTime.inMinutes;
-    final seconds = remainingTime.inSeconds % 60;
-    final timeText = "${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}";
-    
-    // Update animation speed for critical time
-    if (remainingTime.inMinutes < 5) {
-      _timerAnimationController.duration = Duration(milliseconds: 800);
-    } else {
-      _timerAnimationController.duration = Duration(seconds: 2);
-    }
     
     // Check if we need to show result screen
     if (exam.isCompleted) {
@@ -249,7 +147,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> with TickerProv
       onWillPop: _onWillPop,
       child: Scaffold(
         appBar: AppBar(
-          title: _buildEnhancedTimer(remainingTime, timeText),
+          title: AnimatedExamTimer(),
           centerTitle: true,
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
