@@ -185,6 +185,24 @@ class FirebaseContentApi implements ContentApiInterface {
     return 0;
   }
   
+  /// Helper method to sort questions by their numeric ID suffix (for Learn by Topics)
+  List<QuizQuestion> _sortQuestionsByNumericId(List<QuizQuestion> questions) {
+    questions.sort((a, b) {
+      final aNum = _extractNumericSuffixFromQuestionId(a.id);
+      final bNum = _extractNumericSuffixFromQuestionId(b.id);
+      return aNum.compareTo(bNum);
+    });
+    return questions;
+  }
+  
+  /// Helper method to extract numeric suffix from question ID
+  int _extractNumericSuffixFromQuestionId(String questionId) {
+    // Extract numeric part from IDs like "q_il_en_duties_01" -> 1
+    final regex = RegExp(r'_(\d+)$');
+    final match = regex.firstMatch(questionId);
+    return int.tryParse(match?.group(1) ?? '0') ?? 0;
+  }
+  
   /// Get quiz topics based on language and state
   @override
   Future<List<QuizTopic>> getQuizTopics(String language, String state) async {
@@ -509,12 +527,15 @@ class FirebaseContentApi implements ContentApiInterface {
         print('🔍 [DEBUG] Unique topicIds in cache: ${uniqueTopicIds.join(", ")}');
         
         // Filter cached questions by topicId
-        final topicQuestions = cachedQuestions.where((q) => q.topicId == topicId).toList();
+        var topicQuestions = cachedQuestions.where((q) => q.topicId == topicId).toList();
         print('🔍 [DEBUG] Found ${topicQuestions.length} matching questions for topicId "$topicId"');
         
         if (topicQuestions.isNotEmpty) {
           print('💾 [CACHE HIT] Found ${topicQuestions.length} cached questions for topic $topicId');
-          print('🎯 [CACHE HIT] Returning cached questions: ${topicQuestions.map((q) => q.id).take(5).join(", ")}${topicQuestions.length > 5 ? "..." : ""}');
+          // Sort questions by numeric ID for Learn by Topics
+          topicQuestions = _sortQuestionsByNumericId(topicQuestions);
+          print('🔢 [SORT] Sorted cached questions by numeric ID for Learn by Topics');
+          print('🎯 [CACHE HIT] Returning sorted questions: ${topicQuestions.map((q) => q.id).take(5).join(", ")}${topicQuestions.length > 5 ? "..." : ""}');
           return topicQuestions;
         }
         print('📭 [CACHE PARTIAL] Cache exists but no questions match topicId "$topicId"');
@@ -638,6 +659,11 @@ class FirebaseContentApi implements ContentApiInterface {
           }
           
           print('📊 Firebase Functions result: ${processedQuestions.length} questions processed');
+          // Sort Firebase Functions questions by numeric ID for Learn by Topics
+          if (processedQuestions.isNotEmpty) {
+            processedQuestions = _sortQuestionsByNumericId(processedQuestions);
+            print('🔢 [SORT] Sorted Firebase Functions questions by numeric ID for Learn by Topics');
+          }
         } else {
           print('❌ Firebase Functions returned empty response');
         }
@@ -663,7 +689,7 @@ class FirebaseContentApi implements ContentApiInterface {
           print('📋 Direct Firestore result: ${querySnapshot.docs.length} documents found');
           
           if (querySnapshot.docs.isNotEmpty) {
-            final List<QuizQuestion> firestoreQuestions = [];
+            var firestoreQuestions = <QuizQuestion>[];
             
             for (var doc in querySnapshot.docs) {
               try {
@@ -726,6 +752,9 @@ class FirebaseContentApi implements ContentApiInterface {
             
             if (firestoreQuestions.length > processedQuestions.length) {
               print('🎉 Firestore provided more questions (${firestoreQuestions.length}) than Firebase Functions (${processedQuestions.length}), using Firestore result');
+              // Sort Firestore questions by numeric ID for Learn by Topics
+              firestoreQuestions = _sortQuestionsByNumericId(firestoreQuestions);
+              print('🔢 [SORT] Sorted Firestore questions by numeric ID for Learn by Topics');
               processedQuestions = firestoreQuestions;
             } else {
               print('📊 Firebase Functions result was better, keeping it');
