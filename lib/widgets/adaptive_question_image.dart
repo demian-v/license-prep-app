@@ -11,7 +11,7 @@ class AdaptiveQuestionImage extends StatelessWidget {
     Key? key,
     required this.imagePath,
     this.assetFallback,
-    this.maxHeight = 250.0,
+    this.maxHeight = 265.0,
     this.minHeight = 150.0,
   }) : super(key: key);
 
@@ -20,7 +20,7 @@ class AdaptiveQuestionImage extends StatelessWidget {
     return Container(
       margin: EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.2),
@@ -31,7 +31,7 @@ class AdaptiveQuestionImage extends StatelessWidget {
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         child: ConstrainedBox(
           constraints: BoxConstraints(
             minHeight: minHeight,
