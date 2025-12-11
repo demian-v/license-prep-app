@@ -7,6 +7,7 @@ import '../providers/auth_provider.dart';
 import '../services/service_locator.dart';
 import '../services/direct_firestore_service.dart';
 import '../localization/app_localizations.dart';
+import '../widgets/adaptive_question_image.dart';
 
 class SavedItemsScreen extends StatefulWidget {
   const SavedItemsScreen({Key? key}) : super(key: key);
@@ -523,26 +524,11 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> with TickerProvider
                                     children: [
                                       // Question image (if available)
                                       if (question.imagePath != null)
-                                        Container(
-                                          width: double.infinity,
-                                          height: 150,
-                                          margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                          decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(
-                                              color: Colors.grey.shade200,
-                                              width: 1,
-                                            ),
-                                          ),
-                                          child: ClipRRect(
-                                            borderRadius: BorderRadius.circular(12),
-                                            child: serviceLocator.storage.getImage(
-                                              storagePath: 'quiz_images/${question.imagePath}',
-                                              assetFallback: question.imagePath,
-                                              fit: BoxFit.contain,
-                                              placeholderIcon: Icons.broken_image,
-                                              placeholderColor: Colors.grey[200],
-                                            ),
+                                        Padding(
+                                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                          child: AdaptiveQuestionImage(
+                                            imagePath: question.imagePath!,
+                                            assetFallback: question.imagePath,
                                           ),
                                         ),
                                       
