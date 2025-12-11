@@ -6,6 +6,7 @@ import '../providers/auth_provider.dart';
 import '../providers/state_provider.dart';
 import '../services/analytics_service.dart';
 import '../widgets/report_sheet.dart';
+import '../widgets/adaptive_question_image.dart';
 import 'package:provider/provider.dart';
 
 class TrafficRuleContentScreen extends StatefulWidget {
@@ -488,6 +489,17 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
             _buildSectionHeader(section.title, index),
           
           if (section.title != null && section.title.isNotEmpty)
+            SizedBox(height: 16),
+          
+          // NEW: Add image display if imagePath exists
+          if (section.imagePath != null && section.imagePath.isNotEmpty)
+            AdaptiveQuestionImage(
+              imagePath: section.imagePath,
+              storageFolder: 'theory_images',
+              assetFallback: section.imagePath,
+            ),
+          
+          if (section.imagePath != null && section.imagePath.isNotEmpty)
             SizedBox(height: 16),
           
           // Enhanced content text

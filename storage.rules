@@ -1,0 +1,19 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Allow read access to quiz_images for authenticated users
+    match /quiz_images/{allPaths=**} {
+      allow read: if request.auth != null;
+    }
+    
+    // Allow read access to theory_images for authenticated users
+    match /theory_images/{allPaths=**} {
+      allow read: if request.auth != null;
+    }
+    
+    // Deny all other write access by default
+    match /{allPaths=**} {
+      allow write: if false;
+    }
+  }
+}

@@ -6,6 +6,7 @@ class AdaptiveQuestionImage extends StatelessWidget {
   final String? assetFallback;
   final double maxHeight;
   final double minHeight;
+  final String storageFolder;
 
   const AdaptiveQuestionImage({
     Key? key,
@@ -13,6 +14,7 @@ class AdaptiveQuestionImage extends StatelessWidget {
     this.assetFallback,
     this.maxHeight = 265.0,
     this.minHeight = 150.0,
+    this.storageFolder = 'quiz_images', // Default for backward compatibility
   }) : super(key: key);
 
   @override
@@ -38,7 +40,7 @@ class AdaptiveQuestionImage extends StatelessWidget {
             maxHeight: maxHeight,
           ),
           child: serviceLocator.storage.getImage(
-            storagePath: 'quiz_images/$imagePath',
+            storagePath: '$storageFolder/$imagePath',
             assetFallback: assetFallback,
             fit: BoxFit.contain, // Changed from BoxFit.cover
             width: double.infinity,
