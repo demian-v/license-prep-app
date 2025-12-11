@@ -10,6 +10,7 @@ import '../services/service_locator.dart';
 import '../services/analytics_service.dart';
 import '../localization/app_localizations.dart';
 import '../widgets/report_sheet.dart';
+import '../widgets/adaptive_question_image.dart';
 import 'practice_result_screen.dart';
 
 class PracticeQuestionScreen extends StatefulWidget {
@@ -602,33 +603,9 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
                   children: [
                     // Question image (if available) - moved inside scroll view
                     if (currentQuestion.imagePath != null)
-                      Container(
-                        margin: EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.2),
-                              spreadRadius: 0,
-                              blurRadius: 6,
-                              offset: Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            width: double.infinity,
-                            height: 200,
-                            child: serviceLocator.storage.getImage(
-                              storagePath: 'quiz_images/${currentQuestion.imagePath}',
-                              assetFallback: currentQuestion.imagePath,
-                              fit: BoxFit.cover,
-                              placeholderIcon: Icons.broken_image,
-                              placeholderColor: Colors.grey[200],
-                            ),
-                          ),
-                        ),
+                      AdaptiveQuestionImage(
+                        imagePath: currentQuestion.imagePath!,
+                        assetFallback: currentQuestion.imagePath,
                       ),
                     
                     // Enhanced question card - moved inside scroll view

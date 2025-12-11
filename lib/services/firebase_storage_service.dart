@@ -181,7 +181,7 @@ class FirebaseStorageService {
     String? assetFallback,
     double? width,
     double? height,
-    BoxFit fit = BoxFit.contain,
+    BoxFit fit = BoxFit.contain, // Changed default from BoxFit.cover to prevent cropping
     Color? placeholderColor,
     IconData placeholderIcon = Icons.image,
   }) {

@@ -10,6 +10,7 @@ import '../services/service_locator.dart';
 import '../services/analytics_service.dart';
 import '../localization/app_localizations.dart';
 import '../widgets/report_sheet.dart';
+import '../widgets/adaptive_question_image.dart';
 import 'quiz_result_screen.dart';
 
 class QuizQuestionScreen extends StatefulWidget {
@@ -892,33 +893,9 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
                 children: [
                   // Enhanced question image (if available) - moved inside scroll view
                   if (question.imagePath != null)
-                    Container(
-                      margin: EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.2),
-                            spreadRadius: 0,
-                            blurRadius: 6,
-                            offset: Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          width: double.infinity,
-                          height: 200,
-                          child: serviceLocator.storage.getImage(
-                            storagePath: 'quiz_images/${question.imagePath}',
-                            assetFallback: 'assets/images/quiz/default.png',
-                            fit: BoxFit.cover,
-                            placeholderIcon: Icons.broken_image,
-                            placeholderColor: Colors.grey[200],
-                          ),
-                        ),
-                      ),
+                    AdaptiveQuestionImage(
+                      imagePath: question.imagePath!,
+                      assetFallback: 'assets/images/quiz/default.png',
                     ),
                   
                   // Enhanced question card - moved inside scroll view
