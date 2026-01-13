@@ -23,12 +23,14 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getRenewalStats = exports.renewActiveSubscriptions = exports.verifySubscriptionTestData = exports.createQuickSubscriptionTest = exports.cleanupSubscriptionTestData = exports.generateSubscriptionTestData = exports.subscriptionSystemHealth = exports.handleMockPaymentWebhook = exports.getSubscriptionStats = exports.processSubscriptionsManualy = exports.checkExpiredSubscriptions = exports.deleteUserAccount = exports.updateProfile = exports.getSavedQuestionsWithContent = exports.getSavedQuestions = exports.removeSavedQuestion = exports.addSavedQuestion = exports.createOrUpdateUserDocument = exports.getUserData = exports.updateUserState = exports.updateUserLanguage = exports.getPracticeTests = exports.getPracticeQuestions = exports.getTheoryModules = exports.getTrafficRuleTopics = exports.getQuizQuestions = exports.contentGetQuizTopics = exports.getQuizTopics = void 0;
+exports.validatePurchaseReceipt = exports.getRenewalStats = exports.renewActiveSubscriptions = exports.verifySubscriptionTestData = exports.createQuickSubscriptionTest = exports.cleanupSubscriptionTestData = exports.generateSubscriptionTestData = exports.subscriptionSystemHealth = exports.handleMockPaymentWebhook = exports.getSubscriptionStats = exports.processSubscriptionsManualy = exports.checkExpiredSubscriptions = exports.deleteUserAccount = exports.updateProfile = exports.getSavedQuestionsWithContent = exports.getSavedQuestions = exports.removeSavedQuestion = exports.addSavedQuestion = exports.createOrUpdateUserDocument = exports.getUserData = exports.updateUserState = exports.updateUserLanguage = exports.getPracticeTests = exports.getPracticeQuestions = exports.getTheoryModules = exports.getTrafficRuleTopics = exports.getQuizQuestions = exports.contentGetQuizTopics = exports.getQuizTopics = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const subscription_manager_1 = require("./subscription-manager");
 const subscription_renewal_manager_1 = require("./subscription-renewal-manager");
 const test_data_generator_1 = require("./test-data-generator");
+const receipt_validation_1 = require("./receipt-validation");
+Object.defineProperty(exports, "validatePurchaseReceipt", { enumerable: true, get: function () { return receipt_validation_1.validatePurchaseReceipt; } });
 // Initialize Firebase Admin
 admin.initializeApp();
 // Get Firestore reference

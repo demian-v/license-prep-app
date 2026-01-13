@@ -15,6 +15,7 @@ import {
   createQuickTestScenario,
   verifyTestData
 } from './test-data-generator';
+import { validatePurchaseReceipt } from './receipt-validation';
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -1926,3 +1927,10 @@ export const getRenewalStats = functions.https.onCall(async (data, context) => {
     );
   }
 });
+
+// =============================================================================
+// RECEIPT VALIDATION FUNCTION
+// =============================================================================
+
+// Export receipt validation function (imported from receipt-validation.ts)
+export { validatePurchaseReceipt };

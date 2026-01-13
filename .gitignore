@@ -49,3 +49,6 @@ app.*.map.json
 *.keystore
 upload-keystore.jks
 android/key.properties
+
+# Firebase Functions - Google Cloud Service Account (KEEP SECRET!)
+functions/service-account.json
