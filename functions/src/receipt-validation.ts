@@ -85,11 +85,15 @@ interface ValidationResult {
 // CONSTANTS
 // ============================================================================
 
-// Apple Shared Secret - Now loaded from Firebase Config (Phase 5: Security)
-// Fallback order: Firebase Config → Environment Variable → Hardcoded (dev only)
-const APPLE_SHARED_SECRET = functions.config().apple?.shared_secret || 
-  process.env.APPLE_SHARED_SECRET || 
-  '574b56c57bc64fefb8189ed68b7fc351';  // Fallback for local development only
+// Apple Shared Secret - Loaded from Firebase Config (Phase 5: Security)
+const APPLE_SHARED_SECRET = functions.config().apple?.shared_secret;
+
+if (!APPLE_SHARED_SECRET) {
+  console.error('❌ CRITICAL: Apple shared secret not configured in Firebase Config!');
+  throw new Error('Apple shared secret must be configured. Run: firebase functions:config:set apple.shared_secret="YOUR_SECRET"');
+}
+
+console.log('✅ Apple shared secret loaded securely from Firebase Config');
 
 // Apple App Store verification URLs
 const APPLE_SANDBOX_URL = 'https://sandbox.itunes.apple.com/verifyReceipt';
@@ -148,27 +152,22 @@ const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;  // 1 hour in milliseconds
 
 /**
  * Get Google Service Account credentials (Phase 5: Security)
- * Tries Firebase Config first, then falls back to file for local development
+ * Loads from Firebase Config only (secure)
  */
 function getGoogleCredentials(): any {
-  // Try Firebase config first (deployed functions)
+  // Load from Firebase Config only (secure)
   const configCreds = functions.config().google?.credentials;
-  if (configCreds) {
-    console.log('🔐 Using Google credentials from Firebase Config');
-    // Decode base64 credentials
-    const decoded = Buffer.from(configCreds, 'base64').toString('utf-8');
-    return JSON.parse(decoded);
+  
+  if (!configCreds) {
+    console.error('❌ CRITICAL: Google credentials not configured in Firebase Config!');
+    throw new Error('Google credentials must be configured. Run: firebase functions:config:set google.credentials="BASE64_JSON"');
   }
   
-  // Fallback to file for local development
-  const fs = require('fs');
-  const path = './service-account.json';
-  if (fs.existsSync(path)) {
-    console.log('🔐 Using Google credentials from local file (development mode)');
-    return JSON.parse(fs.readFileSync(path, 'utf8'));
-  }
+  console.log('✅ Google credentials loaded securely from Firebase Config');
   
-  throw new Error('Google service account credentials not found. Set up Firebase config or add service-account.json');
+  // Decode base64 credentials
+  const decoded = Buffer.from(configCreds, 'base64').toString('utf-8');
+  return JSON.parse(decoded);
 }
 
 /**

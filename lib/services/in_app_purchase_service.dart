@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_android/billing_client_wrappers.dart';
 import 'package:in_app_purchase_android/in_app_purchase_android.dart';
@@ -251,25 +252,60 @@ class InAppPurchaseService {
     try {
       debugPrint('🔐 InAppPurchaseService: Validating receipt for ${purchaseDetails.productID}');
       
-      // This is where you would call your backend service to validate the receipt
-      // For now, we'll return true as a placeholder
-      // You should implement proper receipt validation with your Firebase Functions
+      // Get receipt data and platform
+      String receipt;
+      String platform;
       
       if (Platform.isAndroid) {
-        // For Android, you can validate with Google Play Developer API
-        // The purchaseDetails.verificationData contains the necessary data
-        debugPrint('📱 Android receipt validation data available');
+        platform = 'android';
+        // Android: Get purchase token from verification data
+        receipt = purchaseDetails.verificationData.serverVerificationData;
+        debugPrint('📱 Android receipt token: ${receipt.substring(0, 20)}...');
       } else if (Platform.isIOS) {
-        // For iOS, you can validate with App Store Server API
-        // The purchaseDetails.verificationData contains the receipt data
-        debugPrint('🍎 iOS receipt validation data available');
+        platform = 'ios';
+        // iOS: Get receipt data from verification data
+        receipt = purchaseDetails.verificationData.serverVerificationData;
+        debugPrint('🍎 iOS receipt data length: ${receipt.length} chars');
+      } else {
+        debugPrint('❌ Unsupported platform');
+        return false;
       }
       
-      // TODO: Implement actual receipt validation with your backend
-      await Future.delayed(Duration(seconds: 1)); // Simulate network call
-      return true;
+      debugPrint('📡 Calling Firebase function: validatePurchaseReceipt');
+      
+      // Call Firebase function to validate receipt
+      final callable = FirebaseFunctions.instance.httpsCallable('validatePurchaseReceipt');
+      
+      final result = await callable.call({
+        'receipt': receipt,
+        'platform': platform,
+        'productId': purchaseDetails.productID,
+      });
+      
+      // Parse response from backend
+      final data = result.data as Map<String, dynamic>;
+      final isValid = data['valid'] == true;
+      
+      if (isValid) {
+        final subscriptionId = data['subscriptionId'] ?? 'unknown';
+        final expiresAt = data['expiresAt'] ?? 'unknown';
+        debugPrint('✅ Receipt validated successfully!');
+        debugPrint('📦 Subscription ID: $subscriptionId');
+        debugPrint('⏰ Expires at: $expiresAt');
+      } else {
+        final message = data['message'] ?? 'Validation failed';
+        debugPrint('❌ Receipt validation failed: $message');
+      }
+      
+      return isValid;
+      
     } catch (e) {
       debugPrint('❌ InAppPurchaseService: Receipt validation error: $e');
+      // Log error details for debugging
+      if (e is FirebaseFunctionsException) {
+        debugPrint('🔴 Firebase Functions Error: ${e.code} - ${e.message}');
+        debugPrint('🔴 Details: ${e.details}');
+      }
       return false;
     }
   }
