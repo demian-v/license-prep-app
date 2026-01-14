@@ -9,10 +9,10 @@ import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
 import 'package:in_app_purchase_storekit/store_kit_wrappers.dart';
 
 class InAppPurchaseService {
-  static const String monthlyProductId = 'monthly_subscription';
-  static const String yearlyProductId = 'yearly_subscription';
+  static const String monthlyProductId = 'monthly';
+  static const String yearlyProductId = 'yearly';
   
-  // Product IDs that match your Firebase subscriptionsType data
+  // Product IDs that match your Firebase subscriptionsType and App Store Connect
   static const List<String> productIds = [
     monthlyProductId,
     yearlyProductId,
