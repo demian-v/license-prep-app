@@ -16,6 +16,7 @@ import 'services/content_loading_manager.dart';
 import 'services/email_sync_service.dart';
 import 'services/analytics_service.dart';
 import 'services/session_manager.dart';
+import 'services/in_app_purchase_service.dart';
 
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
@@ -459,6 +460,15 @@ void main() async {
         ChangeNotifierProvider.value(value: practiceProvider),
         ChangeNotifierProvider.value(value: contentProvider),
         ChangeNotifierProvider.value(value: stateProvider),
+        // Add InAppPurchaseService provider
+        Provider<InAppPurchaseService>(
+          create: (_) {
+            final service = InAppPurchaseService();
+            service.initialize(); // Initialize on app start
+            return service;
+          },
+          dispose: (_, service) => service.dispose(),
+        ),
       ],
       child: MyApp(
         authProvider: authProvider,

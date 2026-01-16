@@ -6,6 +6,7 @@ import '../providers/subscription_provider.dart';
 import '../providers/auth_provider.dart';
 import '../localization/app_localizations.dart';
 import '../services/upgrade_calculator.dart';
+import '../services/in_app_purchase_service.dart';
 
 class EnhancedSubscriptionCard extends StatefulWidget {
   final SubscriptionType subscriptionType;
@@ -34,6 +35,7 @@ class EnhancedSubscriptionCard extends StatefulWidget {
 class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> with TickerProviderStateMixin {
   bool _isProcessing = false;
   String? _errorMessage;
+  InAppPurchaseService? _iapService;
 
   late AnimationController _cardAnimationController;
   late AnimationController _featuresAnimationController;
@@ -120,6 +122,77 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
 
     // Start animations with delays
     _startAnimations();
+    
+    // Setup In-App Purchase callbacks
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _iapService = Provider.of<InAppPurchaseService>(context, listen: false);
+      _setupPurchaseCallbacks();
+    });
+  }
+  
+  void _setupPurchaseCallbacks() {
+    if (_iapService == null) return;
+    
+    // Get auth provider to access user ID
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userId = authProvider.user?.id;
+    
+    _iapService!.setPurchaseCallbacks(
+      onSuccess: (productId) async {
+        debugPrint('✅ Purchase successful: $productId');
+        
+        if (!mounted) return;
+        
+        setState(() {
+          _isProcessing = false;
+        });
+        
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppLocalizations.of(context).translate('subscription_successful')),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        
+        // Refresh subscription data from Firebase
+        if (userId != null) {
+          await widget.subscriptionProvider.initialize(userId);
+        }
+        
+        // Navigate to home
+        Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+      },
+      onError: (error) {
+        debugPrint('❌ Purchase error: $error');
+        
+        if (!mounted) return;
+        
+        setState(() {
+          _isProcessing = false;
+          _errorMessage = error;
+        });
+      },
+      onCanceled: (productId) {
+        debugPrint('❌ Purchase canceled: $productId');
+        
+        if (!mounted) return;
+        
+        setState(() {
+          _isProcessing = false;
+        });
+        
+        // Optional: Show cancellation message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Purchase canceled'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      },
+    );
   }
 
   void _startAnimations() {
@@ -886,49 +959,45 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
 
   Widget _buildEnhancedSubscribeButton(bool isActiveTrial) {
     Future<void> handleSubscribe() async {
+      if (_iapService == null) {
+        debugPrint('❌ InAppPurchaseService not initialized');
+        setState(() {
+          _errorMessage = 'Purchase service not available. Please restart the app.';
+        });
+        return;
+      }
+      
       setState(() {
         _isProcessing = true;
         _errorMessage = null;
       });
       
       try {
+        // Use real product IDs that match App Store Connect
         String productId = widget.subscriptionType == SubscriptionType.yearly 
-            ? 'yearly_subscription' 
-            : 'monthly_subscription';
+            ? 'yearly'   // ✅ Real product ID
+            : 'monthly'; // ✅ Real product ID
         
-        final success = await widget.subscriptionProvider.mockPurchaseSubscription(
-          productId, 
-          widget.packageId
-        );
+        debugPrint('🛒 Initiating purchase for: $productId');
+        
+        // Call REAL purchase method (not mock!)
+        final success = await _iapService!.purchaseProduct(productId);
         
         if (!success && mounted) {
+          // Purchase initiation failed
           setState(() {
-            _errorMessage = widget.subscriptionProvider.errorMessage ?? 
-                AppLocalizations.of(context).translate('subscription_failed');
+            _isProcessing = false;
+            _errorMessage = 'Failed to initiate purchase. Please try again.';
           });
-        } else if (mounted) {
-          // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(AppLocalizations.of(context).translate('subscription_successful')),
-              backgroundColor: Colors.green,
-            ),
-          );
-          
-          // Go back to home screen
-          Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
         }
+        // Note: If success, the callbacks we setup will handle the rest
+        
       } catch (e) {
         debugPrint('❌ Subscription Button: Error: $e');
         if (mounted) {
           setState(() {
-            _errorMessage = AppLocalizations.of(context).translate('subscription_error');
-          });
-        }
-      } finally {
-        if (mounted) {
-          setState(() {
             _isProcessing = false;
+            _errorMessage = 'Purchase error. Please try again.';
           });
         }
       }
