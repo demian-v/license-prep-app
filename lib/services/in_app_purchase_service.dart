@@ -218,7 +218,7 @@ class InAppPurchaseService {
   void _handleSuccessfulPurchase(PurchaseDetails purchaseDetails) {
     _purchasePending = false;
     
-    // Validate receipt with backend (you should implement this)
+    // Validate receipt with backend
     _validateReceipt(purchaseDetails).then((isValid) {
       if (isValid) {
         debugPrint('✅ InAppPurchaseService: Receipt validated successfully');
@@ -228,9 +228,9 @@ class InAppPurchaseService {
         onPurchaseError?.call('Receipt validation failed');
       }
     }).catchError((error) {
+      // BUG FIX: Call error callback when validation throws an exception
       debugPrint('❌ InAppPurchaseService: Receipt validation error: $error');
-      // Still call success callback as the purchase was successful from the store
-      onPurchaseSuccess?.call(purchaseDetails.productID);
+      onPurchaseError?.call('Receipt validation error: ${error.toString()}');
     });
   }
 
@@ -272,6 +272,7 @@ class InAppPurchaseService {
       }
       
       debugPrint('📡 Calling Firebase function: validatePurchaseReceipt');
+      debugPrint('📤 Request payload: platform=$platform, productId=${purchaseDetails.productID}');
       
       // Call Firebase function to validate receipt
       final callable = FirebaseFunctions.instance.httpsCallable('validatePurchaseReceipt');
@@ -283,18 +284,30 @@ class InAppPurchaseService {
       });
       
       // Parse response from backend
+      debugPrint('📥 Firebase function response received');
+      debugPrint('📋 Response type: ${result.data.runtimeType}');
+      debugPrint('📋 Response data: ${result.data}');
+      
       final data = result.data as Map<String, dynamic>;
       final isValid = data['valid'] == true;
+      
+      debugPrint('🔍 Parsed valid field: $isValid');
       
       if (isValid) {
         final subscriptionId = data['subscriptionId'] ?? 'unknown';
         final expiresAt = data['expiresAt'] ?? 'unknown';
+        final productId = data['productId'] ?? 'unknown';
+        final platform = data['platform'] ?? 'unknown';
+        
         debugPrint('✅ Receipt validated successfully!');
         debugPrint('📦 Subscription ID: $subscriptionId');
         debugPrint('⏰ Expires at: $expiresAt');
+        debugPrint('📦 Product ID: $productId');
+        debugPrint('📱 Platform: $platform');
       } else {
         final message = data['message'] ?? 'Validation failed';
         debugPrint('❌ Receipt validation failed: $message');
+        debugPrint('📋 Full response: $data');
       }
       
       return isValid;
