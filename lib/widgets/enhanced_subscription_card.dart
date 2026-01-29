@@ -156,9 +156,20 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
           ),
         );
         
+        // FIXED: Add delay to ensure Firebase has processed the receipt validation
+        debugPrint('⏳ Waiting for Firebase to process subscription...');
+        await Future.delayed(Duration(milliseconds: 800));
+        
         // Refresh subscription data from Firebase
         if (userId != null) {
+          debugPrint('🔄 Refreshing subscription data from Firebase...');
           await widget.subscriptionProvider.initialize(userId);
+          
+          // FIXED: Force parent screen to rebuild with updated data
+          if (mounted) {
+            debugPrint('🔄 Forcing UI rebuild...');
+            setState(() {});
+          }
         }
         
         // Navigate to home
@@ -479,7 +490,9 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
               ],
               SizedBox(height: 8),
               // NEW: Enhanced trial countdown display
-              if (widget.subscription?.isTrial == true) ...[
+              // FIXED: Only show if user has trial AND not paid subscription
+              if (widget.subscription?.isTrial == true && 
+                  widget.subscription?.isPaidSubscription == false) ...[
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
@@ -653,8 +666,33 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
   }
 
   Widget _buildEnhancedActionArea(bool isPaidSubscription, bool isActiveTrial) {
-    // Determine if this card represents an upgrade opportunity
+    // NEW: Check if this card matches the user's current plan
+    final isCurrentPlan = _isCurrentUserPlan();
+    
+    // Check if this is an upgrade opportunity
     final isUpgradeOpportunity = _isUpgradeOpportunity();
+    
+    debugPrint('🎨 Building action area:');
+    debugPrint('   - isPaidSubscription: $isPaidSubscription');
+    debugPrint('   - isCurrentPlan: $isCurrentPlan');
+    debugPrint('   - isUpgradeOpportunity: $isUpgradeOpportunity');
+    
+    // FIXED LOGIC:
+    // 1. If this card matches user's plan → Show "Subscribed" + Cancel button
+    // 2. If this is yearly and user has monthly → Show "Upgrade" button  
+    // 3. Otherwise → Show "Subscribe" button
+    
+    Widget actionWidget;
+    if (isCurrentPlan) {
+      debugPrint('   - 📌 Showing: Subscription Status (Current Plan)');
+      actionWidget = _buildSubscriptionStatusIndicator();
+    } else if (isUpgradeOpportunity) {
+      debugPrint('   - ⬆️ Showing: Upgrade Button');
+      actionWidget = _buildUpgradeButton();
+    } else {
+      debugPrint('   - 🛒 Showing: Subscribe Button');
+      actionWidget = _buildEnhancedSubscribeButton(isActiveTrial);
+    }
     
     return AnimatedBuilder(
       animation: _buttonAnimationController,
@@ -663,11 +701,7 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
           offset: Offset(0, _buttonSlideAnimation.value),
           child: Opacity(
             opacity: _buttonFadeAnimation.value,
-            child: isPaidSubscription 
-              ? (isUpgradeOpportunity 
-                  ? _buildUpgradeButton() 
-                  : _buildSubscriptionStatusIndicator())
-              : _buildEnhancedSubscribeButton(isActiveTrial),
+            child: actionWidget,
           ),
         );
       },
@@ -692,6 +726,33 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
     
     debugPrint('   - Is upgrade opportunity: $isUpgrade');
     return isUpgrade;
+  }
+
+  /// NEW METHOD: Check if this card represents user's current plan
+  bool _isCurrentUserPlan() {
+    if (widget.subscription == null) return false;
+    
+    final userPlanType = widget.subscription!.planType;
+    final cardType = widget.subscriptionType;
+    
+    debugPrint('🎯 Checking if current plan:');
+    debugPrint('   - User plan: $userPlanType');
+    debugPrint('   - Card type: $cardType');
+    
+    // Monthly card + user has monthly = current plan
+    if (cardType == SubscriptionType.monthly && userPlanType == 'monthly') {
+      debugPrint('   - ✅ Monthly match - IS current plan');
+      return true;
+    }
+    
+    // Yearly card + user has yearly = current plan
+    if (cardType == SubscriptionType.yearly && userPlanType == 'yearly') {
+      debugPrint('   - ✅ Yearly match - IS current plan');
+      return true;
+    }
+    
+    debugPrint('   - ❌ No match - NOT current plan');
+    return false;
   }
 
   Widget _buildSubscriptionStatusIndicator() {

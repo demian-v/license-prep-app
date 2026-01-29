@@ -33,14 +33,14 @@ class UserSubscription {
     return UserSubscription(
       id: json['id']?.toString() ?? '',
       userId: json['userId'] ?? '',
-      packageId: json['packageId'] ?? 0,
+      packageId: _parseInt(json['packageId']) ?? 0,
       status: json['status'] ?? 'active',
       isActive: json['isActive'] ?? false,
       createdAt: _parseDateTime(json['createdAt']) ?? DateTime.now(),
       updatedAt: _parseDateTime(json['updatedAt']) ?? DateTime.now(),
       trialEndsAt: _parseDateTime(json['trialEndsAt']),
-      trialUsed: json['trialUsed'] ?? 0,
-      duration: json['duration'] ?? 0,
+      trialUsed: _parseInt(json['trialUsed']) ?? 0,
+      duration: _parseInt(json['duration']) ?? 0,
       nextBillingDate: _parseDateTime(json['nextBillingDate']),
       planType: json['planType'] ?? 'trial',
     );
@@ -52,6 +52,16 @@ class UserSubscription {
     if (value == null) return null;
     if (value is Timestamp) return value.toDate();
     if (value is String) return DateTime.parse(value);
+    return null;
+  }
+
+  /// Helper method to parse int from dynamic value (handles String, int, double)
+  /// Handles cases where Firestore returns strings instead of ints
+  static int? _parseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value);
     return null;
   }
 

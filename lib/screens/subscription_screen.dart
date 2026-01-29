@@ -34,7 +34,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
 
   @override
   Widget build(BuildContext context) {
-    final subscriptionProvider = Provider.of<SubscriptionProvider>(context);
+    // FIXED: Use listen: true to rebuild when subscription changes
+    final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: true);
     final subscription = subscriptionProvider.subscription;
 
     return Scaffold(
