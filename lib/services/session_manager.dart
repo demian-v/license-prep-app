@@ -17,6 +17,14 @@ import 'subscription_management_service.dart';
 /// SessionManager handles single-device session management
 /// Only one device can be logged in at a time per user account
 class SessionManager {
+  /// Feature flag to enable/disable session conflict detection
+  /// Set to FALSE to disable session monitoring (allows multiple device logins)
+  /// Set to TRUE to enable session monitoring (single device login only)
+  /// 
+  /// TEMPORARY DISABLE: Set to false for release to fix current issues
+  /// TODO: Re-enable after fixing session conflict logic
+  static const bool ENABLE_SESSION_CONFLICT_DETECTION = false;
+  
   static final SessionManager _instance = SessionManager._internal();
   factory SessionManager() => _instance;
   SessionManager._internal();

@@ -91,6 +91,13 @@ void handleGlobalSessionConflict(AuthProvider authProvider) {
 
 // Validate existing user sessions on app startup
 Future<void> validateExistingSession(AuthProvider authProvider) async {
+  // Check if session conflict detection is enabled
+  if (!SessionManager.ENABLE_SESSION_CONFLICT_DETECTION) {
+    debugPrint('🔕 Session Validation: DISABLED by feature flag');
+    debugPrint('ℹ️  Multiple device logins are currently ALLOWED');
+    return;
+  }
+  
   final user = authProvider.user;
   if (user == null) {
     debugPrint('🔍 Session Validation: No user logged in, skipping');
