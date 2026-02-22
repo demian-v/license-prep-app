@@ -220,6 +220,12 @@ class AppLifecycleObserver extends WidgetsBindingObserver {
   
   /// Validate session when app resumes from background
   void _validateSessionOnResume() async {
+    // ✅ CRITICAL FIX: Respect the feature flag - fixes phone unlock logout!
+    if (!SessionManager.ENABLE_SESSION_CONFLICT_DETECTION) {
+      debugPrint('⏭️ App Resume: Session validation DISABLED by flag');
+      return;
+    }
+    
     try {
       final user = _authProvider?.user;
       

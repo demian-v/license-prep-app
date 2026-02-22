@@ -52,3 +52,7 @@ android/key.properties
 
 # Firebase Functions - Google Cloud Service Account (KEEP SECRET!)
 functions/service-account.json
+
+# Firebase Functions - Build artifacts (iOS/Android/Xcode cache)
+functions/build/
+functions/lib/

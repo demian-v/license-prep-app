@@ -142,6 +142,12 @@ class SessionManager {
     try {
       debugPrint('👁️ SessionManager: Starting session monitoring for user: $userId');
       
+      // ✅ FIXED: Respect the feature flag
+      if (!ENABLE_SESSION_CONFLICT_DETECTION) {
+        debugPrint('⏭️ SessionManager: Session conflict detection DISABLED - skipping monitoring');
+        return;
+      }
+      
       // Stop any existing monitoring
       stopSessionMonitoring();
       
@@ -179,6 +185,12 @@ class SessionManager {
 
   /// Handle session document changes with enhanced conflict detection
   void _handleSessionSnapshot(DocumentSnapshot snapshot, String localSessionId, {String? userId}) async {
+    // ✅ FIXED: Respect the feature flag
+    if (!ENABLE_SESSION_CONFLICT_DETECTION) {
+      debugPrint('⏭️ SessionManager: Session conflict detection DISABLED - skipping snapshot validation');
+      return;
+    }
+    
     try {
       if (!snapshot.exists) {
         debugPrint('⚠️ SessionManager: Session document deleted - conflict detected');
@@ -255,6 +267,12 @@ class SessionManager {
 
   /// Trigger session conflict (logout) with enhanced logging and analytics
   void _triggerSessionConflict() {
+    // ✅ FIXED: Respect the feature flag - don't trigger if disabled
+    if (!ENABLE_SESSION_CONFLICT_DETECTION) {
+      debugPrint('⏭️ SessionManager: Session conflict detection DISABLED - ignoring trigger');
+      return;
+    }
+    
     debugPrint('🚨 SessionManager: Triggering session conflict logout');
     debugPrint('🔗 SessionManager: Callback exists: ${onSessionConflict != null}');
     
@@ -336,6 +354,12 @@ class SessionManager {
 
   /// Validate session after a delay (for error recovery)
   void _validateSessionAfterDelay(String userId, String localSessionId) {
+    // ✅ CRITICAL FIX: Respect the feature flag - skip delayed validation when disabled
+    if (!ENABLE_SESSION_CONFLICT_DETECTION) {
+      debugPrint('⏭️ SessionManager: Delayed validation DISABLED by flag');
+      return;
+    }
+    
     Timer(Duration(seconds: 5), () async {
       final isValid = await isSessionValid(userId);
       if (!isValid) {
@@ -347,6 +371,12 @@ class SessionManager {
 
   /// Check if current session is valid
   Future<bool> isSessionValid(String userId) async {
+    // ✅ CRITICAL FIX: Respect the feature flag - return true when disabled
+    if (!ENABLE_SESSION_CONFLICT_DETECTION) {
+      debugPrint('⏭️ SessionManager: Session validation DISABLED by flag - returning true');
+      return true;
+    }
+    
     try {
       final localSessionId = await currentSessionId;
       if (localSessionId == null) {
@@ -456,6 +486,12 @@ class SessionManager {
 
   /// Validate session after network reconnection
   Future<void> validateSessionAfterReconnection(String userId) async {
+    // ✅ CRITICAL FIX: Respect the feature flag - skip validation when disabled
+    if (!ENABLE_SESSION_CONFLICT_DETECTION) {
+      debugPrint('⏭️ SessionManager: Network reconnection validation DISABLED by flag');
+      return;
+    }
+    
     try {
       debugPrint('🌐 SessionManager: Validating session after network reconnection');
       
