@@ -464,6 +464,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
             'app_settings_reset_desc': 'Restablecer todas las configuraciones y preferencias',
             'Not selected': 'No seleccionado',
             'updating_state': 'Actualizando estado...',
+            'more_states_coming': 'Próximamente nuevos estados',
           }[key] ?? key;
         case 'uk':
           return {
@@ -493,6 +494,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
             'app_settings_reset_desc': 'Скинути всі налаштування та налаштування',
             'Not selected': 'Не вибрано',
             'updating_state': 'Оновлення штату...',
+            'more_states_coming': 'Незабаром з\'являться нові штати',
           }[key] ?? key;
         case 'ru':
           return {
@@ -522,6 +524,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
             'app_settings_reset_desc': 'Сбросить все настройки и предпочтения',
             'Not selected': 'Не выбрано',
             'updating_state': 'Обновление штата...',
+            'more_states_coming': 'Скоро появятся новые штаты',
           }[key] ?? key;
         case 'pl':
           return {
@@ -551,6 +554,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
             'app_settings_reset_desc': 'Zresetuj wszystkie ustawienia i preferencje',
             'Not selected': 'Nie wybrano',
             'updating_state': 'Aktualizacja stanu...',
+            'more_states_coming': 'Wkrótce nowe stany',
           }[key] ?? key;
         case 'en':
         default:
@@ -580,6 +584,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
             'app_settings_reset': 'App Settings Reset',
             'app_settings_reset_desc': 'Reset all app settings and preferences',
             'updating_state': 'Updating state...',
+            'more_states_coming': 'More states coming soon',
           }[key] ?? key;
       }
     } catch (e) {
@@ -1063,7 +1068,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     
     showDialog<Map<String, dynamic>>(
       context: context,
-      barrierDismissible: false, // Prevent dismissal during loading
+      barrierDismissible: true, // Allow dismissal by tapping outside
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) {
           bool _isDialogLoading = false;
@@ -1092,105 +1097,123 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                         ],
                       ),
                     )
-                  : ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: visibleStates.length,
-                      itemBuilder: (context, index) {
-                        final stateInfo = visibleStates[index];
-                        final state = stateInfo.name;
-                        final stateId = stateInfo.id;
-                        final isSelected = state == currentState || stateId == currentState;
-                        
-                        // Convert state name to title case for display
-                        final titleCaseState = state.split(' ').map((word) => 
-                          word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}' : ''
-                        ).join(' ');
-                        
-                        return ListTile(
-                          title: Text(titleCaseState),
-                          trailing: isSelected ? Icon(Icons.check, color: Colors.green) : null,
-                          enabled: !_isDialogLoading, // Disable during loading
-                          onTap: () async {
-                            // Set loading state
-                            setDialogState(() {
-                              _isDialogLoading = true;
-                            });
-                            
-                            try {
-                              // Calculate time spent
-                              final timeSpent = _stateDialogStartTime != null 
-                                  ? DateTime.now().difference(_stateDialogStartTime!).inSeconds 
-                                  : null;
+                  : Column(
+                      children: [
+                        Expanded(
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: visibleStates.length,
+                            itemBuilder: (context, index) {
+                              final stateInfo = visibleStates[index];
+                              final state = stateInfo.name;
+                              final stateId = stateInfo.id;
+                              final isSelected = state == currentState || stateId == currentState;
                               
-                              // Update state in auth provider (use state name)
-                              await authProvider.updateUserState(state);
+                              // Convert state name to title case for display
+                              final titleCaseState = state.split(' ').map((word) => 
+                                word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}' : ''
+                              ).join(' ');
                               
-                              // CRITICAL FIX: Also update StateProvider to sync with AuthProvider
-                              // This ensures TheoryScreen gets the updated state immediately
-                              final stateProvider = Provider.of<StateProvider>(context, listen: false);
-                              await stateProvider.setSelectedState(stateId);
-                              
-                              debugPrint('🔄 ProfileScreen: Updated both AuthProvider and StateProvider with state: $stateId');
-                              
-                              // Track successful state change
-                              analyticsService.logStateChanged(
-                                selectionContext: 'profile',
-                                previousState: _stateBeforeChange,
-                                previousStateName: _stateNameBeforeChange,
-                                newState: stateId,
-                                newStateName: titleCaseState,
-                                timeSpentSeconds: timeSpent,
+                              return ListTile(
+                                title: Text(titleCaseState),
+                                trailing: isSelected ? Icon(Icons.check, color: Colors.green) : null,
+                                enabled: !_isDialogLoading, // Disable during loading
+                                onTap: () async {
+                                  // Set loading state
+                                  setDialogState(() {
+                                    _isDialogLoading = true;
+                                  });
+                                  
+                                  try {
+                                    // Calculate time spent
+                                    final timeSpent = _stateDialogStartTime != null 
+                                        ? DateTime.now().difference(_stateDialogStartTime!).inSeconds 
+                                        : null;
+                                    
+                                    // Update state in auth provider (use state name)
+                                    await authProvider.updateUserState(state);
+                                    
+                                    // CRITICAL FIX: Also update StateProvider to sync with AuthProvider
+                                    // This ensures TheoryScreen gets the updated state immediately
+                                    final stateProvider = Provider.of<StateProvider>(context, listen: false);
+                                    await stateProvider.setSelectedState(stateId);
+                                    
+                                    debugPrint('🔄 ProfileScreen: Updated both AuthProvider and StateProvider with state: $stateId');
+                                    
+                                    // Track successful state change
+                                    analyticsService.logStateChanged(
+                                      selectionContext: 'profile',
+                                      previousState: _stateBeforeChange,
+                                      previousStateName: _stateNameBeforeChange,
+                                      newState: stateId,
+                                      newStateName: titleCaseState,
+                                      timeSpentSeconds: timeSpent,
+                                    );
+                                    debugPrint('📊 Analytics: state_changed logged (profile: ${_stateBeforeChange ?? "none"} → $stateId)');
+                                    
+                                    // Force immediate UI update
+                                    if (mounted) {
+                                      setState(() {
+                                        // This will trigger an immediate UI rebuild
+                                        _isLoadingState = false;
+                                      });
+                                    }
+                                    
+                                    // Close dialog with success result
+                                    Navigator.pop(dialogContext, {
+                                      'success': true,
+                                      'state': stateId,
+                                      'stateName': titleCaseState,
+                                      'previousState': _stateBeforeChange,
+                                    });
+                                    
+                                  } catch (e) {
+                                    // Enhanced error logging
+                                    final errorMessage = e.toString();
+                                    final truncatedError = errorMessage.length > 100 
+                                        ? errorMessage.substring(0, 97) + '...'
+                                        : errorMessage;
+                                    
+                                    analyticsService.logStateChangeFailed(
+                                      selectionContext: 'profile',
+                                      targetState: state,
+                                      targetStateName: titleCaseState,
+                                      errorType: _getErrorType(errorMessage),
+                                      errorMessage: truncatedError,
+                                    );
+                                    debugPrint('📊 Analytics: state_change_failed logged (profile: $state)');
+                                    debugPrint('🚨 Profile Screen: State change error: $errorMessage');
+                                    
+                                    // Reset loading state on error
+                                    setDialogState(() {
+                                      _isDialogLoading = false;
+                                    });
+                                    
+                                    // Close dialog with error result
+                                    Navigator.pop(dialogContext, {
+                                      'success': false,
+                                      'error': 'Error changing state. Please try again.',
+                                      'targetState': state,
+                                    });
+                                  }
+                                },
                               );
-                              debugPrint('📊 Analytics: state_changed logged (profile: ${_stateBeforeChange ?? "none"} → $stateId)');
-                              
-                              // Force immediate UI update
-                              if (mounted) {
-                                setState(() {
-                                  // This will trigger an immediate UI rebuild
-                                  _isLoadingState = false;
-                                });
-                              }
-                              
-                              // Close dialog with success result
-                              Navigator.pop(dialogContext, {
-                                'success': true,
-                                'state': stateId,
-                                'stateName': titleCaseState,
-                                'previousState': _stateBeforeChange,
-                              });
-                              
-                            } catch (e) {
-                              // Enhanced error logging
-                              final errorMessage = e.toString();
-                              final truncatedError = errorMessage.length > 100 
-                                  ? errorMessage.substring(0, 97) + '...'
-                                  : errorMessage;
-                              
-                              analyticsService.logStateChangeFailed(
-                                selectionContext: 'profile',
-                                targetState: state,
-                                targetStateName: titleCaseState,
-                                errorType: _getErrorType(errorMessage),
-                                errorMessage: truncatedError,
-                              );
-                              debugPrint('📊 Analytics: state_change_failed logged (profile: $state)');
-                              debugPrint('🚨 Profile Screen: State change error: $errorMessage');
-                              
-                              // Reset loading state on error
-                              setDialogState(() {
-                                _isDialogLoading = false;
-                              });
-                              
-                              // Close dialog with error result
-                              Navigator.pop(dialogContext, {
-                                'success': false,
-                                'error': 'Error changing state. Please try again.',
-                                'targetState': state,
-                              });
-                            }
-                          },
-                        );
-                      },
+                            },
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16.0),
+                          child: Text(
+                            _translate('more_states_coming', languageProvider),
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
                     ),
             ),
           );

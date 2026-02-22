@@ -123,6 +123,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> with Ticker
             'tap_to_select': 'Toque para seleccionar',
             'selected_state': 'Estado seleccionado',
             'continue': 'Continuar',
+            'more_states_coming': 'Próximamente nuevos estados',
           }[key] ?? key;
         case 'uk':
           return {
@@ -134,6 +135,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> with Ticker
             'tap_to_select': 'Натисніть, щоб вибрати',
             'selected_state': 'Вибраний штат',
             'continue': 'Продовжити',
+            'more_states_coming': 'Незабаром з\'являться нові штати',
           }[key] ?? key;
         case 'ru':
           return {
@@ -145,6 +147,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> with Ticker
             'tap_to_select': 'Нажмите для выбора',
             'selected_state': 'Выбранный штат',
             'continue': 'Продолжить',
+            'more_states_coming': 'Скоро появятся новые штаты',
           }[key] ?? key;
         case 'pl':
           return {
@@ -156,6 +159,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> with Ticker
             'tap_to_select': 'Dotknij, aby wybrać',
             'selected_state': 'Wybrany stan',
             'continue': 'Kontynuuj',
+            'more_states_coming': 'Wkrótce nowe stany',
           }[key] ?? key;
         case 'en':
         default:
@@ -168,6 +172,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> with Ticker
             'tap_to_select': 'Tap to select',
             'selected_state': 'Selected state',
             'continue': 'Continue',
+            'more_states_coming': 'More states coming soon',
           }[key] ?? key;
       }
     } catch (e) {
@@ -321,28 +326,46 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> with Ticker
                       ],
                     ),
                   )
-                : ListView.builder(
-                    itemCount: _filteredStates.length,
-                    padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                    itemBuilder: (context, index) {
-                      final state = _filteredStates[index];
-                      final isSelected = state == _selectedState;
-                      final subtitleText = isSelected 
-                          ? _translate('selected', Provider.of<LanguageProvider>(context, listen: false)) 
-                          : _translate('tap_to_select', Provider.of<LanguageProvider>(context, listen: false));
-                      
-                      // Use the new enhanced state card
-                      return EnhancedStateCard(
-                        stateName: state,
-                        isSelected: isSelected,
-                        subtitleText: subtitleText,
-                        onTap: () {
-                          setState(() {
-                            _selectedState = state;
-                          });
-                        },
-                      );
-                    },
+                : Column(
+                    children: [
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: _filteredStates.length,
+                          padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                          itemBuilder: (context, index) {
+                            final state = _filteredStates[index];
+                            final isSelected = state == _selectedState;
+                            final subtitleText = isSelected 
+                                ? _translate('selected', Provider.of<LanguageProvider>(context, listen: false)) 
+                                : _translate('tap_to_select', Provider.of<LanguageProvider>(context, listen: false));
+                            
+                            // Use the new enhanced state card
+                            return EnhancedStateCard(
+                              stateName: state,
+                              isSelected: isSelected,
+                              subtitleText: subtitleText,
+                              onTap: () {
+                                setState(() {
+                                  _selectedState = state;
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
+                        child: Text(
+                          _translate('more_states_coming', Provider.of<LanguageProvider>(context, listen: false)),
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
                   ),
           ),
         ],
