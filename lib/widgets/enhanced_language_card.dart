@@ -3,13 +3,15 @@ import 'package:flutter/material.dart';
 class EnhancedLanguageCard extends StatefulWidget {
   final String language;
   final String languageCode;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final bool isEnabled;
   
   const EnhancedLanguageCard({
     Key? key,
     required this.language,
     required this.languageCode,
-    required this.onTap,
+    this.onTap,
+    this.isEnabled = true,
   }) : super(key: key);
 
   @override
@@ -139,20 +141,22 @@ class _EnhancedLanguageCardState extends State<EnhancedLanguageCard> with Single
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => _controller.forward(),
-      onTapUp: (_) => _controller.reverse(),
-      onTapCancel: () => _controller.reverse(),
-      child: ScaleTransition(
-        scale: _scaleAnimation,
-        child: Card(
-          elevation: 3,
-          shadowColor: Colors.black.withOpacity(0.3),
-          margin: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Container(
+    return Opacity(
+      opacity: widget.isEnabled ? 1.0 : 0.5,
+      child: GestureDetector(
+        onTapDown: (_) => widget.isEnabled ? _controller.forward() : null,
+        onTapUp: (_) => widget.isEnabled ? _controller.reverse() : null,
+        onTapCancel: () => widget.isEnabled ? _controller.reverse() : null,
+        child: ScaleTransition(
+          scale: _scaleAnimation,
+          child: Card(
+            elevation: 3,
+            shadowColor: Colors.black.withOpacity(0.3),
+            margin: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               gradient: _getGradientForLanguage(widget.languageCode),
@@ -263,6 +267,7 @@ class _EnhancedLanguageCardState extends State<EnhancedLanguageCard> with Single
           ),
         ),
       ),
+    ),
     );
   }
 }

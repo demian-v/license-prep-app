@@ -18,6 +18,10 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
   DateTime? _selectionStartTime;
   String? _initialLanguage;
   
+  // Loading state variables
+  bool _isLoading = false;
+  String? _selectedLanguageName;
+  
   @override
   void initState() {
     super.initState();
@@ -107,28 +111,34 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
         automaticallyImplyLeading: false, // Prevent automatic back button
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildSectionHeader('Select your language'), // This remains hardcoded in English as specified
-                SizedBox(height: 8),
-                Consumer<LanguageProvider>(
-                  builder: (context, languageProvider, _) => Column(
-                    children: [
-                      _buildLanguageButton(context, 'English', 'en'),
-                      _buildLanguageButton(context, 'Spanish', 'es'),
-                      _buildLanguageButton(context, 'Ukrainian', 'uk'),
-                      _buildLanguageButton(context, 'Polish', 'pl'),
-                      _buildLanguageButton(context, 'Russian', 'ru'),
-                    ],
-                  ),
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionHeader('Select your language'), // This remains hardcoded in English as specified
+                    SizedBox(height: 8),
+                    Consumer<LanguageProvider>(
+                      builder: (context, languageProvider, _) => Column(
+                        children: [
+                          _buildLanguageButton(context, 'English', 'en'),
+                          _buildLanguageButton(context, 'Spanish', 'es'),
+                          _buildLanguageButton(context, 'Ukrainian', 'uk'),
+                          _buildLanguageButton(context, 'Polish', 'pl'),
+                          _buildLanguageButton(context, 'Russian', 'ru'),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
+            // Loading overlay
+            if (_isLoading) _buildLoadingOverlay(),
+          ],
         ),
       ),
     );
@@ -162,6 +172,59 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
     );
   }
 
+  Widget _buildLoadingOverlay() {
+    return Container(
+      color: Colors.black.withOpacity(0.5),
+      child: Center(
+        child: Container(
+          padding: EdgeInsets.all(24),
+          margin: EdgeInsets.symmetric(horizontal: 40),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 10,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.indigo.shade400),
+                strokeWidth: 4,
+              ),
+              SizedBox(height: 20),
+              Text(
+                _selectedLanguageName != null
+                    ? 'Setting up $_selectedLanguageName...'
+                    : 'Please wait...',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 8),
+              Text(
+                'This may take a few seconds',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   String _getErrorType(String errorMessage) {
     if (errorMessage.contains('provider')) {
       return 'provider_error';
@@ -187,16 +250,16 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
     return EnhancedLanguageCard(
       language: language,
       languageCode: code,
-      onTap: () async {
+      isEnabled: !_isLoading,
+      onTap: _isLoading ? null : () async {
+        // Set loading state
+        setState(() {
+          _isLoading = true;
+          _selectedLanguageName = language;
+        });
+        
         // Visual feedback
         ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Setting UI language to $language...'), // Updated message
-            duration: Duration(seconds: 2),
-            backgroundColor: languageColors[code],
-          ),
-        );
         
         try {
           // Get current language before change
