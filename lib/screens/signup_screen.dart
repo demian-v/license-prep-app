@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/auth_provider.dart';
 import '../services/analytics_service.dart';
 import 'language_selection_screen.dart';
@@ -16,6 +18,8 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   String? _errorMessage;
+  bool _agreedToTerms = false;
+  bool _termsError = false;
   
   // Animation controller for card press effect
   late AnimationController _animationController;
@@ -130,6 +134,30 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
     }
   }
 
+  /// Launch Terms of Service URL
+  Future<void> _launchTermsOfService() async {
+    final Uri url = Uri.parse('https://sites.google.com/view/driveusa/home');
+    try {
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        debugPrint('Could not launch $url');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not open Terms of Service')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error launching URL: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error opening link')),
+        );
+      }
+    }
+  }
+
   /// Parse technical error messages into user-friendly messages
   String _parseErrorMessage(String errorMessage) {
     final errorLower = errorMessage.toLowerCase();
@@ -162,6 +190,16 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
       // Track validation errors
       _hasFormErrors = true;
       _formErrors = 'validation_failed';
+      return;
+    }
+    
+    // Check if user agreed to terms
+    if (!_agreedToTerms) {
+      setState(() {
+        _termsError = true;
+      });
+      _hasFormErrors = true;
+      _formErrors = 'terms_not_agreed';
       return;
     }
     
@@ -493,24 +531,76 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
                                 Container(
                                   padding: EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: Colors.blue.shade50,
+                                    color: _termsError ? Colors.red.shade50 : Colors.blue.shade50,
                                     borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: Colors.blue.shade100),
+                                    border: Border.all(
+                                      color: _termsError ? Colors.red.shade300 : Colors.blue.shade100,
+                                      width: _termsError ? 2 : 1,
+                                    ),
                                   ),
-                                  child: Row(
+                                  child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
-                                      SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          'By signing up, you agree to our Terms of Service and start your 3-day free trial. After the trial ends, you\'ll lose access to premium features. You can subscribe for \$9.99/month or \$79.99/year.',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.blue.shade800,
+                                      Row(
+                                        crossAxisAlignment: CrossAxisAlignment.center,
+                                        children: [
+                                          Checkbox(
+                                            value: _agreedToTerms,
+                                            onChanged: (value) {
+                                              setState(() {
+                                                _agreedToTerms = value ?? false;
+                                                if (_agreedToTerms) {
+                                                  _termsError = false;
+                                                }
+                                              });
+                                            },
+                                            activeColor: Colors.indigo.shade400,
+                                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                            visualDensity: VisualDensity.compact,
+                                          ),
+                                          Expanded(
+                                            child: RichText(
+                                              text: TextSpan(
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: _termsError ? Colors.red.shade800 : Colors.blue.shade800,
+                                                ),
+                                                children: [
+                                                  TextSpan(text: 'By signing up, you agree to our '),
+                                                  TextSpan(
+                                                    text: 'Terms of Service',
+                                                    style: TextStyle(
+                                                      color: _termsError ? Colors.red.shade800 : Colors.blue.shade700,
+                                                      decoration: TextDecoration.underline,
+                                                      fontWeight: FontWeight.w500,
+                                                    ),
+                                                    recognizer: TapGestureRecognizer()
+                                                      ..onTap = () {
+                                                        _launchTermsOfService();
+                                                      },
+                                                  ),
+                                                  TextSpan(
+                                                    text: ' and start your 3-day free trial. After the trial ends, you\'ll lose access to premium features. You can subscribe for \$9.99/month or \$79.99/year.',
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      if (_termsError) ...[
+                                        Padding(
+                                          padding: const EdgeInsets.only(left: 12.0, top: 4.0),
+                                          child: Text(
+                                            'Please agree to Terms of Service to continue',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.red.shade800,
+                                              fontWeight: FontWeight.w500,
+                                            ),
                                           ),
                                         ),
-                                      ),
+                                      ],
                                     ],
                                   ),
                                 ),

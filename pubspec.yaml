@@ -33,6 +33,7 @@ dependencies:
   in_app_purchase: ^3.1.11
   in_app_purchase_android: ^0.3.0+11
   in_app_purchase_storekit: ^0.3.6+7
+  url_launcher: ^6.2.1
 
 # Removing overrides as they may be causing conflicts
 
