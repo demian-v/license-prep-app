@@ -5,6 +5,10 @@ function getDb() {
   return admin.firestore();
 }
 
+// Maximum consecutive missed billing cycles before a subscription is deactivated.
+// Each scheduler run represents one 6-hour window, so 3 attempts ≈ 18 hours grace.
+const MAX_RENEWAL_ATTEMPTS = 3;
+
 // Interface definitions
 interface SubscriptionData {
   id: string;
@@ -15,6 +19,7 @@ interface SubscriptionData {
   nextBillingDate: admin.firestore.Timestamp;
   planType: string; // 'monthly' | 'yearly'
   packageId: number;
+  renewalAttempts?: number; // tracks consecutive missed billing cycles
 }
 
 interface RenewalResult {
@@ -23,12 +28,6 @@ interface RenewalResult {
   failedRenewals: number;
   emailsSent: number;
   errors: string[];
-}
-
-interface MockPaymentResult {
-  success: boolean;
-  failureReason?: string;
-  transactionId: string;
 }
 
 interface UserData {
@@ -75,72 +74,79 @@ export async function processActiveSubscriptionRenewals(): Promise<RenewalResult
 }
 
 /**
- * Check and process subscriptions due for renewal
+ * Check and process subscriptions that are overdue (past their nextBillingDate).
+ *
+ * IMPORTANT: For iOS/Android, the App Store / Google Play handles the actual
+ * payment and renewal. This scheduler's job is purely to track Firestore state:
+ *
+ *   1. First occurrence: mark subscription `past_due`, increment renewalAttempts.
+ *   2. After MAX_RENEWAL_ATTEMPTS consecutive missed cycles: deactivate the
+ *      subscription (isActive=false, status='inactive') and notify the user.
+ *   3. When Apple/Google delivers a real renewal receipt to the Flutter app, the
+ *      receipt-validation function resets status→'active' and renewalAttempts→0.
+ *
+ * Querying both 'active' and 'past_due' statuses because after the first run
+ * overdue subscriptions become 'past_due' and would be missed by a single query.
  */
 async function checkSubscriptionRenewals(): Promise<{
-  processed: number, 
-  successful: number, 
-  failed: number, 
-  emailsSent: number, 
-  errors: string[]
+  processed: number;
+  successful: number;
+  failed: number;
+  emailsSent: number;
+  errors: string[];
 }> {
   console.log('🔄 Checking subscriptions due for renewal...');
-  const result: {
-    processed: number;
-    successful: number;
-    failed: number;
-    emailsSent: number;
-    errors: string[];
-  } = { processed: 0, successful: 0, failed: 0, emailsSent: 0, errors: [] };
+  const result = { processed: 0, successful: 0, failed: 0, emailsSent: 0, errors: [] as string[] };
 
   try {
     const now = admin.firestore.Timestamp.now();
-    
-    // Query subscriptions due for renewal
     const db = getDb();
-    const subscriptionsDueQuery = await db.collection('subscriptions')
-      .where('nextBillingDate', '<=', now)
-      .where('status', '==', 'active')
-      .where('isActive', '==', true)
-      .where('trialUsed', '==', 1) // Past trial period
-      .limit(100) // Process in batches
-      .get();
 
-    console.log(`Found ${subscriptionsDueQuery.docs.length} subscriptions due for renewal`);
+    // Run two queries (Firestore does not support OR on different field values
+    // without a composite index; two separate queries are simpler and reliable).
+    const [activeQuery, pastDueQuery] = await Promise.all([
+      db.collection('subscriptions')
+        .where('nextBillingDate', '<=', now)
+        .where('status', '==', 'active')
+        .where('isActive', '==', true)
+        .where('trialUsed', '==', 1)
+        .limit(100)
+        .get(),
+      db.collection('subscriptions')
+        .where('nextBillingDate', '<=', now)
+        .where('status', '==', 'past_due')
+        .where('isActive', '==', true)
+        .where('trialUsed', '==', 1)
+        .limit(100)
+        .get(),
+    ]);
 
-    // Process each subscription
-    for (const doc of subscriptionsDueQuery.docs) {
+    // Merge and de-duplicate (shouldn't overlap, but be safe)
+    const seen = new Set<string>();
+    const allDocs = [...activeQuery.docs, ...pastDueQuery.docs].filter(doc => {
+      if (seen.has(doc.id)) return false;
+      seen.add(doc.id);
+      return true;
+    });
+
+    console.log(`Found ${allDocs.length} overdue subscription(s) to process`);
+
+    for (const doc of allDocs) {
       try {
         const subscriptionData = { id: doc.id, ...doc.data() } as SubscriptionData;
-        
-        // Attempt renewal
-        const renewalSuccess = await renewSubscription(subscriptionData);
-        
-        if (renewalSuccess) {
-          result.successful++;
-          
-          // Send success notification
-          const emailSent = await sendRenewalSuccessNotification(subscriptionData.userId);
-          if (emailSent) result.emailsSent++;
-          
-          // Log successful renewal
-          await logRenewalActivity(subscriptionData, 'subscription_renewed' as const, true);
-        } else {
+        const { deactivated, emailSent } = await processOverdueSubscription(subscriptionData);
+
+        if (deactivated) {
           result.failed++;
-          
-          // Send failure notification
-          const emailSent = await sendRenewalFailureNotification(subscriptionData.userId);
-          if (emailSent) result.emailsSent++;
-          
-          // Log failed renewal
-          await logRenewalActivity(subscriptionData, 'subscription_renewal_failed' as const, false);
+        } else {
+          result.successful++;
         }
-        
+        if (emailSent) result.emailsSent++;
         result.processed++;
-        console.log(`✅ Processed renewal for user: ${subscriptionData.userId}, success: ${renewalSuccess}`);
-        
+
+        console.log(`✅ Processed overdue subscription for user: ${subscriptionData.userId}, deactivated: ${deactivated}`);
       } catch (error) {
-        const errorMsg = `Error processing renewal ${doc.id}: ${error instanceof Error ? error.message : String(error)}`;
+        const errorMsg = `Error processing overdue subscription ${doc.id}: ${error instanceof Error ? error.message : String(error)}`;
         console.error(`❌ ${errorMsg}`);
         result.errors.push(errorMsg);
       }
@@ -156,148 +162,84 @@ async function checkSubscriptionRenewals(): Promise<{
 }
 
 /**
- * Process individual subscription renewal
+ * Process a single overdue subscription.
+ *
+ * - Increments renewalAttempts and marks status 'past_due'.
+ * - After MAX_RENEWAL_ATTEMPTS it deactivates the subscription entirely.
+ *
+ * Real payment/renewal is done by Apple/Google — we only track Firestore state.
+ * The receipt-validation function resets attempts when a real receipt arrives.
  */
-async function renewSubscription(subscriptionData: SubscriptionData): Promise<boolean> {
-  try {
-    console.log(`💳 Processing renewal for subscription: ${subscriptionData.id}`);
-    
-    // 1. Mock payment processing
-    const paymentResult = await mockRenewalPayment(subscriptionData);
-    
-  if (paymentResult.success) {
-      // 2. Calculate new billing date
-      const currentBillingDate = subscriptionData.nextBillingDate.toDate();
-      const newBillingDate = calculateNextBillingDate(currentBillingDate, subscriptionData.planType);
-      const newBillingTimestamp = admin.firestore.Timestamp.fromDate(newBillingDate);
-      
-      // 3. Update both subscription and user collections using batch
-      const db = getDb();
-      const batch = db.batch();
-      
-      // Update subscription document
-      const subscriptionRef = db.collection('subscriptions').doc(subscriptionData.id);
-      batch.update(subscriptionRef, {
-        nextBillingDate: newBillingTimestamp,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-      
-      // Update user document with same nextBillingDate
-      const userRef = db.collection('users').doc(subscriptionData.userId);
-      batch.update(userRef, {
-        nextBillingDate: newBillingTimestamp,
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp()
-      });
-      
-      // Commit both updates atomically
-      await batch.commit();
-      
-      console.log(`✅ Subscription ${subscriptionData.id} renewed successfully. Next billing: ${newBillingDate.toISOString()}`);
-      console.log(`✅ User ${subscriptionData.userId} nextBillingDate updated to: ${newBillingDate.toISOString()}`);
-      return true;
-    } else {
-      console.log(`❌ Payment failed for subscription ${subscriptionData.id}: ${paymentResult.failureReason}`);
-      return false;
-    }
-    
-  } catch (error) {
-    console.error(`❌ Error renewing subscription ${subscriptionData.id}:`, error);
-    return false;
+async function processOverdueSubscription(
+  subscriptionData: SubscriptionData
+): Promise<{ deactivated: boolean; emailSent: boolean }> {
+  const db = getDb();
+  const attempts = (subscriptionData.renewalAttempts ?? 0);
+  const newAttempts = attempts + 1;
+
+  if (newAttempts > MAX_RENEWAL_ATTEMPTS) {
+    // ── Deactivate ──────────────────────────────────────────────────────────
+    console.log(`❌ Subscription ${subscriptionData.id} exceeded ${MAX_RENEWAL_ATTEMPTS} grace periods → deactivating`);
+
+    const batch = db.batch();
+    batch.update(db.collection('subscriptions').doc(subscriptionData.id), {
+      isActive: false,
+      status: 'inactive',
+      renewalAttempts: 0, // reset so it can be reactivated cleanly if user re-subscribes
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    // RM-MOD-1 FIX: Use batch.set(..., {merge:true}) instead of batch.update().
+    // batch.update() throws NOT_FOUND if the user document doesn't exist (e.g.
+    // user deleted their profile but their subscription survived 3 grace cycles).
+    // That would cause the entire batch to fail silently, leaving the subscription
+    // isActive=true even after grace period exhaustion — permanent free access.
+    // set/merge creates the doc if missing and merges if present — always safe.
+    // This mirrors the exact same fix applied in subscription-manager.ts for
+    // updateExpiredTrial and updateExpiredCanceledSubscription (SM-MOD-1).
+    batch.set(
+      db.collection('users').doc(subscriptionData.userId),
+      { isActive: false, lastUpdated: admin.firestore.FieldValue.serverTimestamp() },
+      { merge: true }
+    );
+    await batch.commit();
+
+    const emailSent = await sendRenewalFailureNotification(subscriptionData.userId);
+    await logRenewalActivity(subscriptionData, 'subscription_deactivated', false, emailSent);
+
+    return { deactivated: true, emailSent };
   }
+
+  // ── Mark past_due, increment counter ──────────────────────────────────────
+  console.log(`⚠️ Subscription ${subscriptionData.id} is overdue (attempt ${newAttempts}/${MAX_RENEWAL_ATTEMPTS}) → marking past_due`);
+
+  await db.collection('subscriptions').doc(subscriptionData.id).update({
+    status: 'past_due',
+    renewalAttempts: newAttempts,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  // BUG RM-1 FIX: Only email the user on the FIRST missed billing cycle
+  // (when attempts transitions from 0 → 1, i.e. status changes from 'active'
+  // to 'past_due').  On every subsequent scheduler run the subscription is
+  // already 'past_due' — re-sending the same email every 6 hours is spammy
+  // and hurts deliverability.  The user receives a second (final) notification
+  // when the subscription is deactivated after MAX_RENEWAL_ATTEMPTS.
+  const isFirstMiss = attempts === 0;
+  const emailSent = isFirstMiss
+    ? await sendRenewalFailureNotification(subscriptionData.userId)
+    : false;
+
+  if (!isFirstMiss) {
+    console.log(`📭 Skipping email for attempt ${newAttempts}/${MAX_RENEWAL_ATTEMPTS} (already notified on first miss)`);
+  }
+
+  await logRenewalActivity(subscriptionData, 'subscription_past_due', false, emailSent);
+
+  return { deactivated: false, emailSent };
 }
 
 /**
- * Mock payment processing function
- * Simulates different payment outcomes for testing
- */
-async function mockRenewalPayment(subscriptionData: SubscriptionData): Promise<MockPaymentResult> {
-  console.log(`🎭 Mock payment processing for subscription: ${subscriptionData.id}`);
-  
-  // Simulate processing delay
-  await new Promise(resolve => setTimeout(resolve, 100));
-  
-  // Generate predictable results based on subscription ID
-  const lastDigit = parseInt(subscriptionData.id.slice(-1), 16) % 10;
-  
-  if (lastDigit <= 7) { // 80% success rate
-    return {
-      success: true,
-      transactionId: `mock_renewal_${Date.now()}_${subscriptionData.id.slice(-4)}`
-    };
-  } else if (lastDigit === 8) { // 10% payment failure
-    return {
-      success: false,
-      failureReason: 'insufficient_funds',
-      transactionId: `failed_${Date.now()}_${subscriptionData.id.slice(-4)}`
-    };
-  } else { // 10% network error
-    return {
-      success: false,
-      failureReason: 'network_error',
-      transactionId: `error_${Date.now()}_${subscriptionData.id.slice(-4)}`
-    };
-  }
-}
-
-/**
- * Calculate next billing date based on plan type
- */
-function calculateNextBillingDate(currentDate: Date, planType: string): Date {
-  const newDate = new Date(currentDate);
-  
-  if (planType === 'monthly') {
-    // Add 1 month
-    newDate.setMonth(newDate.getMonth() + 1);
-    
-    // Handle edge cases (e.g., Jan 31 -> Feb 28/29)
-    if (newDate.getDate() !== currentDate.getDate()) {
-      // If day changed due to month having fewer days, set to last day of month
-      newDate.setDate(0);
-    }
-  } else if (planType === 'yearly') {
-    // Add 1 year
-    newDate.setFullYear(newDate.getFullYear() + 1);
-    
-    // Handle leap year edge case (Feb 29 -> Feb 28)
-    if (newDate.getDate() !== currentDate.getDate()) {
-      newDate.setDate(0);
-    }
-  } else {
-    console.warn(`Unknown plan type: ${planType}, defaulting to monthly`);
-    newDate.setMonth(newDate.getMonth() + 1);
-  }
-  
-  return newDate;
-}
-
-/**
- * Send renewal success notification email
- */
-async function sendRenewalSuccessNotification(userId: string): Promise<boolean> {
-  try {
-    console.log(`📧 Sending renewal success notification to user: ${userId}`);
-    
-    const userData = await getUserData(userId);
-    if (!userData) {
-      console.warn(`⚠️ User data not found for ${userId}, skipping email`);
-      return false;
-    }
-
-    // Mock email sending - replace with actual implementation
-    console.log(`📨 MOCK EMAIL: Renewal success notification sent to ${userData.email}`);
-    console.log(`   Subject: Your subscription has been renewed`);
-    console.log(`   Language: ${userData.language}`);
-    console.log(`   Template: RENEWAL_SUCCESS_TEMPLATES.${userData.language}`);
-    
-    return true;
-  } catch (error) {
-    console.error(`❌ Error sending renewal success email to ${userId}:`, error);
-    return false;
-  }
-}
-
-/**
- * Send renewal failure notification email
+ * Send renewal failure / past-due notification email
  */
 async function sendRenewalFailureNotification(userId: string): Promise<boolean> {
   try {
@@ -352,111 +294,137 @@ async function getUserData(userId: string): Promise<UserData | null> {
   }
 }
 
-// Define the action type explicitly
-type RenewalAction = 'subscription_renewed' | 'subscription_renewal_failed';
+// All possible renewal-lifecycle actions written to the audit log.
+type RenewalAction =
+  | 'subscription_past_due'      // overdue; within grace period
+  | 'subscription_deactivated'   // grace period exhausted; access revoked
+  | 'subscription_renewed';      // kept for backward-compat with existing logs
 
 /**
- * Log renewal activity for audit trail
+ * Log renewal activity for audit trail.
+ * BUG F FIX: emailSent is now passed in from the caller instead of being
+ * hardcoded to `true`, so the log accurately reflects what happened.
  */
 async function logRenewalActivity(
   subscriptionData: SubscriptionData,
   action: RenewalAction,
-  success: boolean
+  success: boolean,
+  emailSent: boolean  // FIX: actual result, not hardcoded true
 ): Promise<void> {
   try {
-    const currentBillingDate = subscriptionData.nextBillingDate.toDate();
-    const newBillingDate = success ? calculateNextBillingDate(currentBillingDate, subscriptionData.planType) : currentBillingDate;
-    
+    const isDeactivated = action === 'subscription_deactivated';
+
     const logEntry = {
       userId: subscriptionData.userId,
       subscriptionId: subscriptionData.id,
-      action: action,
+      action,
       oldStatus: {
         nextBillingDate: subscriptionData.nextBillingDate,
         status: subscriptionData.status,
-        isActive: subscriptionData.isActive
+        isActive: subscriptionData.isActive,
+        renewalAttempts: subscriptionData.renewalAttempts ?? 0,
       },
       newStatus: {
-        nextBillingDate: admin.firestore.Timestamp.fromDate(newBillingDate),
-        status: 'active', // Status remains active regardless of renewal outcome
-        isActive: true
+        status: isDeactivated ? 'inactive' : 'past_due',
+        isActive: !isDeactivated,
       },
       renewalDetails: {
         planType: subscriptionData.planType,
         packageId: subscriptionData.packageId,
-        renewalSuccess: success
+        renewalSuccess: success,
       },
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
       processedBy: 'renewal_function',
-      emailSent: true // Will be updated based on actual email result
+      emailSent,  // FIX: actual value, not hardcoded true
     };
 
     const db = getDb();
     await db.collection('subscriptionLogs').add(logEntry);
     console.log(`📊 Logged renewal activity: ${action} for ${subscriptionData.userId}`);
-    
   } catch (error) {
-    console.error(`❌ Error logging renewal activity:`, error);
-    // Don't throw error - logging failure shouldn't stop processing
+    console.error('❌ Error logging renewal activity:', error);
+    // Don't throw — logging failure must not stop subscription processing
   }
 }
 
 /**
- * Get statistics about subscription renewals for monitoring
+ * Get statistics about subscription renewals for monitoring.
+ * BUG RM-2 FIX: Added `pastDueCount` — subscriptions already in the grace
+ * period (status='past_due') were previously invisible to the dashboard,
+ * making it look like there were 0 overdue subscriptions when there could be
+ * dozens waiting to be deactivated.
  */
 export async function getRenewalStatistics(): Promise<{
-  subscriptionsDueToday: number;
-  subscriptionsDueTomorrow: number;
+  subscriptionsDueToday: number;    // active subscriptions that just became overdue
+  subscriptionsDueTomorrow: number; // active subscriptions overdue within 24 h
   monthlySubscriptionsDue: number;
   yearlySubscriptionsDue: number;
+  pastDueCount: number;             // FIX: subscriptions already in grace period
 }> {
   const now = new Date();
   const today = admin.firestore.Timestamp.fromDate(now);
   const tomorrow = admin.firestore.Timestamp.fromDate(new Date(now.getTime() + 24 * 60 * 60 * 1000));
-  
+
   try {
     const db = getDb();
-    
-    // Count subscriptions due today
-    const subscriptionsToday = await db.collection('subscriptions')
-      .where('nextBillingDate', '<=', today)
-      .where('status', '==', 'active')
-      .where('isActive', '==', true)
-      .where('trialUsed', '==', 1)
-      .get();
 
-    // Count subscriptions due tomorrow
-    const subscriptionsTomorrow = await db.collection('subscriptions')
-      .where('nextBillingDate', '<=', tomorrow)
-      .where('nextBillingDate', '>', today)
-      .where('status', '==', 'active')
-      .where('isActive', '==', true)
-      .where('trialUsed', '==', 1)
-      .get();
+    // Fetch all five counts in parallel for efficiency
+    const [
+      subscriptionsTodaySnap,
+      subscriptionsTomorrowSnap,
+      monthlySnap,
+      yearlySnap,
+      pastDueSnap,              // FIX: new query
+    ] = await Promise.all([
+      // Active subscriptions that are already overdue
+      db.collection('subscriptions')
+        .where('nextBillingDate', '<=', today)
+        .where('status', '==', 'active')
+        .where('isActive', '==', true)
+        .where('trialUsed', '==', 1)
+        .get(),
 
-    // Count monthly subscriptions due
-    const monthlySubscriptions = await db.collection('subscriptions')
-      .where('nextBillingDate', '<=', today)
-      .where('status', '==', 'active')
-      .where('isActive', '==', true)
-      .where('trialUsed', '==', 1)
-      .where('planType', '==', 'monthly')
-      .get();
+      // Active subscriptions that will become overdue within the next 24 h
+      db.collection('subscriptions')
+        .where('nextBillingDate', '<=', tomorrow)
+        .where('nextBillingDate', '>', today)
+        .where('status', '==', 'active')
+        .where('isActive', '==', true)
+        .where('trialUsed', '==', 1)
+        .get(),
 
-    // Count yearly subscriptions due
-    const yearlySubscriptions = await db.collection('subscriptions')
-      .where('nextBillingDate', '<=', today)
-      .where('status', '==', 'active')
-      .where('isActive', '==', true)
-      .where('trialUsed', '==', 1)
-      .where('planType', '==', 'yearly')
-      .get();
+      // Monthly breakdown of overdue active subscriptions
+      db.collection('subscriptions')
+        .where('nextBillingDate', '<=', today)
+        .where('status', '==', 'active')
+        .where('isActive', '==', true)
+        .where('trialUsed', '==', 1)
+        .where('planType', '==', 'monthly')
+        .get(),
+
+      // Yearly breakdown of overdue active subscriptions
+      db.collection('subscriptions')
+        .where('nextBillingDate', '<=', today)
+        .where('status', '==', 'active')
+        .where('isActive', '==', true)
+        .where('trialUsed', '==', 1)
+        .where('planType', '==', 'yearly')
+        .get(),
+
+      // BUG RM-2 FIX: subscriptions already in the grace-period queue
+      db.collection('subscriptions')
+        .where('status', '==', 'past_due')
+        .where('isActive', '==', true)
+        .where('trialUsed', '==', 1)
+        .get(),
+    ]);
 
     return {
-      subscriptionsDueToday: subscriptionsToday.docs.length,
-      subscriptionsDueTomorrow: subscriptionsTomorrow.docs.length,
-      monthlySubscriptionsDue: monthlySubscriptions.docs.length,
-      yearlySubscriptionsDue: yearlySubscriptions.docs.length
+      subscriptionsDueToday: subscriptionsTodaySnap.docs.length,
+      subscriptionsDueTomorrow: subscriptionsTomorrowSnap.docs.length,
+      monthlySubscriptionsDue: monthlySnap.docs.length,
+      yearlySubscriptionsDue: yearlySnap.docs.length,
+      pastDueCount: pastDueSnap.docs.length,  // FIX: now visible in dashboard
     };
   } catch (error) {
     console.error('❌ Error getting renewal statistics:', error);
@@ -464,7 +432,8 @@ export async function getRenewalStatistics(): Promise<{
       subscriptionsDueToday: 0,
       subscriptionsDueTomorrow: 0,
       monthlySubscriptionsDue: 0,
-      yearlySubscriptionsDue: 0
+      yearlySubscriptionsDue: 0,
+      pastDueCount: 0,
     };
   }
 }

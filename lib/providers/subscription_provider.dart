@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
-import 'dart:math';
 import '../models/user_subscription.dart';
 import '../models/subscription_package.dart';
 import '../services/subscription_management_service.dart';
@@ -253,44 +250,6 @@ class SubscriptionProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('❌ SubscriptionProvider: Error loading user subscription: $e');
-    }
-  }
-
-  // MOCK PURCHASE SUBSCRIPTION (for testing without real payments)
-  Future<bool> subscribe({String? paymentMethodId, String userId = ''}) async {
-    return await mockPurchaseSubscription('monthly_subscription', 1);
-  }
-
-  Future<bool> mockPurchaseSubscription(String productId, int packageId) async {
-    debugPrint('🛒 SubscriptionProvider: Mock purchase - Product: $productId, Package: $packageId');
-    _setLoading(true);
-    _clearError();
-    
-    try {
-      // Simulate network delay
-      await Future.delayed(Duration(seconds: 2));
-      
-      // Always succeed for better user experience (removed artificial failures)
-      if (_subscription != null) {
-        debugPrint('💳 SubscriptionProvider: Converting trial to paid subscription');
-        _subscription = await _subscriptionService.convertTrialToPaid(
-          _subscription!.userId, 
-          packageId
-        );
-        _clearTrialCache(); // Clear cache when subscription changes
-        notifyListeners();
-        debugPrint('✅ SubscriptionProvider: Mock purchase successful');
-        return true;
-      } else {
-        _setError('No subscription found to convert');
-        return false;
-      }
-    } catch (e) {
-      debugPrint('❌ SubscriptionProvider: Purchase error: $e');
-      _setError('Purchase error: $e');
-      return false;
-    } finally {
-      _setLoading(false);
     }
   }
 

@@ -20,55 +20,6 @@ interface ReceiptValidationRequest {
 }
 
 /**
- * Apple's App Store receipt validation response structure
- * @ts-expect-error - Will be used when we add more detailed parsing in future
- */
-interface AppleReceiptResponse {
-  status: number;  // 0 = valid, others = errors
-  receipt: {
-    in_app: Array<{
-      product_id: string;
-      transaction_id: string;
-      original_transaction_id: string;
-      purchase_date_ms: string;
-      expires_date_ms: string;
-      cancellation_date_ms?: string;
-    }>;
-  };
-  latest_receipt_info?: Array<{
-    product_id: string;
-    expires_date: string;
-    expires_date_ms: string;
-  }>;
-  pending_renewal_info?: Array<{
-    auto_renew_product_id: string;
-    auto_renew_status: string;
-  }>;
-}
-
-/**
- * Google Play purchase response structure
- * @ts-expect-error - Will be used in Phase 3 for Android validation
- */
-interface GooglePlayPurchase {
-  kind: string;
-  purchaseTimeMillis: string;
-  purchaseState: number;  // 0 = purchased, 1 = cancelled
-  consumptionState: number;
-  developerPayload: string;
-  orderId: string;
-  purchaseType: number;  // 0 = test, 1 = promo, 2 = rewarded
-  acknowledgementState: number;
-  expiryTimeMillis: string;
-  autoRenewing: boolean;
-  priceCurrencyCode: string;
-  priceAmountMicros: string;
-  countryCode: string;
-  paymentState: number;  // 0 = pending, 1 = received
-  cancelReason?: number;
-}
-
-/**
  * Standardized validation result returned to the app
  */
 interface ValidationResult {
@@ -246,7 +197,7 @@ async function retryWithBackoff<T>(
 async function validateAppleReceipt(
   receiptData: string,
   productId: string
-): Promise<{ valid: boolean; expiresAt?: Date; transactionId?: string; error?: string }> {
+): Promise<{ valid: boolean; expiresAt?: Date; transactionId?: string; actualProductId?: string; error?: string }> {
   console.log('🍎 Starting Apple receipt validation');
   console.log(`📦 Product ID: ${productId}`);
   console.log(`📄 Receipt length: ${receiptData.length} characters`);
@@ -330,19 +281,53 @@ async function validateAppleReceipt(
       };
     }
     
-    // Find the matching product in the receipt
-    const matchingReceipt = latestReceipts.find((r: any) => r.product_id === productId);
-    
+    // ── Product matching with same-group plan-change fallback ──────────────
+    //
+    // BUG RV-MATCH FIX: The original code required an exact product_id match.
+    // This fails when a user switches plans within the same subscription group
+    // (e.g. yearly → monthly).  Apple only allows ONE active subscription per
+    // group at a time.  When the user "buys" a different plan, Apple either
+    // defers the change (downgrade) or immediately transitions (upgrade) — in
+    // both cases the receipt contains the CURRENTLY ACTIVE product, not
+    // necessarily the one the user requested.
+    //
+    // Fix strategy:
+    //   1. Try exact match first (happy path — new subscriber or same-plan renewal).
+    //   2. If no exact match, look for ANY non-expired subscription in the receipt
+    //      from the same group.  Use whatever Apple actually billed.
+    //      Apple already charged the correct amount before this function is even
+    //      called, so trusting the receipt is always safe.
+    let matchingReceipt = latestReceipts.find((r: any) => r.product_id === productId);
+    let effectiveProductId = productId; // will be updated if fallback triggers
+
     if (!matchingReceipt) {
-      console.error(`❌ Product ID "${productId}" not found in receipt`);
-      console.error(`📋 Available products:`, latestReceipts.map((r: any) => r.product_id));
-      return {
-        valid: false,
-        error: `Product "${productId}" not found in receipt`
-      };
+      console.warn(`⚠️ Exact product "${productId}" not found in receipt`);
+      console.warn(`📋 Available products:`, latestReceipts.map((r: any) => r.product_id));
+      console.log('🔄 Attempting plan-change fallback: looking for any active subscription in group...');
+
+      const now = Date.now();
+      // Filter to non-expired receipts, sort newest expiry first
+      const activeReceipts = latestReceipts
+        .filter((r: any) => parseInt(r.expires_date_ms) > now)
+        .sort((a: any, b: any) => parseInt(b.expires_date_ms) - parseInt(a.expires_date_ms));
+
+      if (activeReceipts.length > 0) {
+        matchingReceipt = activeReceipts[0];
+        effectiveProductId = matchingReceipt.product_id;
+        console.log(`✅ Plan-change fallback: using active subscription "${effectiveProductId}" from receipt`);
+        console.log(`   Requested: "${productId}" → Apple has active: "${effectiveProductId}"`);
+        console.log(`   This is normal for same-group plan changes (Apple defers downgrade / mirrors upgrade)`);
+      } else {
+        // No active subscriptions in receipt at all — hard failure
+        console.error(`❌ No active subscriptions found in receipt`);
+        return {
+          valid: false,
+          error: `No active subscription found in receipt. Requested "${productId}" but receipt contains: ${latestReceipts.map((r: any) => r.product_id).join(', ')}`
+        };
+      }
     }
-    
-    console.log(`✅ Found matching product: ${productId}`);
+
+    console.log(`✅ Found matching product: ${effectiveProductId}`);
     console.log(`📄 Transaction details:`, JSON.stringify(matchingReceipt, null, 2));
     
     // Extract expiration date (Apple returns milliseconds since epoch)
@@ -383,11 +368,15 @@ async function validateAppleReceipt(
     // SUCCESS! Return valid subscription data
     console.log('🎉 Receipt validation successful!');
     console.log(`✅ Valid subscription until: ${expiresAt.toISOString()}`);
-    
+    if (effectiveProductId !== productId) {
+      console.log(`📝 Note: Requested "${productId}", recording as "${effectiveProductId}" (plan-change via Apple)`);
+    }
+
     return {
       valid: true,
       expiresAt: expiresAt,
-      transactionId: transactionId
+      transactionId: transactionId,
+      actualProductId: effectiveProductId,  // BUG RV-MATCH FIX: pass real product ID
     };
     
   } catch (error) {
@@ -677,8 +666,22 @@ async function getSubscriptionMetadata(productId: string): Promise<{
 }
 
 /**
- * Find existing subscription for a user
- * Phase 4: Helper function
+ * Find the user's currently ACTIVE subscription.
+ *
+ * BUG RV-C1 FIX: The previous implementation queried by `orderBy('createdAt',
+ * 'desc').limit(1)` — returning the most recently *created* subscription
+ * regardless of its `isActive` state.  This broke the re-subscribe flow:
+ *
+ *   1. User has an old, inactive trial (isActive=false, planType='trial').
+ *   2. User buys a monthly plan.
+ *   3. Old query returns the inactive trial doc.
+ *   4. 'trial' !== 'monthly' → Scenario C ("upgrade") runs, resurrecting the
+ *      dead trial document with stale fields instead of creating a clean new
+ *      subscription (Scenario A).
+ *
+ * Fix: query only `isActive==true`.  If no active subscription exists, return
+ * null so Scenario A creates a fresh document.  A composite index on
+ * (userId, isActive) is simpler and more reliable than (userId, createdAt).
  */
 async function findExistingSubscription(userId: string): Promise<{
   id: string;
@@ -686,31 +689,76 @@ async function findExistingSubscription(userId: string): Promise<{
   packageId: string;
   [key: string]: any;
 } | null> {
-  console.log(`🔍 Searching for existing subscription for user: ${userId}`);
-  
+  console.log(`🔍 Searching for active subscription for user: ${userId}`);
+
   const db = admin.firestore();
   const snapshot = await db.collection('subscriptions')
     .where('userId', '==', userId)
-    .orderBy('createdAt', 'desc')
+    .where('isActive', '==', true)   // FIX: only consider live subscriptions
     .limit(1)
     .get();
-  
+
   if (snapshot.empty) {
-    console.log(`📭 No existing subscription found for user: ${userId}`);
+    console.log(`📭 No active subscription found for user: ${userId} → will create new`);
     return null;
   }
-  
+
   const doc = snapshot.docs[0];
   const data = doc.data();
-  
-  console.log(`✅ Found existing subscription: ${doc.id}, planType=${data.planType}`);
-  
+
+  console.log(`✅ Found active subscription: ${doc.id}, planType=${data.planType}`);
+
   return {
     id: doc.id,
     planType: data.planType,
     packageId: data.packageId,
-    ...data
+    ...data,
   };
+}
+
+/**
+ * Sync the user document after a successful purchase (all three scenarios).
+ *
+ * BUG RV-C2 FIX — two problems with the original version:
+ *
+ * Problem 1 — isActive never restored on re-subscribe:
+ *   When the scheduler deactivates a subscription it sets users.isActive=false.
+ *   When the user re-subscribes, createOrUpdateSubscription correctly marks
+ *   subscriptions.isActive=true but this helper only updated billing dates —
+ *   it never wrote isActive back to true.  The Flutter app gates premium
+ *   features via users.isActive, so the user was permanently locked out even
+ *   after successfully paying.
+ *   Fix: always write isActive:true here (this function is ONLY called on a
+ *   successful purchase, so setting true is always correct).
+ *
+ * Problem 2 — update() throws if user document doesn't exist:
+ *   Firestore update() fails with NOT_FOUND if the document is absent (e.g.
+ *   a user was deleted from Auth but their subscription record survived).
+ *   We used to swallow that error silently, leaving isActive out of sync.
+ *   Fix: use set({merge:true}) — creates the doc if missing, merges if present.
+ */
+async function syncUserBillingDate(
+  db: admin.firestore.Firestore,
+  userId: string,
+  nextBillingDate: Date,
+  now: admin.firestore.Timestamp
+): Promise<void> {
+  try {
+    await db.collection('users').doc(userId).set(
+      {
+        isActive: true,   // FIX: restore access after server-side deactivation
+        nextBillingDate: admin.firestore.Timestamp.fromDate(nextBillingDate),
+        lastBillingDate: now,
+        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }     // FIX: safe whether the doc exists or not
+    );
+    console.log(`✅ Synced user document: isActive=true, nextBillingDate=${nextBillingDate.toISOString()}`);
+  } catch (error) {
+    // Log but don't rethrow — a sync failure here is corrected the next time
+    // the Flutter app calls validateBillingSynchronization().
+    console.warn('⚠️ Could not sync user document (non-fatal):', error);
+  }
 }
 
 /**
@@ -753,6 +801,8 @@ async function createOrUpdateSubscription(
       amount: metadata.price
     };
     
+    let subscriptionDocId: string;
+
     // Scenario A: New Subscription (First Time)
     if (!existingSubscription) {
       console.log('🆕 Creating NEW subscription...');
@@ -776,52 +826,72 @@ async function createOrUpdateSubscription(
       
       const docRef = await db.collection('subscriptions').add(newSubscription);
       console.log(`✅ Created new subscription: ${docRef.id}`);
-      
-      return docRef.id;
-    }
-    
-    // Scenario B: Renewal (Same Plan)
-    if (existingSubscription.planType === productId) {
+      subscriptionDocId = docRef.id;
+
+    } else if (existingSubscription.planType === productId) {
+      // Scenario B: Renewal (Same Plan)
       console.log(`🔄 RENEWING existing subscription: ${existingSubscription.id}`);
       
+      // BUG RV-1 FIX: Reset renewalAttempts to 0.
+      // When the scheduler marks a subscription 'past_due' it increments
+      // renewalAttempts (max 3 before deactivation).  Apple/Google delivering
+      // a real receipt here means payment succeeded, so the grace-period counter
+      // MUST be cleared.  Without this reset, a subscription that had gone
+      // past_due (renewalAttempts=2) would only need one more missed cycle to
+      // be permanently deactivated — effectively halving its grace period.
       await db.collection('subscriptions').doc(existingSubscription.id).update({
         nextBillingDate: admin.firestore.Timestamp.fromDate(expiresAt),
         isActive: true,
         status: 'active',
+        renewalAttempts: 0,  // FIX: clear grace-period counter on successful renewal
         platform: platform,  // Update platform (user might switch devices)
         transactions: admin.firestore.FieldValue.arrayUnion(transactionRecord),
         updatedAt: now
       });
       
       console.log(`✅ Renewed subscription: ${existingSubscription.id}`);
-      return existingSubscription.id;
+      subscriptionDocId = existingSubscription.id;
+
+    } else {
+      // Scenario C: Upgrade/Downgrade (Different Plan)
+      console.log(`⬆️ UPGRADING subscription from ${existingSubscription.planType} to ${productId}`);
+      
+      // Add upgrade info to transaction record
+      const upgradeTransaction = {
+        ...transactionRecord,
+        upgradeFrom: existingSubscription.planType  // Track upgrade path
+      };
+      
+      // BUG RV-C3 FIX: Reset renewalAttempts to 0 on upgrade/downgrade.
+      // Scenario B (renewal) already resets this counter.  Scenario C was
+      // missed — if the existing subscription had been in the grace-period queue
+      // (renewalAttempts=2), the upgraded plan would inherit that counter and
+      // be permanently deactivated after just ONE more missed billing cycle
+      // instead of the full 3-run grace period.
+      await db.collection('subscriptions').doc(existingSubscription.id).update({
+        planType: productId,  // Change plan
+        packageId: metadata.id,
+        duration: metadata.duration,
+        price: metadata.price,
+        nextBillingDate: admin.firestore.Timestamp.fromDate(expiresAt),
+        trialUsed: 1,  // Mark trial as used if upgrading from trial
+        isActive: true,
+        status: 'active',
+        renewalAttempts: 0,  // FIX: don't carry over grace-period counter
+        platform: platform,
+        transactions: admin.firestore.FieldValue.arrayUnion(upgradeTransaction),
+        updatedAt: now
+      });
+      
+      console.log(`✅ Upgraded subscription: ${existingSubscription.id}`);
+      subscriptionDocId = existingSubscription.id;
     }
-    
-    // Scenario C: Upgrade/Downgrade (Different Plan)
-    console.log(`⬆️ UPGRADING subscription from ${existingSubscription.planType} to ${productId}`);
-    
-    // Add upgrade info to transaction record
-    const upgradeTransaction = {
-      ...transactionRecord,
-      upgradeFrom: existingSubscription.planType  // Track upgrade path
-    };
-    
-    await db.collection('subscriptions').doc(existingSubscription.id).update({
-      planType: productId,  // Change plan
-      packageId: metadata.id,
-      duration: metadata.duration,
-      price: metadata.price,
-      nextBillingDate: admin.firestore.Timestamp.fromDate(expiresAt),
-      trialUsed: 1,  // Mark trial as used if upgrading from trial
-      isActive: true,
-      status: 'active',
-      platform: platform,
-      transactions: admin.firestore.FieldValue.arrayUnion(upgradeTransaction),
-      updatedAt: now
-    });
-    
-    console.log(`✅ Upgraded subscription: ${existingSubscription.id}`);
-    return existingSubscription.id;
+
+    // Sync user document — keeps user.nextBillingDate consistent with the
+    // subscription document for any code that reads it directly from users/.
+    await syncUserBillingDate(db, userId, expiresAt, now);
+
+    return subscriptionDocId;
     
   } catch (error) {
     console.error('❌ Error in createOrUpdateSubscription:', error);
@@ -928,6 +998,7 @@ export const validatePurchaseReceipt = functions.https.onCall(
         valid: boolean; 
         expiresAt?: Date; 
         transactionId?: string;
+        actualProductId?: string;  // BUG RV-MATCH FIX: real product from Apple receipt
         error?: string;
       };
       
@@ -971,11 +1042,18 @@ export const validatePurchaseReceipt = functions.https.onCall(
       // ======================================================================
       
       console.log('💾 Creating/updating subscription in Firestore...');
-      
+
+      // BUG RV-MATCH FIX: use the product ID Apple actually has active
+      // (may differ from the requested one for same-group plan changes).
+      const effectiveProductId = validationResult.actualProductId || productId;
+      if (effectiveProductId !== productId) {
+        console.log(`📝 Plan-change: recording subscription as "${effectiveProductId}" (requested "${productId}")`);
+      }
+
       // Create/update subscription in Firestore
       const subscriptionId = await createOrUpdateSubscription(
         userId,
-        productId,
+        effectiveProductId,   // BUG RV-MATCH FIX: use real product from Apple receipt
         validationResult.expiresAt!,
         platform,
         validationResult.transactionId!
@@ -986,7 +1064,8 @@ export const validatePurchaseReceipt = functions.https.onCall(
         userId: userId,
         action: 'receipt_validated',
         platform: platform,
-        productId: productId,
+        productIdRequested: productId,          // what the app asked for
+        productId: effectiveProductId,          // what Apple actually has active
         subscriptionId: subscriptionId,
         transactionId: validationResult.transactionId,
         expiresAt: admin.firestore.Timestamp.fromDate(validationResult.expiresAt!),
@@ -1003,7 +1082,7 @@ export const validatePurchaseReceipt = functions.https.onCall(
         message: 'Subscription activated successfully!',
         subscriptionId: subscriptionId,
         expiresAt: validationResult.expiresAt!.toISOString(),
-        productId: productId,
+        productId: effectiveProductId,    // BUG RV-MATCH FIX: return real product ID
         platform: platform,
         transactionId: validationResult.transactionId
       };

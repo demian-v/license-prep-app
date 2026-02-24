@@ -16,6 +16,9 @@ class EnhancedSubscriptionCard extends StatefulWidget {
   final SubscriptionProvider subscriptionProvider;
   final int packageId;
   final bool showBestValue;
+  /// Whether this card is the currently visible page in the PageView.
+  /// Only the active card should own the shared InAppPurchaseService callbacks.
+  final bool isActive;
 
   const EnhancedSubscriptionCard({
     Key? key,
@@ -26,6 +29,7 @@ class EnhancedSubscriptionCard extends StatefulWidget {
     required this.subscriptionProvider,
     required this.packageId,
     this.showBestValue = false,
+    this.isActive = true,
   }) : super(key: key);
 
   @override
@@ -123,13 +127,35 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
     // Start animations with delays
     _startAnimations();
     
-    // Setup In-App Purchase callbacks
+    // Setup In-App Purchase callbacks.
+    // Only the ACTIVE (visible) card registers callbacks — this prevents the
+    // off-screen card from overwriting the callbacks when it is first built.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _iapService = Provider.of<InAppPurchaseService>(context, listen: false);
-      _setupPurchaseCallbacks();
+      if (widget.isActive) {
+        _setupPurchaseCallbacks();
+      }
     });
   }
-  
+
+  @override
+  void didUpdateWidget(EnhancedSubscriptionCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // When this card becomes the visible page, take ownership of the shared
+    // IAP callbacks so purchase results are handled by the correct context.
+    // If a purchase is already in flight we skip the transfer — the card that
+    // started the purchase must stay in charge until it receives the result.
+    if (widget.isActive && !oldWidget.isActive && _iapService != null) {
+      if (!_iapService!.isPurchasePending) {
+        debugPrint('📲 ${widget.subscriptionType == SubscriptionType.yearly ? 'Yearly' : 'Monthly'} card '
+            'became active — re-claiming IAP callbacks');
+        _setupPurchaseCallbacks();
+      } else {
+        debugPrint('⚠️ Skipping callback transfer: purchase in flight on the other card');
+      }
+    }
+  }
+
   void _setupPurchaseCallbacks() {
     if (_iapService == null) return;
     
@@ -172,7 +198,10 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
           }
         }
         
-        // Navigate to home
+        // FIXED: Guard navigation with mounted check — the widget can be
+        // disposed during the async gaps above (800ms delay + initialize()).
+        // Using context after disposal causes "deactivated widget" errors.
+        if (!mounted) return;
         Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
       },
       onError: (error) {

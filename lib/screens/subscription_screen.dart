@@ -83,6 +83,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
                       subscriptionProvider: subscriptionProvider,
                       packageId: 2, // Yearly package ID from Firebase
                       showBestValue: true,
+                      // FIXED: Only the visible card owns IAP callbacks.
+                      // didUpdateWidget re-claims them when the user swipes.
+                      isActive: _currentPage == 0,
                     ),
                   ),
                   // Monthly Subscription Card (Page 1)
@@ -96,6 +99,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
                       subscriptionProvider: subscriptionProvider,
                       packageId: 1, // Monthly package ID from Firebase
                       showBestValue: false,
+                      isActive: _currentPage == 1,
                     ),
                   ),
                 ],

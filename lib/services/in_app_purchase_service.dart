@@ -23,6 +23,8 @@ class InAppPurchaseService {
   List<ProductDetails> _products = [];
   bool _isAvailable = false;
   bool _purchasePending = false;
+  bool _isRestoringPurchases = false;
+  Timer? _restoreSessionTimer;
 
   // Callbacks for purchase events
   void Function(String productId)? onPurchaseSuccess;
@@ -167,10 +169,27 @@ class InAppPurchaseService {
     debugPrint('🔄 InAppPurchaseService: Restoring purchases...');
     
     try {
+      _isRestoringPurchases = true;
+      
+      // StoreKit delivers all restored transactions asynchronously one by one.
+      // We keep the flag true for 10 seconds so every restored event in the
+      // same session is treated as user-initiated, even if there are multiple
+      // products. The timer is cancelled and restarted on each restored event
+      // to extend the window as long as events keep coming.
+      _restoreSessionTimer?.cancel();
+      _restoreSessionTimer = Timer(Duration(seconds: 10), () {
+        debugPrint('⏱️ InAppPurchaseService: Restore session window closed');
+        _isRestoringPurchases = false;
+        _restoreSessionTimer = null;
+      });
+
       await _inAppPurchase.restorePurchases();
       debugPrint('✅ InAppPurchaseService: Restore purchases initiated');
     } catch (e) {
       debugPrint('❌ InAppPurchaseService: Restore purchases error: $e');
+      _isRestoringPurchases = false;
+      _restoreSessionTimer?.cancel();
+      _restoreSessionTimer = null;
     }
   }
 
@@ -188,7 +207,15 @@ class InAppPurchaseService {
         
         case PurchaseStatus.purchased:
           debugPrint('✅ Purchase successful: ${purchaseDetails.productID}');
-          _handleSuccessfulPurchase(purchaseDetails);
+          // FIXED: Only handle as a new purchase if the user explicitly initiated one.
+          // StoreKit can re-deliver unfinished transactions automatically on app start,
+          // which would otherwise trigger a phantom purchase without any user action.
+          if (_purchasePending) {
+            _handleSuccessfulPurchase(purchaseDetails);
+          } else {
+            debugPrint('⚠️ InAppPurchaseService: Received purchased event without a pending purchase '
+                '(auto-delivered by StoreKit) - completing silently');
+          }
           break;
         
         case PurchaseStatus.error:
@@ -203,7 +230,24 @@ class InAppPurchaseService {
         
         case PurchaseStatus.restored:
           debugPrint('🔄 Purchase restored: ${purchaseDetails.productID}');
-          _handleSuccessfulPurchase(purchaseDetails);
+          // FIXED: Only process a restore if the user explicitly tapped "Restore Purchases".
+          // StoreKit automatically re-delivers restored transactions on every app start.
+          // Without this guard, opening the Subscriptions screen after those events arrive
+          // (and callbacks get registered) causes a phantom "purchase" to complete.
+          if (_isRestoringPurchases) {
+            _handleSuccessfulPurchase(purchaseDetails);
+            // Extend the restore session window on every arriving event so that
+            // all products in the same batch get handled correctly.
+            _restoreSessionTimer?.cancel();
+            _restoreSessionTimer = Timer(Duration(seconds: 10), () {
+              debugPrint('⏱️ InAppPurchaseService: Restore session window closed');
+              _isRestoringPurchases = false;
+              _restoreSessionTimer = null;
+            });
+          } else {
+            debugPrint('⚠️ InAppPurchaseService: Auto-restored transaction from StoreKit '
+                '(no user action) - completing silently');
+          }
           break;
       }
 
@@ -351,6 +395,8 @@ class InAppPurchaseService {
     debugPrint('🛒 InAppPurchaseService: Disposing...');
     _subscription?.cancel();
     _subscription = null;
+    _restoreSessionTimer?.cancel();
+    _restoreSessionTimer = null;
   }
 
   /// Set purchase callbacks

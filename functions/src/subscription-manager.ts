@@ -66,14 +66,18 @@ export async function processExpiredSubscriptions(): Promise<ProcessingResult> {
   };
 
   try {
-    // Process expired trials
-    const trialResult = await checkExpiredTrials();
+    // PERF-1 FIX: Run both checks in parallel — they query different statuses
+    // (planType='trial' vs status='canceled') with zero overlap, so Promise.all
+    // is safe and cuts Cloud Function runtime roughly in half.
+    const [trialResult, canceledResult] = await Promise.all([
+      checkExpiredTrials(),
+      checkExpiredCanceledSubscriptions(),
+    ]);
+
     result.expiredTrials = trialResult.processed;
     result.emailsSent += trialResult.emailsSent;
     result.errors = result.errors.concat(trialResult.errors);
 
-    // Process expired canceled subscriptions
-    const canceledResult = await checkExpiredCanceledSubscriptions();
     result.expiredCanceledSubscriptions = canceledResult.processed;
     result.emailsSent += canceledResult.emailsSent;
     result.errors = result.errors.concat(canceledResult.errors);
@@ -102,13 +106,21 @@ async function checkExpiredTrials(): Promise<{processed: number, emailsSent: num
   try {
     const now = admin.firestore.Timestamp.now();
     
-    // Query expired trials
+    // Query expired trials.
+    // BUG D FIX: added planType == 'trial' filter — without it, any subscription
+    // with trialUsed=0 due to data corruption could be incorrectly deactivated.
     const db = getDb();
+    // SM-MOD-2 FIX: Added isActive==true guard — consistent with every other
+    // query in both files.  Without it, a partially-deactivated subscription
+    // (isActive=false but status still 'active' due to a crash mid-update)
+    // would be picked up, re-processed, and produce duplicate audit log entries.
     const expiredTrialsQuery = await db.collection('subscriptions')
+      .where('planType', '==', 'trial')   // Only actual trial subscriptions
+      .where('isActive', '==', true)       // FIX: skip already-deactivated docs
       .where('trialEndsAt', '<=', now)
       .where('trialUsed', '==', 0)
       .where('status', '==', 'active')
-      .limit(100) // Process in batches
+      .limit(100)
       .get();
 
     console.log(`Found ${expiredTrialsQuery.docs.length} expired trials to process`);
@@ -125,8 +137,8 @@ async function checkExpiredTrials(): Promise<{processed: number, emailsSent: num
         const emailSent = await sendTrialExpiredNotification(subscriptionData.userId);
         if (emailSent) result.emailsSent++;
         
-        // Log the change
-        await logSubscriptionChange(subscriptionData, 'trial_expired');
+        // Log the change — pass actual emailSent result (Bug SM-2 fix)
+        await logSubscriptionChange(subscriptionData, 'trial_expired', emailSent);
         
         result.processed++;
         console.log(`✅ Processed expired trial for user: ${subscriptionData.userId}`);
@@ -181,8 +193,8 @@ async function checkExpiredCanceledSubscriptions(): Promise<{processed: number, 
         const emailSent = await sendSubscriptionExpiredNotification(subscriptionData.userId);
         if (emailSent) result.emailsSent++;
         
-        // Log the change
-        await logSubscriptionChange(subscriptionData, 'canceled_subscription_expired');
+        // Log the change — pass actual emailSent result (Bug SM-2 fix)
+        await logSubscriptionChange(subscriptionData, 'canceled_subscription_expired', emailSent);
         
         result.processed++;
         console.log(`✅ Processed expired canceled subscription for user: ${subscriptionData.userId}`);
@@ -204,38 +216,74 @@ async function checkExpiredCanceledSubscriptions(): Promise<{processed: number, 
 }
 
 /**
- * Update expired trial subscription in database
+ * Update expired trial subscription in database.
+ * BUG SM-1 FIX: Use a batch write to update BOTH the subscription document AND
+ * the user document atomically.  The Flutter app gates premium access via
+ * users.isActive — without this fix, expired-trial users kept full access
+ * because only subscriptions.isActive was set to false.
  */
 async function updateExpiredTrial(subscriptionData: SubscriptionData): Promise<void> {
   console.log(`📝 Updating expired trial for subscription: ${subscriptionData.id}`);
   
   const db = getDb();
-  await db.collection('subscriptions').doc(subscriptionData.id).update({
+  const batch = db.batch();
+
+  // 1. Mark subscription inactive and consume the trial slot
+  batch.update(db.collection('subscriptions').doc(subscriptionData.id), {
     isActive: false,
     status: 'inactive',
-    trialUsed: 1, // Mark trial as used
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    trialUsed: 1, // Prevent reuse of the trial
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
-  
-  console.log(`✅ Trial subscription ${subscriptionData.id} marked as expired`);
+
+  // 2. Revoke premium access on the user document.
+  // SM-MOD-1 FIX: Use batch.set(..., {merge:true}) instead of batch.update().
+  // batch.update() throws NOT_FOUND if the user document doesn't exist (e.g.
+  // the user deleted their profile but the subscription survived).  That would
+  // cause the entire batch to fail, leaving the trial subscription active and
+  // the user with permanent premium access.  set/merge creates the doc if
+  // missing and merges if present — always safe.
+  batch.set(
+    db.collection('users').doc(subscriptionData.userId),
+    { isActive: false, lastUpdated: admin.firestore.FieldValue.serverTimestamp() },
+    { merge: true }
+  );
+
+  await batch.commit();
+  console.log(`✅ Trial subscription ${subscriptionData.id} marked inactive (both collections updated)`);
 }
 
 
 /**
- * Update expired canceled subscription in database
+ * Update expired canceled subscription in database.
+ * BUG SM-1 FIX: Same batch-update pattern — revoke users.isActive so the
+ * app correctly blocks premium access once the paid period ends.
  */
 async function updateExpiredCanceledSubscription(subscriptionData: SubscriptionData): Promise<void> {
   console.log(`📝 Updating expired canceled subscription: ${subscriptionData.id}`);
   
   const db = getDb();
-  await db.collection('subscriptions').doc(subscriptionData.id).update({
+  const batch = db.batch();
+
+  // 1. Mark subscription inactive
+  batch.update(db.collection('subscriptions').doc(subscriptionData.id), {
     isActive: false,
     status: 'inactive',
-    // Note: trialUsed stays as it was (1 for previously paid subscriptions)
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    // trialUsed stays as-is (already 1 for paid subscriptions)
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
-  
-  console.log(`✅ Canceled subscription ${subscriptionData.id} marked as expired`);
+
+  // 2. Revoke premium access on the user document.
+  // SM-MOD-1 FIX: Same set/merge pattern as updateExpiredTrial — prevents
+  // NOT_FOUND error if the user document was deleted.
+  batch.set(
+    db.collection('users').doc(subscriptionData.userId),
+    { isActive: false, lastUpdated: admin.firestore.FieldValue.serverTimestamp() },
+    { merge: true }
+  );
+
+  await batch.commit();
+  console.log(`✅ Canceled subscription ${subscriptionData.id} marked inactive (both collections updated)`);
 }
 
 /**
@@ -323,39 +371,42 @@ async function getUserData(userId: string): Promise<UserData | null> {
 }
 
 /**
- * Log subscription change for audit trail
+ * Log subscription change for audit trail.
+ * BUG SM-2 FIX: `emailSent` is now passed in by the caller (actual value)
+ * instead of being hardcoded to `true`, so logs are accurate even when the
+ * email service fails or the user document is missing.
  */
 async function logSubscriptionChange(
   subscriptionData: SubscriptionData,
-  action: 'trial_expired' | 'subscription_expired' | 'canceled_subscription_expired'
+  action: 'trial_expired' | 'subscription_expired' | 'canceled_subscription_expired',
+  emailSent: boolean  // FIX: actual result from the caller
 ): Promise<void> {
   try {
     const logEntry = {
       userId: subscriptionData.userId,
       subscriptionId: subscriptionData.id,
-      action: action,
+      action,
       oldStatus: {
         isActive: subscriptionData.isActive,
         status: subscriptionData.status,
-        trialUsed: subscriptionData.trialUsed
+        trialUsed: subscriptionData.trialUsed,
       },
       newStatus: {
         isActive: false,
         status: 'inactive',
-        trialUsed: action === 'trial_expired' ? 1 : subscriptionData.trialUsed
+        trialUsed: action === 'trial_expired' ? 1 : subscriptionData.trialUsed,
       },
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
       processedBy: 'scheduled_function',
-      emailSent: true // We'll update this based on actual email result
+      emailSent,  // FIX: actual value, not hardcoded true
     };
 
     const db = getDb();
     await db.collection('subscriptionLogs').add(logEntry);
     console.log(`📊 Logged subscription change: ${action} for ${subscriptionData.userId}`);
-    
   } catch (error) {
-    console.error(`❌ Error logging subscription change:`, error);
-    // Don't throw error - logging failure shouldn't stop processing
+    console.error('❌ Error logging subscription change:', error);
+    // Don't throw — logging failure must not stop subscription processing
   }
 }
 
@@ -383,42 +434,52 @@ export async function getSubscriptionStatistics(): Promise<{
   const tomorrow = admin.firestore.Timestamp.fromDate(new Date(now.getTime() + 24 * 60 * 60 * 1000));
   
   try {
-    // Count trials expiring today
+    // PERF-2 FIX: Run all 4 queries in parallel — they are fully independent.
+    // Previously they ran sequentially, making the function 4× slower than
+    // necessary.  This mirrors the same optimization applied to
+    // getRenewalStatistics in subscription-renewal-manager.ts (RM-2 fix).
     const db = getDb();
-    const trialsToday = await db.collection('subscriptions')
-      .where('trialEndsAt', '<=', today)
-      .where('trialUsed', '==', 0)
-      .where('status', '==', 'active')
-      .get();
+    const [trialsToday, trialsTomorrow, canceledToday, canceledTomorrow] = await Promise.all([
+      // Trials that have already expired (or expire right now)
+      db.collection('subscriptions')
+        .where('planType', '==', 'trial')   // BUG SM-3 FIX: only real trials
+        .where('isActive', '==', true)       // SM-MOD-2 FIX: skip dead docs
+        .where('trialEndsAt', '<=', today)
+        .where('trialUsed', '==', 0)
+        .where('status', '==', 'active')
+        .get(),
 
-    // Count trials expiring tomorrow
-    const trialsTomorrow = await db.collection('subscriptions')
-      .where('trialEndsAt', '<=', tomorrow)
-      .where('trialEndsAt', '>', today)
-      .where('trialUsed', '==', 0)
-      .where('status', '==', 'active')
-      .get();
+      // Trials expiring within the next 24 hours
+      db.collection('subscriptions')
+        .where('planType', '==', 'trial')   // BUG SM-3 FIX
+        .where('isActive', '==', true)       // SM-MOD-2 FIX
+        .where('trialEndsAt', '<=', tomorrow)
+        .where('trialEndsAt', '>', today)
+        .where('trialUsed', '==', 0)
+        .where('status', '==', 'active')
+        .get(),
 
-    // Count canceled subscriptions expiring today
-    const canceledToday = await db.collection('subscriptions')
-      .where('nextBillingDate', '<=', today)
-      .where('status', '==', 'canceled')
-      .where('isActive', '==', true)
-      .get();
+      // Canceled subscriptions whose paid period has already ended
+      db.collection('subscriptions')
+        .where('nextBillingDate', '<=', today)
+        .where('status', '==', 'canceled')
+        .where('isActive', '==', true)
+        .get(),
 
-    // Count canceled subscriptions expiring tomorrow
-    const canceledTomorrow = await db.collection('subscriptions')
-      .where('nextBillingDate', '<=', tomorrow)
-      .where('nextBillingDate', '>', today)
-      .where('status', '==', 'canceled')
-      .where('isActive', '==', true)
-      .get();
+      // Canceled subscriptions ending within the next 24 hours
+      db.collection('subscriptions')
+        .where('nextBillingDate', '<=', tomorrow)
+        .where('nextBillingDate', '>', today)
+        .where('status', '==', 'canceled')
+        .where('isActive', '==', true)
+        .get(),
+    ]);
 
     return {
       trialsExpiringToday: trialsToday.docs.length,
       trialsExpiringTomorrow: trialsTomorrow.docs.length,
       canceledExpiringToday: canceledToday.docs.length,
-      canceledExpiringTomorrow: canceledTomorrow.docs.length
+      canceledExpiringTomorrow: canceledTomorrow.docs.length,
     };
   } catch (error) {
     console.error('❌ Error getting subscription statistics:', error);
