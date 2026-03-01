@@ -3,6 +3,7 @@ import '../models/user_subscription.dart';
 import '../models/subscription_package.dart';
 import '../services/subscription_management_service.dart';
 import '../services/upgrade_calculator.dart';
+import '../services/in_app_purchase_service.dart';
 
 class SubscriptionProvider extends ChangeNotifier {
   // STATE MANAGEMENT
@@ -14,6 +15,13 @@ class SubscriptionProvider extends ChangeNotifier {
   // CACHE MANAGEMENT
   int? _cachedTrialDaysRemaining;
   DateTime? _cacheTimestamp;
+
+  // Per-session auto-restore guard: once checkAndAutoRestoreIfNeeded() triggers
+  // a restore, subsequent calls within the same app session are no-ops. This
+  // prevents multiple restores when home_screen._initializeContent() runs more
+  // than once (e.g., on widget rebuild), which would flood Firebase with
+  // redundant receipt validations and hit the rate limit.
+  static bool _autoRestoreTriggeredThisSession = false;
   
   // SERVICES
   final SubscriptionManagementService _subscriptionService = SubscriptionManagementService();
@@ -275,6 +283,40 @@ class SubscriptionProvider extends ChangeNotifier {
     } finally {
       _setLoading(false);
     }
+  }
+
+  // AUTO-RESTORE: Trigger IAP restore when subscription appears locally expired
+  // but Firestore still marks it 'active'. This handles the common case where
+  // Apple renewed the subscription while the app was closed/backgrounded and
+  // the new receipt has not yet been delivered to the device.
+  Future<void> checkAndAutoRestoreIfNeeded(InAppPurchaseService iapService) async {
+    // Per-session guard: only trigger a restore once per app launch.
+    // home_screen._initializeContent() can run multiple times (widget rebuilds,
+    // re-navigation), and each call would trigger restorePurchases() → StoreKit
+    // delivers ALL pending renewal receipts in one burst → Firebase gets
+    // 10+ concurrent validation calls → rate limit exceeded.
+    if (_autoRestoreTriggeredThisSession) {
+      debugPrint('⏭️ SubscriptionProvider: Auto-restore already triggered this '
+          'session — skipping');
+      return;
+    }
+
+    if (_subscription == null) return;
+    if (_subscription!.isTrial) return;
+
+    // Only act when Firestore says 'active' — Apple renewed it, receipt pending
+    if (_subscription!.status != 'active') return;
+
+    // If the billing date is still in the future, nothing to do
+    if (!hasExpiredPaidSubscription) return;
+
+    // Mark BEFORE calling restorePurchases() so a re-entrant call during the
+    // async gap is also blocked.
+    _autoRestoreTriggeredThisSession = true;
+
+    debugPrint('🔄 SubscriptionProvider: nextBillingDate has passed but Firestore '
+        'status=active → triggering auto-restore to fetch latest Apple receipt');
+    await iapService.restorePurchases();
   }
 
   // CHECK SUBSCRIPTION STATUS

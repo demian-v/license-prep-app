@@ -1,10 +1,18 @@
 // Phase 2: iOS Receipt Validation - IMPLEMENTED ✅
 // Phase 3: Android Receipt Validation - IMPLEMENTED ✅
 // Phase 4: Firestore Integration - Pending
-import * as functions from 'firebase-functions';
+import * as functions from 'firebase-functions/v1';
+import { defineSecret } from 'firebase-functions/params';
 import * as admin from 'firebase-admin';
 import axios from 'axios';
 import { google } from 'googleapis';
+
+// ============================================================================
+// SECRETS (Firebase Secret Manager)
+// ============================================================================
+
+const appleSharedSecret = defineSecret('APPLE_SHARED_SECRET');
+const googleCredentials = defineSecret('GOOGLE_CREDENTIALS');
 
 // ============================================================================
 // INTERFACES & TYPES
@@ -35,16 +43,6 @@ interface ValidationResult {
 // ============================================================================
 // CONSTANTS
 // ============================================================================
-
-// Apple Shared Secret - Loaded from Firebase Config (Phase 5: Security)
-const APPLE_SHARED_SECRET = functions.config().apple?.shared_secret;
-
-if (!APPLE_SHARED_SECRET) {
-  console.error('❌ CRITICAL: Apple shared secret not configured in Firebase Config!');
-  throw new Error('Apple shared secret must be configured. Run: firebase functions:config:set apple.shared_secret="YOUR_SECRET"');
-}
-
-console.log('✅ Apple shared secret loaded securely from Firebase Config');
 
 // Apple App Store verification URLs
 const APPLE_SANDBOX_URL = 'https://sandbox.itunes.apple.com/verifyReceipt';
@@ -106,15 +104,15 @@ const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;  // 1 hour in milliseconds
  * Loads from Firebase Config only (secure)
  */
 function getGoogleCredentials(): any {
-  // Load from Firebase Config only (secure)
-  const configCreds = functions.config().google?.credentials;
+  // Load from Secret Manager
+  const configCreds = googleCredentials.value();
   
   if (!configCreds) {
-    console.error('❌ CRITICAL: Google credentials not configured in Firebase Config!');
-    throw new Error('Google credentials must be configured. Run: firebase functions:config:set google.credentials="BASE64_JSON"');
+    console.error('❌ CRITICAL: GOOGLE_CREDENTIALS secret not set in Secret Manager!');
+    throw new Error('Google credentials must be configured in Firebase Secret Manager');
   }
   
-  console.log('✅ Google credentials loaded securely from Firebase Config');
+  console.log('✅ Google credentials loaded from Secret Manager');
   
   // Decode base64 credentials
   const decoded = Buffer.from(configCreds, 'base64').toString('utf-8');
@@ -206,7 +204,7 @@ async function validateAppleReceipt(
     // Prepare request body for Apple API
     const requestBody = {
       'receipt-data': receiptData,
-      'password': APPLE_SHARED_SECRET,
+      'password': appleSharedSecret.value(),
       'exclude-old-transactions': true
     };
     
@@ -281,53 +279,22 @@ async function validateAppleReceipt(
       };
     }
     
-    // ── Product matching with same-group plan-change fallback ──────────────
-    //
-    // BUG RV-MATCH FIX: The original code required an exact product_id match.
-    // This fails when a user switches plans within the same subscription group
-    // (e.g. yearly → monthly).  Apple only allows ONE active subscription per
-    // group at a time.  When the user "buys" a different plan, Apple either
-    // defers the change (downgrade) or immediately transitions (upgrade) — in
-    // both cases the receipt contains the CURRENTLY ACTIVE product, not
-    // necessarily the one the user requested.
-    //
-    // Fix strategy:
-    //   1. Try exact match first (happy path — new subscriber or same-plan renewal).
-    //   2. If no exact match, look for ANY non-expired subscription in the receipt
-    //      from the same group.  Use whatever Apple actually billed.
-    //      Apple already charged the correct amount before this function is even
-    //      called, so trusting the receipt is always safe.
-    let matchingReceipt = latestReceipts.find((r: any) => r.product_id === productId);
-    let effectiveProductId = productId; // will be updated if fallback triggers
+    // Strict product matching — no fallback to other plans.
+    // If Apple's receipt does not contain the exact requested product ID, we
+    // return a clear error so the issue is visible and debuggable rather than
+    // silently recording the wrong plan type.
+    const matchingReceipt = latestReceipts.find((r: any) => r.product_id === productId);
 
     if (!matchingReceipt) {
-      console.warn(`⚠️ Exact product "${productId}" not found in receipt`);
-      console.warn(`📋 Available products:`, latestReceipts.map((r: any) => r.product_id));
-      console.log('🔄 Attempting plan-change fallback: looking for any active subscription in group...');
-
-      const now = Date.now();
-      // Filter to non-expired receipts, sort newest expiry first
-      const activeReceipts = latestReceipts
-        .filter((r: any) => parseInt(r.expires_date_ms) > now)
-        .sort((a: any, b: any) => parseInt(b.expires_date_ms) - parseInt(a.expires_date_ms));
-
-      if (activeReceipts.length > 0) {
-        matchingReceipt = activeReceipts[0];
-        effectiveProductId = matchingReceipt.product_id;
-        console.log(`✅ Plan-change fallback: using active subscription "${effectiveProductId}" from receipt`);
-        console.log(`   Requested: "${productId}" → Apple has active: "${effectiveProductId}"`);
-        console.log(`   This is normal for same-group plan changes (Apple defers downgrade / mirrors upgrade)`);
-      } else {
-        // No active subscriptions in receipt at all — hard failure
-        console.error(`❌ No active subscriptions found in receipt`);
-        return {
-          valid: false,
-          error: `No active subscription found in receipt. Requested "${productId}" but receipt contains: ${latestReceipts.map((r: any) => r.product_id).join(', ')}`
-        };
-      }
+      const available = latestReceipts.map((r: any) => r.product_id).join(', ');
+      console.error(`❌ Product "${productId}" not found in receipt. Available: [${available}]`);
+      return {
+        valid: false,
+        error: `Receipt does not contain "${productId}". Available products: [${available}]. Please contact support.`
+      };
     }
 
-    console.log(`✅ Found matching product: ${effectiveProductId}`);
+    console.log(`✅ Found matching product: ${productId}`);
     console.log(`📄 Transaction details:`, JSON.stringify(matchingReceipt, null, 2));
     
     // Extract expiration date (Apple returns milliseconds since epoch)
@@ -368,15 +335,12 @@ async function validateAppleReceipt(
     // SUCCESS! Return valid subscription data
     console.log('🎉 Receipt validation successful!');
     console.log(`✅ Valid subscription until: ${expiresAt.toISOString()}`);
-    if (effectiveProductId !== productId) {
-      console.log(`📝 Note: Requested "${productId}", recording as "${effectiveProductId}" (plan-change via Apple)`);
-    }
 
     return {
       valid: true,
       expiresAt: expiresAt,
       transactionId: transactionId,
-      actualProductId: effectiveProductId,  // BUG RV-MATCH FIX: pass real product ID
+      actualProductId: productId,
     };
     
   } catch (error) {
@@ -791,7 +755,47 @@ async function createOrUpdateSubscription(
     
     // Check if user has existing subscription
     const existingSubscription = await findExistingSubscription(userId);
-    
+
+    // ── IDEMPOTENCY GUARD ────────────────────────────────────────────────────
+    // Apple/Google can deliver the same transaction receipt multiple times.
+    // StoreKit re-queues every unfinished transaction on each app launch, and
+    // our auto-renewal code now processes every such delivery — which is correct
+    // for catching missed renewals but means the same transactionId can arrive
+    // 10-14 times in a short window.
+    //
+    // Without this guard, each call would append a new entry to transactions[]
+    // because arrayUnion compares by deep equality and `date: Timestamp.now()`
+    // differs on every invocation — even when transactionId is identical.
+    //
+    // Fix: if this transactionId already exists in the subscription's
+    // transactions array, do an idempotent billing-date update ONLY and return
+    // early — no duplicate array entry is written.
+    if (existingSubscription) {
+      const existingTransactions: any[] = existingSubscription.transactions || [];
+      const alreadyRecorded = existingTransactions.some(
+        (t: any) => t.transactionId === transactionId
+      );
+
+      if (alreadyRecorded) {
+        console.log(
+          `⚠️ Transaction "${transactionId}" already recorded for user ${userId} — ` +
+          `performing idempotent billing-date update only (no duplicate entry)`
+        );
+        // Still refresh billing metadata (safe to repeat — keeps Firestore in sync).
+        await db.collection('subscriptions').doc(existingSubscription.id).update({
+          nextBillingDate: admin.firestore.Timestamp.fromDate(expiresAt),
+          isActive: true,
+          status: 'active',
+          renewalAttempts: 0,
+          updatedAt: now,
+        });
+        await syncUserBillingDate(db, userId, expiresAt, now);
+        console.log(`✅ Idempotent update complete for subscription: ${existingSubscription.id}`);
+        return existingSubscription.id;
+      }
+    }
+    // ── END IDEMPOTENCY GUARD ────────────────────────────────────────────────
+
     // Create transaction record
     const transactionRecord = {
       transactionId: transactionId,
@@ -917,7 +921,9 @@ async function createOrUpdateSubscription(
  * @param context - Firebase callable function context
  * @returns ValidationResult with success/failure status
  */
-export const validatePurchaseReceipt = functions.https.onCall(
+export const validatePurchaseReceipt = functions
+  .runWith({ secrets: [appleSharedSecret, googleCredentials] })
+  .https.onCall(
   async (data: ReceiptValidationRequest, context): Promise<ValidationResult> => {
     
     console.log('🔐 Receipt validation requested');
@@ -1043,17 +1049,10 @@ export const validatePurchaseReceipt = functions.https.onCall(
       
       console.log('💾 Creating/updating subscription in Firestore...');
 
-      // BUG RV-MATCH FIX: use the product ID Apple actually has active
-      // (may differ from the requested one for same-group plan changes).
-      const effectiveProductId = validationResult.actualProductId || productId;
-      if (effectiveProductId !== productId) {
-        console.log(`📝 Plan-change: recording subscription as "${effectiveProductId}" (requested "${productId}")`);
-      }
-
       // Create/update subscription in Firestore
       const subscriptionId = await createOrUpdateSubscription(
         userId,
-        effectiveProductId,   // BUG RV-MATCH FIX: use real product from Apple receipt
+        productId,
         validationResult.expiresAt!,
         platform,
         validationResult.transactionId!
@@ -1064,8 +1063,7 @@ export const validatePurchaseReceipt = functions.https.onCall(
         userId: userId,
         action: 'receipt_validated',
         platform: platform,
-        productIdRequested: productId,          // what the app asked for
-        productId: effectiveProductId,          // what Apple actually has active
+        productId: productId,
         subscriptionId: subscriptionId,
         transactionId: validationResult.transactionId,
         expiresAt: admin.firestore.Timestamp.fromDate(validationResult.expiresAt!),
@@ -1082,7 +1080,7 @@ export const validatePurchaseReceipt = functions.https.onCall(
         message: 'Subscription activated successfully!',
         subscriptionId: subscriptionId,
         expiresAt: validationResult.expiresAt!.toISOString(),
-        productId: effectiveProductId,    // BUG RV-MATCH FIX: return real product ID
+        productId: productId,
         platform: platform,
         transactionId: validationResult.transactionId
       };

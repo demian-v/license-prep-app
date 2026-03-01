@@ -580,7 +580,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
                                                       },
                                                   ),
                                                   TextSpan(
-                                                    text: ' and start your 3-day free trial. After the trial ends, you\'ll lose access to premium features. You can subscribe for \$9.99/month or \$79.99/year.',
+                                                    text: ' and start your 3-day free trial. After the trial ends, you\'ll lose access to premium features. You can subscribe for \$9.99/month.',
                                                   ),
                                                 ],
                                               ),

@@ -698,22 +698,24 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
     // NEW: Check if this card matches the user's current plan
     final isCurrentPlan = _isCurrentUserPlan();
     
-    // Check if this is an upgrade opportunity
+    // Check if this is an upgrade or downgrade opportunity
     final isUpgradeOpportunity = _isUpgradeOpportunity();
-    
+    final isDowngradeOpportunity = _isDowngradeOpportunity();
+
     debugPrint('🎨 Building action area:');
     debugPrint('   - isPaidSubscription: $isPaidSubscription');
     debugPrint('   - isCurrentPlan: $isCurrentPlan');
     debugPrint('   - isUpgradeOpportunity: $isUpgradeOpportunity');
-    
-    // FIXED LOGIC:
-    // 1. If this card matches user's plan → Show "Subscribed" + Cancel button
-    // 2. If this is yearly and user has monthly → Show "Upgrade" button  
+    debugPrint('   - isDowngradeOpportunity: $isDowngradeOpportunity');
+
+    // LOGIC:
+    // 1. Current plan OR downgrade card → Show "Subscribed" message (no subscribe button)
+    // 2. Upgrade opportunity (monthly→yearly) → Show "Upgrade" button
     // 3. Otherwise → Show "Subscribe" button
-    
+
     Widget actionWidget;
-    if (isCurrentPlan) {
-      debugPrint('   - 📌 Showing: Subscription Status (Current Plan)');
+    if (isCurrentPlan || isDowngradeOpportunity) {
+      debugPrint('   - 📌 Showing: Subscription Status (Current Plan / Downgrade hidden)');
       actionWidget = _buildSubscriptionStatusIndicator();
     } else if (isUpgradeOpportunity) {
       debugPrint('   - ⬆️ Showing: Upgrade Button');
@@ -735,6 +737,17 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
         );
       },
     );
+  }
+
+  /// Returns true when this card is a LOWER-tier plan than the user's current
+  /// active subscription (e.g. monthly card while user has yearly).
+  /// In that case we hide the "Subscribe Now" button — the downgrade API
+  /// remains intact server-side for future use.
+  bool _isDowngradeOpportunity() {
+    if (widget.subscription == null) return false;
+    return widget.subscriptionType == SubscriptionType.monthly &&
+           widget.subscription!.planType == 'yearly' &&
+           widget.subscription!.isValidSubscription;
   }
 
   bool _isUpgradeOpportunity() {
@@ -877,58 +890,66 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
   }
 
   Widget _buildCanceledExpiredIndicator() {
-    return Container(
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Colors.white, Colors.red.shade50.withOpacity(0.6)],
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.shade200),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Colors.white, Colors.red.shade100],
+    return Column(
+      children: [
+        // ── Expired banner ──────────────────────────────────────────────────
+        Container(
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Colors.white, Colors.red.shade50.withOpacity(0.6)],
+            ),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.red.shade200),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Colors.white, Colors.red.shade100],
+                  ),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.red.shade300, width: 2),
+                ),
+                child: Icon(Icons.cancel, color: Colors.red.shade700, size: 24),
               ),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.red.shade300, width: 2),
-            ),
-            child: Icon(Icons.cancel, color: Colors.red.shade700, size: 24),
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Subscription Expired',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Subscription Expired',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text(
+                      'Renew to continue access',
+                      style: TextStyle(
+                        color: Colors.red.shade700,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
                 ),
-                Text(
-                  'Renew to continue access',
-                  style: TextStyle(
-                    color: Colors.red.shade700,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+        // ── Renew button (same IAP flow as Subscribe Now) ───────────────────
+        SizedBox(height: 12),
+        _buildEnhancedSubscribeButton(false),
+      ],
     );
   }
 

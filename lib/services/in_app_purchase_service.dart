@@ -12,11 +12,20 @@ class InAppPurchaseService {
   static const String monthlyProductId = 'monthly';
   static const String yearlyProductId = 'yearly';
   
-  // Product IDs that match your Firebase subscriptionsType and App Store Connect
+  // All product IDs registered in App Store Connect / Play Console.
+  // Kept for future use — yearly can be re-enabled here when needed.
   static const List<String> productIds = [
     monthlyProductId,
     yearlyProductId,
   ];
+
+  // Products currently offered and supported in the UI.
+  // Restored or auto-renewed transactions for products NOT in this set are
+  // silently completed (to clear StoreKit's queue) but NOT sent to the backend.
+  // This prevents old yearly receipts from StoreKit history being validated
+  // after yearly was removed from the UI, which caused "Product 'yearly' not
+  // found in receipt" errors and unnecessary Firebase function calls.
+  static const Set<String> _activeProductIds = {monthlyProductId};
 
   final InAppPurchase _inAppPurchase = InAppPurchase.instance;
   StreamSubscription<List<PurchaseDetails>>? _subscription;
@@ -25,6 +34,22 @@ class InAppPurchaseService {
   bool _purchasePending = false;
   bool _isRestoringPurchases = false;
   Timer? _restoreSessionTimer;
+
+  // In-session deduplication: tracks purchaseIDs already sent to
+  // validatePurchaseReceipt this session. Prevents redundant Firebase function
+  // calls when StoreKit re-delivers the same unfinished transaction multiple
+  // times on app launch (sandbox behaviour in particular).
+  final Set<String> _processedPurchaseIds = {};
+
+  // Concurrency guard: only one validation may be in flight at a time.
+  // In sandbox, Apple accelerates subscription renewals to every 5 minutes, so
+  // after 1 hour there may be 12+ pending renewal receipts in StoreKit's queue.
+  // Each has a DIFFERENT transaction_id → _processedPurchaseIds doesn't catch
+  // them. When restorePurchases() delivers all 12 simultaneously, without this
+  // flag they all fire concurrent Firebase calls and exhaust the rate limit.
+  // With this flag, only the first validation runs; the other 11 still call
+  // completePurchase() to clear StoreKit's queue but skip Firebase.
+  bool _isValidating = false;
 
   // Callbacks for purchase events
   void Function(String productId)? onPurchaseSuccess;
@@ -207,14 +232,24 @@ class InAppPurchaseService {
         
         case PurchaseStatus.purchased:
           debugPrint('✅ Purchase successful: ${purchaseDetails.productID}');
-          // FIXED: Only handle as a new purchase if the user explicitly initiated one.
-          // StoreKit can re-deliver unfinished transactions automatically on app start,
-          // which would otherwise trigger a phantom purchase without any user action.
           if (_purchasePending) {
+            // User explicitly initiated this purchase — always process,
+            // bypassing the _isValidating concurrency guard.
+            _handleSuccessfulPurchase(purchaseDetails, isUserInitiated: true);
+          } else if (_activeProductIds.contains(purchaseDetails.productID)) {
+            // Apple auto-renewal: StoreKit delivers the renewed subscription
+            // receipt automatically when the app is foregrounded after a renewal
+            // has occurred. We must process it so nextBillingDate gets updated
+            // in Firestore and the app correctly reflects the active subscription.
+            // Only active products are processed — inactive ones (e.g. yearly)
+            // are skipped to avoid "product not found in receipt" errors.
+            debugPrint('🔄 InAppPurchaseService: Apple auto-renewal receipt for '
+                '${purchaseDetails.productID} — processing to update billing date');
             _handleSuccessfulPurchase(purchaseDetails);
           } else {
-            debugPrint('⚠️ InAppPurchaseService: Received purchased event without a pending purchase '
-                '(auto-delivered by StoreKit) - completing silently');
+            // Non-subscription product delivered without user action — ignore.
+            debugPrint('⚠️ InAppPurchaseService: Received purchased event without a '
+                'pending purchase (auto-delivered by StoreKit for unknown product) — ignoring');
           }
           break;
         
@@ -235,7 +270,15 @@ class InAppPurchaseService {
           // Without this guard, opening the Subscriptions screen after those events arrive
           // (and callbacks get registered) causes a phantom "purchase" to complete.
           if (_isRestoringPurchases) {
-            _handleSuccessfulPurchase(purchaseDetails);
+            if (_activeProductIds.contains(purchaseDetails.productID)) {
+              // Only validate currently-offered products. Old purchases (e.g.
+              // yearly) are in StoreKit history but should not be sent to the
+              // backend since they are no longer in the active product set.
+              _handleSuccessfulPurchase(purchaseDetails);
+            } else {
+              debugPrint('⚠️ InAppPurchaseService: Skipping restore for '
+                  'non-active product ${purchaseDetails.productID} — completing silently');
+            }
             // Extend the restore session window on every arriving event so that
             // all products in the same batch get handled correctly.
             _restoreSessionTimer?.cancel();
@@ -258,12 +301,49 @@ class InAppPurchaseService {
     }
   }
 
-  /// Handle successful purchase
-  void _handleSuccessfulPurchase(PurchaseDetails purchaseDetails) {
+  /// Handle successful purchase.
+  ///
+  /// [isUserInitiated] – true when the user explicitly tapped "Subscribe" or
+  /// "Buy". User-initiated purchases bypass the [_isValidating] concurrency
+  /// guard so they are never silently dropped, even if a background restore
+  /// is already in flight.
+  void _handleSuccessfulPurchase(PurchaseDetails purchaseDetails,
+      {bool isUserInitiated = false}) {
     _purchasePending = false;
-    
+
+    // Concurrency guard: only one validation in flight at a time.
+    // In sandbox, Apple delivers many renewal receipts simultaneously (each
+    // with a different transaction_id). Without this guard they all reach
+    // Firebase concurrently and exhaust the rate limit.
+    // User-initiated purchases bypass this guard so they are always processed.
+    if (!isUserInitiated && _isValidating) {
+      debugPrint('⚠️ InAppPurchaseService: Validation already in progress — '
+          'skipping concurrent receipt for ${purchaseDetails.productID}/'
+          '${purchaseDetails.purchaseID} (StoreKit delivered multiple renewals at once)');
+      return;
+    }
+    _isValidating = true;
+
+    // In-session deduplication: skip if this exact purchase was already sent to
+    // the Firebase function this session. StoreKit can re-deliver the same
+    // unfinished transaction many times before we call completePurchase(), so
+    // without this guard each re-delivery triggers a redundant Firebase call.
+    // The backend has its own idempotency guard (by transactionId), but avoiding
+    // the call altogether is cheaper.
+    final purchaseId = purchaseDetails.purchaseID ?? '';
+    if (purchaseId.isNotEmpty) {
+      if (_processedPurchaseIds.contains(purchaseId)) {
+        debugPrint('⚠️ InAppPurchaseService: Purchase $purchaseId already processed '
+            'this session — skipping duplicate Firebase call');
+        _isValidating = false;
+        return;
+      }
+      _processedPurchaseIds.add(purchaseId);
+    }
+
     // Validate receipt with backend
     _validateReceipt(purchaseDetails).then((isValid) {
+      _isValidating = false;
       if (isValid) {
         debugPrint('✅ InAppPurchaseService: Receipt validated successfully');
         onPurchaseSuccess?.call(purchaseDetails.productID);
@@ -272,6 +352,7 @@ class InAppPurchaseService {
         onPurchaseError?.call('Receipt validation failed');
       }
     }).catchError((error) {
+      _isValidating = false;
       // BUG FIX: Call error callback when validation throws an exception
       debugPrint('❌ InAppPurchaseService: Receipt validation error: $error');
       onPurchaseError?.call('Receipt validation error: ${error.toString()}');
@@ -397,6 +478,8 @@ class InAppPurchaseService {
     _subscription = null;
     _restoreSessionTimer?.cancel();
     _restoreSessionTimer = null;
+    _processedPurchaseIds.clear();
+    _isValidating = false;
   }
 
   /// Set purchase callbacks

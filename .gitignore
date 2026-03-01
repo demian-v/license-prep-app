@@ -56,3 +56,7 @@ functions/service-account.json
 # Firebase Functions - Build artifacts (iOS/Android/Xcode cache)
 functions/build/
 functions/lib/
+
+# Node modules (never commit these)
+node_modules/
+functions/node_modules/

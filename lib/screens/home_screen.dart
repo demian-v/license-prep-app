@@ -11,6 +11,7 @@ import '../providers/content_provider.dart';
 import '../providers/state_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/subscription_provider.dart';
+import '../services/in_app_purchase_service.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -99,7 +100,32 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       } else if (subscriptionProvider.subscription != null) {
         print('✅ HomeScreen: SubscriptionProvider already initialized');
       }
-      
+
+      // AUTO-RENEWAL FIX: After subscription is loaded, check if Apple may have
+      // renewed it while the app was closed. If nextBillingDate has passed but
+      // Firestore status is still 'active', trigger a receipt restore so the new
+      // Apple receipt is processed and nextBillingDate updated.
+      if (authProvider.user != null) {
+        try {
+          final iapService = Provider.of<InAppPurchaseService>(context, listen: false);
+
+          // Register success callback so the subscription data refreshes in the
+          // UI immediately after the renewed receipt is validated by the backend.
+          iapService.onPurchaseSuccess = (productId) async {
+            print('🔄 HomeScreen: Renewal/restore processed ($productId) — refreshing subscription');
+            if (mounted && authProvider.user != null) {
+              await subscriptionProvider.refreshSubscription(authProvider.user!.id);
+            }
+          };
+
+          // Trigger restore only if needed (expired locally but active in Firestore).
+          await subscriptionProvider.checkAndAutoRestoreIfNeeded(iapService);
+        } catch (e) {
+          print('⚠️ HomeScreen: Auto-restore check failed: $e');
+          // Non-critical — subscription UI will still show correctly from Firestore data.
+        }
+      }
+
       // NOTE: We don't load theory/practice content here anymore!
       // Each screen (TheoryScreen, TestScreen) will load its own content when accessed
       // This makes HomeScreen load instantly while keeping lazy loading for content
