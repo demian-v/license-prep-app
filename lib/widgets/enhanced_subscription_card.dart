@@ -713,8 +713,13 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
     // 2. Upgrade opportunity (monthly→yearly) → Show "Upgrade" button
     // 3. Otherwise → Show "Subscribe" button
 
+    final isExpiredSamePlan = _isExpiredMatchingPlan();
+
     Widget actionWidget;
-    if (isCurrentPlan || isDowngradeOpportunity) {
+    if (isExpiredSamePlan) {
+      debugPrint('   - ⏰ Showing: Expired Subscription banner + Renew button');
+      actionWidget = _buildCanceledExpiredIndicator();
+    } else if (isCurrentPlan || isDowngradeOpportunity) {
       debugPrint('   - 📌 Showing: Subscription Status (Current Plan / Downgrade hidden)');
       actionWidget = _buildSubscriptionStatusIndicator();
     } else if (isUpgradeOpportunity) {
@@ -774,6 +779,11 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
   bool _isCurrentUserPlan() {
     if (widget.subscription == null) return false;
     
+    // Only treat as "current plan" if the subscription is actually valid/active.
+    // An inactive or expired subscription of the same type must NOT show
+    // "You're subscribed!" — the user needs to see the renew flow instead.
+    if (!widget.subscription!.isValidSubscription) return false;
+    
     final userPlanType = widget.subscription!.planType;
     final cardType = widget.subscriptionType;
     
@@ -797,13 +807,31 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
     return false;
   }
 
+  /// Returns true when this card's plan type matches the user's subscription
+  /// but the subscription is no longer valid (inactive/expired).
+  /// Used to show the "Subscription Expired" banner + Renew button instead
+  /// of a plain "Subscribe Now" button, giving the user clear context.
+  bool _isExpiredMatchingPlan() {
+    if (widget.subscription == null) return false;
+    if (widget.subscription!.isValidSubscription) return false; // still active — not expired
+    if (widget.subscription!.isTrial) return false; // trial expiry is handled elsewhere
+
+    final userPlanType = widget.subscription!.planType;
+    final cardType = widget.subscriptionType;
+
+    return (cardType == SubscriptionType.monthly && userPlanType == 'monthly') ||
+           (cardType == SubscriptionType.yearly  && userPlanType == 'yearly');
+  }
+
   Widget _buildSubscriptionStatusIndicator() {
     final isCanceled = widget.subscription?.status == 'canceled';
+    final isInactive = widget.subscription?.status == 'inactive';
     final isStillActive = widget.subscription?.isActive == true;
     
     if (isCanceled && isStillActive) {
       return _buildCanceledButActiveIndicator();
-    } else if (isCanceled) {
+    } else if (isCanceled || isInactive) {
+      // Both canceled-expired and inactive subscriptions show the expired + renew UI
       return _buildCanceledExpiredIndicator();
     } else {
       return _buildActiveSubscriptionIndicator();

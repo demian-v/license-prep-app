@@ -318,8 +318,12 @@ async function validateAppleReceipt(
     
     console.log('✅ Subscription is active and not expired');
     
-    // Extract transaction ID (use original_transaction_id for consistency)
-    const transactionId = matchingReceipt.original_transaction_id || matchingReceipt.transaction_id;
+    // Extract transaction ID.
+    // Use transaction_id (unique per billing cycle) so each renewal is recorded
+    // as a separate entry in the transactions[] array.
+    // original_transaction_id never changes across renewals — using it would
+    // cause the idempotency guard to block every renewal after the first purchase.
+    const transactionId = matchingReceipt.transaction_id || matchingReceipt.original_transaction_id;
     console.log(`🔑 Transaction ID: ${transactionId}`);
     
     // Check for cancellation
