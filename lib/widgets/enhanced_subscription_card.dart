@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import '../models/subscription.dart';
 import '../models/user_subscription.dart';
@@ -418,6 +420,36 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
                         fontStyle: FontStyle.italic,
                       ),
                       textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 8),
+                    RichText(
+                      textAlign: TextAlign.center,
+                      text: TextSpan(
+                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                        children: [
+                          TextSpan(text: 'By subscribing you agree to our '),
+                          TextSpan(
+                            text: 'Terms of Use',
+                            style: TextStyle(decoration: TextDecoration.underline),
+                            recognizer: TapGestureRecognizer()
+                              ..onTap = () => launchUrl(
+                                    Uri.parse('https://sites.google.com/view/driveusa/home'),
+                                    mode: LaunchMode.externalApplication,
+                                  ),
+                          ),
+                          TextSpan(text: ' and '),
+                          TextSpan(
+                            text: 'Privacy Policy',
+                            style: TextStyle(decoration: TextDecoration.underline),
+                            recognizer: TapGestureRecognizer()
+                              ..onTap = () => launchUrl(
+                                    Uri.parse('https://sites.google.com/view/driveusa/privacy-policy'),
+                                    mode: LaunchMode.externalApplication,
+                                  ),
+                          ),
+                          TextSpan(text: '.'),
+                        ],
+                      ),
                     ),
                   ],
                 ),
