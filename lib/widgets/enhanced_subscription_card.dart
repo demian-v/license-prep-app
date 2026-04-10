@@ -1017,7 +1017,7 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: () => _showCancelConfirmation(context),
+              onTap: _isProcessing ? null : () => _showCancelConfirmation(context),
               borderRadius: BorderRadius.circular(20),
               splashColor: Colors.white.withOpacity(0.3),
               highlightColor: Colors.white.withOpacity(0.2),
@@ -1065,6 +1065,7 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
               color: Colors.transparent,
               child: InkWell(
                 onTap: () async {
+                  if (_isProcessing) return;
                   Navigator.of(context).pop(); // Close dialog
                   await _handleCancelSubscription();
                 },

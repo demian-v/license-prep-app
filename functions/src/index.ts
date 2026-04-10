@@ -1926,3 +1926,101 @@ export const getRenewalStats = functions.https.onCall(async (data, context) => {
     );
   }
 });
+
+// =============================================================================
+// RECEIPT VALIDATION FUNCTION
+// =============================================================================
+
+// Export receipt validation function (imported from receipt-validation.ts)
+export { validatePurchaseReceipt };
+
+// =============================================================================
+// SUBSCRIPTION SECURITY FUNCTIONS
+// =============================================================================
+
+// Creates a trial subscription server-side on new user signup.
+// Replaces the client-side _createInitialTrialSubscription in direct_auth_service.dart.
+// Fixes the 2017-date bug — timestamps are set server-side.
+export const createTrialSubscription = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Not logged in');
+  const userId = context.auth.uid;
+
+  // Prevent duplicate trials
+  const existing = await db.collection('subscriptions')
+    .where('userId', '==', userId).limit(1).get();
+  if (!existing.empty) throw new functions.https.HttpsError('already-exists', 'Subscription exists');
+
+  const trialEnd = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000); // 3 days
+  const ref = db.collection('subscriptions').doc();
+  await ref.set({
+    id: ref.id, userId,
+    packageId: 3, status: 'active', isActive: true,
+    planType: 'trial', duration: 3, price: 0, trialUsed: 0,
+    trialEndsAt: admin.firestore.Timestamp.fromDate(trialEnd),
+    nextBillingDate: admin.firestore.Timestamp.fromDate(trialEnd),
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return { subscriptionId: ref.id };
+});
+
+// Cancels the user's active subscription server-side.
+// Preserves isActive=true until nextBillingDate (user keeps access for paid days remaining).
+export const cancelSubscription = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Not logged in');
+  const userId = context.auth.uid;
+
+  const snap = await db.collection('subscriptions')
+    .where('userId', '==', userId).where('isActive', '==', true).limit(1).get();
+  if (snap.empty) throw new functions.https.HttpsError('not-found', 'No active subscription');
+
+  const sub = snap.docs[0].data();
+  const now = new Date();
+  const nextBilling: Date | undefined = sub.nextBillingDate?.toDate();
+  const shouldStayActive = nextBilling != null && now < nextBilling;
+
+  await snap.docs[0].ref.update({
+    status: 'canceled',
+    isActive: shouldStayActive,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return { success: true, isActive: shouldStayActive };
+});
+
+// Upgrades an active monthly subscription to yearly (free proration for existing subscribers).
+// Server validates planType === 'monthly' before allowing upgrade.
+export const upgradeSubscription = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Not logged in');
+  const userId = context.auth.uid;
+  const { targetPlanType, packageId } = data;
+
+  if (targetPlanType !== 'yearly') {
+    throw new functions.https.HttpsError('invalid-argument', 'Only monthly→yearly upgrade supported');
+  }
+
+  // Must already be a paying monthly subscriber (not trial)
+  const snap = await db.collection('subscriptions')
+    .where('userId', '==', userId)
+    .where('isActive', '==', true)
+    .where('planType', '==', 'monthly')
+    .limit(1).get();
+  if (snap.empty) throw new functions.https.HttpsError('not-found', 'No active monthly subscription');
+
+  const sub = snap.docs[0].data();
+  const currentNextBilling = sub.nextBillingDate.toDate() as Date;
+  const now = new Date();
+
+  // Prorate: preserve remaining days from current monthly period
+  const remainingDays = Math.max(0, Math.ceil(
+    (currentNextBilling.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+  ));
+  const newBillingDate = new Date(now.getTime() + (365 + remainingDays) * 24 * 60 * 60 * 1000);
+
+  await snap.docs[0].ref.update({
+    packageId, planType: 'yearly', duration: 365,
+    nextBillingDate: admin.firestore.Timestamp.fromDate(newBillingDate),
+    status: 'active', isActive: true,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return { success: true, newBillingDate: newBillingDate.toISOString() };
+});
