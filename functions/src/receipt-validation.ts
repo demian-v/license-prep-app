@@ -176,7 +176,6 @@ async function retryWithBackoff<T>(
       
       // Exponential backoff: 1s, 2s, 4s...
       const delay = baseDelay * Math.pow(2, attempt);
-      console.log(`⏳ Retry attempt ${attempt + 1}/${maxRetries}, waiting ${delay}ms...`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -257,7 +256,6 @@ async function validateAppleReceipt(
       // Non-zero status means validation failed
       const errorMessage = APPLE_STATUS_CODES[status] || `Unknown error (status ${status})`;
       console.error(`❌ Receipt validation failed: ${errorMessage}`);
-      console.error(`📋 Full Apple response:`, JSON.stringify(response.data, null, 2));
       
       return {
         valid: false,
@@ -295,7 +293,6 @@ async function validateAppleReceipt(
     }
 
     console.log(`✅ Found matching product: ${productId}`);
-    console.log(`📄 Transaction details:`, JSON.stringify(matchingReceipt, null, 2));
     
     // Extract expiration date (Apple returns milliseconds since epoch)
     const expiresAtMs = parseInt(matchingReceipt.expires_date_ms);
@@ -423,7 +420,6 @@ async function validateGooglePlayReceipt(
     );
     
     console.log('✅ Google Play API responded successfully');
-    console.log(`📋 Response data:`, JSON.stringify(response.data, null, 2));
     
     // ========================================================================
     // STEP 3: Parse Response & Extract Subscription Data
@@ -1116,11 +1112,3 @@ export const validatePurchaseReceipt = functions
 // EXPORTED FOR USE IN index.ts
 // ============================================================================
 
-console.log('✅ Receipt validation module loaded');
-console.log('📦 Function: validatePurchaseReceipt');
-console.log('✅ Status: Phases 1-4 COMPLETE!');
-console.log('   ✅ Phase 1: File structure');
-console.log('   ✅ Phase 2: iOS receipt validation');
-console.log('   ✅ Phase 3: Android receipt validation');
-console.log('   ✅ Phase 4: Firestore integration (with transaction history, upgrades, renewals)');
-console.log('⏳ Next: Phase 5 (Security & Error Handling), Phase 6 (Deploy & Test)');

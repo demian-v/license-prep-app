@@ -50,9 +50,14 @@ service cloud.firestore {
         && counterId == ('user_' + request.auth.uid + '_reports');
     }
     
-    // Global report counter - allow authenticated users to read and write
+    // Global report counter - read-only; updates must be exactly +1 increment
     match /counters/global_report_counter {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow update: if request.auth != null
+        && request.resource.data.value == resource.data.value + 1
+        && request.resource.data.keys().hasOnly(['value', 'lastUpdated', 'description']);
+      allow create: if false;
+      allow delete: if false;
     }
     
     // Reports collection - consolidated rule for all report operations
@@ -91,13 +96,10 @@ service cloud.firestore {
       allow read: if isAdmin() && !reportId.matches('user_.*_report_[0-9]+');
     }
     
-    // NEW: Subscriptions collection - users can only access their own subscriptions
+    // Subscriptions collection - read-only for owner, all writes go through Cloud Functions
     match /subscriptions/{subscriptionId} {
-      allow read, write: if request.auth != null && 
-        request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && 
-        request.auth.uid == request.resource.data.userId &&
-        request.resource.data.keys().hasAll(['userId', 'packageId', 'status', 'isActive', 'createdAt', 'updatedAt']);
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow write: if false;
     }
     
     // NEW: SubscriptionsType collection - read-only for authenticated users

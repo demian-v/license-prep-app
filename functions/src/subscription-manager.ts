@@ -141,8 +141,7 @@ async function checkExpiredTrials(): Promise<{processed: number, emailsSent: num
         await logSubscriptionChange(subscriptionData, 'trial_expired', emailSent);
         
         result.processed++;
-        console.log(`✅ Processed expired trial for user: ${subscriptionData.userId}`);
-        
+
       } catch (error) {
         const errorMsg = `Error processing trial ${doc.id}: ${error instanceof Error ? error.message : String(error)}`;
         console.error(`❌ ${errorMsg}`);
@@ -197,8 +196,7 @@ async function checkExpiredCanceledSubscriptions(): Promise<{processed: number, 
         await logSubscriptionChange(subscriptionData, 'canceled_subscription_expired', emailSent);
         
         result.processed++;
-        console.log(`✅ Processed expired canceled subscription for user: ${subscriptionData.userId}`);
-        
+
       } catch (error) {
         const errorMsg = `Error processing canceled subscription ${doc.id}: ${error instanceof Error ? error.message : String(error)}`;
         console.error(`❌ ${errorMsg}`);
@@ -223,8 +221,6 @@ async function checkExpiredCanceledSubscriptions(): Promise<{processed: number, 
  * because only subscriptions.isActive was set to false.
  */
 async function updateExpiredTrial(subscriptionData: SubscriptionData): Promise<void> {
-  console.log(`📝 Updating expired trial for subscription: ${subscriptionData.id}`);
-  
   const db = getDb();
   const batch = db.batch();
 
@@ -250,7 +246,6 @@ async function updateExpiredTrial(subscriptionData: SubscriptionData): Promise<v
   );
 
   await batch.commit();
-  console.log(`✅ Trial subscription ${subscriptionData.id} marked inactive (both collections updated)`);
 }
 
 
@@ -260,8 +255,6 @@ async function updateExpiredTrial(subscriptionData: SubscriptionData): Promise<v
  * app correctly blocks premium access once the paid period ends.
  */
 async function updateExpiredCanceledSubscription(subscriptionData: SubscriptionData): Promise<void> {
-  console.log(`📝 Updating expired canceled subscription: ${subscriptionData.id}`);
-  
   const db = getDb();
   const batch = db.batch();
 
@@ -283,7 +276,6 @@ async function updateExpiredCanceledSubscription(subscriptionData: SubscriptionD
   );
 
   await batch.commit();
-  console.log(`✅ Canceled subscription ${subscriptionData.id} marked inactive (both collections updated)`);
 }
 
 /**
@@ -291,8 +283,6 @@ async function updateExpiredCanceledSubscription(subscriptionData: SubscriptionD
  */
 async function sendTrialExpiredNotification(userId: string): Promise<boolean> {
   try {
-    console.log(`📧 Sending trial expired notification to user: ${userId}`);
-    
     // Get user data for email
     const userData = await getUserData(userId);
     if (!userData) {
@@ -302,10 +292,6 @@ async function sendTrialExpiredNotification(userId: string): Promise<boolean> {
 
     // For now, we'll mock the email sending
     // In production, replace with actual email implementation
-    console.log(`📨 MOCK EMAIL: Trial expired notification sent to ${userData.email}`);
-    console.log(`   Subject: Your trial has expired`);
-    console.log(`   Language: ${userData.language}`);
-    
     return true; // Mock successful send
   } catch (error) {
     console.error(`❌ Error sending trial expired email to ${userId}:`, error);
@@ -318,8 +304,6 @@ async function sendTrialExpiredNotification(userId: string): Promise<boolean> {
  */
 async function sendSubscriptionExpiredNotification(userId: string): Promise<boolean> {
   try {
-    console.log(`📧 Sending subscription expired notification to user: ${userId}`);
-    
     // Get user data for email
     const userData = await getUserData(userId);
     if (!userData) {
@@ -329,10 +313,6 @@ async function sendSubscriptionExpiredNotification(userId: string): Promise<bool
 
     // For now, we'll mock the email sending
     // In production, replace with actual email implementation
-    console.log(`📨 MOCK EMAIL: Subscription expired notification sent to ${userData.email}`);
-    console.log(`   Subject: Your subscription has expired`);
-    console.log(`   Language: ${userData.language}`);
-    
     return true; // Mock successful send
   } catch (error) {
     console.error(`❌ Error sending subscription expired email to ${userId}:`, error);

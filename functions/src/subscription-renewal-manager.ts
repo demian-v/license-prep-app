@@ -144,7 +144,6 @@ async function checkSubscriptionRenewals(): Promise<{
         if (emailSent) result.emailsSent++;
         result.processed++;
 
-        console.log(`✅ Processed overdue subscription for user: ${subscriptionData.userId}, deactivated: ${deactivated}`);
       } catch (error) {
         const errorMsg = `Error processing overdue subscription ${doc.id}: ${error instanceof Error ? error.message : String(error)}`;
         console.error(`❌ ${errorMsg}`);
@@ -179,8 +178,6 @@ async function processOverdueSubscription(
 
   if (newAttempts > MAX_RENEWAL_ATTEMPTS) {
     // ── Deactivate ──────────────────────────────────────────────────────────
-    console.log(`❌ Subscription ${subscriptionData.id} exceeded ${MAX_RENEWAL_ATTEMPTS} grace periods → deactivating`);
-
     const batch = db.batch();
     batch.update(db.collection('subscriptions').doc(subscriptionData.id), {
       isActive: false,
@@ -210,8 +207,6 @@ async function processOverdueSubscription(
   }
 
   // ── Mark past_due, increment counter ──────────────────────────────────────
-  console.log(`⚠️ Subscription ${subscriptionData.id} is overdue (attempt ${newAttempts}/${MAX_RENEWAL_ATTEMPTS}) → marking past_due`);
-
   await db.collection('subscriptions').doc(subscriptionData.id).update({
     status: 'past_due',
     renewalAttempts: newAttempts,
@@ -229,10 +224,6 @@ async function processOverdueSubscription(
     ? await sendRenewalFailureNotification(subscriptionData.userId)
     : false;
 
-  if (!isFirstMiss) {
-    console.log(`📭 Skipping email for attempt ${newAttempts}/${MAX_RENEWAL_ATTEMPTS} (already notified on first miss)`);
-  }
-
   await logRenewalActivity(subscriptionData, 'subscription_past_due', false, emailSent);
 
   return { deactivated: false, emailSent };
@@ -243,8 +234,6 @@ async function processOverdueSubscription(
  */
 async function sendRenewalFailureNotification(userId: string): Promise<boolean> {
   try {
-    console.log(`📧 Sending renewal failure notification to user: ${userId}`);
-    
     const userData = await getUserData(userId);
     if (!userData) {
       console.warn(`⚠️ User data not found for ${userId}, skipping email`);
@@ -252,10 +241,6 @@ async function sendRenewalFailureNotification(userId: string): Promise<boolean> 
     }
 
     // Mock email sending - replace with actual implementation
-    console.log(`📨 MOCK EMAIL: Renewal failure notification sent to ${userData.email}`);
-    console.log(`   Subject: Action required: Subscription renewal failed`);
-    console.log(`   Language: ${userData.language}`);
-    console.log(`   Template: RENEWAL_FAILURE_TEMPLATES.${userData.language}`);
     
     return true;
   } catch (error) {

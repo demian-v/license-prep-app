@@ -573,10 +573,13 @@ class SessionManager {
       if (subscription.status == 'active' && _isSubscriptionExpired(subscription)) {
         debugPrint('⚠️ SessionManager: Found expired subscription, updating status...');
         
-        // Update subscription status to inactive
-        await _subscriptionService.updateSubscriptionStatus(userId, 'inactive');
-        
-        debugPrint('✅ SessionManager: Subscription status updated to inactive');
+        // Update subscription status to inactive (best-effort; server handles expiry via Cloud Scheduler)
+        try {
+          await _subscriptionService.updateSubscriptionStatus(userId, 'inactive');
+          debugPrint('✅ SessionManager: Subscription status updated to inactive');
+        } catch (e) {
+          debugPrint('ℹ️ SessionManager: Client-side status update skipped (server handles expiry): $e');
+        }
         
         // Clear subscription cache to force refresh
         await _clearSubscriptionCache(userId);

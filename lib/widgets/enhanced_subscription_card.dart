@@ -734,12 +734,6 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
     final isUpgradeOpportunity = _isUpgradeOpportunity();
     final isDowngradeOpportunity = _isDowngradeOpportunity();
 
-    debugPrint('🎨 Building action area:');
-    debugPrint('   - isPaidSubscription: $isPaidSubscription');
-    debugPrint('   - isCurrentPlan: $isCurrentPlan');
-    debugPrint('   - isUpgradeOpportunity: $isUpgradeOpportunity');
-    debugPrint('   - isDowngradeOpportunity: $isDowngradeOpportunity');
-
     // LOGIC:
     // 1. Current plan OR downgrade card → Show "Subscribed" message (no subscribe button)
     // 2. Upgrade opportunity (monthly→yearly) → Show "Upgrade" button
@@ -749,16 +743,12 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
 
     Widget actionWidget;
     if (isExpiredSamePlan) {
-      debugPrint('   - ⏰ Showing: Expired Subscription banner + Renew button');
       actionWidget = _buildCanceledExpiredIndicator();
     } else if (isCurrentPlan || isDowngradeOpportunity) {
-      debugPrint('   - 📌 Showing: Subscription Status (Current Plan / Downgrade hidden)');
       actionWidget = _buildSubscriptionStatusIndicator();
     } else if (isUpgradeOpportunity) {
-      debugPrint('   - ⬆️ Showing: Upgrade Button');
       actionWidget = _buildUpgradeButton();
     } else {
-      debugPrint('   - 🛒 Showing: Subscribe Button');
       actionWidget = _buildEnhancedSubscribeButton(isActiveTrial);
     }
     
@@ -790,20 +780,13 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
   bool _isUpgradeOpportunity() {
     if (widget.subscription == null) return false;
     
-    debugPrint('🔍 Checking upgrade opportunity:');
-    debugPrint('   - User plan: ${widget.subscription!.planType}');
-    debugPrint('   - Card type: ${widget.subscriptionType}');
-    debugPrint('   - User has valid subscription: ${widget.subscription!.isValidSubscription}');
-    debugPrint('   - User can upgrade to yearly: ${widget.subscription!.canUpgradeToYearly()}');
-    
     // Show upgrade button if:
     // 1. User has monthly subscription AND this card is yearly
     // 2. User has valid subscription
-    final isUpgrade = widget.subscription!.isMonthly && 
+    final isUpgrade = widget.subscription!.isMonthly &&
                      widget.subscriptionType == SubscriptionType.yearly &&
                      widget.subscription!.isValidSubscription;
-    
-    debugPrint('   - Is upgrade opportunity: $isUpgrade');
+
     return isUpgrade;
   }
 
@@ -819,23 +802,16 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
     final userPlanType = widget.subscription!.planType;
     final cardType = widget.subscriptionType;
     
-    debugPrint('🎯 Checking if current plan:');
-    debugPrint('   - User plan: $userPlanType');
-    debugPrint('   - Card type: $cardType');
-    
     // Monthly card + user has monthly = current plan
     if (cardType == SubscriptionType.monthly && userPlanType == 'monthly') {
-      debugPrint('   - ✅ Monthly match - IS current plan');
       return true;
     }
-    
+
     // Yearly card + user has yearly = current plan
     if (cardType == SubscriptionType.yearly && userPlanType == 'yearly') {
-      debugPrint('   - ✅ Yearly match - IS current plan');
       return true;
     }
-    
-    debugPrint('   - ❌ No match - NOT current plan');
+
     return false;
   }
 

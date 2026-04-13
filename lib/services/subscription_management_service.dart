@@ -2,10 +2,9 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:uuid/uuid.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import '../models/user_subscription.dart';
 import '../models/subscription_package.dart';
-import '../models/user.dart';
 import 'billing_calculator.dart';
 import 'upgrade_calculator.dart';
 
@@ -15,20 +14,24 @@ class SubscriptionManagementService {
   static const String packagesCacheKey = 'subscription_packages_cache';
   
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final Uuid _uuid = Uuid();
 
   /// Initialize trial for new user
   Future<UserSubscription> initializeTrial(String userId) async {
     debugPrint('🆓 SubscriptionManagementService: Initializing trial for user: $userId');
-    
+
     try {
       final now = DateTime.now();
       final trialEndsAt = BillingCalculator.calculateTrialEndDate(now);
-      
-      final subscription = UserSubscription(
-        id: _uuid.v4(),
+
+      // Create trial subscription via Cloud Function (server-side timestamps + duplicate prevention)
+      final callable = FirebaseFunctions.instance.httpsCallable('createTrialSubscription');
+      await callable.call();
+
+      // Re-fetch from Firestore — server is now the source of truth
+      final subscription = await getUserSubscription(userId) ?? UserSubscription(
+        id: '',
         userId: userId,
-        packageId: 3, // Trial package ID from your Firebase subscriptionsType
+        packageId: 3,
         status: 'active',
         isActive: true,
         createdAt: now,
@@ -37,18 +40,15 @@ class SubscriptionManagementService {
         trialUsed: 0,
         duration: BillingCalculator.TRIAL_DAYS,
         planType: 'trial',
-        nextBillingDate: trialEndsAt, // CRITICAL: Must match user.nextBillingDate
+        nextBillingDate: trialEndsAt,
       );
-      
-      // Save to Firebase
-      await _saveSubscriptionToFirebase(subscription);
-      
+
       // Save to local cache
       await _saveSubscriptionToCache(subscription);
-      
+
       // Sync billing dates between user and subscription tables
       await _syncUserBillingDates(userId, now, trialEndsAt);
-      
+
       debugPrint('✅ SubscriptionManagementService: Trial initialized successfully');
       debugPrint('📅 Trial ends at: ${trialEndsAt.toIso8601String()}');
       debugPrint('🔄 User and subscription billing dates synchronized');
@@ -234,16 +234,24 @@ class SubscriptionManagementService {
         isActive: true,
       );
       
-      // Save to Firebase and cache
-      await _saveSubscriptionToFirebase(upgradedSubscription);
-      await _saveSubscriptionToCache(upgradedSubscription);
-      await _syncUserBillingDates(userId, now, newBillingDate);
-      
+      // Upgrade via Cloud Function (server-side validation)
+      final callable = FirebaseFunctions.instance.httpsCallable('upgradeSubscription');
+      await callable.call({
+        'targetPlanType': targetPlanType,
+        'packageId': newPackageId,
+      });
+
+      // Re-fetch from Firestore — server is now the source of truth
+      final updated = await getUserSubscription(userId) ?? upgradedSubscription;
+
+      await _saveSubscriptionToCache(updated);
+      await _syncUserBillingDates(userId, now, updated.nextBillingDate ?? newBillingDate);
+
       debugPrint('✅ SubscriptionManagementService: Subscription upgraded successfully');
       debugPrint('📊 Plan: ${currentSubscription.planType} → $targetPlanType');
-      debugPrint('📅 New billing date: ${newBillingDate.toIso8601String()}');
-      
-      return upgradedSubscription;
+      debugPrint('📅 New billing date: ${updated.nextBillingDate?.toIso8601String()}');
+
+      return updated;
     } catch (e) {
       debugPrint('❌ SubscriptionManagementService: Error upgrading subscription: $e');
       throw Exception('Failed to upgrade subscription: $e');
@@ -402,24 +410,28 @@ class SubscriptionManagementService {
         // Keep nextBillingDate unchanged - user gets full value
       );
       
-      // Save to Firebase
-      await _saveSubscriptionToFirebase(canceledSubscription);
-      
+      // Cancel via Cloud Function (server-side validation)
+      final callable = FirebaseFunctions.instance.httpsCallable('cancelSubscription');
+      await callable.call();
+
+      // Re-fetch from Firestore — server is now the source of truth
+      final updated = await getUserSubscription(userId) ?? canceledSubscription;
+
       // Save to local cache
-      await _saveSubscriptionToCache(canceledSubscription);
-      
+      await _saveSubscriptionToCache(updated);
+
       // Sync billing dates (keep existing dates)
       await _syncUserBillingDates(
-        userId, 
+        userId,
         currentSubscription.createdAt ?? now,
-        currentSubscription.nextBillingDate ?? now
+        updated.nextBillingDate ?? now
       );
       
       debugPrint('✅ SubscriptionManagementService: Subscription canceled successfully');
       debugPrint('📊 Status: ${currentSubscription.status} → canceled');
       debugPrint('📊 IsActive: ${currentSubscription.isActive} → $shouldStayActive');
       
-      return canceledSubscription;
+      return updated;
       
     } catch (e) {
       debugPrint('❌ SubscriptionManagementService: Error canceling subscription: $e');
@@ -638,9 +650,9 @@ class SubscriptionManagementService {
     DateTime nextBillingDate
   ) async {
     try {
-      debugPrint('� SubscriptionManagementService: Syncing billing dates for user: $userId');
+      debugPrint('🔄 SubscriptionManagementService: Syncing billing dates for user: $userId');
       debugPrint('📅 Last billing date: ${lastBillingDate.toIso8601String()}');
-      debugPrint('� Next billing date: ${nextBillingDate.toIso8601String()}');
+      debugPrint('📅 Next billing date: ${nextBillingDate.toIso8601String()}');
       
       await _firestore.collection('users').doc(userId).update({
         'lastBillingDate': Timestamp.fromDate(lastBillingDate),

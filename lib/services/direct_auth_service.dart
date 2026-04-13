@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import '../models/user.dart' as app_models;
 import '../services/api/base/auth_api_interface.dart';
@@ -127,9 +128,10 @@ class DirectAuthService implements AuthApiInterface {
       await _firestore.collection('users').doc(userId).set(userData);
       debugPrint('✅ [DirectAuthService] Created Firestore user document with billing fields');
       
-      // Create initial trial subscription record
-      await _createInitialTrialSubscription(userId, trialEndDate);
-      
+      // Create initial trial subscription via Cloud Function (server-side timestamps + duplicate prevention)
+      final callable = FirebaseFunctions.instance.httpsCallable('createTrialSubscription');
+      await callable.call();
+
       // Create progress document
       await _firestore.collection('progress').doc(userId).set({
         'savedQuestions': [],
@@ -145,34 +147,6 @@ class DirectAuthService implements AuthApiInterface {
     }
   }
   
-  /// Create initial trial subscription record for new user
-  Future<void> _createInitialTrialSubscription(String userId, DateTime trialEndDate) async {
-    try {
-      debugPrint('🆓 [DirectAuthService] Creating initial trial subscription for user: $userId');
-      
-      final subscriptionData = {
-        'createdAt': FieldValue.serverTimestamp(),
-        'isActive': true,
-        'updatedAt': FieldValue.serverTimestamp(),
-        'status': 'active',
-        'trialEndsAt': Timestamp.fromDate(trialEndDate),
-        'trialUsed': 0, // 0 during trial period
-        'packageId': 3, // Trial package ID (from your specification)
-        'duration': BillingCalculator.TRIAL_DAYS, // 3 days trial
-        'userId': userId,
-        'nextBillingDate': Timestamp.fromDate(trialEndDate), // MATCHES user table
-      };
-      
-      await _firestore.collection('subscriptions').add(subscriptionData);
-      debugPrint('✅ [DirectAuthService] Created initial trial subscription');
-      debugPrint('    - Trial ends: $trialEndDate');
-      debugPrint('    - NextBillingDate matches user table: ✅');
-    } catch (e) {
-      debugPrint('⚠️ [DirectAuthService] Error creating trial subscription: $e');
-      // Don't throw error - user creation should succeed even if subscription fails
-    }
-  }
-
   /// Log in a user directly with Firebase
   Future<bool> signIn(String email, String password) async {
     try {
