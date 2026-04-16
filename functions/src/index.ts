@@ -1,5 +1,15 @@
 import * as functions from 'firebase-functions/v1';
 import * as admin from 'firebase-admin';
+import * as fs from 'fs';
+import * as path from 'path';
+import { defineInt, defineSecret } from 'firebase-functions/params';
+import {
+  SignedDataVerifier,
+  Environment,
+  NotificationTypeV2,
+  AutoRenewStatus,
+} from '@apple/app-store-server-library';
+import { google } from 'googleapis';
 import { 
   processExpiredSubscriptions, 
   testSubscriptionProcessing,
@@ -22,6 +32,23 @@ admin.initializeApp();
 
 // Get Firestore reference
 const db = admin.firestore();
+
+// Google credentials secret — same secret used by receipt-validation.ts
+const googleCredentials = defineSecret('GOOGLE_CREDENTIALS');
+
+// Apple numeric App ID — set via: firebase functions:params:set APPLE_APP_ID="YOUR_NUMERIC_ID"
+// Found in: App Store Connect → Your App → General → App Information → Apple ID
+const appleAppId = defineInt('APPLE_APP_ID', { default: 0 });
+
+// VERIFY this bundle ID matches App Store Connect before deploying.
+// If wrong, ALL webhook verifications fail silently (caught → 200, no processing).
+const APPLE_BUNDLE_ID = 'com.driveusa.app';
+
+// ⚠️  Path: __dirname = functions/lib at runtime (tsconfig outDir:"lib", rootDir:"src")
+// functions/lib/../certs/ = functions/certs/  — ONE "../" not two "../../"
+const appleRootCAs: Buffer[] = [
+  fs.readFileSync(path.join(__dirname, '../certs/AppleRootCA-G3.cer')),
+];
 
 // Content functions
 export const getQuizTopics = functions.https.onCall(async (data, context) => {
@@ -2020,3 +2047,420 @@ export const upgradeSubscription = functions.https.onCall(async (data, context) 
   });
   return { success: true, newBillingDate: newBillingDate.toISOString() };
 });
+
+// =============================================================================
+// WEBHOOK HANDLERS
+// =============================================================================
+
+/**
+ * Apple App Store Server Notifications webhook.
+ *
+ * Receives real-time subscription events (renewals, cancellations, expirations)
+ * directly from Apple. Verifies the JWS signature, decodes the payload, and
+ * updates Firestore atomically.
+ *
+ * Register URL in App Store Connect → Your App → App Store Server Notifications:
+ *   https://us-central1-licenseprepapp.cloudfunctions.net/appStoreWebhook
+ *
+ * IMPORTANT: Always returns HTTP 200 — non-200 triggers Apple retries for our own bugs.
+ */
+export const appStoreWebhook = functions.https.onRequest(async (req, res) => {
+  if (req.method !== 'POST') { res.status(405).send('Method Not Allowed'); return; }
+
+  const { signedPayload } = req.body;
+  if (!signedPayload) { res.status(200).json({ received: true }); return; }
+
+  try {
+    const appId = appleAppId.value();
+
+    // Try to verify against the correct environment.
+    // Apple sends sandbox notifications (sandbox purchases, sandbox test button) signed with
+    // the sandbox cert chain. Production notifications are signed with the production chain.
+    // VerificationException status 4 = ENVIRONMENT_MISMATCH — retry with the other environment.
+    const makeVerifier = (env: Environment) => new SignedDataVerifier(
+      appleRootCAs,
+      true,                          // enableOnlineChecks (OCSP)
+      env,
+      APPLE_BUNDLE_ID,
+      appId > 0 ? appId : undefined  // required for Production; optional for Sandbox
+    );
+
+    let verifier: SignedDataVerifier;
+    let notification: Awaited<ReturnType<SignedDataVerifier['verifyAndDecodeNotification']>>;
+    try {
+      // In emulator always use sandbox. In production try production first.
+      const primaryEnv = process.env.FUNCTIONS_EMULATOR ? Environment.SANDBOX : Environment.PRODUCTION;
+      verifier = makeVerifier(primaryEnv);
+      notification = await verifier.verifyAndDecodeNotification(signedPayload);
+    } catch (e: any) {
+      if (e?.status === 4 && !process.env.FUNCTIONS_EMULATOR) {
+        // ENVIRONMENT_MISMATCH — this is a sandbox notification sent to the production endpoint
+        // (sandbox purchases, App Store Connect "Send test notification" sandbox button)
+        console.log('ℹ️ appStoreWebhook: Production verification failed with ENVIRONMENT_MISMATCH — retrying as Sandbox');
+        verifier = makeVerifier(Environment.SANDBOX);
+        notification = await verifier.verifyAndDecodeNotification(signedPayload);
+      } else {
+        throw e;
+      }
+    }
+    const { notificationType, subtype, data, notificationUUID } = notification;
+
+    // Apple sends this when you click "Send test notification" in App Store Connect
+    if (notificationType === NotificationTypeV2.TEST) {
+      console.log('✅ appStoreWebhook: Test notification received');
+      res.status(200).json({ received: true });
+      return;
+    }
+
+    if (!data?.signedTransactionInfo) {
+      console.log(`ℹ️ appStoreWebhook: No transaction info for ${notificationType}`);
+      res.status(200).json({ received: true });
+      return;
+    }
+
+    const transaction = await verifier.verifyAndDecodeTransaction(data.signedTransactionInfo);
+    const { originalTransactionId, expiresDate, productId } = transaction;
+
+    // Decode renewalInfo — needed for DID_CHANGE_RENEWAL_STATUS autoRenewStatus branching (Bug B2 fix)
+    let renewalInfo: Awaited<ReturnType<typeof verifier.verifyAndDecodeRenewalInfo>> | null = null;
+    if (data.signedRenewalInfo) {
+      renewalInfo = await verifier.verifyAndDecodeRenewalInfo(data.signedRenewalInfo);
+    }
+
+    // Idempotency: notificationUUID is Apple's own dedup key — same UUID on every retry
+    if (!notificationUUID) {
+      console.warn('⚠️ appStoreWebhook: Missing notificationUUID, skipping');
+      res.status(200).json({ received: true });
+      return;
+    }
+
+    const alreadyProcessed = await db.collection('processedWebhooks').doc(notificationUUID).get();
+    if (alreadyProcessed.exists) {
+      console.log(`⏭️ appStoreWebhook: Already processed ${notificationUUID}`);
+      res.status(200).json({ received: true });
+      return;
+    }
+
+    // Look up subscription by originalTransactionId
+    const snap = await db.collection('subscriptions')
+      .where('originalTransactionId', '==', originalTransactionId)
+      .limit(1).get();
+
+    if (snap.empty) {
+      // Existing subscriber: originalTransactionId not yet stored (pre-deployment purchase).
+      // Will self-heal on their next purchase through validatePurchaseReceipt.
+      console.warn(`⚠️ appStoreWebhook: No subscription found for txn ${originalTransactionId}. ` +
+        'Existing subscriber without originalTransactionId — will self-heal on next purchase.');
+      await db.collection('processedWebhooks').doc(notificationUUID).set({
+        processedAt: admin.firestore.FieldValue.serverTimestamp(),
+        notificationType,
+        subtype: subtype ?? null,
+        originalTransactionId,
+        result: 'subscription_not_found',
+      });
+      res.status(200).json({ received: true });
+      return;
+    }
+
+    const subRef = snap.docs[0].ref;
+    const subData = snap.docs[0].data();
+    const userId = subData.userId as string;
+    const userRef = db.collection('users').doc(userId);
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    // expiresDate is Unix milliseconds per JWSTransactionDecodedPayload
+    const expiresTimestamp = expiresDate
+      ? admin.firestore.Timestamp.fromMillis(expiresDate)
+      : null;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let subUpdates: Record<string, any> = { updatedAt: now };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let userUpdates: Record<string, any> | null = null;
+    let logAction = notificationType as string;
+
+    switch (notificationType) {
+      case NotificationTypeV2.DID_RENEW:
+      case NotificationTypeV2.SUBSCRIBED:
+        subUpdates = {
+          ...subUpdates,
+          isActive: true,
+          status: 'active',
+          renewalAttempts: 0,
+          ...(expiresTimestamp && { nextBillingDate: expiresTimestamp }),
+        };
+        userUpdates = {
+          isActive: true,
+          ...(expiresTimestamp && { nextBillingDate: expiresTimestamp }),
+          lastUpdated: now,
+        };
+        logAction = 'apple_renewed';
+        break;
+
+      case NotificationTypeV2.DID_FAIL_TO_RENEW:
+        // Apple's grace period begins — keep access, flag as past_due
+        subUpdates = { ...subUpdates, status: 'past_due' };
+        logAction = 'apple_billing_failed';
+        break;
+
+      case NotificationTypeV2.GRACE_PERIOD_EXPIRED:
+      case NotificationTypeV2.EXPIRED:
+        subUpdates = { ...subUpdates, isActive: false, status: 'inactive' };
+        userUpdates = { isActive: false, lastUpdated: now };
+        logAction = 'apple_expired';
+        break;
+
+      case NotificationTypeV2.REFUND:
+      case NotificationTypeV2.REVOKE:
+        subUpdates = { ...subUpdates, isActive: false, status: 'inactive' };
+        userUpdates = { isActive: false, lastUpdated: now };
+        logAction = 'apple_revoked';
+        break;
+
+      case NotificationTypeV2.DID_CHANGE_RENEWAL_STATUS: {
+        // BUG B2 FIX: subtype distinguishes enable vs disable — both arrive as this notification type.
+        // Original plan set status='canceled' unconditionally, which incorrectly canceled subscriptions
+        // when users RE-ENABLED auto-renew. Must check autoRenewStatus from signedRenewalInfo.
+        const autoRenewOn = renewalInfo?.autoRenewStatus === AutoRenewStatus.ON;
+        if (autoRenewOn) {
+          subUpdates = { ...subUpdates, status: 'active' };
+          userUpdates = { isActive: true, lastUpdated: now };
+          logAction = 'apple_autorenew_enabled';
+        } else {
+          // User disabled auto-renew — access continues until nextBillingDate
+          subUpdates = { ...subUpdates, status: 'canceled' };
+          logAction = 'apple_cancel_requested';
+        }
+        break;
+      }
+
+      default:
+        console.log(`ℹ️ appStoreWebhook: Unhandled type ${notificationType}, skipping`);
+        res.status(200).json({ received: true });
+        return;
+    }
+
+    // Atomic batch: subscription + users (if needed) + dedup record + audit log
+    const batch = db.batch();
+    batch.update(subRef, subUpdates);
+    if (userUpdates) {
+      batch.set(userRef, userUpdates, { merge: true });
+    }
+    batch.set(db.collection('processedWebhooks').doc(notificationUUID), {
+      processedAt: now,
+      notificationType,
+      subtype: subtype ?? null,
+      originalTransactionId,
+    });
+    batch.set(db.collection('subscriptionLogs').doc(), {
+      userId,
+      subscriptionId: snap.docs[0].id,
+      action: logAction,
+      oldStatus: { isActive: subData.isActive, status: subData.status },
+      newStatus: {
+        isActive: subUpdates.isActive !== undefined ? subUpdates.isActive : subData.isActive,
+        status: subUpdates.status ?? subData.status,
+      },
+      timestamp: now,
+      source: 'apple_webhook',
+      originalTransactionId,
+      productId,
+    });
+    await batch.commit();
+
+    console.log(`✅ appStoreWebhook: ${logAction} for user ${userId}`);
+    res.status(200).json({ received: true });
+
+  } catch (err) {
+    console.error('❌ appStoreWebhook error:', err);
+    // Always return 200 — non-200 causes Apple to retry for our own bugs
+    res.status(200).json({ received: true });
+  }
+});
+
+/**
+ * Google Play Real-Time Developer Notifications handler.
+ *
+ * Triggered by Pub/Sub topic 'play-rtdn'. Handles subscription lifecycle
+ * events: renewals, cancellations, expirations, and billing failures.
+ *
+ * Setup:
+ *   1. GCP Console → Pub/Sub → Create topic: play-rtdn
+ *      (originally 'google-play-rtdn' but renamed to comply with GCP naming restrictions)
+ *   2. Grant google-play-developer-notifications@system.gserviceaccount.com Publisher role
+ *   3. Play Console → Monetization settings → Real-time Developer Notifications
+ *      → projects/licenseprepapp/topics/play-rtdn
+ *
+ * NOTE: Do NOT rethrow errors — Pub/Sub retries on thrown exceptions.
+ */
+export const handleGooglePlayNotifications = functions
+  .runWith({ secrets: [googleCredentials] })
+  .pubsub.topic('play-rtdn')
+  .onPublish(async (message) => {
+    try {
+      const dataStr = Buffer.from(message.data, 'base64').toString('utf-8');
+      const notification = JSON.parse(dataStr);
+
+      if (notification.testNotification) {
+        console.log('✅ handleGooglePlayNotifications: Test notification received');
+        return;
+      }
+
+      if (!notification.subscriptionNotification) {
+        console.log('ℹ️ handleGooglePlayNotifications: Non-subscription notification, skipping');
+        return;
+      }
+
+      const { notificationType, purchaseToken } = notification.subscriptionNotification;
+
+      // BUG B3 FIX: Pub/Sub guarantees at-least-once delivery — deduplicate using message.messageId.
+      // Without this, duplicate deliveries can double-write subscriptionLogs or clobber status
+      // if a stale EXPIRED message arrives after a RENEWED message.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const messageId = (message as any).messageId as string;
+      const alreadyProcessed = await db.collection('processedWebhooks').doc(`gp_${messageId}`).get();
+      if (alreadyProcessed.exists) {
+        console.log(`⏭️ handleGooglePlayNotifications: Already processed ${messageId}`);
+        return;
+      }
+
+      const subSnap = await db.collection('subscriptions')
+        .where('androidPurchaseToken', '==', purchaseToken)
+        .limit(1).get();
+
+      if (subSnap.empty) {
+        // Existing subscriber: androidPurchaseToken not yet stored (pre-deployment purchase).
+        // Will self-heal on their next purchase through validatePurchaseReceipt.
+        console.warn('⚠️ handleGooglePlayNotifications: No subscription found for purchaseToken. ' +
+          'Existing subscriber without androidPurchaseToken — will self-heal on next purchase.');
+        await db.collection('processedWebhooks').doc(`gp_${messageId}`).set({
+          processedAt: admin.firestore.FieldValue.serverTimestamp(),
+          notificationType,
+          result: 'subscription_not_found',
+        });
+        return;
+      }
+
+      const subRef = subSnap.docs[0].ref;
+      const subData = subSnap.docs[0].data();
+      const userId = subData.userId as string;
+      const userRef = db.collection('users').doc(userId);
+      const now = admin.firestore.FieldValue.serverTimestamp();
+
+      // Notification type integers from Google Play Developer API:
+      // 1=RECOVERED, 2=RENEWED, 3=CANCELED, 4=PURCHASED, 5=ON_HOLD,
+      // 6=IN_GRACE_PERIOD, 7=RESTARTED, 8=PAUSE_SCHEDULE_CHANGED, 12=REVOKED, 13=EXPIRED
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let subUpdates: Record<string, any> = { updatedAt: now };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let userUpdates: Record<string, any> | null = null;
+      let logAction = `google_play_${notificationType}`;
+
+      // BUG B4 FIX: For renewal events, fetch the real expiryTime from the Google Play Developer API.
+      // Without this, nextBillingDate stays in the past and the 6-hour renewal scheduler re-enters
+      // grace period every run, creating a permanent active→past_due flip-flop for Android users.
+      let newBillingDate: admin.firestore.Timestamp | null = null;
+      if ([1, 2, 4, 7].includes(notificationType as number)) {
+        try {
+          const credsRaw = googleCredentials.value();
+          const creds = JSON.parse(Buffer.from(credsRaw, 'base64').toString());
+          const auth = new google.auth.GoogleAuth({
+            credentials: creds,
+            scopes: ['https://www.googleapis.com/auth/androidpublisher'],
+          });
+          const androidPublisher = google.androidpublisher({ version: 'v3', auth });
+          const pkgName = (notification.packageName as string | undefined)
+            ?? 'com.driveusa.app';
+          const subResponse = await androidPublisher.purchases.subscriptionsv2.get({
+            packageName: pkgName,
+            token: purchaseToken as string,
+          });
+          // expiryTime is RFC 3339 (e.g. "2026-05-14T19:30:00Z") — NOT milliseconds.
+          // parseInt() would parse just the year prefix (2026ms ≈ epoch) and set a 1970 date.
+          const expiryTimeStr = ((subResponse.data as any).lineItems?.[0]?.expiryTime as string | undefined);
+          if (expiryTimeStr) {
+            const expiryMs = new Date(expiryTimeStr).getTime();
+            if (!isNaN(expiryMs) && expiryMs > 0) {
+              newBillingDate = admin.firestore.Timestamp.fromMillis(expiryMs);
+            }
+          }
+        } catch (apiErr) {
+          console.warn('⚠️ handleGooglePlayNotifications: Could not fetch expiry from Play API, ' +
+            'falling back to heuristic extension:', apiErr);
+          // Heuristic fallback: advance nextBillingDate by one billing cycle so the renewal
+          // scheduler does not immediately re-enter grace period before the real date is known.
+          const currentDate = (subData.nextBillingDate as admin.firestore.Timestamp | undefined)
+            ?.toDate() ?? new Date();
+          const billingDuration = (subData.duration as number | undefined) ?? 30;
+          const extended = new Date(Math.max(currentDate.getTime(), Date.now()));
+          extended.setDate(extended.getDate() + billingDuration);
+          newBillingDate = admin.firestore.Timestamp.fromDate(extended);
+        }
+      }
+
+      switch (notificationType as number) {
+        case 1: case 2: case 4: case 7: // RECOVERED, RENEWED, PURCHASED, RESTARTED
+          subUpdates = {
+            ...subUpdates,
+            isActive: true,
+            status: 'active',
+            renewalAttempts: 0,
+            ...(newBillingDate && { nextBillingDate: newBillingDate }),
+          };
+          userUpdates = {
+            isActive: true,
+            ...(newBillingDate && { nextBillingDate: newBillingDate }),
+            lastUpdated: now,
+          };
+          logAction = 'google_renewed';
+          break;
+        case 3: // CANCELED — access continues until nextBillingDate
+          subUpdates = { ...subUpdates, status: 'canceled' };
+          logAction = 'google_cancel_requested';
+          break;
+        case 5: case 6: // ON_HOLD, IN_GRACE_PERIOD
+          subUpdates = { ...subUpdates, status: 'past_due' };
+          break;
+        case 12: case 13: // REVOKED, EXPIRED
+          subUpdates = { ...subUpdates, isActive: false, status: 'inactive' };
+          userUpdates = { isActive: false, lastUpdated: now };
+          logAction = 'google_expired';
+          break;
+        default:
+          console.log(`ℹ️ handleGooglePlayNotifications: Unhandled type ${notificationType}`);
+          await db.collection('processedWebhooks').doc(`gp_${messageId}`).set({
+            processedAt: now, notificationType, result: 'unhandled_type',
+          });
+          return;
+      }
+
+      const batch = db.batch();
+      batch.update(subRef, subUpdates);
+      if (userUpdates) {
+        batch.set(userRef, userUpdates, { merge: true });
+      }
+      batch.set(db.collection('processedWebhooks').doc(`gp_${messageId}`), {
+        processedAt: now,
+        notificationType,
+        purchaseToken: purchaseToken ?? null,
+      });
+      batch.set(db.collection('subscriptionLogs').doc(), {
+        userId,
+        subscriptionId: subSnap.docs[0].id,
+        action: logAction,
+        oldStatus: { isActive: subData.isActive, status: subData.status },
+        newStatus: {
+          isActive: subUpdates.isActive !== undefined ? subUpdates.isActive : subData.isActive,
+          status: subUpdates.status ?? subData.status,
+        },
+        timestamp: now,
+        source: 'google_play_webhook',
+        notificationType,
+      });
+      await batch.commit();
+
+      console.log(`✅ handleGooglePlayNotifications: ${logAction} for user ${userId}`);
+    } catch (err) {
+      console.error('❌ handleGooglePlayNotifications error:', err);
+      // Do NOT rethrow — Pub/Sub retries on thrown errors
+    }
+  });

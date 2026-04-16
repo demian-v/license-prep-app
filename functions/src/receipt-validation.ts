@@ -194,7 +194,7 @@ async function retryWithBackoff<T>(
 async function validateAppleReceipt(
   receiptData: string,
   productId: string
-): Promise<{ valid: boolean; expiresAt?: Date; transactionId?: string; actualProductId?: string; error?: string }> {
+): Promise<{ valid: boolean; expiresAt?: Date; transactionId?: string; originalTransactionId?: string; actualProductId?: string; error?: string }> {
   console.log('🍎 Starting Apple receipt validation');
   console.log(`📦 Product ID: ${productId}`);
   console.log(`📄 Receipt length: ${receiptData.length} characters`);
@@ -315,13 +315,20 @@ async function validateAppleReceipt(
     
     console.log('✅ Subscription is active and not expired');
     
-    // Extract transaction ID.
+    // Extract transaction IDs.
     // Use transaction_id (unique per billing cycle) so each renewal is recorded
     // as a separate entry in the transactions[] array.
     // original_transaction_id never changes across renewals — using it would
     // cause the idempotency guard to block every renewal after the first purchase.
+    // We separately capture original_transaction_id for webhook event matching.
     const transactionId = matchingReceipt.transaction_id || matchingReceipt.original_transaction_id;
+    // Apple sandbox receipts sometimes omit original_transaction_id.
+    // For first-time purchases transaction_id === original_transaction_id, so this fallback is safe.
+    // For renewals, original_transaction_id is stable across renewals and takes priority.
+    const originalTransactionId = (matchingReceipt.original_transaction_id || matchingReceipt.transaction_id) as string | undefined;
     console.log(`🔑 Transaction ID: ${transactionId}`);
+    console.log(`🔑 Original Transaction ID: ${originalTransactionId ?? '(not present in receipt)'}`);
+    console.log(`🔑 Original Transaction ID: ${originalTransactionId ?? '(not present in receipt)'}`);
     
     // Check for cancellation
     if (matchingReceipt.cancellation_date_ms) {
@@ -341,6 +348,7 @@ async function validateAppleReceipt(
       valid: true,
       expiresAt: expiresAt,
       transactionId: transactionId,
+      originalTransactionId: originalTransactionId,
       actualProductId: productId,
     };
     
@@ -741,7 +749,8 @@ async function createOrUpdateSubscription(
   productId: string,
   expiresAt: Date,
   platform: 'ios' | 'android',
-  transactionId: string
+  transactionId: string,
+  originalTransactionId?: string
 ): Promise<string> {
   console.log('💾 Starting createOrUpdateSubscription...');
   console.log(`   User: ${userId}, Product: ${productId}, Platform: ${platform}`);
@@ -824,6 +833,8 @@ async function createOrUpdateSubscription(
         trialUsed: productId === 'trial' ? 0 : 1,
         trialEndsAt: productId === 'trial' ? admin.firestore.Timestamp.fromDate(expiresAt) : null,
         transactions: [transactionRecord],  // Transaction history array
+        originalTransactionId: platform === 'ios' && originalTransactionId ? originalTransactionId : null,
+        androidPurchaseToken: platform === 'android' ? transactionId : null,
         createdAt: now,
         updatedAt: now
       };
@@ -850,6 +861,8 @@ async function createOrUpdateSubscription(
         renewalAttempts: 0,  // FIX: clear grace-period counter on successful renewal
         platform: platform,  // Update platform (user might switch devices)
         transactions: admin.firestore.FieldValue.arrayUnion(transactionRecord),
+        ...(platform === 'ios' && originalTransactionId && { originalTransactionId }),
+        ...(platform === 'android' && { androidPurchaseToken: transactionId }),
         updatedAt: now
       });
       
@@ -884,6 +897,8 @@ async function createOrUpdateSubscription(
         renewalAttempts: 0,  // FIX: don't carry over grace-period counter
         platform: platform,
         transactions: admin.firestore.FieldValue.arrayUnion(upgradeTransaction),
+        ...(platform === 'ios' && originalTransactionId && { originalTransactionId }),
+        ...(platform === 'android' && { androidPurchaseToken: transactionId }),
         updatedAt: now
       });
       
@@ -1000,10 +1015,11 @@ export const validatePurchaseReceipt = functions
     try {
       console.log('🔍 Starting receipt validation process...');
       
-      let validationResult: { 
-        valid: boolean; 
-        expiresAt?: Date; 
+      let validationResult: {
+        valid: boolean;
+        expiresAt?: Date;
         transactionId?: string;
+        originalTransactionId?: string;  // iOS only — stable ID across renewals, used for webhook matching
         actualProductId?: string;  // BUG RV-MATCH FIX: real product from Apple receipt
         error?: string;
       };
@@ -1055,7 +1071,8 @@ export const validatePurchaseReceipt = functions
         productId,
         validationResult.expiresAt!,
         platform,
-        validationResult.transactionId!
+        validationResult.transactionId!,
+        platform === 'ios' ? validationResult.originalTransactionId : undefined
       );
 
       // Log successful validation with subscription creation

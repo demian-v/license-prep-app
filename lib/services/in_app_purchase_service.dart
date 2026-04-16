@@ -32,6 +32,13 @@ class InAppPurchaseService {
   List<ProductDetails> _products = [];
   bool _isAvailable = false;
   bool _purchasePending = false;
+  // Tracks which product the user explicitly initiated a purchase for.
+  // Prevents old pending renewal events (same or different product) from
+  // stealing _purchasePending and leaving the UI stuck in a loading state.
+  String? _pendingProductId;
+  // Safety-net timeout: if no purchase event arrives within 60s of the user
+  // tapping Subscribe, clear the loading state and show an error.
+  Timer? _purchasePendingTimeoutTimer;
   bool _isRestoringPurchases = false;
   Timer? _restoreSessionTimer;
 
@@ -162,26 +169,46 @@ class InAppPurchaseService {
 
     debugPrint('🛒 InAppPurchaseService: Starting purchase for ${product.id}');
     _purchasePending = true;
+    _pendingProductId = productId;
+
+    // Safety net: if StoreKit never delivers a purchase event (e.g. race
+    // condition where an old renewal steals the flag), clear loading after 60s.
+    _purchasePendingTimeoutTimer?.cancel();
+    _purchasePendingTimeoutTimer = Timer(const Duration(seconds: 60), () {
+      if (_purchasePending) {
+        debugPrint('⏱️ InAppPurchaseService: Purchase timed out — clearing pending state');
+        _clearPurchasePending();
+        onPurchaseError?.call('Purchase timed out. Please try again.');
+      }
+    });
 
     try {
       final purchaseParam = PurchaseParam(productDetails: product);
       final result = await _inAppPurchase.buyNonConsumable(purchaseParam: purchaseParam);
-      
+
       if (result) {
         debugPrint('✅ InAppPurchaseService: Purchase initiated successfully');
         return true;
       } else {
         debugPrint('❌ InAppPurchaseService: Failed to initiate purchase');
-        _purchasePending = false;
+        _clearPurchasePending();
         onPurchaseError?.call('Failed to initiate purchase');
         return false;
       }
     } catch (e) {
       debugPrint('❌ InAppPurchaseService: Purchase error: $e');
-      _purchasePending = false;
+      _clearPurchasePending();
       onPurchaseError?.call('Purchase error: $e');
       return false;
     }
+  }
+
+  /// Clears the purchase-pending state and cancels the safety-net timeout.
+  void _clearPurchasePending() {
+    _purchasePending = false;
+    _pendingProductId = null;
+    _purchasePendingTimeoutTimer?.cancel();
+    _purchasePendingTimeoutTimer = null;
   }
 
   /// Restore purchases (iOS)
@@ -232,9 +259,9 @@ class InAppPurchaseService {
         
         case PurchaseStatus.purchased:
           debugPrint('✅ Purchase successful: ${purchaseDetails.productID}');
-          if (_purchasePending) {
-            // User explicitly initiated this purchase — always process,
-            // bypassing the _isValidating concurrency guard.
+          if (_purchasePending && purchaseDetails.productID == _pendingProductId) {
+            // Correct product confirmed — this is the user-initiated purchase.
+            // Bypass _isValidating so it's never blocked by a concurrent renewal.
             _handleSuccessfulPurchase(purchaseDetails, isUserInitiated: true);
           } else if (_activeProductIds.contains(purchaseDetails.productID)) {
             // Apple auto-renewal: StoreKit delivers the renewed subscription
@@ -309,7 +336,7 @@ class InAppPurchaseService {
   /// is already in flight.
   void _handleSuccessfulPurchase(PurchaseDetails purchaseDetails,
       {bool isUserInitiated = false}) {
-    _purchasePending = false;
+    if (isUserInitiated) _clearPurchasePending();
 
     // Concurrency guard: only one validation in flight at a time.
     // In sandbox, Apple delivers many renewal receipts simultaneously (each
@@ -361,14 +388,14 @@ class InAppPurchaseService {
 
   /// Handle purchase error
   void _handlePurchaseError(PurchaseDetails purchaseDetails) {
-    _purchasePending = false;
+    _clearPurchasePending();
     final errorMessage = purchaseDetails.error?.message ?? 'Unknown purchase error';
     onPurchaseError?.call(errorMessage);
   }
 
   /// Handle purchase cancellation
   void _handlePurchaseCanceled(PurchaseDetails purchaseDetails) {
-    _purchasePending = false;
+    _clearPurchasePending();
     onPurchaseCanceled?.call(purchaseDetails.productID);
   }
 

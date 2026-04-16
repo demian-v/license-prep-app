@@ -13,6 +13,10 @@ class UserSubscription {
   final int duration; // days
   final DateTime? nextBillingDate;
   final String planType; // 'monthly', 'yearly', 'trial'
+  // Written by Cloud Functions only — never written from Flutter.
+  // Stored so Firestore round-trips preserve these fields without losing them.
+  final String? originalTransactionId; // iOS: stable ID across renewals, used for webhook matching
+  final String? androidPurchaseToken;  // Android: purchase token, used for webhook matching
 
   UserSubscription({
     required this.id,
@@ -27,6 +31,8 @@ class UserSubscription {
     required this.duration,
     this.nextBillingDate,
     required this.planType,
+    this.originalTransactionId,
+    this.androidPurchaseToken,
   });
 
   factory UserSubscription.fromJson(Map<String, dynamic> json) {
@@ -43,6 +49,8 @@ class UserSubscription {
       duration: _parseInt(json['duration']) ?? 0,
       nextBillingDate: _parseDateTime(json['nextBillingDate']),
       planType: json['planType'] ?? 'trial',
+      originalTransactionId: json['originalTransactionId'] as String?,
+      androidPurchaseToken: json['androidPurchaseToken'] as String?,
     );
   }
 
@@ -79,6 +87,8 @@ class UserSubscription {
       'duration': duration,
       'nextBillingDate': nextBillingDate != null ? Timestamp.fromDate(nextBillingDate!) : null,
       'planType': planType,
+      if (originalTransactionId != null) 'originalTransactionId': originalTransactionId,
+      if (androidPurchaseToken != null) 'androidPurchaseToken': androidPurchaseToken,
     };
   }
 
@@ -98,6 +108,8 @@ class UserSubscription {
       'duration': duration,
       'nextBillingDate': nextBillingDate?.toIso8601String(),
       'planType': planType,
+      if (originalTransactionId != null) 'originalTransactionId': originalTransactionId,
+      if (androidPurchaseToken != null) 'androidPurchaseToken': androidPurchaseToken,
     };
   }
 
@@ -114,6 +126,8 @@ class UserSubscription {
     int? duration,
     DateTime? nextBillingDate,
     String? planType,
+    String? originalTransactionId,
+    String? androidPurchaseToken,
     bool clearTrialEndsAt = false,
     bool clearNextBillingDate = false,
   }) {
@@ -130,6 +144,8 @@ class UserSubscription {
       duration: duration ?? this.duration,
       nextBillingDate: clearNextBillingDate ? null : (nextBillingDate ?? this.nextBillingDate),
       planType: planType ?? this.planType,
+      originalTransactionId: originalTransactionId ?? this.originalTransactionId,
+      androidPurchaseToken: androidPurchaseToken ?? this.androidPurchaseToken,
     );
   }
 

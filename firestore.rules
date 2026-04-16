@@ -108,6 +108,11 @@ service cloud.firestore {
       allow write: if false; // Only admins can modify via Firebase Console
     }
     
+    // processedWebhooks — written by Cloud Functions admin SDK only (webhook dedup)
+    match /processedWebhooks/{docId} {
+      allow read, write: if false;
+    }
+
     // Default deny all other access
     match /{document=**} {
       allow read, write: if false;
