@@ -1,0 +1,5 @@
+node_modules/
+deletion-manifest.json
+deletion-log-*.txt
+admin-service-account.json
+*-firebase-adminsdk-*.json

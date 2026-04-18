@@ -1,0 +1,18 @@
+{
+  "name": "license-prep-app-scripts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "One-off admin scripts for license-prep-app Firestore / Auth cleanup",
+  "scripts": {
+    "delete-test-users": "tsx delete-test-users.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.130",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0"
+  }
+}

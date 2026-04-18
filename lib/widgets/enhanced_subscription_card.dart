@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -1351,39 +1352,26 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
       _isProcessing = true;
       _errorMessage = null;
     });
-    
+
     try {
-      // Get user ID from auth provider
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final userId = authProvider.user?.id;
-      
-      if (userId == null) {
-        throw Exception('User not authenticated');
-      }
-      
-      // Call the subscription provider's cancel method
-      final success = await widget.subscriptionProvider.cancelSubscription(userId);
-      
-      if (success && mounted) {
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context).translate('subscription_canceled_success')),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      } else if (mounted) {
-        setState(() {
-          _errorMessage = widget.subscriptionProvider.errorMessage ?? 
-              'Failed to cancel subscription';
-        });
+      final url = Platform.isIOS
+          ? Uri.parse('https://apps.apple.com/account/subscriptions')
+          : Uri.parse('https://play.google.com/store/account/subscriptions');
+
+      final launched = await launchUrl(url, mode: LaunchMode.externalApplication);
+
+      if (!launched) {
+        throw Exception('Could not open subscription settings');
       }
     } catch (e) {
-      debugPrint('❌ Subscription Card: Cancellation error: $e');
+      debugPrint('❌ Subscription Card: Failed to open store subscription settings: $e');
       if (mounted) {
-        setState(() {
-          _errorMessage = 'Cancellation failed. Please try again.';
-        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppLocalizations.of(context).translate('cancel_subscription_open_failed')),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } finally {
       if (mounted) {
