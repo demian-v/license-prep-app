@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/user.dart' as app_models;
 import '../services/api/base/auth_api_interface.dart';
 import 'session_manager.dart';
-import 'billing_calculator.dart';
+import 'device_trial_fingerprint.dart';
 
 /// A service class that directly interacts with Firebase Auth and Firestore
 /// without any abstractions or complex mappings
@@ -99,38 +99,40 @@ class DirectAuthService implements AuthApiInterface {
   /// Create Firestore documents for a new user
   Future<void> createUserDocuments(String userId, String name, String email) async {
     try {
-      final now = DateTime.now();
-      final trialEndDate = BillingCalculator.calculateTrialEndDate(now);
-      
-      // Create user document with explicit default values including billing fields
       final userData = {
         'name': name,
         'email': email,
         'createdAt': FieldValue.serverTimestamp(),
         'lastLoginAt': FieldValue.serverTimestamp(),
-        'language': 'en',    // Explicitly set to English 
-        'state': null,       // Explicitly set to null
-        // Billing fields for subscription management
-        'status': 'active',  // Active subscription status
-        'lastBillingDate': FieldValue.serverTimestamp(), // Registration date as first billing
-        'nextBillingDate': Timestamp.fromDate(trialEndDate), // Trial end date
+        'language': 'en',
+        'state': null,
       };
-      
+
       debugPrint('🔄 [DirectAuthService] Creating user document with data:');
       debugPrint('    - User ID: $userId');
       debugPrint('    - Name: $name');
       debugPrint('    - Email: $email');
       debugPrint('    - Language: ${userData['language']}');
       debugPrint('    - State: ${userData['state']}');
-      debugPrint('    - Status: ${userData['status']}');
-      debugPrint('    - Trial ends: $trialEndDate');
-      
+
       await _firestore.collection('users').doc(userId).set(userData);
-      debugPrint('✅ [DirectAuthService] Created Firestore user document with billing fields');
+      debugPrint('✅ [DirectAuthService] Created Firestore user document');
       
-      // Create initial trial subscription via Cloud Function (server-side timestamps + duplicate prevention)
-      final callable = FirebaseFunctions.instance.httpsCallable('createTrialSubscription');
-      await callable.call();
+      // Create initial trial subscription via Cloud Function (server-side timestamps + device-bound dedupe)
+      try {
+        final fp = await DeviceTrialFingerprint.compute();
+        final callable = FirebaseFunctions.instance.httpsCallable('createTrialSubscription');
+        await callable.call({
+          'deviceIdHash': fp.hash,
+          'isPhysicalDevice': fp.isPhysicalDevice,
+        });
+      } on FirebaseFunctionsException catch (e) {
+        if (e.code == 'already-exists' || e.code == 'failed-precondition') {
+          debugPrint('⚠️ [DirectAuthService] No trial created: ${e.code} — ${e.message}');
+        } else {
+          rethrow;
+        }
+      }
 
       // Create progress document
       await _firestore.collection('progress').doc(userId).set({

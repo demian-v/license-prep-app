@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_android/billing_client_wrappers.dart';
 import 'package:in_app_purchase_android/in_app_purchase_android.dart';
@@ -402,6 +403,12 @@ class InAppPurchaseService {
   /// Validate receipt with backend
   Future<bool> _validateReceipt(PurchaseDetails purchaseDetails) async {
     try {
+      if (FirebaseAuth.instance.currentUser == null) {
+        debugPrint('⚠️ InAppPurchaseService: Skipping receipt validation — no Firebase user signed in '
+            '(likely StoreKit replay on cold start). Apple/Google webhook keeps server state in sync.');
+        return true;
+      }
+
       debugPrint('🔐 InAppPurchaseService: Validating receipt for ${purchaseDetails.productID}');
       
       // Get receipt data and platform

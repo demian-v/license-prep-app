@@ -256,24 +256,25 @@ class AuthProvider extends ChangeNotifier {
           debugPrint('✅ [AuthProvider] User created with correct default values');
         }
         
-        // NEW: Initialize 3-day trial for new user
+        // NEW: Initialize 3-day trial for new user (may be rejected if device already used trial)
         debugPrint('🆓 [AuthProvider] Initializing 3-day trial for new user: ${user!.id}');
         try {
           final subscriptionService = SubscriptionManagementService();
           final trialSubscription = await subscriptionService.initializeTrial(user!.id);
-          
-          // Update user with trial dates
-          final now = DateTime.now();
-          final updatedUser = user!.copyWith(
-            lastBillingDate: now,
-            nextBillingDate: trialSubscription.trialEndsAt,
-            lastLoginAt: now,
-          );
-          
-          user = updatedUser;
-          debugPrint('✅ [AuthProvider] Trial initialized successfully. Trial ends: ${trialSubscription.trialEndsAt}');
-          
-          // CRITICAL FIX: Initialize SubscriptionProvider for new user
+
+          if (trialSubscription != null) {
+            final now = DateTime.now();
+            user = user!.copyWith(
+              lastBillingDate: now,
+              nextBillingDate: trialSubscription.trialEndsAt,
+              lastLoginAt: now,
+            );
+            debugPrint('✅ [AuthProvider] Trial initialized. Trial ends: ${trialSubscription.trialEndsAt}');
+          } else {
+            debugPrint('ℹ️ [AuthProvider] Trial not granted (device already used trial or ineligible)');
+          }
+
+          // Initialize SubscriptionProvider regardless — it will reflect the actual server state
           if (context != null) {
             debugPrint('🔄 [AuthProvider] Initializing SubscriptionProvider for new user');
             try {
@@ -282,14 +283,12 @@ class AuthProvider extends ChangeNotifier {
               debugPrint('✅ [AuthProvider] SubscriptionProvider initialized successfully');
             } catch (e) {
               debugPrint('⚠️ [AuthProvider] SubscriptionProvider initialization failed: $e');
-              // Non-critical error - continue with signup
             }
           } else {
             debugPrint('⚠️ [AuthProvider] Context not provided, SubscriptionProvider will be initialized later');
           }
         } catch (e) {
           debugPrint('⚠️ [AuthProvider] Trial initialization failed (non-critical): $e');
-          // Continue with registration even if trial initialization fails
         }
         
         // Run email sync immediately to ensure consistency and fix any potential issues

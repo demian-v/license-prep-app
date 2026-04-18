@@ -7,6 +7,7 @@ import '../models/user_subscription.dart';
 import '../models/subscription_package.dart';
 import 'billing_calculator.dart';
 import 'upgrade_calculator.dart';
+import 'device_trial_fingerprint.dart';
 
 class SubscriptionManagementService {
   static const int trialDurationDays = 3;
@@ -15,44 +16,46 @@ class SubscriptionManagementService {
   
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// Initialize trial for new user
-  Future<UserSubscription> initializeTrial(String userId) async {
+  /// Initialize trial for new user. Returns null when the trial was rejected
+  /// (e.g. device already used trial, simulator) — caller must treat as "no subscription".
+  Future<UserSubscription?> initializeTrial(String userId) async {
     debugPrint('🆓 SubscriptionManagementService: Initializing trial for user: $userId');
 
     try {
-      final now = DateTime.now();
-      final trialEndsAt = BillingCalculator.calculateTrialEndDate(now);
-
-      // Create trial subscription via Cloud Function (server-side timestamps + duplicate prevention)
-      final callable = FirebaseFunctions.instance.httpsCallable('createTrialSubscription');
-      await callable.call();
+      // Create trial subscription via Cloud Function (server-side timestamps + device-bound dedupe)
+      try {
+        final fp = await DeviceTrialFingerprint.compute();
+        final callable = FirebaseFunctions.instance.httpsCallable('createTrialSubscription');
+        await callable.call({
+          'deviceIdHash': fp.hash,
+          'isPhysicalDevice': fp.isPhysicalDevice,
+        });
+      } on FirebaseFunctionsException catch (e) {
+        if (e.code == 'already-exists' || e.code == 'failed-precondition') {
+          debugPrint('⚠️ SubscriptionManagementService: No trial created: ${e.code} — ${e.message}');
+          return null;
+        }
+        rethrow;
+      }
 
       // Re-fetch from Firestore — server is now the source of truth
-      final subscription = await getUserSubscription(userId) ?? UserSubscription(
-        id: '',
-        userId: userId,
-        packageId: 3,
-        status: 'active',
-        isActive: true,
-        createdAt: now,
-        updatedAt: now,
-        trialEndsAt: trialEndsAt,
-        trialUsed: 0,
-        duration: BillingCalculator.TRIAL_DAYS,
-        planType: 'trial',
-        nextBillingDate: trialEndsAt,
-      );
+      final subscription = await getUserSubscription(userId);
+      if (subscription == null) {
+        debugPrint('⚠️ SubscriptionManagementService: Cloud Function succeeded but no subscription doc found');
+        return null;
+      }
 
       // Save to local cache
       await _saveSubscriptionToCache(subscription);
 
       // Sync billing dates between user and subscription tables
-      await _syncUserBillingDates(userId, now, trialEndsAt);
+      if (subscription.trialEndsAt != null) {
+        await _syncUserBillingDates(userId, DateTime.now(), subscription.trialEndsAt!);
+      }
 
       debugPrint('✅ SubscriptionManagementService: Trial initialized successfully');
-      debugPrint('📅 Trial ends at: ${trialEndsAt.toIso8601String()}');
-      debugPrint('🔄 User and subscription billing dates synchronized');
-      
+      debugPrint('📅 Trial ends at: ${subscription.trialEndsAt?.toIso8601String()}');
+
       return subscription;
     } catch (e) {
       debugPrint('❌ SubscriptionManagementService: Error initializing trial: $e');

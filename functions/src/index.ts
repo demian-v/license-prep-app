@@ -1964,27 +1964,54 @@ export { validatePurchaseReceipt };
 // Creates a trial subscription server-side on new user signup.
 // Replaces the client-side _createInitialTrialSubscription in direct_auth_service.dart.
 // Fixes the 2017-date bug — timestamps are set server-side.
-export const createTrialSubscription = functions.https.onCall(async (_data: any, context: any) => {
+export const createTrialSubscription = functions.https.onCall(async (data: any, context: any) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Not logged in');
   const userId = context.auth.uid;
 
-  // Prevent duplicate trials
+  const deviceIdHash: string | undefined = data?.deviceIdHash;
+  const isPhysicalDevice: boolean | undefined = data?.isPhysicalDevice;
+
+  if (!deviceIdHash || typeof deviceIdHash !== 'string' || deviceIdHash.length !== 64) {
+    throw new functions.https.HttpsError('invalid-argument', 'Missing or invalid deviceIdHash');
+  }
+  if (isPhysicalDevice !== true) {
+    throw new functions.https.HttpsError('failed-precondition', 'Trial unavailable on this device');
+  }
+
+  // Dedupe #1 — per userId
   const existing = await db.collection('subscriptions')
     .where('userId', '==', userId).limit(1).get();
   if (!existing.empty) throw new functions.https.HttpsError('already-exists', 'Subscription exists');
 
+  // Dedupe #2 — per device fingerprint
+  const deviceRef = db.collection('trialDevices').doc(deviceIdHash);
+  const deviceSnap = await deviceRef.get();
+  if (deviceSnap.exists) {
+    throw new functions.https.HttpsError('failed-precondition', 'trial-already-used-on-device');
+  }
+
   const trialEnd = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000); // 3 days
-  const ref = db.collection('subscriptions').doc();
-  await ref.set({
-    id: ref.id, userId,
+  const subRef = db.collection('subscriptions').doc();
+
+  const batch = db.batch();
+  batch.set(subRef, {
+    id: subRef.id, userId,
     packageId: 3, status: 'active', isActive: true,
     planType: 'trial', duration: 3, price: 0, trialUsed: 0,
     trialEndsAt: admin.firestore.Timestamp.fromDate(trialEnd),
     nextBillingDate: admin.firestore.Timestamp.fromDate(trialEnd),
+    deviceIdHash,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
-  return { subscriptionId: ref.id };
+  batch.set(deviceRef, {
+    firstUserId: userId,
+    firstSubscriptionId: subRef.id,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  await batch.commit();
+
+  return { subscriptionId: subRef.id };
 });
 
 // Cancels the user's active subscription server-side.
