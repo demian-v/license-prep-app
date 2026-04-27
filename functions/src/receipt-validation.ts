@@ -209,41 +209,43 @@ async function validateAppleReceipt(
     
     console.log('📡 Prepared request body for Apple API');
     
-    // SANDBOX-FIRST APPROACH (as requested by user for testing)
-    // Try sandbox first, then fall back to production if needed
-    console.log('🧪 Step 1: Trying SANDBOX environment first (testing mode)...');
+    // PRODUCTION-FIRST APPROACH (Apple's recommended order)
+    // Try production first, fall back to sandbox only if Apple returns 21007.
+    // Reference: https://developer.apple.com/documentation/appstorereceipts/verifyreceipt
+    console.log('🌐 Step 1: Validating against PRODUCTION endpoint...');
     let response;
-    let isSandbox = true;
-    
+    let isSandbox = false;
+
     try {
       response = await retryWithBackoff(() =>
-        axios.post(APPLE_SANDBOX_URL, requestBody, {
+        axios.post(APPLE_PRODUCTION_URL, requestBody, {
           headers: { 'Content-Type': 'application/json' },
-          timeout: 10000 // 10 second timeout
+          timeout: 10000
         })
       );
-      console.log(`✅ Sandbox API responded with status: ${response.data.status}`);
-      
-      // If status is 21008 (production receipt in sandbox), switch to production
-      if (response.data.status === 21008) {
-        console.log('🔄 Status 21008: This is a production receipt, switching to production API...');
-        response = await axios.post(APPLE_PRODUCTION_URL, requestBody, {
+      console.log(`✅ Production API responded with status: ${response.data.status}`);
+
+      // If status is 21007 (sandbox receipt in production), switch to sandbox.
+      // This is the expected path for TestFlight builds and dev sandbox accounts.
+      if (response.data.status === 21007) {
+        console.log('🧪 Status 21007: This is a sandbox receipt, switching to sandbox API...');
+        response = await axios.post(APPLE_SANDBOX_URL, requestBody, {
           headers: { 'Content-Type': 'application/json' },
           timeout: 10000
         });
-        isSandbox = false;
-        console.log(`✅ Production API responded with status: ${response.data.status}`);
+        isSandbox = true;
+        console.log(`✅ Sandbox API responded with status: ${response.data.status}`);
       }
-    } catch (sandboxError: unknown) {
-      const errorMessage = sandboxError instanceof Error ? sandboxError.message : 'Unknown error';
-      console.warn('⚠️ Sandbox API failed, trying production:', errorMessage);
-      // If sandbox fails entirely, try production
-      response = await axios.post(APPLE_PRODUCTION_URL, requestBody, {
-        headers: { 'Content-Type': 'application/json' },
-        timeout: 10000
-      });
-      isSandbox = false;
-      console.log(`✅ Production API responded with status: ${response.data.status}`);
+    } catch (productionError: unknown) {
+      // Production endpoint failed after retries. Do NOT silently fall back to
+      // sandbox — that would risk tagging a real purchase as sandbox in logs.
+      // Surface a clean error so the client can retry and the failure is visible.
+      const errorMessage = productionError instanceof Error ? productionError.message : 'Unknown error';
+      console.error('❌ Apple production endpoint unavailable after retries:', errorMessage);
+      return {
+        valid: false,
+        error: 'Apple verification temporarily unavailable. Please try again.'
+      };
     }
     
     console.log(`🌍 Using environment: ${isSandbox ? 'SANDBOX' : 'PRODUCTION'}`);
