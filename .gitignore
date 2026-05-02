@@ -60,3 +60,7 @@ functions/lib/
 # Node modules (never commit these)
 node_modules/
 functions/node_modules/
+
+# Claude Code project-local config and generated plans
+.claude/
+reports/
