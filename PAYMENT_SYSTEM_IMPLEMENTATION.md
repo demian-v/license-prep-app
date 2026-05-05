@@ -500,7 +500,7 @@ firebase functions:config:get
 ```json
 {
   "apple": {
-    "shared_secret": "574b56c57bc64fefb8189ed68b7fc351"
+    "shared_secret": "[REDACTED]"
   },
   "google": {
     "credentials": "ewogICJ0eXBlIjogInNlcnZpY2VfYWNjb3VudCIsCi..."

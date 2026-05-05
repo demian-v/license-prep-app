@@ -23,7 +23,7 @@ You need to set the secrets in Firebase so your deployed functions can access th
 
 ```bash
 cd /Users/demianvyrozub/projects/license-prep-app/functions
-firebase functions:config:set apple.shared_secret="574b56c57bc64fefb8189ed68b7fc351"
+firebase functions:config:set apple.shared_secret="[REDACTED]"
 ```
 
 ### **What this does:**
@@ -46,7 +46,7 @@ firebase functions:config:get
 ```json
 {
   "apple": {
-    "shared_secret": "574b56c57bc64fefb8189ed68b7fc351"
+    "shared_secret": "[REDACTED]"
   }
 }
 ```
@@ -88,7 +88,7 @@ firebase functions:config:get
 ```json
 {
   "apple": {
-    "shared_secret": "574b56c57bc64fefb8189ed68b7fc351"
+    "shared_secret": "[REDACTED]"
   },
   "google": {
     "credentials": "ewogICJ0eXBlIjogInNlcnZpY2VfYWNjb3VudC...[long base64 string]"
@@ -193,10 +193,10 @@ If you want to test functions locally on Windows:
 **For local testing on Windows:**
 ```bash
 # Set environment variable (Windows CMD)
-set APPLE_SHARED_SECRET=574b56c57bc64fefb8189ed68b7fc351
+set APPLE_SHARED_SECRET=[REDACTED]
 
 # Or PowerShell
-$env:APPLE_SHARED_SECRET="574b56c57bc64fefb8189ed68b7fc351"
+$env:APPLE_SHARED_SECRET="[REDACTED]"
 
 # Then run local emulator
 firebase emulators:start --only functions
@@ -229,7 +229,7 @@ firebase emulators:start --only functions
 cd /Users/demianvyrozub/projects/license-prep-app/functions
 
 # Step 1: Set Apple shared secret
-firebase functions:config:set apple.shared_secret="574b56c57bc64fefb8189ed68b7fc351"
+firebase functions:config:set apple.shared_secret="[REDACTED]"
 
 # Step 2: Set Google credentials
 firebase functions:config:set google.credentials="$(cat service-account.json | base64)"
