@@ -24,12 +24,15 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
+    // Java 17 required by in_app_purchase_android 0.5.0 (Play Billing 8.0.0),
+    // which compiles at 17. Leaving the app module on 11 fails the build with
+    // "class file has wrong version 61.0, should be 55.0".
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 kotlinOptions {
-    jvmTarget = '11'
+    jvmTarget = '17'
 }
 
     signingConfigs {

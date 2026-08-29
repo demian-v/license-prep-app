@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -7,6 +8,7 @@ import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
 import 'firebase_options.dart';
 
 import 'services/service_locator.dart';
@@ -262,6 +264,24 @@ class _AppCleanupObserver extends WidgetsBindingObserver {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ⚠️ DO NOT REMOVE without first making validateAppleReceipt format-aware.
+  // See driveusa-risk-register #56 / android-billing-8-migration in the wiki.
+  //
+  // in_app_purchase_storekit 0.4.x makes StoreKit 2 the default. Under StoreKit 2
+  // `serverVerificationData` is the JWS transaction representation, NOT the base64
+  // app receipt. The backend (functions/src/receipt-validation.ts:194) posts it to
+  // Apple's legacy verifyReceipt endpoint, which rejects a JWS with status 21002 —
+  // so every iOS purchase, renewal and restore would fail validation AFTER the user
+  // has been charged. The iOS deployment target is 15.0, so every device qualifies
+  // for StoreKit 2 and none would be spared.
+  //
+  // This must run before the first access to `InAppPurchase.instance`, which is what
+  // lazily calls registerPlatform(). That first access happens in the Provider below,
+  // so main() is early enough.
+  if (Platform.isIOS) {
+    await InAppPurchaseStoreKitPlatform.enableStoreKit1();
+  }
   
   // Register app lifecycle observer to detect when app comes back from background
   final lifecycleObserver = AppLifecycleObserver();

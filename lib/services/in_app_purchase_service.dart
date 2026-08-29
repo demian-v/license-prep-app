@@ -4,10 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
-import 'package:in_app_purchase_android/billing_client_wrappers.dart';
-import 'package:in_app_purchase_android/in_app_purchase_android.dart';
-import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
-import 'package:in_app_purchase_storekit/store_kit_wrappers.dart';
 
 class InAppPurchaseService {
   static const String monthlyProductId = 'monthly';
@@ -74,12 +70,6 @@ class InAppPurchaseService {
       if (!_isAvailable) {
         debugPrint('❌ InAppPurchaseService: Store is not available');
         return false;
-      }
-
-      // Enable pending purchases on Android
-      if (Platform.isAndroid) {
-        InAppPurchaseAndroidPlatformAddition.enablePendingPurchases();
-        debugPrint('✅ InAppPurchaseService: Enabled pending purchases on Android');
       }
 
       // Set up purchase stream listener
