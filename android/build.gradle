@@ -1,17 +1,9 @@
-buildscript {
-    ext.kotlin_version = '2.1.0'
-    repositories {
-        google()
-        mavenCentral()
-    }
-
-    dependencies {
-        classpath 'com.android.tools.build:gradle:8.4.0'
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-        // Add Google Services Gradle plugin
-        classpath 'com.google.gms:google-services:4.4.0'
-    }
-}
+// NOTE: plugin versions live in android/settings.gradle, not here.
+// A legacy `buildscript { ... classpath 'com.android.tools.build:gradle:8.4.0' }`
+// block used to sit above this line. It was inert — app/build.gradle applies
+// plugins via the plugins DSL, which resolves from settings.gradle — and it
+// advertised AGP 8.4.0 while builds actually used the 8.13.0 declared at
+// settings.gradle:21. Removed so the file stops contradicting the real toolchain.
 
 allprojects {
     repositories {
