@@ -52,8 +52,8 @@ flutter run -d "iPhone 16 Pro" --dart-define=USE_EMULATOR=true
 | E3 | Node 22 installed | ✅ DONE | `brew install node@22` (keg-only). Prepend `/opt/homebrew/opt/node@22/bin` to PATH for any functions work |
 | E4 | `emulators` block in `firebase.json` | ✅ DONE | auth 9099, functions 5001, firestore 8080, storage 9199, pubsub 8085, ui 4000 |
 | E5 | Local secrets for emulator | ✅ DONE | `functions/.secret.local`, dummy values, gitignored |
-| E6 | Content exported from production | ⏸️ **BLOCKED** | `functions/service-account.json` is `firebase-receipt-validation@` — Play-scoped, **no Firestore read**. Needs `gcloud auth application-default login` (user action). `subscriptionsType` already captured via MCP into `.local-export/` |
-| E7 | Flutter emulator wiring | ⬜ TODO | `USE_EMULATOR` dart-define in `lib/main.dart` |
+| E6 | Content exported from production | ✅ DONE | 6,627 docs (~8.7 MB) via ADC, read-only, into `.local-export/` (gitignored). Seeded into emulator with `scripts/local/seed-emulator.js`. **No user data copied** |
+| E7 | Flutter emulator wiring | ✅ DONE | `lib/config/emulator_config.dart`, one call in `main.dart`. Throws in release mode |
 | E8 | iOS pods reinstalled | ✅ DONE | 43 pods, Sep 16. **Needs `LANG=en_US.UTF-8`** or CocoaPods dies on a Ruby 3.4 encoding bug |
 | E9 | App runs on simulator against emulators | ⬜ TODO | acceptance gate for setup phase |
 
@@ -62,9 +62,9 @@ flutter run -d "iPhone 16 Pro" --dart-define=USE_EMULATOR=true
 | # | Step | Status | Notes |
 |---|---|---|---|
 | T1 | Jest + ts-jest in `functions/` | ✅ DONE | `npm test` wraps `firebase emulators:exec --project demo-driveusa`. Emulators spin up, tests run, teardown is automatic |
-| T2 | `@firebase/rules-unit-testing` suite | ⬜ TODO | installed, no suite written yet |
+| T2 | `@firebase/rules-unit-testing` suite | ✅ DONE | `firestore-rules.test.ts` — risks #3, #29. Own project id `demo-rules-test`, never touches seeded data |
 | T3 | StoreKit configuration file | ⬜ TODO | local fake store for simulator purchase / restore / renewal / trial→paid |
-| T4 | One red test per in-scope risk | 🔄 IN PROGRESS | #3 done (5 tests, 4 red + 1 positive control) |
+| T4 | One red test per in-scope risk | 🔄 IN PROGRESS | #3 and #29 done. **13 tests: 9 red, 4 green controls** |
 
 ---
 
@@ -100,7 +100,7 @@ Status: ⬜ not started · 🔄 in progress · ✅ done & verified · ⏸️ blo
 | #18 | 8 admin-grade functions callable by any authenticated user | ⬜ | function test | |
 | #12 | `sendEmailVerification()` never called; `emailVerified` gates nothing | ⬜ | function test + iOS | |
 | #26 | Trial gate forgeable (client-supplied `deviceIdHash`), dedupe non-transactional | ⬜ | function test | |
-| #29 | `users/{uid}` accepts arbitrary client writes including `isActive` | ⬜ | rules test | |
+| #29 | `users/{uid}` accepts arbitrary client writes including `isActive` | 🔄 red tests written | `firestore-rules.test.ts` | |
 
 **Out of scope this round** (tracked, not started): #13 #14 privacy/deletion · #21 cross-device sync · #36 CI · #49 Docker · #53 content authoring · #55 #56 store platform (already handled/mitigated) · all remaining Medium rows.
 
@@ -137,3 +137,7 @@ The answer key and explanation are served to an anonymous stranger. Reproduce wi
 - `pod install` needs `export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8`, otherwise CocoaPods 1.16.2 on Ruby 3.4 dies with `Encoding::CompatibilityError`. It exits non-zero but a piped `tail` will mask it — always check `Podfile.lock`'s date.
 - Xcode warns that `Runner` has a custom base configuration so CocoaPods did not set `Pods-Runner.profile.xcconfig`. Pre-existing, affects Profile builds only. Not touched.
 - `functions/package.json` pins Node 22; the machine's default is Node 20. Every functions command needs the PATH prefix.
+- The functions emulator prompts for `APPLE_APP_ID` and hangs forever if unanswered. `functions/.env.local` supplies it. **Note:** the code declares `defineInt('APPLE_APP_ID', { default: 0 })` — so if it is unset in *production*, Apple notification verification runs against app id `0`. That is the unverified item in the register's Top-7 #5, and the default confirms the failure mode is real.
+- Since ADC now exists, the functions emulator warns that **non-emulated** Google APIs will hit production with those credentials. Emulated services (Firestore/Auth/Storage/Functions) are unaffected. Run `gcloud auth application-default revoke` once the content export is no longer needed.
+- Test fixtures use the synthetic `state: 'ZZ' / language: 'zz'` so they cannot collide with the 6,627 seeded production documents.
+- When the long-running emulator is already up, run `npx jest` directly. `npm test` wraps `emulators:exec`, which will fail on the already-bound ports.

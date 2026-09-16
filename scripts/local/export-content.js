@@ -22,8 +22,12 @@ const CONTENT_COLLECTIONS = [
 
 const OUT = path.join(__dirname, '../../.local-export');
 
+// Uses Application Default Credentials (gcloud auth application-default login),
+// i.e. the operator's own read access. Deliberately NOT the bundled
+// service-account.json, which is Play-receipt scoped and has no Firestore read.
 admin.initializeApp({
-  credential: admin.credential.cert(require('../../functions/service-account.json')),
+  credential: admin.credential.applicationDefault(),
+  projectId: 'licenseprepapp',
 });
 const db = admin.firestore();
 

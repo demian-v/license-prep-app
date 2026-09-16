@@ -20,10 +20,10 @@ const PAID_CTX = { auth: { uid: 'paid-user', token: { firebase: { sign_in_provid
 
 beforeAll(async () => {
   await db().collection('quizTopics').doc('t1').set({
-    language: 'en', state: 'IL', order: 1, title: 'Road Signs',
+    language: 'zz', state: 'ZZ', order: 1, title: 'Road Signs',
   });
   await db().collection('quizQuestions').doc('q1').set({
-    language: 'en', state: 'IL', topicId: 't1',
+    language: 'zz', state: 'ZZ', topicId: 't1',
     question: 'What does a red octagon mean?',
     options: ['Stop', 'Yield', 'Go', 'Slow'],
     correctAnswer: 0,
@@ -41,25 +41,25 @@ afterAll(async () => { testEnv.cleanup(); });
 describe('Risk #3 — content callables must require an entitled, non-anonymous user', () => {
   it('getQuizTopics rejects a caller with no auth at all', async () => {
     const wrapped = testEnv.wrap(fns.getQuizTopics as any);
-    await expect(wrapped({ language: 'en', state: 'IL' } as any, {} as any))
+    await expect(wrapped({ language: 'zz', state: 'ZZ' } as any, {} as any))
       .rejects.toMatchObject({ code: 'unauthenticated' });
   });
 
   it('getQuizTopics rejects an anonymous caller', async () => {
     const wrapped = testEnv.wrap(fns.getQuizTopics as any);
-    await expect(wrapped({ language: 'en', state: 'IL' } as any, ANON_CTX as any))
+    await expect(wrapped({ language: 'zz', state: 'ZZ' } as any, ANON_CTX as any))
       .rejects.toMatchObject({ code: 'permission-denied' });
   });
 
   it('getQuizTopics rejects a signed-in user with no subscription', async () => {
     const wrapped = testEnv.wrap(fns.getQuizTopics as any);
-    await expect(wrapped({ language: 'en', state: 'IL' } as any, FREE_CTX as any))
+    await expect(wrapped({ language: 'zz', state: 'ZZ' } as any, FREE_CTX as any))
       .rejects.toMatchObject({ code: 'permission-denied' });
   });
 
   it('getQuizTopics serves an entitled user (positive control)', async () => {
     const wrapped = testEnv.wrap(fns.getQuizTopics as any);
-    const res: any = await wrapped({ language: 'en', state: 'IL' } as any, PAID_CTX as any);
+    const res: any = await wrapped({ language: 'zz', state: 'ZZ' } as any, PAID_CTX as any);
     expect(Array.isArray(res)).toBe(true);
     expect(res).toHaveLength(1);
     expect(res[0].title).toBe('Road Signs');
@@ -67,7 +67,7 @@ describe('Risk #3 — content callables must require an entitled, non-anonymous 
 
   it('getQuizQuestions does not leak answers to an unauthenticated caller', async () => {
     const wrapped = testEnv.wrap(fns.getQuizQuestions as any);
-    await expect(wrapped({ language: 'en', state: 'IL', topicId: 't1' } as any, {} as any))
+    await expect(wrapped({ language: 'zz', state: 'ZZ', topicId: 't1' } as any, {} as any))
       .rejects.toMatchObject({ code: 'unauthenticated' });
   });
 });

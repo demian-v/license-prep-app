@@ -71,3 +71,5 @@ reports/
 functions/.secret.local
 *.storekit.local
 .local-export/
+functions/.env.local
+functions/.env.demo-driveusa
