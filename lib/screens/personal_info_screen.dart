@@ -571,7 +571,39 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
       context: context,
       builder: (context) => AlertDialog(
         title: Text(_translate('delete_confirmation_title', languageProvider)),
-        content: Text(_translate('delete_confirmation_message', languageProvider)),
+        // Risk #14 — deleting the account does NOT cancel an App Store or
+        // Google Play subscription; only the store can do that. Saying nothing
+        // meant people kept being charged for an account that no longer
+        // existed. Warned BEFORE the irreversible action, not after it.
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(_translate('delete_confirmation_message', languageProvider)),
+            SizedBox(height: 12),
+            Container(
+              padding: EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, size: 18, color: Colors.orange.shade800),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _translate('delete_subscription_warning', languageProvider),
+                      style: TextStyle(fontSize: 12, color: Colors.orange.shade900),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () {

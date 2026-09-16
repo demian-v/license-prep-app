@@ -4,6 +4,7 @@ import 'firebase_functions_client.dart';
 import 'base/auth_api_interface.dart';
 import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth, FirebaseAuthException, EmailAuthProvider, ActionCodeSettings;
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseFirestore, FieldValue, SetOptions;
+import 'package:cloud_functions/cloud_functions.dart' show FirebaseFunctionsException;
 import '../../data/state_data.dart';
 import '../session_manager.dart';
 
@@ -825,13 +826,33 @@ class FirebaseAuthApi implements AuthApiInterface {
           debugPrint('✅ [API] Account deletion completed via Firebase function');
           return;
         }
+      } on FirebaseFunctionsException catch (functionError) {
+        // Risks #13 and #14 — the client fallback below used to run on ANY
+        // failure. It deleted only users/{uid}, leaving seven other locations
+        // of personal data behind while reporting the account "deleted", and
+        // it bypassed the server's recent-login requirement entirely.
+        //
+        // A deliberate refusal from the server is an answer, not an outage:
+        // surface it so the user can sign in again and retry. Falling back
+        // here would have silently defeated the reauthentication gate.
+        if (functionError.code == 'failed-precondition'
+            || functionError.code == 'permission-denied'
+            || functionError.code == 'unauthenticated') {
+          debugPrint('🚫 [API] Server refused deletion (${functionError.code}); not falling back');
+          rethrow;
+        }
+        debugPrint('❌ [API] Firebase function unavailable: $functionError, trying direct fallback...');
       } catch (functionError) {
         debugPrint('❌ [API] Firebase function failed: $functionError, trying direct fallback...');
       }
-      
-      // STEP 2: Fallback to direct Firebase operations
-      debugPrint('🔄 [API] Using direct Firebase fallback for account deletion');
-      
+
+      // STEP 2: Fallback for genuine unavailability only. This is a PARTIAL
+      // deletion — it removes the user document and the Auth account, but not
+      // the other personal data the callable handles. It exists so a user is
+      // not trapped while Functions is down; the callable remains the complete
+      // path, and the server-side data is cleaned up when it next succeeds.
+      debugPrint('🔄 [API] Using direct Firebase fallback for account deletion (PARTIAL)');
+
       // Delete user document from Firestore directly
       try {
         await _firestore.collection('users').doc(userId).delete();

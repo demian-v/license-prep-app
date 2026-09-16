@@ -15,9 +15,9 @@ import * as admin from 'firebase-admin';
  * Returns how many records were anonymised, so the caller can log it.
  */
 export async function anonymizeTrialDevicesForUser(
-  db: FirebaseFirestore.Firestore,
   batch: FirebaseFirestore.WriteBatch,
   userId: string,
+  db: FirebaseFirestore.Firestore,
 ): Promise<number> {
   const snap = await db.collection('trialDevices')
     .where('firstUserId', '==', userId)

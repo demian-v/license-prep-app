@@ -5,6 +5,7 @@ import { applyToAllMatches } from './webhook-fanout';
 import { mapPlayNotification, PLAY_NOTIFICATION } from './play-notifications';
 import { recordWebhookFailure } from './webhook-dead-letter';
 import { anonymizeTrialDevicesForUser } from './trial-devices';
+import { collectUserDataForDeletion, applyDeletionPlan, assertRecentLogin } from './account-deletion';
 import * as fs from 'fs';
 import * as path from 'path';
 import { defineInt, defineSecret } from 'firebase-functions/params';
@@ -1349,54 +1350,52 @@ export const deleteUserAccount = functions.https.onCall(async (data, context) =>
       );
     }
     
-    // Step 3: Check if user document exists
-    console.log(`Checking if user document exists for: ${userId}`);
-    const userDoc = await db.collection('users').doc(userId).get();
-    
-    if (!userDoc.exists) {
-      console.warn(`User document not found for: ${userId}, but proceeding with auth deletion`);
-    } else {
-      console.log(`User document found for: ${userId}, proceeding with deletion`);
-    }
-    
-    // Step 4: Delete related user data
-    const batch = db.batch();
-    
-    // Delete user document
-    if (userDoc.exists) {
-      batch.delete(db.collection('users').doc(userId));
-      console.log(`Added user document deletion to batch for: ${userId}`);
-    }
-    
-    // Delete saved questions document if it exists
+    // Risk #14 — require a recent login. admin.auth().deleteUser() bypasses
+    // Firebase's own requires-recent-login entirely, so nothing enforced this:
+    // a borrowed or stolen unlocked phone could destroy an account hours after
+    // the real user last authenticated. Deletion is irreversible; it deserves
+    // the same bar as changing a password.
     try {
-      const savedQuestionsDoc = await db.collection('savedQuestions').doc(userId).get();
-      if (savedQuestionsDoc.exists) {
-        batch.delete(db.collection('savedQuestions').doc(userId));
-        console.log(`Added saved questions deletion to batch for: ${userId}`);
-      }
-    } catch (savedQuestionsError) {
-      console.warn(`Error checking saved questions for user ${userId}:`, savedQuestionsError);
-      // Continue with account deletion even if saved questions check fails
+      assertRecentLogin(context.auth.token?.auth_time);
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
+      console.warn(`deleteUserAccount: refused for ${userId} — ${reason}`);
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'Please sign in again before deleting your account.',
+        { reason },
+      );
     }
 
-    // Risk #26 — trialDevices holds firstUserId, so deletion must not leave it
-    // behind. It is ANONYMISED rather than deleted: removing the record would
-    // make account deletion the easiest way to farm unlimited free trials.
+    // Risk #13 — enumerate EVERY location holding this user's data. The old
+    // implementation deleted two of at least eight, while privacy_policy.md
+    // promised "your account and all associated data".
+    const targets = await collectUserDataForDeletion(db, userId);
+    console.log(
+      `deleteUserAccount: ${targets.length} target(s) for ${userId}: ` +
+      targets.map((t) => `${t.collection}:${t.action}`).join(', '),
+    );
+
+    // Risk #26 — trialDevices is anonymised rather than deleted; removing it
+    // would make account deletion a way to farm unlimited free trials.
+    const trialDeviceBatch = db.batch();
+    let anonymizedDevices = 0;
     try {
-      const anonymized = await anonymizeTrialDevicesForUser(db, batch, userId);
-      if (anonymized > 0) {
-        console.log(`Anonymised ${anonymized} trialDevices record(s) for: ${userId}`);
-      }
+      anonymizedDevices = await anonymizeTrialDevicesForUser(trialDeviceBatch, userId, db);
     } catch (trialDeviceError) {
       console.warn(`Error anonymising trialDevices for user ${userId}:`, trialDeviceError);
-      // Continue with account deletion even if this fails
     }
 
-    // Step 5: Execute Firestore batch deletion
+    // Step 5: Apply the plan, chunked — a long history exceeds Firestore's
+    // 500-write batch limit, which the previous single batch would have hit.
+    let applied;
     try {
-      await batch.commit();
-      console.log(`Successfully deleted Firestore documents for user: ${userId}`);
+      applied = await applyDeletionPlan(db, targets, `deleted_${userId.slice(0, 8)}`);
+      if (anonymizedDevices > 0) await trialDeviceBatch.commit();
+      console.log(
+        `deleteUserAccount: deleted ${applied.deleted}, anonymised ` +
+        `${applied.anonymized} + ${anonymizedDevices} device record(s) for ${userId}`,
+      );
     } catch (firestoreError) {
       console.error(`Failed to delete Firestore documents for user ${userId}:`, firestoreError);
       throw new functions.https.HttpsError(
@@ -1404,7 +1403,7 @@ export const deleteUserAccount = functions.https.onCall(async (data, context) =>
         'Failed to delete user data from database'
       );
     }
-    
+
     // Step 6: Delete Firebase Auth user
     try {
       console.log(`Deleting Firebase Auth user: ${userId}`);
@@ -1431,6 +1430,14 @@ export const deleteUserAccount = functions.https.onCall(async (data, context) =>
     return {
       success: true,
       message: 'Account deleted successfully',
+      // Risk #14 — deleting the account does NOT cancel an App Store or Google
+      // Play subscription. Only the store can do that, and only the user can
+      // ask it to. Saying nothing meant people kept being charged for an
+      // account that no longer existed.
+      storeSubscriptionWarning:
+        'Deleting your account does not cancel an active App Store or Google Play '
+        + 'subscription. Cancel it in your device subscription settings, or you will '
+        + 'continue to be charged.',
       userId: userId,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     };

@@ -184,5 +184,6 @@
   "verify_email_title": "Zweryfikuj e-mail",
   "verify_email_message": "Wysłaliśmy link weryfikacyjny. Potwierdź adres e-mail, aby rozpocząć 3-dniowy bezpłatny okres próbny.",
   "no_subscription_title": "Brak aktywnej subskrypcji",
-  "no_subscription_message": "Wykup subskrypcję, aby odblokować wszystkie testy i teorię."
+  "no_subscription_message": "Wykup subskrypcję, aby odblokować wszystkie testy i teorię.",
+  "delete_subscription_warning": "Usunięcie konta nie anuluje aktywnej subskrypcji App Store ani Google Play. Anuluj ją w ustawieniach subskrypcji urządzenia, w przeciwnym razie opłaty będą naliczane dalej."
 }

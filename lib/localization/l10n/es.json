@@ -184,5 +184,6 @@
   "verify_email_title": "Verifica tu correo",
   "verify_email_message": "Te enviamos un enlace de verificación. Confirma tu correo para comenzar tu prueba gratuita de 3 días.",
   "no_subscription_title": "Sin suscripción activa",
-  "no_subscription_message": "Suscríbete para desbloquear todos los exámenes de práctica y la teoría."
+  "no_subscription_message": "Suscríbete para desbloquear todos los exámenes de práctica y la teoría.",
+  "delete_subscription_warning": "Eliminar tu cuenta no cancela una suscripción activa de App Store o Google Play. Cancélala en los ajustes de suscripciones de tu dispositivo o se te seguirá cobrando."
 }

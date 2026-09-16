@@ -89,7 +89,7 @@ describe('Risk #26 — trialDevices is anonymised, not deleted, on account delet
     });
 
     const batch = db().batch();
-    const count = await anonymizeTrialDevicesForUser(db(), batch, 'departing-user');
+    const count = await anonymizeTrialDevicesForUser(batch, 'departing-user', db());
     await batch.commit();
     expect(count).toBe(1);
 
@@ -104,7 +104,7 @@ describe('Risk #26 — trialDevices is anonymised, not deleted, on account delet
 
   it('is a no-op for a user with no device records', async () => {
     const batch = db().batch();
-    const count = await anonymizeTrialDevicesForUser(db(), batch, 'user-with-no-devices');
+    const count = await anonymizeTrialDevicesForUser(batch, 'user-with-no-devices', db());
     await batch.commit();
     expect(count).toBe(0);
   });
