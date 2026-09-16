@@ -155,6 +155,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // webhookDeadLetter — failed store notifications kept for replay (risk #9).
+    // Contains raw Apple/Google payloads, so never client-readable.
+    match /webhookDeadLetter/{failureId} {
+      allow read, write: if false;
+    }
+
     // processedWebhooks — written by Cloud Functions admin SDK only (webhook dedup)
     match /processedWebhooks/{docId} {
       allow read, write: if false;

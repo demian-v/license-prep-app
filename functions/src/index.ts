@@ -3,6 +3,7 @@ import * as admin from 'firebase-admin';
 import { requireEntitledUser, requireAdmin } from './entitlement';
 import { applyToAllMatches } from './webhook-fanout';
 import { mapPlayNotification, PLAY_NOTIFICATION } from './play-notifications';
+import { recordWebhookFailure } from './webhook-dead-letter';
 import * as fs from 'fs';
 import * as path from 'path';
 import { defineInt, defineSecret } from 'firebase-functions/params';
@@ -1884,6 +1885,11 @@ export const appStoreWebhook = functions.https.onRequest(async (req, res) => {
   const { signedPayload } = req.body;
   if (!signedPayload) { res.status(200).json({ received: true }); return; }
 
+  // Captured for the dead letter (risk #9): the real values are parsed inside
+  // the try and are therefore out of scope in the catch.
+  let dlKey: string | undefined;
+  let dlType = 'unknown';
+
   try {
     const appId = appleAppId.value();
 
@@ -1918,6 +1924,8 @@ export const appStoreWebhook = functions.https.onRequest(async (req, res) => {
       }
     }
     const { notificationType, subtype, data, notificationUUID } = notification;
+    dlKey = notificationUUID as string | undefined;
+    dlType = String(notificationType ?? 'unknown');
 
     // Apple sends this when you click "Send test notification" in App Store Connect
     if (notificationType === NotificationTypeV2.TEST) {
@@ -2097,8 +2105,26 @@ export const appStoreWebhook = functions.https.onRequest(async (req, res) => {
 
   } catch (err) {
     console.error('❌ appStoreWebhook error:', err);
-    // Always return 200 — non-200 causes Apple to retry for our own bugs
-    res.status(200).json({ received: true });
+
+    // Risk #9 — this used to return 200 unconditionally, so a renewal or a
+    // revocation lost to a transient error was lost permanently, with nothing
+    // recording that it had arrived. The old comment's worry (Apple retrying
+    // our own bugs forever) is handled by bounding the retries instead of
+    // refusing them: record the failure, ask Apple to redeliver a few times,
+    // then start acking and leave the dead letter for manual replay.
+    const { shouldRetry } = await recordWebhookFailure(db, {
+      source: 'apple',
+      key: dlKey ?? `nouuid_${Date.now()}`,
+      notificationType: dlType,
+      payload: { signedPayload },
+      error: err,
+    });
+
+    if (shouldRetry) {
+      res.status(500).json({ received: false, retry: true });
+    } else {
+      res.status(200).json({ received: true, deadLettered: true });
+    }
   }
 });
 
@@ -2121,9 +2147,16 @@ export const handleGooglePlayNotifications = functions
   .runWith({ secrets: [googleCredentials] })
   .pubsub.topic('play-rtdn')
   .onPublish(async (message) => {
+    // Captured for the dead letter (risk #9): parsed inside the try, so out of
+    // scope in the catch.
+    let dlKey: string | undefined;
+    let dlType = 'unknown';
+    let dlPayload: unknown;
+
     try {
       const dataStr = Buffer.from(message.data, 'base64').toString('utf-8');
       const notification = JSON.parse(dataStr);
+      dlPayload = notification;
 
       if (notification.testNotification) {
         console.log('✅ handleGooglePlayNotifications: Test notification received');
@@ -2142,6 +2175,8 @@ export const handleGooglePlayNotifications = functions
       // if a stale EXPIRED message arrives after a RENEWED message.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const messageId = (message as any).messageId as string;
+      dlKey = messageId;
+      dlType = String(notificationType ?? 'unknown');
       const alreadyProcessed = await db.collection('processedWebhooks').doc(`gp_${messageId}`).get();
       if (alreadyProcessed.exists) {
         console.log(`⏭️ handleGooglePlayNotifications: Already processed ${messageId}`);
@@ -2271,6 +2306,24 @@ export const handleGooglePlayNotifications = functions
       console.log(`✅ handleGooglePlayNotifications: ${logAction} for user ${userId}`);
     } catch (err) {
       console.error('❌ handleGooglePlayNotifications error:', err);
-      // Do NOT rethrow — Pub/Sub retries on thrown errors
+
+      // Risk #9 — this used to swallow every error so Pub/Sub always acked,
+      // which lost the notification for good. Retries are now bounded by the
+      // dead-letter attempt count, so a persistent failure cannot become an
+      // endless redelivery loop.
+      const { shouldRetry } = await recordWebhookFailure(db, {
+        source: 'play',
+        key: String(dlKey ?? `nomsgid_${Date.now()}`),
+        notificationType: dlType,
+        payload: dlPayload ?? {},
+        error: err,
+      });
+
+      if (shouldRetry) {
+        // Rethrowing nacks the message and Pub/Sub redelivers with backoff.
+        throw err;
+      }
+      // Budget spent: ack so the subscription stops redelivering. The dead
+      // letter remains for manual replay.
     }
   });
