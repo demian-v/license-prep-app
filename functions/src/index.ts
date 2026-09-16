@@ -4,6 +4,7 @@ import { requireEntitledUser, requireAdmin } from './entitlement';
 import { applyToAllMatches } from './webhook-fanout';
 import { mapPlayNotification, PLAY_NOTIFICATION } from './play-notifications';
 import { recordWebhookFailure } from './webhook-dead-letter';
+import { anonymizeTrialDevicesForUser } from './trial-devices';
 import * as fs from 'fs';
 import * as path from 'path';
 import { defineInt, defineSecret } from 'firebase-functions/params';
@@ -1374,7 +1375,20 @@ export const deleteUserAccount = functions.https.onCall(async (data, context) =>
       console.warn(`Error checking saved questions for user ${userId}:`, savedQuestionsError);
       // Continue with account deletion even if saved questions check fails
     }
-    
+
+    // Risk #26 — trialDevices holds firstUserId, so deletion must not leave it
+    // behind. It is ANONYMISED rather than deleted: removing the record would
+    // make account deletion the easiest way to farm unlimited free trials.
+    try {
+      const anonymized = await anonymizeTrialDevicesForUser(db, batch, userId);
+      if (anonymized > 0) {
+        console.log(`Anonymised ${anonymized} trialDevices record(s) for: ${userId}`);
+      }
+    } catch (trialDeviceError) {
+      console.warn(`Error anonymising trialDevices for user ${userId}:`, trialDeviceError);
+      // Continue with account deletion even if this fails
+    }
+
     // Step 5: Execute Firestore batch deletion
     try {
       await batch.commit();
@@ -1789,54 +1803,64 @@ export const createTrialSubscription = functions.https.onCall(async (data: any, 
     throw new functions.https.HttpsError('failed-precondition', 'Trial unavailable on this device');
   }
 
-  // Dedupe #1 — per userId
-  const existing = await db.collection('subscriptions')
-    .where('userId', '==', userId).limit(1).get();
-  if (!existing.empty) throw new functions.https.HttpsError('already-exists', 'Subscription exists');
-
-  // Dedupe #2 — per device fingerprint
-  const deviceRef = db.collection('trialDevices').doc(deviceIdHash);
-  const deviceSnap = await deviceRef.get();
-  if (deviceSnap.exists) {
-    throw new functions.https.HttpsError('failed-precondition', 'trial-already-used-on-device');
-  }
-
   const trialEnd = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000); // 3 days
-  const subRef = db.collection('subscriptions').doc();
+  const deviceRef = db.collection('trialDevices').doc(deviceIdHash);
 
-  const batch = db.batch();
-  batch.set(subRef, {
+  // Risk #26 — both dedupe checks used to be read-then-write OUTSIDE any
+  // transaction: two reads, then a separate batch commit. Two signups racing on
+  // one device both passed their reads before either wrote, and both were
+  // granted a trial. The reads and the writes now share one transaction, so
+  // Firestore retries the loser on contention and it sees the winner's write.
+  const subscriptionId = await db.runTransaction(async (tx) => {
+    // Dedupe #1 — per userId
+    const existing = await tx.get(
+      db.collection('subscriptions').where('userId', '==', userId).limit(1),
+    );
+    if (!existing.empty) {
+      throw new functions.https.HttpsError('already-exists', 'Subscription exists');
+    }
+
+    // Dedupe #2 — per device fingerprint
+    const deviceSnap = await tx.get(deviceRef);
+    if (deviceSnap.exists) {
+      throw new functions.https.HttpsError('failed-precondition', 'trial-already-used-on-device');
+    }
+
+    const subRef = db.collection('subscriptions').doc();
+    tx.set(subRef, {
     id: subRef.id, userId,
     packageId: 3, status: 'active', isActive: true,
     planType: 'trial', duration: 3, price: 0, trialUsed: 0,
     trialEndsAt: admin.firestore.Timestamp.fromDate(trialEnd),
     nextBillingDate: admin.firestore.Timestamp.fromDate(trialEnd),
     deviceIdHash,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
-  batch.set(deviceRef, {
-    firstUserId: userId,
-    firstSubscriptionId: subRef.id,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    tx.set(deviceRef, {
+      firstUserId: userId,
+      firstSubscriptionId: subRef.id,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
   // Mirror entitlement onto the user document, exactly as the purchase path does
   // (receipt-validation.ts syncUserDocument) and the schedulers expect.
   // Trials were the one path that never wrote it, so `users.isActive` was false
   // for every trial user — which made the flag unusable as a security-rules gate
   // and left trial users looking inactive to any server logic keyed on it.
-  batch.set(
-    db.collection('users').doc(userId),
-    {
-      isActive: true,
-      nextBillingDate: admin.firestore.Timestamp.fromDate(trialEnd),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    },
-    { merge: true },
-  );
-  await batch.commit();
+    tx.set(
+      db.collection('users').doc(userId),
+      {
+        isActive: true,
+        nextBillingDate: admin.firestore.Timestamp.fromDate(trialEnd),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
 
-  return { subscriptionId: subRef.id };
+    return subRef.id;
+  });
+
+  return { subscriptionId };
 });
 
 // Cancels the user's active subscription server-side.
