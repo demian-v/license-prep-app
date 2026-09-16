@@ -1,8 +1,25 @@
 # Local Hardening Session — security & money path
 
+## STATUS AT A GLANCE — read this first
+
+| | |
+|---|---|
+| **Branch** | `local/security-money-hardening` (base `84300d0`) — **local only, never pushed** |
+| **Commits** | 28 |
+| **Tests** | 109 Cloud Functions (Jest) + 21 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
+| **Analyzer** | 0 errors |
+| **Register rows addressed** | 29 of 59 |
+| **Deployed?** | **NO.** Nothing here has ever run in production. The deploy path itself has never been exercised |
+
+**Risks fixed on this branch:** #2 #3 #4 #5 #6 #7 #8 #12 #13 #14 #16 #18 #19 #20 #22 #23 #24 #25 #29 #32 #39 #43 #48 #54 #58 #59
+**Partial, with reasons below:** #9 (no reconciliation job) · #21 (no sync built) · #26 (needs attestation)
+
+**Biggest open question:** none of this protects anyone until it ships. The next conversation is probably about deploying and verifying, not about more fixes.
+
+
 **Branch:** `local/security-money-hardening` (base `84300d0`, off `chore/play-billing-8-migration`)
 **Started:** 2026-09-16
-**Last updated:** 2026-09-16 (setup phase)
+**Last updated:** 2026-09-16 — handed off for a fresh session
 **Goal:** Fix the Critical + High security and revenue risks from `driveusa-risk-register`, verified locally. **Never deploy. Never touch the live Firebase project.**
 
 > If this session is interrupted, read **How to resume** below. Everything needed to pick up is in this file.
@@ -24,8 +41,50 @@
 ```bash
 cd /Users/demianvyrozub/projects/license-prep-app
 git checkout local/security-money-hardening
-git log --oneline -5            # what landed last
-cat SESSION.md                  # this file — check the queue below
+git log --oneline -10           # what landed last
+```
+
+Bring the environment up. **Every functions command needs the Node 22 prefix** —
+the machine's default is Node 20 and `functions/package.json` pins 22:
+
+```bash
+export PATH="/opt/homebrew/opt/node@22/bin:$PATH"
+firebase emulators:start --project licenseprepapp --only firestore,auth,functions,storage,pubsub
+```
+
+Seed content into a fresh emulator (data is in-memory and lost on restart):
+
+```bash
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 GCLOUD_PROJECT=licenseprepapp node scripts/local/seed-emulator.js
+```
+
+Run the tests. **After ANY TypeScript change, build first** — the emulator runs
+`functions/lib/`, not `functions/src/`, so tests and the emulator will otherwise
+disagree silently:
+
+```bash
+npm --prefix functions run build && (cd functions && npx jest)
+```
+
+```bash
+flutter test
+```
+
+Build and run the app (about 6 minutes; `LANG` is required or CocoaPods fails):
+
+```bash
+LANG=en_US.UTF-8 flutter build ios --simulator --debug --dart-define=USE_EMULATOR=true
+```
+
+```bash
+xcrun simctl install booted build/ios/iphonesimulator/Runner.app && xcrun simctl launch booted com.driveusa.app
+```
+
+The simulator can never obtain a trial through signup (`isPhysicalDevice` is
+false there, by design). Grant one the way a real device would:
+
+```bash
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 GCLOUD_PROJECT=licenseprepapp node scripts/local/grant-local-trial.js <email>
 ```
 
 Then bring the environment up (see **Environment** for current state):
@@ -243,7 +302,9 @@ Diagnostic left in place (`🧪 Firestore settings -> host=… ssl=…` plus a p
 read) because it makes a silent misconfiguration loud. It only runs under
 `USE_EMULATOR`.
 
-## Reproduced evidence — risk #58, live on the simulator
+## Reproduced evidence
+
+### Risk #58, live on the simulator
 
 Signing up in the app creates the `users/{uid}` document but **no subscription
 and no entitlement**, and the screen says nothing about it. Cause:
@@ -266,7 +327,7 @@ signup. A focused test calling that callable passes, and
 Most likely the emulator hot-reloaded `functions/lib/` mid-rebuild. **Not
 fixed, not claimed fixed** — re-check if it recurs on a stable build.
 
-## Reproduced evidence
+### Risk #3 evidence
 
 **Risk #3, 2026-09-16.** An unauthenticated call to `getQuizQuestions` (no `context.auth` whatsoever) returned:
 
@@ -293,7 +354,7 @@ The answer key and explanation are served to an anonymous stranger. Reproduce wi
 - `docs/webhook.md` asks twice for `handleMockPaymentWebhook` to be removed before production. Now done — that document can drop the warning.
 - Register Top-7 #2 suggests counting `subscriptionLogs` where `processedBy == 'scheduled_function'` to see how much audit trail `cleanupSubscriptionTestData` already destroyed. **Not done** — it needs a production read, and this machine deliberately has no production credentials now. Owner call.
 
-## Gotchas found during setup
+### More gotchas
 
 - `pod install` needs `export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8`, otherwise CocoaPods 1.16.2 on Ruby 3.4 dies with `Encoding::CompatibilityError`. It exits non-zero but a piped `tail` will mask it — always check `Podfile.lock`'s date.
 - Xcode warns that `Runner` has a custom base configuration so CocoaPods did not set `Pods-Runner.profile.xcconfig`. Pre-existing, affects Profile builds only. Not touched.
