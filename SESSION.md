@@ -84,14 +84,14 @@ Status: ⬜ not started · 🔄 in progress · ✅ done & verified · ⏸️ blo
 | Risk | What | Status | Verified by | Commit |
 |---|---|---|---|---|
 | #2 | `upgradeSubscription` grants 365 days yearly, free, no audit row | ✅ **DONE** | `no-free-upgrade.test.ts` | Deleted server-side **and** the whole client path: UI button, confirmation dialog, provider + service methods, model helpers, and the orphaned `UpgradeCalculator` (138 lines). ~480 lines removed in total |
-| #5 | No receipt→account binding — one receipt entitles unlimited accounts | ⬜ | function test | |
+| #5 | No receipt→account binding — one receipt entitles unlimited accounts | ✅ **DONE** | `receipt-binding.test.ts` — 8 tests incl. wiring + renewal positive controls | Guard refuses a receipt bound to another `userId`, before any write |
 | #6 | `yearly` receipts dropped client-side (`_activeProductIds` = monthly only) | ⬜ | dart test + StoreKit | **Approach changed 2026-09-16: remove yearly**, don't re-enable. Drop from `productIds` and the server allow-list |
 | #7 | Home-grown 18h grace period vs Apple 16d / Google 30d | ⬜ | function test | |
 | #8 | Play `PAUSED` / `PAUSE_SCHEDULE_CHANGED` (types 10, 11) not modelled | ⬜ | function test | |
 | #9 | Webhooks always return 200, no dead-letter, no reconciliation | ⬜ | function test | |
 | #19 | Rate limit counts failures — paying user locked out for an hour | ⬜ | function test | |
 | #20 | `subscriptionsType` is a single point of failure for every purchase | ⬜ | function test | |
-| #22 | Duplicate `subscriptions` docs after re-subscribe; webhooks update the corpse | ⬜ | function test | |
+| #22 | Duplicate `subscriptions` docs after re-subscribe; webhooks update the corpse | ⬜ | function test | **Inherits work from #5:** both webhook lookups no longer `.limit(1)` and now log loudly when several documents share one receipt, but still update only `docs[0]`. Fanning the update out to every match is this risk's job |
 
 ### High — security / abuse
 
@@ -130,6 +130,8 @@ Status: ⬜ not started · 🔄 in progress · ✅ done & verified · ⏸️ blo
 | 2026-09-16 | Emulators run under the REAL project id, not `demo-driveusa` | `FirebaseOptions` is a matched set; overriding only `projectId` leaves the real API key, so Firebase Installations calls `projects/demo-*/installations` with a key that does not belong to it. Owner chose to **revoke ADC first** (`gcloud auth application-default revoke`), so the machine now holds no production credentials at all — a stronger position than the `demo-` prefix gave |
 | 2026-09-16 | Gate content rules on `users/{uid}.isActive`, and make trials write it | It is the server-maintained entitlement mirror the purchase path, renewal manager and schedulers already use. `createTrialSubscription` was the one path that never wrote it, so gating on it without that fix would have locked out every trial user |
 | 2026-09-16 | Blocklist rather than allowlist for `users/{uid}` writes | Several services write profile fields dynamically (`email_sync_service` passes a computed map); an allowlist would break them. The blocklist covers the nine fields that decide entitlement, which is what #29 is actually about |
+| 2026-09-16 | #5 fixes the binding; the webhook `.limit(1)` fan-out is deferred to #22 | The register lists `.limit(1)` as a *compounding* factor of #5, not part of its fix. Fanning a webhook update across N documents means restructuring two large handlers that build one update block for one ref — that is exactly what #22 is about. Interim: the limit is removed and duplicates are logged, so the condition is visible instead of silent |
+| 2026-09-16 | Superseded the 2026-04-21 "accept receipt sharing as known-issue" decision | Owner asked for #5 directly on 2026-09-16. The earlier reasoning (time-limited, self-healing, zero revenue impact) was about shipping under deadline, not about the defect being acceptable long-term |
 | 2026-09-16 | Leave the `Pods-Runner.profile.xcconfig` warning alone | Runner's Profile config points at `Flutter/Release.xcconfig`. Debug and Release are correctly wired; only Profile builds (performance profiling, never shipped) are affected. Not a register risk, and editing Xcode build config on a security branch invites unrelated breakage |
 
 ## Gotchas
@@ -205,6 +207,8 @@ The answer key and explanation are served to an anonymous stranger. Reproduce wi
 - When the long-running emulator is already up, run `npx jest` directly. `npm test` wraps `emulators:exec`, which will fail on the already-bound ports.
 
 ## Owner action required outside the repo
+
+- **Check production for receipts already shared across accounts.** The binding guard stops new sharing, but says nothing about rows created before it. Query `subscriptions` grouped by `originalTransactionId` / `androidPurchaseToken` and look for any value held by more than one `userId`. The webhooks now log `🚨 ... subscriptions share ...` if it happens live. Needs a production read, which this machine no longer has credentials for.
 
 - **Provision an `admins/{uid}` document** (register risk #45). The collection is empty, so `processSubscriptionsManualy`, `getSubscriptionStats`, `subscriptionSystemHealth` and `getRenewalStats` are now callable by nobody — deliberate, but it means those stats endpoints stay closed until an admin exists. It also unblocks reading the 27 filed `reports`, which today are reachable only through the Firebase console. Create it in the console; the collection is client-deny by rule.
 

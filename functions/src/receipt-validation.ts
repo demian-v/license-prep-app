@@ -746,7 +746,67 @@ async function syncUserBillingDate(
  * - Transaction history tracking
  * - Platform tracking (iOS/Android)
  */
-async function createOrUpdateSubscription(
+/**
+ * Receipt→account binding (risk #5).
+ *
+ * Nothing used to check whether an incoming receipt was already bound to a
+ * different account, so one paid receipt could entitle unlimited accounts:
+ * share the receipt, every recipient gets a subscription document, and each
+ * looks legitimate. Revocation could not clean it up either, because both
+ * webhook lookups use `.limit(1)` and so reach exactly one of the N documents.
+ *
+ * The store identifiers are stable across renewals — `originalTransactionId`
+ * on iOS, the purchase token on Android — which is exactly what makes them
+ * usable as an ownership key.
+ *
+ * The query filters on a single field by equality, so it is served by a
+ * single-field index and needs no composite index (cf. risk #15, where a
+ * missing composite index silently breaks the purchase path).
+ *
+ * Deliberately NOT filtered on `isActive`: a receipt bound to someone's
+ * lapsed subscription still belongs to them, and ignoring inactive rows would
+ * reopen the hole the moment a subscription expired.
+ */
+export async function assertReceiptNotBoundToAnotherUser(params: {
+  userId: string;
+  platform: 'ios' | 'android';
+  originalTransactionId?: string;
+  androidPurchaseToken?: string;
+}): Promise<void> {
+  const { userId, platform } = params;
+  const field = platform === 'ios' ? 'originalTransactionId' : 'androidPurchaseToken';
+  const value = platform === 'ios' ? params.originalTransactionId : params.androidPurchaseToken;
+
+  // Nothing to bind against. Apple omits original_transaction_id on some
+  // receipt shapes; that is not grounds to reject a purchase.
+  if (!value) {
+    console.log(`🔗 Receipt binding: no ${field} present, skipping ownership check`);
+    return;
+  }
+
+  const snap = await admin.firestore()
+    .collection('subscriptions')
+    .where(field, '==', value)
+    .get();
+
+  const foreign = snap.docs.filter((doc) => doc.get('userId') !== userId);
+
+  if (foreign.length > 0) {
+    const owners = Array.from(new Set(foreign.map((d) => d.get('userId'))));
+    console.error(
+      `🚫 Receipt binding violation: ${field}=${value} is already bound to ` +
+      `${owners.length} other account(s) [${owners.join(', ')}]; ${userId} was refused.`,
+    );
+    throw new functions.https.HttpsError(
+      'permission-denied',
+      'This purchase is already associated with another account.',
+    );
+  }
+
+  console.log(`🔗 Receipt binding OK: ${field}=${value} belongs to ${userId}`);
+}
+
+export async function createOrUpdateSubscription(
   userId: string,
   productId: string,
   expiresAt: Date,
@@ -756,7 +816,19 @@ async function createOrUpdateSubscription(
 ): Promise<string> {
   console.log('💾 Starting createOrUpdateSubscription...');
   console.log(`   User: ${userId}, Product: ${productId}, Platform: ${platform}`);
-  
+
+  // Risk #5 — refuse a receipt already bound to another account BEFORE any
+  // write, and outside the try below so the permission-denied is not reshaped
+  // into a generic 'internal' error by the catch.
+  // Android stores the purchase token in androidPurchaseToken, which is this
+  // transactionId (see the writes further down).
+  await assertReceiptNotBoundToAnotherUser({
+    userId,
+    platform,
+    originalTransactionId,
+    androidPurchaseToken: platform === 'android' ? transactionId : undefined,
+  });
+
   try {
     const db = admin.firestore();
     const now = admin.firestore.Timestamp.now();

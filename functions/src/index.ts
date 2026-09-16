@@ -1954,9 +1954,21 @@ export const appStoreWebhook = functions.https.onRequest(async (req, res) => {
     }
 
     // Look up subscription by originalTransactionId
+    // No .limit(1): a receipt bound to several accounts (risk #5, possible in
+    // data created before the binding guard) must at least be visible. Only
+    // docs[0] is updated below — fanning the update out to every match is
+    // risk #22's job, not this one — but a silent miss becomes a loud warning.
     const snap = await db.collection('subscriptions')
       .where('originalTransactionId', '==', originalTransactionId)
-      .limit(1).get();
+      .get();
+
+    if (snap.size > 1) {
+      console.error(
+        `🚨 appStoreWebhook: ${snap.size} subscriptions share originalTransactionId ` +
+        `${originalTransactionId} (users: ${snap.docs.map((d) => d.get('userId')).join(', ')}). ` +
+        'Only the first is being updated — see risk #5 / #22.',
+      );
+    }
 
     if (snap.empty) {
       // Existing subscriber: originalTransactionId not yet stored (pre-deployment purchase).
@@ -2135,9 +2147,18 @@ export const handleGooglePlayNotifications = functions
         return;
       }
 
+      // See the appStoreWebhook note above: surfacing duplicates, not fanning out.
       const subSnap = await db.collection('subscriptions')
         .where('androidPurchaseToken', '==', purchaseToken)
-        .limit(1).get();
+        .get();
+
+      if (subSnap.size > 1) {
+        console.error(
+          `🚨 handleGooglePlayNotifications: ${subSnap.size} subscriptions share this ` +
+          `purchaseToken (users: ${subSnap.docs.map((d) => d.get('userId')).join(', ')}). ` +
+          'Only the first is being updated — see risk #5 / #22.',
+        );
+      }
 
       if (subSnap.empty) {
         // Existing subscriber: androidPurchaseToken not yet stored (pre-deployment purchase).
