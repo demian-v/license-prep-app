@@ -1,5 +1,6 @@
 import * as functions from 'firebase-functions/v1';
 import * as admin from 'firebase-admin';
+import { isWithinStoreGrace } from './billing-grace';
 
 /**
  * Server-side entitlement gate (risk #3).
@@ -49,12 +50,18 @@ export async function requireEntitledUser(context: any): Promise<string> {
 
   // `isActive` alone is not proof of entitlement: the expiry schedulers are
   // capped at 100 documents per run (risk #25), so a lapsed subscription can
-  // sit with isActive:true until a sweep reaches it. Checking the date here
-  // makes the gate correct regardless of scheduler lag.
+  // sit with isActive:true until a sweep reaches it.
+  //
+  // But a bare `nextBillingDate > now` was too strict, and reproduced risk #7
+  // one layer up: it locked out a paying customer the moment a renewal ran
+  // late, while Apple or Google were still retrying the charge. Entitlement
+  // therefore extends through the same store grace window the renewal
+  // scheduler uses, so the two cannot disagree about who is entitled.
   const nowMs = Date.now();
   const entitled = snap.docs.some((doc) => {
     const nextBillingDate = doc.get('nextBillingDate');
-    return nextBillingDate != null && nextBillingDate.toMillis() > nowMs;
+    if (nextBillingDate == null) return false;
+    return nextBillingDate.toMillis() > nowMs || isWithinStoreGrace(nextBillingDate, nowMs);
   });
 
   if (!entitled) {

@@ -1,13 +1,15 @@
 import * as admin from 'firebase-admin';
+import { isWithinStoreGrace } from './billing-grace';
 
 // Function to get Firestore instance (ensures Firebase is initialized)
 function getDb() {
   return admin.firestore();
 }
 
-// Maximum consecutive missed billing cycles before a subscription is deactivated.
-// Each scheduler run represents one 6-hour window, so 3 attempts ≈ 18 hours grace.
-const MAX_RENEWAL_ATTEMPTS = 3;
+// Risk #7: deactivation is decided by ELAPSED TIME since nextBillingDate, not
+// by counting scheduler passes. See billing-grace.ts for why 30 days and why
+// attempt-counting was the wrong unit. renewalAttempts is still recorded, for
+// observability only — it no longer decides anything.
 
 // Interface definitions
 interface SubscriptionData {
@@ -79,9 +81,12 @@ export async function processActiveSubscriptionRenewals(): Promise<RenewalResult
  * IMPORTANT: For iOS/Android, the App Store / Google Play handles the actual
  * payment and renewal. This scheduler's job is purely to track Firestore state:
  *
- *   1. First occurrence: mark subscription `past_due`, increment renewalAttempts.
- *   2. After MAX_RENEWAL_ATTEMPTS consecutive missed cycles: deactivate the
- *      subscription (isActive=false, status='inactive') and notify the user.
+ *   1. First occurrence: mark subscription `past_due`, increment renewalAttempts
+ *      (observability only — access is NOT revoked, the store may still be
+ *      retrying the charge).
+ *   2. Once nextBillingDate is older than the store grace window
+ *      (billing-grace.ts, risk #7): deactivate the subscription
+ *      (isActive=false, status='inactive') and notify the user.
  *   3. When Apple/Google delivers a real renewal receipt to the Flutter app, the
  *      receipt-validation function resets status→'active' and renewalAttempts→0.
  *
@@ -163,20 +168,24 @@ async function checkSubscriptionRenewals(): Promise<{
 /**
  * Process a single overdue subscription.
  *
- * - Increments renewalAttempts and marks status 'past_due'.
- * - After MAX_RENEWAL_ATTEMPTS it deactivates the subscription entirely.
+ * - Increments renewalAttempts and marks status 'past_due'. Access is retained.
+ * - Deactivates entirely only once nextBillingDate is older than the store
+ *   grace window (billing-grace.ts, risk #7) — never on an attempt count.
  *
  * Real payment/renewal is done by Apple/Google — we only track Firestore state.
  * The receipt-validation function resets attempts when a real receipt arrives.
  */
-async function processOverdueSubscription(
+export async function processOverdueSubscription(
   subscriptionData: SubscriptionData
 ): Promise<{ deactivated: boolean; emailSent: boolean }> {
   const db = getDb();
   const attempts = (subscriptionData.renewalAttempts ?? 0);
   const newAttempts = attempts + 1;
 
-  if (newAttempts > MAX_RENEWAL_ATTEMPTS) {
+  // Only give up once the stores' own retry windows have certainly closed.
+  // Until then the subscription stays active and merely reads as past_due:
+  // Apple or Google may still be charging the customer successfully.
+  if (!isWithinStoreGrace(subscriptionData.nextBillingDate)) {
     // ── Deactivate ──────────────────────────────────────────────────────────
     const batch = db.batch();
     batch.update(db.collection('subscriptions').doc(subscriptionData.id), {
@@ -218,7 +227,8 @@ async function processOverdueSubscription(
   // to 'past_due').  On every subsequent scheduler run the subscription is
   // already 'past_due' — re-sending the same email every 6 hours is spammy
   // and hurts deliverability.  The user receives a second (final) notification
-  // when the subscription is deactivated after MAX_RENEWAL_ATTEMPTS.
+  // when the subscription is finally deactivated, once the store grace window
+  // has closed.
   const isFirstMiss = attempts === 0;
   const emailSent = isFirstMiss
     ? await sendRenewalFailureNotification(subscriptionData.userId)
