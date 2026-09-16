@@ -46,7 +46,11 @@ class DefaultFirebaseOptions {
     messagingSenderId: '987638335534',
     projectId: 'licenseprepapp',
     authDomain: 'licenseprepapp.firebaseapp.com',
-    storageBucket: 'licenseprepapp.appspot.com',
+    // Risk #54 — web pointed at licenseprepapp.appspot.com while every other
+    // platform used licenseprepapp.firebasestorage.app. Both google-services.json
+    // and GoogleService-Info.plist name firebasestorage.app, so web was the odd
+    // one out: a file uploaded on mobile could be invisible on web.
+    storageBucket: 'licenseprepapp.firebasestorage.app',
     measurementId: 'G-8TTZX72V8P',
   );
 

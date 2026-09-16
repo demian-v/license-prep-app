@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,6 +28,19 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserver {
+  // Risk #59 — was the literal '1.0.0' on screen, so the About section lied
+  // about which build the user was running.
+  String _appVersion = '';
+
+  Future<void> _loadAppVersion() async {
+    try {
+      final pkg = await PackageInfo.fromPlatform();
+      if (mounted) setState(() => _appVersion = '${pkg.version}+${pkg.buildNumber}');
+    } catch (e) {
+      debugPrint('⚠️ ProfileScreen: could not read package version: $e');
+    }
+  }
+
   // Counter for the hidden developer menu
   int _versionTapCount = 0;
   
@@ -54,6 +68,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
   @override
   void initState() {
     super.initState();
+    _loadAppVersion();
     // Force sync the email in Firestore when the profile screen loads
     _syncEmailOnScreenLoad();
     
@@ -871,7 +886,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                     child: Padding(
                       padding: const EdgeInsets.all(8.0),
                       child: Text(
-                        '${_translate('version', languageProvider)} 1.0.0',
+                        '${_translate('version', languageProvider)} $_appVersion',
                         style: TextStyle(color: Colors.grey[500], fontSize: 12),
                       ),
                     ),

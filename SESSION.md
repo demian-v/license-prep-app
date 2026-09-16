@@ -113,6 +113,11 @@ Status: ⬜ not started · 🔄 in progress · ✅ done & verified · ⏸️ blo
 | Risk | What | Status | Why it was pulled in |
 |---|---|---|---|
 | #58 | New user with no trial saw a silent dead end (`SizedBox.shrink()`) | ✅ **DONE** | Unavoidable once #12 gates the trial: refusing a trial without explaining it would send every unverified signup to a blank screen. The branch now renders a real card, and says *"verify your email"* specifically when that is the reason |
+| #32 | `functions/.env.licenseprepapp` tracked in git, no `.env` rule at all | ✅ **DONE** | `git ls-files` | Untracked + blanket `.env` rules. File contains only `APPLE_APP_ID`, not a secret — the risk was the *next* one |
+| #39 | Hardcoded `state: 'IL'` when starting exams and practice | ✅ **DONE** | code + app | Topics already honoured the user's state; **questions did not**, so a New York user got Illinois questions |
+| #48 | Local subscription cache trusted whenever the Firestore read fails | ✅ **DONE** | code | Server is authoritative when it answers; an **expired** cache is discarded when it does not |
+| #54 | Web and mobile point at different Storage buckets | ✅ **DONE** | config | Web was the odd one out — both authoritative Firebase config files say `firebasestorage.app` |
+| #59 | App version hardcoded `1.0.0`, tagging every analytics event | ✅ **DONE** | app | Real version from `PackageInfo` in analytics **and** the profile screen |
 | #21 | Cross-device progress sync does not exist; failure is invisible; local key unscoped | ⚠️ **PARTIAL** | `progress_storage_test.dart` — 3 tests | Local storage **scoped per user** (was one shared key) + the silence documented. **Sync itself is NOT built** — see below |
 | #13 | Privacy policy promises deletion the code cannot deliver (2 of at least 8 locations) | ✅ **DONE** | `account-deletion.test.ts` — 11 tests | All personal locations deleted incl. the `sessions` subcollection; billing records **anonymised**, per the policy's own tax carve-out |
 | #14 | Deletion needs no reauth, is not atomic, silently leaves store subscriptions billing | ✅ **DONE** | `account-deletion.test.ts` | Recent-login required (10 min), chunked writes past Firestore's 500 limit, and the user is warned **before** deleting |

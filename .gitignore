@@ -73,3 +73,11 @@ functions/.secret.local
 .local-export/
 functions/.env.local
 functions/.env.demo-driveusa
+
+# Risk #32 — a blanket rule. functions/.env.licenseprepapp was tracked, and
+# .gitignore had no .env pattern at all, so the next secret would have leaked
+# the same way the Apple shared secret did (risk #1).
+.env
+.env.*
+*.env
+!.env.example

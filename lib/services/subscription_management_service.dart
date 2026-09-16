@@ -238,17 +238,33 @@ class SubscriptionManagementService {
         return subscription;
       }
       
-      // STEP 3: If not found in Firebase, try cache
-      debugPrint('ℹ️ No subscription found in Firebase, checking cache');
-      return await _getSubscriptionFromCache(userId);
+      // Risk #48 — the server ANSWERED, and its answer was "no subscription".
+      // Falling back to the cache here let a stale — or, on a rooted device, a
+      // hand-edited — local file override the server. The cache is a comfort
+      // for being offline, never a second opinion when the server has spoken.
+      debugPrint('ℹ️ No subscription found in Firebase — server is authoritative, returning null');
+      return null;
       
     } catch (e) {
       debugPrint('❌ SubscriptionManagementService: Error getting subscription: $e');
       
-      // Fallback to cache
+      // Risk #48 — the read FAILED (offline, transient error), so the cache is
+      // the only information available and is worth using. But it is not
+      // trusted blindly: an expired cached subscription is discarded rather
+      // than granting access, so a stale or edited file cannot extend itself.
+      // Entitlement is enforced server-side regardless (risk #3), so this only
+      // affects what the UI shows.
       try {
-        debugPrint('🔄 Attempting cache fallback...');
-        return await _getSubscriptionFromCache(userId);
+        debugPrint('🔄 Read failed — attempting cache fallback...');
+        final cached = await _getSubscriptionFromCache(userId);
+        if (cached == null) return null;
+
+        final expiry = cached.nextBillingDate;
+        if (expiry != null && DateTime.now().isAfter(expiry)) {
+          debugPrint('🚫 Cached subscription expired ${expiry.toIso8601String()} — discarding');
+          return null;
+        }
+        return cached;
       } catch (cacheError) {
         debugPrint('❌ SubscriptionManagementService: Cache fallback failed: $cacheError');
         return null;

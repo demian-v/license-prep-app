@@ -353,7 +353,10 @@ class PracticeProvider extends ChangeNotifier {
         final topicQuestions = await serviceLocator.content.getQuizQuestions(
           topic.id,
           language,
-          'IL' // Use 'IL' instead of lowercase 'all' to match Firebase data
+          // Risk #39 — was hardcoded 'IL'. Topics above already honour the
+          // user's selected state; questions did not, so a New York user was
+          // served Illinois questions.
+          state,
         );
         
         print('Fetched ${topicQuestions.length} questions for topic ${topic.id}');

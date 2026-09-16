@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -54,8 +55,19 @@ class AnalyticsService {
       _currentLanguage = 'en-us'; // Default, will be updated
       
       // Set only non-reserved default event parameters
+      // Risk #59 — this was hardcoded '1.0.0' and tagged EVERY analytics event,
+      // so all releases looked identical in reporting. PackageInfo is already a
+      // dependency and already used in report_service.dart.
+      String appVersion = 'unknown';
+      try {
+        final pkg = await PackageInfo.fromPlatform();
+        appVersion = '${pkg.version}+${pkg.buildNumber}';
+      } catch (e) {
+        debugPrint('⚠️ AnalyticsService: could not read package version: $e');
+      }
+
       await _analytics.setDefaultEventParameters({
-        'app_version': '1.0.0',
+        'app_version': appVersion,
         'platform': defaultTargetPlatform.name,
       });
       
