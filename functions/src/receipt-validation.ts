@@ -662,37 +662,70 @@ async function validateGooglePlayReceipt(
 }
 
 /**
- * Get subscription metadata from subscriptionsType collection
- * Phase 4: Helper function
+ * Built-in catalogue defaults (risk #20).
+ *
+ * `subscriptionsType` was a single point of failure for every purchase: one
+ * deleted, renamed or mistyped document and getSubscriptionMetadata threw
+ * before any write, on every platform, silently. The risk is not theoretical —
+ * PAYMENT_SYSTEM_IMPLEMENTATION.md documents planType as 'monthly_subscription',
+ * and seeding it that way would match nothing.
+ *
+ * Values mirror the production catalogue (read 2026-09-16), including the
+ * document ids, which are written through as packageId. Firestore still wins
+ * when a row exists — this only prevents a missing row from costing a customer
+ * a purchase they have already paid for.
  */
-async function getSubscriptionMetadata(productId: string): Promise<{
+const SUBSCRIPTION_DEFAULTS: Record<string, { id: string; duration: number; price: number }> = {
+  monthly: { id: '1', duration: 30, price: 9.99 },
+  // Legacy only: yearly is no longer sold (owner decision 2026-09-16). Kept as
+  // a safety net so a renewal receipt for a pre-existing yearly plan cannot
+  // fail activation.
+  yearly: { id: '2', duration: 360, price: 79.99 },
+  trial: { id: '3', duration: 3, price: 0 },
+};
+
+/**
+ * Get subscription metadata from the subscriptionsType collection, falling back
+ * to built-in defaults for known products (risk #20).
+ */
+export async function getSubscriptionMetadata(productId: string): Promise<{
   id: string;
   duration: number;
   price: number;
 }> {
   console.log(`📋 Fetching subscription metadata for: ${productId}`);
-  
+
   const db = admin.firestore();
   const snapshot = await db.collection('subscriptionsType')
     .where('planType', '==', productId)
     .limit(1)
     .get();
-  
-  if (snapshot.empty) {
-    console.error(`❌ Subscription type not found: ${productId}`);
-    throw new Error(`Subscription type not found: ${productId}`);
+
+  if (!snapshot.empty) {
+    const doc = snapshot.docs[0];
+    const data = doc.data();
+    console.log(`✅ Found metadata: id=${doc.id}, duration=${data.duration}, price=${data.price}`);
+    return { id: doc.id, duration: data.duration, price: data.price };
   }
-  
-  const doc = snapshot.docs[0];
-  const data = doc.data();
-  
-  console.log(`✅ Found metadata: id=${doc.id}, duration=${data.duration}, price=${data.price}`);
-  
-  return {
-    id: doc.id,
-    duration: data.duration,
-    price: data.price
-  };
+
+  const fallback = SUBSCRIPTION_DEFAULTS[productId];
+  if (fallback) {
+    // Operational alarm, not a routine path: the catalogue is broken and should
+    // be repaired. The customer has already been charged, so the purchase
+    // completes on defaults rather than failing.
+    console.error(
+      `🚨 subscriptionsType has no row for "${productId}" — falling back to built-in ` +
+      `defaults (duration=${fallback.duration}, price=${fallback.price}). ` +
+      'Repair the catalogue: this should never be the source of truth. See risk #20.',
+    );
+    return { ...fallback };
+  }
+
+  console.error(`❌ Unknown product id with no catalogue row and no default: ${productId}`);
+  throw new Error(
+    `Subscription type not found and no built-in default exists: ${productId}. ` +
+    `Known products: ${Object.keys(SUBSCRIPTION_DEFAULTS).join(', ')}.`,
+  );
 }
 
 /**
@@ -1246,6 +1279,15 @@ export const validatePurchaseReceipt = functions
         success: false
       });
       
+      // Risk #20: this catch used to flatten EVERY error into 'internal',
+      // including deliberate HttpsErrors raised inside the try — such as the
+      // receipt→account binding refusal (risk #5). The client then could not
+      // tell "this receipt belongs to someone else" from "the server broke",
+      // and neither could support.
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+
       throw new functions.https.HttpsError(
         'internal',
         'Failed to validate receipt. Please try again or contact support.',
