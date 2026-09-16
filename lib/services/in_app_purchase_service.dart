@@ -9,20 +9,30 @@ class InAppPurchaseService {
   static const String monthlyProductId = 'monthly';
   static const String yearlyProductId = 'yearly';
   
-  // All product IDs registered in App Store Connect / Play Console.
-  // Kept for future use — yearly can be re-enabled here when needed.
+  // Products this app OFFERS. Only the 30-day plan is sold (owner decision
+  // 2026-09-16), so yearly is not queried from the store and cannot be
+  // presented in the UI.
   static const List<String> productIds = [
     monthlyProductId,
-    yearlyProductId,
   ];
 
-  // Products currently offered and supported in the UI.
-  // Restored or auto-renewed transactions for products NOT in this set are
-  // silently completed (to clear StoreKit's queue) but NOT sent to the backend.
-  // This prevents old yearly receipts from StoreKit history being validated
-  // after yearly was removed from the UI, which caused "Product 'yearly' not
-  // found in receipt" errors and unnecessary Firebase function calls.
-  static const Set<String> _activeProductIds = {monthlyProductId};
+  // Products whose transactions are forwarded to the backend for validation
+  // (risk #6).
+  //
+  // This is deliberately a SUPERSET of productIds. It previously equalled
+  // {monthly}, so a restored or auto-renewed `yearly` transaction was
+  // completePurchase()-ed to clear StoreKit's queue and never sent to the
+  // backend — the user had paid and received nothing. Dropping a receipt is
+  // never the safe default; the backend still accepts `yearly`
+  // (receipt-validation PRODUCT_IDS) precisely so a legacy or in-flight
+  // purchase can still be honoured.
+  //
+  // Yearly is here as a legacy safety net only. It is not offered above, and
+  // the SKU is being withdrawn from App Store Connect and Play Console.
+  static const Set<String> validatableProductIds = {
+    monthlyProductId,
+    yearlyProductId,
+  };
 
   final InAppPurchase _inAppPurchase = InAppPurchase.instance;
   StreamSubscription<List<PurchaseDetails>>? _subscription;
@@ -254,12 +264,12 @@ class InAppPurchaseService {
             // Correct product confirmed — this is the user-initiated purchase.
             // Bypass _isValidating so it's never blocked by a concurrent renewal.
             _handleSuccessfulPurchase(purchaseDetails, isUserInitiated: true);
-          } else if (_activeProductIds.contains(purchaseDetails.productID)) {
+          } else if (validatableProductIds.contains(purchaseDetails.productID)) {
             // Apple auto-renewal: StoreKit delivers the renewed subscription
             // receipt automatically when the app is foregrounded after a renewal
             // has occurred. We must process it so nextBillingDate gets updated
             // in Firestore and the app correctly reflects the active subscription.
-            // Only active products are processed — inactive ones (e.g. yearly)
+            // Anything the backend can validate is processed (risk #6)
             // are skipped to avoid "product not found in receipt" errors.
             debugPrint('🔄 InAppPurchaseService: Apple auto-renewal receipt for '
                 '${purchaseDetails.productID} — processing to update billing date');
@@ -288,10 +298,10 @@ class InAppPurchaseService {
           // Without this guard, opening the Subscriptions screen after those events arrive
           // (and callbacks get registered) causes a phantom "purchase" to complete.
           if (_isRestoringPurchases) {
-            if (_activeProductIds.contains(purchaseDetails.productID)) {
-              // Only validate currently-offered products. Old purchases (e.g.
-              // yearly) are in StoreKit history but should not be sent to the
-              // backend since they are no longer in the active product set.
+            if (validatableProductIds.contains(purchaseDetails.productID)) {
+              // Forward anything the backend can validate, including a legacy
+              // yearly purchase sitting in StoreKit history (risk #6). Silently
+              // completing those is what left a paying user with nothing.
               _handleSuccessfulPurchase(purchaseDetails);
             } else {
               debugPrint('⚠️ InAppPurchaseService: Skipping restore for '

@@ -48,7 +48,13 @@ interface ValidationResult {
 const APPLE_SANDBOX_URL = 'https://sandbox.itunes.apple.com/verifyReceipt';
 const APPLE_PRODUCTION_URL = 'https://buy.itunes.apple.com/verifyReceipt';
 
-// Product ID mapping (matches your App Store/Play Store product IDs)
+// Product ID mapping (matches your App Store/Play Store product IDs).
+//
+// YEARLY is retained deliberately (risk #6). The app no longer offers it —
+// owner decision 2026-09-16, only the 30-day plan is sold — but the backend
+// must still accept a yearly receipt, or a legacy or in-flight purchase would
+// be charged and receive nothing. Removing it here would recreate exactly the
+// failure #6 describes, one layer down.
 const PRODUCT_IDS = {
   MONTHLY: 'monthly',
   YEARLY: 'yearly',
