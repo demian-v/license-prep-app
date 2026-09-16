@@ -8,15 +8,18 @@ const admin = require('../../functions/node_modules/firebase-admin');
 const fs = require('fs');
 const path = require('path');
 
-const PROJECT = process.env.GCLOUD_PROJECT || 'demo-driveusa';
+const PROJECT = process.env.GCLOUD_PROJECT || 'licenseprepapp';
 const IN = path.join(__dirname, '../../.local-export');
 
 if (!process.env.FIRESTORE_EMULATOR_HOST) {
   console.error('REFUSING: FIRESTORE_EMULATOR_HOST is not set.');
   process.exit(1);
 }
-if (!PROJECT.startsWith('demo-')) {
-  console.error(`REFUSING: project "${PROJECT}" is not a demo- project.`);
+// FIRESTORE_EMULATOR_HOST is the guard that matters: when it is set, the Admin
+// SDK writes to the emulator no matter what project id is named. The check
+// above is therefore load-bearing and must not be removed.
+if (!/^(127\.0\.0\.1|localhost|\[::1\]):\d+$/.test(process.env.FIRESTORE_EMULATOR_HOST)) {
+  console.error(`REFUSING: FIRESTORE_EMULATOR_HOST "${process.env.FIRESTORE_EMULATOR_HOST}" is not a local address.`);
   process.exit(1);
 }
 

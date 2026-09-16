@@ -11,19 +11,22 @@ import 'package:flutter/foundation.dart';
 /// fails in release mode, so a shipped binary can never be pointed at localhost.
 const bool kUseEmulator = bool.fromEnvironment('USE_EMULATOR');
 
-/// The project the emulator suite serves. Deliberately `demo-` prefixed:
-/// Firebase treats such ids as offline-only, so the SDK cannot reach
-/// production even if something else is misconfigured.
-const String kEmulatorProjectId = 'demo-driveusa';
-
-/// In emulator mode the app must connect as [kEmulatorProjectId], not the real
-/// project. Connecting as `licenseprepapp` makes the Auth emulator reject the
-/// session under singleProjectMode, and would put the app in a different,
-/// empty Firestore namespace from the seeded content.
-FirebaseOptions emulatorAwareOptions(FirebaseOptions real) {
-  if (!kUseEmulator) return real;
-  return real.copyWith(projectId: kEmulatorProjectId);
-}
+/// The emulator suite serves the app's REAL project id.
+///
+/// A `demo-` project id would be a stronger guarantee — Firebase treats those
+/// as offline-only — but it cannot work for this iOS client. `FirebaseOptions`
+/// carries one project's apiKey/appId/senderId as a matched set; overriding
+/// only `projectId` leaves the real API key in place, so Firebase Installations
+/// calls `projects/demo-*/installations` with a key that does not belong to it,
+/// fails, and takes Auth and Firestore down with it. Making it work would mean
+/// shipping a second GoogleService-Info.plist and build scheme for local runs.
+///
+/// What actually protects production here:
+///   1. every Firebase service below is explicitly repointed at 127.0.0.1;
+///   2. [kUseEmulator] is off by default and throws in release mode;
+///   3. scripts refuse to run unless FIRESTORE_EMULATOR_HOST is set, which
+///      overrides the target regardless of project id.
+FirebaseOptions emulatorAwareOptions(FirebaseOptions real) => real;
 
 Future<void> connectToEmulatorsIfEnabled() async {
   if (!kUseEmulator) return;
@@ -49,4 +52,17 @@ Future<void> connectToEmulatorsIfEnabled() async {
   debugPrint(
     '🧪 EMULATOR MODE — $host  firestore:8080 auth:9099 functions:5001 storage:9199',
   );
+
+  final settings = FirebaseFirestore.instance.settings;
+  debugPrint('🧪 Firestore settings -> host=${settings.host} ssl=${settings.sslEnabled}');
+
+  try {
+    final probe = await FirebaseFirestore.instance
+        .collection('subscriptionsType')
+        .limit(1)
+        .get();
+    debugPrint('🧪 Emulator probe OK — subscriptionsType returned ${probe.docs.length} doc(s)');
+  } catch (e) {
+    debugPrint('🧪 Emulator probe FAILED — $e');
+  }
 }

@@ -38,8 +38,12 @@ class AnalyticsService {
     if (_isInitialized) return;
     
     try {
-      // Ensure Firebase is initialized
-      await Firebase.initializeApp();
+      // Ensure Firebase is initialized. Guarded: main() already initialised the
+      // default app with explicit options, and re-initialising with none re-reads
+      // GoogleService-Info.plist, discarding those options.
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp();
+      }
       
       // Initialize Firebase Analytics
       _analytics = FirebaseAnalytics.instance;

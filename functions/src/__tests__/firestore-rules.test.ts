@@ -56,6 +56,36 @@ describe('Risk #3 — content must not be readable by anonymous or unentitled us
   it('an unauthenticated visitor cannot read quizQuestions (control — already enforced)', async () => {
     await assertFails(env.unauthenticatedContext().firestore().collection('quizQuestions').doc('q1').get());
   });
+
+  // Without these two, a rule of "deny everyone" would pass every test above.
+  it('a PAID user CAN read quizQuestions (positive control)', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('users').doc('paid-1').set({ isActive: true });
+    });
+    const paid = env.authenticatedContext('paid-1', { firebase: { sign_in_provider: 'password' } } as any);
+    await assertSucceeds(paid.firestore().collection('quizQuestions').doc('q1').get());
+  });
+
+  it('a TRIAL user CAN read quizQuestions (regression guard)', async () => {
+    // createTrialSubscription now mirrors entitlement onto users/{uid}. Before
+    // that change this rule would have locked out every trial user, because
+    // users.isActive was never written on the trial path.
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('users').doc('trial-1').set({
+        isActive: true,
+        nextBillingDate: new Date(Date.now() + 3 * 864e5),
+      });
+    });
+    const trial = env.authenticatedContext('trial-1', { firebase: { sign_in_provider: 'password' } } as any);
+    await assertSucceeds(trial.firestore().collection('quizQuestions').doc('q1').get());
+  });
+
+  it('an anonymous user with isActive still cannot read (anonymous gate holds)', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('users').doc('anon-1').set({ isActive: true });
+    });
+    await assertFails(anon().firestore().collection('quizQuestions').doc('q1').get());
+  });
 });
 
 describe('Risk #29 — users/{uid} must not accept arbitrary client writes', () => {

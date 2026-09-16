@@ -7,9 +7,48 @@ service cloud.firestore {
              exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
+    // Risk #3 — lib/main.dart signs every visitor in anonymously, which turns
+    // any bare `request.auth != null` check into "public". Content must require
+    // a real account AND a live entitlement.
+    function isNotAnonymous() {
+      return request.auth != null
+             && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    // `users/{uid}.isActive` is the server-maintained entitlement mirror: the
+    // purchase path (receipt-validation syncUserDocument), the renewal manager
+    // and the expiry schedulers all write it, and createTrialSubscription now
+    // writes it too. The users/{userId} rule below makes it unwritable by
+    // clients, which is what makes it safe to gate on here.
+    function isEntitled() {
+      return isNotAnonymous()
+             && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+             && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isActive == true;
+    }
+
+    // Risk #29 — fields a client must never write to its own user document.
+    // A blocklist rather than an allowlist: several services write user
+    // profile fields dynamically, and an allowlist would break them. These are
+    // the fields that decide entitlement, which is what actually matters.
+    function serverOwnedUserFields() {
+      return [
+        'isActive', 'subscriptionStatus', 'nextBillingDate', 'lastBillingDate',
+        'packageId', 'planType', 'price', 'trialUsed', 'trialEndsAt'
+      ];
+    }
+
     // Users can read/write their own user document
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // Risk #29: was `allow read, write`, which let any user set their own
+      // `isActive` — the very flag Cloud Functions use to revoke entitlement.
+      allow create: if request.auth != null && request.auth.uid == userId
+        && !request.resource.data.keys().hasAny(serverOwnedUserFields());
+      allow update: if request.auth != null && request.auth.uid == userId
+        && !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(serverOwnedUserFields());
+      allow delete: if false;
       
       // Users can read/write their own session documents
       match /sessions/{sessionDoc} {
@@ -24,23 +63,23 @@ service cloud.firestore {
     
     // Allow reading quiz questions, topics, etc. (read-only for all authenticated users)
     match /quizQuestions/{document} {
-      allow read: if request.auth != null;
+      allow read: if isEntitled();
     }
     
     match /quizTopics/{document} {
-      allow read: if request.auth != null;
+      allow read: if isEntitled();
     }
     
     match /trafficRuleTopics/{document} {
-      allow read: if request.auth != null;
+      allow read: if isEntitled();
     }
     
     match /theoryModules/{document} {
-      allow read: if request.auth != null;
+      allow read: if isEntitled();
     }
     
     match /practiceTests/{document} {
-      allow read: if request.auth != null;
+      allow read: if isEntitled();
     }
     
     // User-specific report counters - each user can manage their own counter

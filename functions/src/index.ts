@@ -2038,6 +2038,20 @@ export const createTrialSubscription = functions.https.onCall(async (data: any, 
     firstSubscriptionId: subRef.id,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
+  // Mirror entitlement onto the user document, exactly as the purchase path does
+  // (receipt-validation.ts syncUserDocument) and the schedulers expect.
+  // Trials were the one path that never wrote it, so `users.isActive` was false
+  // for every trial user — which made the flag unusable as a security-rules gate
+  // and left trial users looking inactive to any server logic keyed on it.
+  batch.set(
+    db.collection('users').doc(userId),
+    {
+      isActive: true,
+      nextBillingDate: admin.firestore.Timestamp.fromDate(trialEnd),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
   await batch.commit();
 
   return { subscriptionId: subRef.id };

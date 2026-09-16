@@ -55,7 +55,7 @@ flutter run -d "iPhone 16 Pro" --dart-define=USE_EMULATOR=true
 | E6 | Content exported from production | ✅ DONE | 6,627 docs (~8.7 MB) via ADC, read-only, into `.local-export/` (gitignored). Seeded into emulator with `scripts/local/seed-emulator.js`. **No user data copied** |
 | E7 | Flutter emulator wiring | ✅ DONE | `lib/config/emulator_config.dart`, one call in `main.dart`. Throws in release mode |
 | E8 | iOS pods reinstalled | ✅ DONE | 43 pods, Sep 16. **Needs `LANG=en_US.UTF-8`** or CocoaPods dies on a Ruby 3.4 encoding bug |
-| E9 | App runs on simulator against emulators | ⬜ TODO | acceptance gate for setup phase |
+| E9 | App runs on simulator against emulators | ✅ DONE | iPhone 16 Pro, login screen, Firestore probe OK (`host=127.0.0.1:8080 ssl=false`) |
 
 ## Test harness (risk #17 — prerequisite, not optional)
 
@@ -64,7 +64,7 @@ flutter run -d "iPhone 16 Pro" --dart-define=USE_EMULATOR=true
 | T1 | Jest + ts-jest in `functions/` | ✅ DONE | `npm test` wraps `firebase emulators:exec --project demo-driveusa`. Emulators spin up, tests run, teardown is automatic |
 | T2 | `@firebase/rules-unit-testing` suite | ✅ DONE | `firestore-rules.test.ts` — risks #3, #29. Own project id `demo-rules-test`, never touches seeded data |
 | T3 | StoreKit configuration file | ⬜ TODO | local fake store for simulator purchase / restore / renewal / trial→paid |
-| T4 | One red test per in-scope risk | 🔄 IN PROGRESS | #3 and #29 done. **13 tests: 9 red, 4 green controls** |
+| T4 | One red test per in-scope risk | 🔄 IN PROGRESS | #3 and #29 complete. **16 tests, all green**, incl. paid + trial positive controls |
 
 ---
 
@@ -76,7 +76,7 @@ Status: ⬜ not started · 🔄 in progress · ✅ done & verified · ⏸️ blo
 
 | Risk | What | Status | Verified by | Commit |
 |---|---|---|---|---|
-| #3 | Paid content corpus served with no auth — 7 callables have no `context.auth`; rules gate only on `auth != null` while `main.dart` signs everyone in anonymously | 🔄 red tests written | `content-auth.test.ts` — 4 red, 1 positive control | |
+| #3 | Paid content corpus served with no auth — 7 callables have no `context.auth`; rules gate only on `auth != null` while `main.dart` signs everyone in anonymously | ✅ **DONE** | `content-auth.test.ts` + `firestore-rules.test.ts`, 16 green | `851a8a1` + rules |
 | #4 | `handleMockPaymentWebhook` (unauthenticated POST) and test-data callables deployed to production | ⬜ | function test | |
 
 ### High — money path
@@ -100,7 +100,7 @@ Status: ⬜ not started · 🔄 in progress · ✅ done & verified · ⏸️ blo
 | #18 | 8 admin-grade functions callable by any authenticated user | ⬜ | function test | |
 | #12 | `sendEmailVerification()` never called; `emailVerified` gates nothing | ⬜ | function test + iOS | |
 | #26 | Trial gate forgeable (client-supplied `deviceIdHash`), dedupe non-transactional | ⬜ | function test | |
-| #29 | `users/{uid}` accepts arbitrary client writes including `isActive` | 🔄 red tests written | `firestore-rules.test.ts` | |
+| #29 | `users/{uid}` accepts arbitrary client writes including `isActive` | ✅ **DONE** | `firestore-rules.test.ts` | rules blocklist |
 
 ### Resolved by product decision
 
@@ -121,6 +121,9 @@ Status: ⬜ not started · 🔄 in progress · ✅ done & verified · ⏸️ blo
 | 2026-09-16 | Export production content read-only rather than hand-seeding | Emulator starts blank; app is unusable without content. Seed script deferred to the #53 fix |
 | 2026-09-16 | Emulators run as `demo-driveusa`, not `licenseprepapp` | `.firebaserc` points at production; a `demo-` project id makes reaching production physically impossible |
 | 2026-09-16 | **Only the 30-day monthly plan is sold. Yearly is removed, not fixed** | Owner decision. Production has **zero** yearly subscriptions ever (register, verified 2026-08-20), so nobody is stranded. Turns #2 from a redesign into a deletion, #6 from an implementation into a removal, and makes #43 moot |
+| 2026-09-16 | Emulators run under the REAL project id, not `demo-driveusa` | `FirebaseOptions` is a matched set; overriding only `projectId` leaves the real API key, so Firebase Installations calls `projects/demo-*/installations` with a key that does not belong to it. Owner chose to **revoke ADC first** (`gcloud auth application-default revoke`), so the machine now holds no production credentials at all — a stronger position than the `demo-` prefix gave |
+| 2026-09-16 | Gate content rules on `users/{uid}.isActive`, and make trials write it | It is the server-maintained entitlement mirror the purchase path, renewal manager and schedulers already use. `createTrialSubscription` was the one path that never wrote it, so gating on it without that fix would have locked out every trial user |
+| 2026-09-16 | Blocklist rather than allowlist for `users/{uid}` writes | Several services write profile fields dynamically (`email_sync_service` passes a computed map); an allowlist would break them. The blocklist covers the nine fields that decide entitlement, which is what #29 is actually about |
 | 2026-09-16 | Leave the `Pods-Runner.profile.xcconfig` warning alone | Runner's Profile config points at `Flutter/Release.xcconfig`. Debug and Release are correctly wired; only Profile builds (performance profiling, never shipped) are affected. Not a register risk, and editing Xcode build config on a security branch invites unrelated breakage |
 
 ## Gotchas
@@ -129,6 +132,20 @@ Status: ⬜ not started · 🔄 in progress · ✅ done & verified · ⏸️ blo
 - `functions/service-account.json` exists locally and is untracked. It has production write access — only ever use it for the read-only export.
 - `functions/.env.licenseprepapp` is still **tracked in git** (risk #32). `.gitignore` lists it but gitignore does not untrack. Needs `git rm --cached` — separate cleanup, not part of this branch.
 - Do not run `initializeGlobalCounterFromExistingReports` or `resetGlobalCounter` against anything (register Top-7 item 5).
+
+## Root causes found while building the environment
+
+**The app could not reach the emulator, and it was not a networking problem.**
+`analytics_service.dart:42` called `Firebase.initializeApp()` a **second time, with
+no options**, right after `main()` had initialised the default app with explicit
+ones. On iOS that re-reads `GoogleService-Info.plist` and discards the emulator
+settings applied moments earlier. Guarded with `if (Firebase.apps.isEmpty)`.
+This is a real latent bug in the app, not a local-setup quirk — the redundant
+call is in the shipped build too.
+
+Diagnostic left in place (`🧪 Firestore settings -> host=… ssl=…` plus a probe
+read) because it makes a silent misconfiguration loud. It only runs under
+`USE_EMULATOR`.
 
 ## Reproduced evidence
 
