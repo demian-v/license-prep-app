@@ -113,6 +113,7 @@ Status: ⬜ not started · 🔄 in progress · ✅ done & verified · ⏸️ blo
 | Risk | What | Status | Why it was pulled in |
 |---|---|---|---|
 | #58 | New user with no trial saw a silent dead end (`SizedBox.shrink()`) | ✅ **DONE** | Unavoidable once #12 gates the trial: refusing a trial without explaining it would send every unverified signup to a blank screen. The branch now renders a real card, and says *"verify your email"* specifically when that is the reason |
+| #21 | Cross-device progress sync does not exist; failure is invisible; local key unscoped | ⚠️ **PARTIAL** | `progress_storage_test.dart` — 3 tests | Local storage **scoped per user** (was one shared key) + the silence documented. **Sync itself is NOT built** — see below |
 | #13 | Privacy policy promises deletion the code cannot deliver (2 of at least 8 locations) | ✅ **DONE** | `account-deletion.test.ts` — 11 tests | All personal locations deleted incl. the `sessions` subcollection; billing records **anonymised**, per the policy's own tax carve-out |
 | #14 | Deletion needs no reauth, is not atomic, silently leaves store subscriptions billing | ✅ **DONE** | `account-deletion.test.ts` | Recent-login required (10 min), chunked writes past Firestore's 500 limit, and the user is warned **before** deleting |
 | #23 | Orphan-auth trap — a failed signup left an Auth user with no document, unrecoverable in-app | ✅ **DONE** | `user-provisioning.test.ts` — 5 tests | `provisionUserDocument` auth trigger + `set/merge` in both updaters so already-orphaned accounts heal |
@@ -178,6 +179,10 @@ security-and-money scope, not the register. See the register itself for the full
 list; the largest remaining Highs are #13 and #14 (privacy and account deletion),
 #21 (cross-device sync does not exist), #10 (a config guide that is actively wrong),
 #11 and #17.
+
+**#21 is deliberately partial.** Two of its three problems are closed: progress is no longer stored under one unscoped key (two accounts on one device shared quiz scores, exam results and study progress), and the failure is no longer dressed up as offline tolerance. Legacy unscoped data migrates once to whoever signs in first — a guess, but the same data they can already see, and each account is separate from then on.
+
+**Cross-device sync itself is not built**, and it is a feature, not a fix: five Cloud Functions written from scratch, a Firestore schema and rules for `progress/{uid}` (currently rule-denied), serialisation for `Exam` (which has none), a migration for existing local progress, and a **conflict-resolution decision** — when two devices disagree, which wins? That last one is the owner's call, not a technical one. **Sixteen** mapped callables have no server implementation (the register said ten); they are now listed in a comment at the mapping in `firebase_functions_client.dart` so nobody assumes a name means an endpoint.
 
 **Known gap left by #13/#14:** the client's partial-delete fallback still exists for the case where Cloud Functions is unavailable. It deletes the Auth account and `users/{uid}` but not the other personal data, so a deletion completed that way is incomplete until the callable next succeeds. Closing it properly needs a server-side deletion queue — worth doing alongside the #9 reconciliation job.
 

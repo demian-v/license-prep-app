@@ -5,6 +5,25 @@ import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 
 /// Maps client-side function names to Cloud Functions names
 class FunctionNameMapper {
+  // ⚠️ Risk #21 — SIXTEEN of the names mapped below have NO server-side
+  // implementation in functions/src/index.ts. Every call to them throws
+  // `not-found`, and the callers swallow it, so the app silently behaves as if
+  // the call succeeded:
+  //
+  //   loginUser, registerUser, getRoadSignCategories, getRoadSigns,
+  //   getUserProgress, updateModuleProgress, updateTopicProgress,
+  //   updateQuestionProgress, saveTestScore, getSavedItems, addSavedItem,
+  //   removeSavedItem, getSubscriptionPlans, getUserSubscription,
+  //   subscribeToPlan, applyPromoCode
+  //
+  // The five progress ones are why cross-device sync does not exist: progress
+  // lives only in device-local storage (see ProgressStorage) and is lost with
+  // the device. `progress/{uid}` is also rule-denied, so a direct write would
+  // fail too.
+  //
+  // The mappings are kept, not deleted, so implementing a function server-side
+  // makes the client work with no further change. Do not assume a name here
+  // means the endpoint exists.
   static const Map<String, String> _nameMap = {
     // Auth functions
     'loginUser': 'getUserData',

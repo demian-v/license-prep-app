@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/progress_storage.dart';
 import 'dart:convert';
 import '../models/progress.dart';
 import '../models/quiz_progress.dart';
@@ -18,7 +19,7 @@ class ProgressProvider extends ChangeNotifier {
     progress = updatedProgress;
     
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('progress', jsonEncode(updatedProgress.toJson()));
+    await ProgressStorage.write(jsonEncode(updatedProgress.toJson()));
     
     notifyListeners();
   }
@@ -42,8 +43,7 @@ class ProgressProvider extends ChangeNotifier {
         
         progress = updatedProgress;
         
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('progress', jsonEncode(updatedProgress.toJson()));
+        await ProgressStorage.write(jsonEncode(updatedProgress.toJson()));
         
         notifyListeners();
       } catch (e) {
@@ -57,8 +57,7 @@ class ProgressProvider extends ChangeNotifier {
         
         progress = updatedProgress;
         
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('progress', jsonEncode(updatedProgress.toJson()));
+        await ProgressStorage.write(jsonEncode(updatedProgress.toJson()));
         
         notifyListeners();
       }
@@ -91,7 +90,7 @@ class ProgressProvider extends ChangeNotifier {
       progress = updatedProgress;
       
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('progress', jsonEncode(updatedProgress.toJson()));
+      await ProgressStorage.write(jsonEncode(updatedProgress.toJson()));
       
       notifyListeners();
     } catch (e) {
@@ -108,7 +107,7 @@ class ProgressProvider extends ChangeNotifier {
       progress = updatedProgress;
       
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('progress', jsonEncode(updatedProgress.toJson()));
+      await ProgressStorage.write(jsonEncode(updatedProgress.toJson()));
       
       notifyListeners();
     }
@@ -182,7 +181,7 @@ class ProgressProvider extends ChangeNotifier {
     
     // Save to SharedPreferences for offline persistence
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('progress', jsonEncode(updatedProgress.toJson()));
+    await ProgressStorage.write(jsonEncode(updatedProgress.toJson()));
     
     // Notify listeners to update UI
     notifyListeners();
@@ -202,12 +201,12 @@ class ProgressProvider extends ChangeNotifier {
       
       // No need to update local state again as we've already done it
     } catch (e) {
-      // Log the error but don't revert the UI change
-      // This allows the app to work offline while providing detailed error info
-      debugPrint('API error while syncing saved question: $e');
-      
-      // We could show a toast message here to inform the user of sync issues
-      // but the local state will remain correct
+      // Risk #21 — this is NOT offline tolerance, whatever the old comment
+      // said. The progress endpoints have no server-side implementation at
+      // all, so this path is taken on every single call, on every device,
+      // always. Local state stays correct and the user keeps working; what
+      // they do not get is any sync, on any network.
+      debugPrint('⚠️ [risk #21] Progress sync unavailable (no server implementation): $e');
     }
   }
   
@@ -264,7 +263,7 @@ class ProgressProvider extends ChangeNotifier {
       
       // Save to SharedPreferences
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('progress', jsonEncode(updatedProgress.toJson()));
+      await ProgressStorage.write(jsonEncode(updatedProgress.toJson()));
       
       // Sync with server
       try {
@@ -301,7 +300,7 @@ class ProgressProvider extends ChangeNotifier {
       progress = updatedProgress;
       
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('progress', jsonEncode(updatedProgress.toJson()));
+      await ProgressStorage.write(jsonEncode(updatedProgress.toJson()));
       
       notifyListeners();
     } catch (e) {
@@ -318,7 +317,7 @@ class ProgressProvider extends ChangeNotifier {
       progress = updatedProgress;
       
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('progress', jsonEncode(updatedProgress.toJson()));
+      await ProgressStorage.write(jsonEncode(updatedProgress.toJson()));
       
       notifyListeners();
     }

@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'config/emulator_config.dart';
+import 'services/progress_storage.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
 import 'firebase_options.dart';
@@ -352,7 +353,10 @@ void main() async {
   
   // Load progress data
   UserProgress progress;
-  final progressString = prefs.getString('progress');
+  // Risk #21 — read through ProgressStorage so the key is scoped to the signed-in
+  // user and legacy unscoped data is migrated once, instead of every account on
+  // the device sharing one blob.
+  final progressString = await ProgressStorage.read();
   if (progressString != null) {
     progress = UserProgress.fromJson(jsonDecode(progressString));
   } else {
