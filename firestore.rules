@@ -147,6 +147,14 @@ service cloud.firestore {
       allow write: if false; // Only admins can modify via Firebase Console
     }
     
+    // admins — membership is the gate for both isAdmin() above and requireAdmin()
+    // in Cloud Functions. Never client-readable or client-writable; provision
+    // through the Firebase console. Covered by the default deny below too, but
+    // stated explicitly because it decides privilege.
+    match /admins/{adminId} {
+      allow read, write: if false;
+    }
+
     // processedWebhooks — written by Cloud Functions admin SDK only (webhook dedup)
     match /processedWebhooks/{docId} {
       allow read, write: if false;

@@ -1,6 +1,6 @@
 import * as functions from 'firebase-functions/v1';
 import * as admin from 'firebase-admin';
-import { requireEntitledUser } from './entitlement';
+import { requireEntitledUser, requireAdmin } from './entitlement';
 import * as fs from 'fs';
 import * as path from 'path';
 import { defineInt, defineSecret } from 'firebase-functions/params';
@@ -1486,11 +1486,16 @@ export const checkExpiredSubscriptions = functions.pubsub
  * Can be called directly from Firebase Console or client app (admin only)
  */
 export const processSubscriptionsManualy = functions.https.onCall(async (data, context) => {
+  // Risk #18 — administrator gate, before the try so its HttpsError
+  // cannot be reshaped into 'internal' by the catch below. The
+  // `if (!context.auth)` check further down is now redundant at
+  // runtime but is kept: it is what narrows `context.auth` for
+  // TypeScript at the `context.auth.uid` uses below.
+  await requireAdmin(context);
+
   try {
     console.log('🧪 Manual subscription processing triggered');
     
-    // Optional: Add admin authentication check here
-    // For now, we'll allow any authenticated user to trigger this for testing
     if (!context.auth) {
       throw new functions.https.HttpsError(
         'unauthenticated',
@@ -1530,10 +1535,16 @@ export const processSubscriptionsManualy = functions.https.onCall(async (data, c
  * Returns information about upcoming expirations
  */
 export const getSubscriptionStats = functions.https.onCall(async (data, context) => {
+  // Risk #18 — administrator gate, before the try so its HttpsError
+  // cannot be reshaped into 'internal' by the catch below. The
+  // `if (!context.auth)` check further down is now redundant at
+  // runtime but is kept: it is what narrows `context.auth` for
+  // TypeScript at the `context.auth.uid` uses below.
+  await requireAdmin(context);
+
   try {
     console.log('📊 Getting subscription statistics');
     
-    // Optional: Add admin authentication check here
     if (!context.auth) {
       throw new functions.https.HttpsError(
         'unauthenticated',
@@ -1572,10 +1583,16 @@ export const getSubscriptionStats = functions.https.onCall(async (data, context)
  * Returns system status and recent activity
  */
 export const subscriptionSystemHealth = functions.https.onCall(async (data, context) => {
+  // Risk #18 — administrator gate, before the try so its HttpsError
+  // cannot be reshaped into 'internal' by the catch below. The
+  // `if (!context.auth)` check further down is now redundant at
+  // runtime but is kept: it is what narrows `context.auth` for
+  // TypeScript at the `context.auth.uid` uses below.
+  await requireAdmin(context);
+
   try {
     console.log('🏥 Health check for subscription system');
     
-    // Optional: Add admin authentication check
     if (!context.auth) {
       throw new functions.https.HttpsError(
         'unauthenticated',
@@ -1699,10 +1716,16 @@ export const renewActiveSubscriptions = functions.pubsub
  * Returns information about upcoming renewals
  */
 export const getRenewalStats = functions.https.onCall(async (data, context) => {
+  // Risk #18 — administrator gate, before the try so its HttpsError
+  // cannot be reshaped into 'internal' by the catch below. The
+  // `if (!context.auth)` check further down is now redundant at
+  // runtime but is kept: it is what narrows `context.auth` for
+  // TypeScript at the `context.auth.uid` uses below.
+  await requireAdmin(context);
+
   try {
     console.log('📊 Getting renewal statistics');
     
-    // Optional: Add admin authentication check here
     if (!context.auth) {
       throw new functions.https.HttpsError(
         'unauthenticated',

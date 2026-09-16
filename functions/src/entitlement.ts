@@ -66,3 +66,41 @@ export async function requireEntitledUser(context: any): Promise<string> {
 
   return uid;
 }
+
+/**
+ * Administrator gate (risk #18).
+ *
+ * Four functions — processSubscriptionsManualy, getSubscriptionStats,
+ * subscriptionSystemHealth, getRenewalStats — were callable by any
+ * authenticated user, each carrying the comment "Optional: Add admin
+ * authentication check". One mutates subscription state; another returns other
+ * users' subscriptionLogs rows.
+ *
+ * Mirrors the isAdmin() helper in firestore.rules: membership is a document at
+ * admins/{uid}. Read with the Admin SDK, so security rules do not apply and the
+ * collection stays unreadable by clients.
+ *
+ * NOTE: the admins collection is empty in production, so until an admin
+ * document is provisioned these endpoints are callable by nobody. That is the
+ * intended resting state for admin tooling — deliberately closed by default.
+ */
+export async function requireAdmin(context: any): Promise<string> {
+  if (!context || !context.auth) {
+    throw new functions.https.HttpsError(
+      'unauthenticated',
+      'Authentication required.',
+    );
+  }
+
+  const uid: string = context.auth.uid;
+  const doc = await admin.firestore().collection('admins').doc(uid).get();
+
+  if (!doc.exists) {
+    throw new functions.https.HttpsError(
+      'permission-denied',
+      'Administrator access required.',
+    );
+  }
+
+  return uid;
+}
