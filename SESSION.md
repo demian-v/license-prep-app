@@ -119,6 +119,62 @@ Status: ⬜ not started · 🔄 in progress · ✅ done & verified · ⏸️ blo
 
 ---
 
+## To do next
+
+Agreed but not started. Nothing here is in the current branch.
+
+### 1. Email verification by 6-digit code (owner request, 2026-09-16)
+
+Replaces the link flow. A code typed in the app avoids both broken paths: the
+hosting rewrite that sends every `/__/auth/action` to `password-reset.html`
+(which has no `verifyEmail` handling at all — confirmed), and the misplaced
+Associated Domains entitlement that breaks deep links (#30).
+
+**Flow:** email + password → code screen → verified → account finalised **with**
+the 3-day trial. The trial still feels instant because verification sits inside
+signup rather than gating afterwards. Someone who abandons at the code screen
+resumes there on next login, so nobody is stranded with an account and no trial.
+
+**Blocker: there is no way to send email at all.** `nodemailer` is commented out
+in `subscription-manager.ts`, and `email-templates.ts` (1,382 lines, five
+languages) is imported by nothing — risk #35. The forgot-password mail cannot be
+reused: `FirebaseAuth.sendPasswordResetEmail()` asks Google to send it, so none
+of that sending is our code, and Firebase's three built-in emails cannot carry
+our own code.
+
+| Step | Who |
+|---|---|
+| Pick a provider (Resend ~3k/mo, Brevo ~300/day, SendGrid ~100/day) | owner |
+| Verify the sending domain — SPF/DKIM DNS records. **This decides inbox vs spam** | owner |
+| `firebase functions:secrets:set MAIL_API_KEY` — never in a tracked file (cf. #1, #32) | owner |
+| Code generation: 6 digits, stored **hashed**, ~10 min expiry, max 5 attempts, resend throttled | me |
+| Verify callable; on success set Firebase's real `emailVerified` via the Admin SDK | me |
+| Sender behind a small interface so the vendor is swappable | me |
+| Code-entry screen: six boxes, paste support, resend countdown, resume-on-relaunch | me |
+| Verification-code template added to `email-templates.ts`, reusing its existing structure | me |
+
+**~2–3 days once mail sending exists.** Can start before the provider is chosen:
+the sender writes codes to the emulator log locally, so the whole flow is
+testable end to end, and production becomes a config change.
+
+**Honest limit:** this raises the cost of multiple accounts from *typing any
+string* to *controlling a real inbox*. Throwaway inbox services still work, so it
+is strong friction, not a wall. It does cleanly deliver the other two goals — a
+confirmed-real address, and a genuine marketing list.
+
+### 2. App Check / device attestation — deferred
+
+Written up in the vault: `wiki/driveusa/Development/infra/app-check-attestation-plan.md`.
+
+### 3. The rest of the risk register
+
+**40 of the 59 rows are still open.** This branch covered the agreed
+security-and-money scope, not the register. See the register itself for the full
+list; the largest remaining Highs are #13 and #14 (privacy and account deletion),
+#23 and #24 (signup failures leaving a user with no entitlement, ever), #25
+(schedulers capped at 100 documents per run — which the #7 grace window now leans
+on), and #21 (cross-device sync does not exist).
+
 ## Decisions log
 
 | Date | Decision | Why |
