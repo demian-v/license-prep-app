@@ -227,9 +227,6 @@ class UserSubscription {
   @override
   int get hashCode => id.hashCode ^ userId.hashCode;
 
-
-
-
   bool isUpgradeEligible(String targetPlanType) {
     if (targetPlanType == 'yearly' && isMonthly) return true;
     return false;

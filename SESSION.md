@@ -153,6 +153,29 @@ Diagnostic left in place (`🧪 Firestore settings -> host=… ssl=…` plus a p
 read) because it makes a silent misconfiguration loud. It only runs under
 `USE_EMULATOR`.
 
+## Reproduced evidence — risk #58, live on the simulator
+
+Signing up in the app creates the `users/{uid}` document but **no subscription
+and no entitlement**, and the screen says nothing about it. Cause:
+`createTrialSubscription` throws `failed-precondition` unless
+`isPhysicalDevice === true`, and a simulator is not a physical device. The gate
+is working as designed; the defect is that the app renders `SizedBox.shrink()`
+for that state instead of an explanation (#58).
+
+Consequence for local work: **the simulator can never obtain a trial through the
+app.** Use `scripts/local/grant-local-trial.js <email>` (with
+`FIRESTORE_EMULATOR_HOST` set), which writes exactly what
+`createTrialSubscription` would, including the `users/{uid}` entitlement mirror.
+
+## Observed once, not reproduced
+
+`Error in createOrUpdateUserDocument: TypeError: Cannot read properties of
+undefined (reading 'serverTimestamp')` appeared in the emulator during one
+signup. A focused test calling that callable passes, and
+`admin.firestore.FieldValue.serverTimestamp` is defined in the test runtime.
+Most likely the emulator hot-reloaded `functions/lib/` mid-rebuild. **Not
+fixed, not claimed fixed** — re-check if it recurs on a stable build.
+
 ## Reproduced evidence
 
 **Risk #3, 2026-09-16.** An unauthenticated call to `getQuizQuestions` (no `context.auth` whatsoever) returned:
@@ -165,6 +188,7 @@ The answer key and explanation are served to an anonymous stranger. Reproduce wi
 
 ## Follow-ups created by this work
 
+- `lib/models/user_subscription.dart:isUpgradeEligible` is dead code — and was already dead at the base commit `84300d0` (zero callers), so it is **not** an orphan this work created. Natural cleanup during #6, when yearly leaves the codebase.
 - `lib/docs/server_side_subscription_management_implementation.md:672` documents the now-deleted test-data generation system. Stale; left alone deliberately (documentation drift, not a security fix).
 - `docs/webhook.md` asks twice for `handleMockPaymentWebhook` to be removed before production. Now done — that document can drop the warning.
 - Register Top-7 #2 suggests counting `subscriptionLogs` where `processedBy == 'scheduled_function'` to see how much audit trail `cleanupSubscriptionTestData` already destroyed. **Not done** — it needs a production read, and this machine deliberately has no production credentials now. Owner call.
