@@ -1,4 +1,5 @@
 import * as admin from 'firebase-admin';
+import { sweepPaginated, SWEEP_TIME_BUDGET_MS } from './sweep';
 // TODO: Uncomment when implementing real email sending
 // import * as nodemailer from 'nodemailer';
 
@@ -69,9 +70,14 @@ export async function processExpiredSubscriptions(): Promise<ProcessingResult> {
     // PERF-1 FIX: Run both checks in parallel — they query different statuses
     // (planType='trial' vs status='canceled') with zero overlap, so Promise.all
     // is safe and cuts Cloud Function runtime roughly in half.
+    // Risk #25 — both sweeps share one wall-clock budget, comfortably inside
+    // the function's configured timeout. Whatever is not reached is reported
+    // and picked up by the next scheduled run rather than dropped silently.
+    const deadline = startTime + SWEEP_TIME_BUDGET_MS;
+
     const [trialResult, canceledResult] = await Promise.all([
-      checkExpiredTrials(),
-      checkExpiredCanceledSubscriptions(),
+      checkExpiredTrials(deadline),
+      checkExpiredCanceledSubscriptions(deadline),
     ]);
 
     result.expiredTrials = trialResult.processed;
@@ -99,7 +105,7 @@ export async function processExpiredSubscriptions(): Promise<ProcessingResult> {
 /**
  * Check and process expired trials
  */
-async function checkExpiredTrials(): Promise<{processed: number, emailsSent: number, errors: string[]}> {
+async function checkExpiredTrials(deadline: number): Promise<{processed: number, emailsSent: number, errors: string[]}> {
   console.log('🆓 Checking expired trials...');
   const result: {processed: number, emailsSent: number, errors: string[]} = { processed: 0, emailsSent: 0, errors: [] };
 
@@ -114,40 +120,31 @@ async function checkExpiredTrials(): Promise<{processed: number, emailsSent: num
     // query in both files.  Without it, a partially-deactivated subscription
     // (isActive=false but status still 'active' due to a crash mid-update)
     // would be picked up, re-processed, and produce duplicate audit log entries.
-    const expiredTrialsQuery = await db.collection('subscriptions')
-      .where('planType', '==', 'trial')   // Only actual trial subscriptions
-      .where('isActive', '==', true)       // FIX: skip already-deactivated docs
-      .where('trialEndsAt', '<=', now)
-      .where('trialUsed', '==', 0)
-      .where('status', '==', 'active')
-      .limit(100)
-      .get();
-
-    console.log(`Found ${expiredTrialsQuery.docs.length} expired trials to process`);
-
-    // Process each expired trial
-    for (const doc of expiredTrialsQuery.docs) {
-      try {
+    // Risk #25 — cursor-paginated, no longer capped at 100. `orderBy` makes the
+    // cursor deterministic; Firestore already orders implicitly by the range
+    // field, so this adds no new index requirement.
+    const sweep = await sweepPaginated({
+      label: 'checkExpiredTrials',
+      baseQuery: db.collection('subscriptions')
+        .where('planType', '==', 'trial')   // Only actual trial subscriptions
+        .where('isActive', '==', true)       // FIX: skip already-deactivated docs
+        .where('trialEndsAt', '<=', now)
+        .where('trialUsed', '==', 0)
+        .where('status', '==', 'active')
+        .orderBy('trialEndsAt'),
+      deadline,
+      handle: async (doc) => {
         const subscriptionData = { id: doc.id, ...doc.data() } as SubscriptionData;
-        
-        // Update subscription status
         await updateExpiredTrial(subscriptionData);
-        
-        // Send notification email
         const emailSent = await sendTrialExpiredNotification(subscriptionData.userId);
         if (emailSent) result.emailsSent++;
-        
         // Log the change — pass actual emailSent result (Bug SM-2 fix)
         await logSubscriptionChange(subscriptionData, 'trial_expired', emailSent);
-        
-        result.processed++;
+      },
+    });
 
-      } catch (error) {
-        const errorMsg = `Error processing trial ${doc.id}: ${error instanceof Error ? error.message : String(error)}`;
-        console.error(`❌ ${errorMsg}`);
-        result.errors.push(errorMsg);
-      }
-    }
+    result.processed = sweep.processed;
+    result.errors.push(...sweep.errors);
 
     return result;
   } catch (error) {
@@ -162,7 +159,7 @@ async function checkExpiredTrials(): Promise<{processed: number, emailsSent: num
 /**
  * Check and process expired canceled subscriptions
  */
-async function checkExpiredCanceledSubscriptions(): Promise<{processed: number, emailsSent: number, errors: string[]}> {
+async function checkExpiredCanceledSubscriptions(deadline: number): Promise<{processed: number, emailsSent: number, errors: string[]}> {
   console.log('❌ Checking expired canceled subscriptions...');
   const result: {processed: number, emailsSent: number, errors: string[]} = { processed: 0, emailsSent: 0, errors: [] };
 
@@ -171,38 +168,27 @@ async function checkExpiredCanceledSubscriptions(): Promise<{processed: number, 
     
     // Query expired canceled subscriptions
     const db = getDb();
-    const expiredCanceledQuery = await db.collection('subscriptions')
-      .where('nextBillingDate', '<=', now)
-      .where('status', '==', 'canceled')
-      .where('isActive', '==', true)
-      .limit(100) // Process in batches
-      .get();
-
-    console.log(`Found ${expiredCanceledQuery.docs.length} expired canceled subscriptions to process`);
-
-    // Process each expired canceled subscription
-    for (const doc of expiredCanceledQuery.docs) {
-      try {
+    // Risk #25 — cursor-paginated, no longer capped at 100.
+    const sweep = await sweepPaginated({
+      label: 'checkExpiredCanceledSubscriptions',
+      baseQuery: db.collection('subscriptions')
+        .where('nextBillingDate', '<=', now)
+        .where('status', '==', 'canceled')
+        .where('isActive', '==', true)
+        .orderBy('nextBillingDate'),
+      deadline,
+      handle: async (doc) => {
         const subscriptionData = { id: doc.id, ...doc.data() } as SubscriptionData;
-        
-        // Update subscription status
         await updateExpiredCanceledSubscription(subscriptionData);
-        
-        // Send notification email
         const emailSent = await sendSubscriptionExpiredNotification(subscriptionData.userId);
         if (emailSent) result.emailsSent++;
-        
         // Log the change — pass actual emailSent result (Bug SM-2 fix)
         await logSubscriptionChange(subscriptionData, 'canceled_subscription_expired', emailSent);
-        
-        result.processed++;
+      },
+    });
 
-      } catch (error) {
-        const errorMsg = `Error processing canceled subscription ${doc.id}: ${error instanceof Error ? error.message : String(error)}`;
-        console.error(`❌ ${errorMsg}`);
-        result.errors.push(errorMsg);
-      }
-    }
+    result.processed = sweep.processed;
+    result.errors.push(...sweep.errors);
 
     return result;
   } catch (error) {

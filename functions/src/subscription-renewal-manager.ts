@@ -1,5 +1,6 @@
 import * as admin from 'firebase-admin';
 import { isWithinStoreGrace } from './billing-grace';
+import { sweepPaginated, SWEEP_TIME_BUDGET_MS } from './sweep';
 
 // Function to get Firestore instance (ensures Firebase is initialized)
 function getDb() {
@@ -107,54 +108,49 @@ async function checkSubscriptionRenewals(): Promise<{
     const now = admin.firestore.Timestamp.now();
     const db = getDb();
 
-    // Run two queries (Firestore does not support OR on different field values
-    // without a composite index; two separate queries are simpler and reliable).
-    const [activeQuery, pastDueQuery] = await Promise.all([
-      db.collection('subscriptions')
-        .where('nextBillingDate', '<=', now)
-        .where('status', '==', 'active')
-        .where('isActive', '==', true)
-        .where('trialUsed', '==', 1)
-        .limit(100)
-        .get(),
-      db.collection('subscriptions')
-        .where('nextBillingDate', '<=', now)
-        .where('status', '==', 'past_due')
-        .where('isActive', '==', true)
-        .where('trialUsed', '==', 1)
-        .limit(100)
-        .get(),
+    // Risk #25 — cursor-paginated, no longer capped at 100.
+    //
+    // A cursor is required here rather than simply re-running the query:
+    // inside the grace window processOverdueSubscription only marks a
+    // subscription `past_due`, which still matches the past_due query it came
+    // from. Re-querying would hand back the same documents forever.
+    //
+    // Two queries because Firestore has no OR across different values for one
+    // field. They share one deadline so the pair cannot overrun together.
+    const deadline = Date.now() + SWEEP_TIME_BUDGET_MS;
+    const seen = new Set<string>();
+
+    const handleOverdue = async (doc: FirebaseFirestore.QueryDocumentSnapshot) => {
+      // Defensive: the two queries should not overlap, but a status change
+      // racing between them must not double-process a subscription.
+      if (seen.has(doc.id)) return;
+      seen.add(doc.id);
+
+      const subscriptionData = { id: doc.id, ...doc.data() } as SubscriptionData;
+      const { deactivated, emailSent } = await processOverdueSubscription(subscriptionData);
+
+      if (deactivated) {
+        result.failed++;
+      } else {
+        result.successful++;
+      }
+      if (emailSent) result.emailsSent++;
+    };
+
+    const base = (status: string) => db.collection('subscriptions')
+      .where('nextBillingDate', '<=', now)
+      .where('status', '==', status)
+      .where('isActive', '==', true)
+      .where('trialUsed', '==', 1)
+      .orderBy('nextBillingDate');
+
+    const [activeSweep, pastDueSweep] = await Promise.all([
+      sweepPaginated({ label: 'renewals:active', baseQuery: base('active'), deadline, handle: handleOverdue }),
+      sweepPaginated({ label: 'renewals:past_due', baseQuery: base('past_due'), deadline, handle: handleOverdue }),
     ]);
 
-    // Merge and de-duplicate (shouldn't overlap, but be safe)
-    const seen = new Set<string>();
-    const allDocs = [...activeQuery.docs, ...pastDueQuery.docs].filter(doc => {
-      if (seen.has(doc.id)) return false;
-      seen.add(doc.id);
-      return true;
-    });
-
-    console.log(`Found ${allDocs.length} overdue subscription(s) to process`);
-
-    for (const doc of allDocs) {
-      try {
-        const subscriptionData = { id: doc.id, ...doc.data() } as SubscriptionData;
-        const { deactivated, emailSent } = await processOverdueSubscription(subscriptionData);
-
-        if (deactivated) {
-          result.failed++;
-        } else {
-          result.successful++;
-        }
-        if (emailSent) result.emailsSent++;
-        result.processed++;
-
-      } catch (error) {
-        const errorMsg = `Error processing overdue subscription ${doc.id}: ${error instanceof Error ? error.message : String(error)}`;
-        console.error(`❌ ${errorMsg}`);
-        result.errors.push(errorMsg);
-      }
-    }
+    result.processed = activeSweep.processed + pastDueSweep.processed;
+    result.errors.push(...activeSweep.errors, ...pastDueSweep.errors);
 
     return result;
   } catch (error) {

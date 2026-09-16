@@ -1455,7 +1455,12 @@ export const deleteUserAccount = functions.https.onCall(async (data, context) =>
  * Scheduled function that runs every hour to check for expired subscriptions
  * This is the main server-side subscription management function
  */
-export const checkExpiredSubscriptions = functions.pubsub
+export const checkExpiredSubscriptions = functions
+  // Risk #25 — the sweeps are cursor-paginated now and need room to drain a
+  // backlog. The default 60s timeout would kill them mid-sweep; the sweep's own
+  // time budget stops it well before this ceiling and reports what is left.
+  .runWith({ timeoutSeconds: 540, memory: '512MB' })
+  .pubsub
   .schedule('every 1 hours')
   .timeZone('America/Chicago')
   .onRun(async (context) => {
@@ -1684,7 +1689,12 @@ export const subscriptionSystemHealth = functions.https.onCall(async (data, cont
  * Scheduled function that runs every 6 hours to renew active subscriptions
  * This is the main server-side subscription renewal function
  */
-export const renewActiveSubscriptions = functions.pubsub
+export const renewActiveSubscriptions = functions
+  // Risk #25 — the sweeps are cursor-paginated now and need room to drain a
+  // backlog. The default 60s timeout would kill them mid-sweep; the sweep's own
+  // time budget stops it well before this ceiling and reports what is left.
+  .runWith({ timeoutSeconds: 540, memory: '512MB' })
+  .pubsub
   .schedule('every 6 hours')
   .timeZone('America/Chicago')
   .onRun(async (context) => {

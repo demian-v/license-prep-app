@@ -113,6 +113,7 @@ Status: ⬜ not started · 🔄 in progress · ✅ done & verified · ⏸️ blo
 | Risk | What | Status | Why it was pulled in |
 |---|---|---|---|
 | #58 | New user with no trial saw a silent dead end (`SizedBox.shrink()`) | ✅ **DONE** | Unavoidable once #12 gates the trial: refusing a trial without explaining it would send every unverified signup to a blank screen. The branch now renders a real card, and says *"verify your email"* specifically when that is the reason |
+| #25 | Schedulers capped at 100 documents per run, no cursor, no queue-depth signal | ✅ **DONE** | `sweep.test.ts` (4) + `scheduler-uncapped.test.ts` — 150 expired trials all swept | Cursor pagination + a wall-clock budget; scheduler timeouts raised 60s → 540s |
 | #16 | No `predeploy` hook — `firebase deploy --only functions` ships stale compiled JS | ✅ **DONE** | Not optional after all: `functions/lib/index.js` was compiled **Apr 27**, five months stale. The emulator runs `lib/`, so every local verification was against April code until this was found. Added `predeploy` to `firebase.json` and deleted the dead root `index.js` shim |
 
 **Out of scope this round** (tracked, not started): #13 #14 privacy/deletion · #21 cross-device sync · #36 CI · #49 Docker · #53 content authoring · #55 #56 store platform (already handled/mitigated) · all remaining Medium rows.
@@ -171,9 +172,7 @@ Written up in the vault: `wiki/driveusa/Development/infra/app-check-attestation-
 **40 of the 59 rows are still open.** This branch covered the agreed
 security-and-money scope, not the register. See the register itself for the full
 list; the largest remaining Highs are #13 and #14 (privacy and account deletion),
-#23 and #24 (signup failures leaving a user with no entitlement, ever), #25
-(schedulers capped at 100 documents per run — which the #7 grace window now leans
-on), and #21 (cross-device sync does not exist).
+#23 and #24 (signup failures leaving a user with no entitlement, ever), #21 (cross-device sync does not exist).
 
 ## Decisions log
 
