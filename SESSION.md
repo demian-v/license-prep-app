@@ -202,6 +202,7 @@ The answer key and explanation are served to an anonymous stranger. Reproduce wi
 
 ## Follow-ups created by this work
 
+- **App Check / attestation is planned but deferred** — written up in the vault at `wiki/driveusa/Development/infra/app-check-attestation-plan.md` (linked from the infra index). Covers what it fixes, what it does not, the console/Apple/Play prerequisites, and why enforcement must be staged against a single production project.
 - **#26 is partial, and the remaining part is not a code fix.** `deviceIdHash` and `isPhysicalDevice` arrive from the client, so a modified build sends any 64-hex string with `isPhysicalDevice: true` and collects an endless supply of trials. No server-side check can close that: the server cannot tell a real device from a claim about one. It needs **device attestation** — Firebase App Check with DeviceCheck (iOS) and Play Integrity (Android). The register already calls for App Check under risk #3. Until then the device gate is a speed bump, not a control, and `isPhysicalDevice` in particular blocks only honest simulator users — which is why local testing needs `scripts/local/grant-local-trial.js`.
 - **The iOS device hash is weaker than it looks.** Memory from an earlier session: the Keychain UUID it derives from is wiped on uninstall, so delete-and-reinstall already yields a fresh hash and therefore a fresh trial — without any client modification at all. Attestation would not fix this either; it needs a server-side identifier that survives reinstall, or accepting that trials are per-install.
 
