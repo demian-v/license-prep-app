@@ -113,6 +113,8 @@ Status: ⬜ not started · 🔄 in progress · ✅ done & verified · ⏸️ blo
 | Risk | What | Status | Why it was pulled in |
 |---|---|---|---|
 | #58 | New user with no trial saw a silent dead end (`SizedBox.shrink()`) | ✅ **DONE** | Unavoidable once #12 gates the trial: refusing a trial without explaining it would send every unverified signup to a blank screen. The branch now renders a real card, and says *"verify your email"* specifically when that is the reason |
+| #23 | Orphan-auth trap — a failed signup left an Auth user with no document, unrecoverable in-app | ✅ **DONE** | `user-provisioning.test.ts` — 5 tests | `provisionUserDocument` auth trigger + `set/merge` in both updaters so already-orphaned accounts heal |
+| #24 | Interrupted signup meant no entitlement, forever | ✅ **DONE** | server dedupe tests + in-app | `SubscriptionProvider.initialize` retries the trial once when no subscription exists at all |
 | #25 | Schedulers capped at 100 documents per run, no cursor, no queue-depth signal | ✅ **DONE** | `sweep.test.ts` (4) + `scheduler-uncapped.test.ts` — 150 expired trials all swept | Cursor pagination + a wall-clock budget; scheduler timeouts raised 60s → 540s |
 | #16 | No `predeploy` hook — `firebase deploy --only functions` ships stale compiled JS | ✅ **DONE** | Not optional after all: `functions/lib/index.js` was compiled **Apr 27**, five months stale. The emulator runs `lib/`, so every local verification was against April code until this was found. Added `predeploy` to `firebase.json` and deleted the dead root `index.js` shim |
 
@@ -172,7 +174,8 @@ Written up in the vault: `wiki/driveusa/Development/infra/app-check-attestation-
 **40 of the 59 rows are still open.** This branch covered the agreed
 security-and-money scope, not the register. See the register itself for the full
 list; the largest remaining Highs are #13 and #14 (privacy and account deletion),
-#23 and #24 (signup failures leaving a user with no entitlement, ever), #21 (cross-device sync does not exist).
+#21 (cross-device sync does not exist), #10 (a config guide that is actively wrong),
+#11 and #17.
 
 ## Decisions log
 
@@ -186,6 +189,8 @@ list; the largest remaining Highs are #13 and #14 (privacy and account deletion)
 | 2026-09-16 | Emulators run under the REAL project id, not `demo-driveusa` | `FirebaseOptions` is a matched set; overriding only `projectId` leaves the real API key, so Firebase Installations calls `projects/demo-*/installations` with a key that does not belong to it. Owner chose to **revoke ADC first** (`gcloud auth application-default revoke`), so the machine now holds no production credentials at all — a stronger position than the `demo-` prefix gave |
 | 2026-09-16 | Gate content rules on `users/{uid}.isActive`, and make trials write it | It is the server-maintained entitlement mirror the purchase path, renewal manager and schedulers already use. `createTrialSubscription` was the one path that never wrote it, so gating on it without that fix would have locked out every trial user |
 | 2026-09-16 | Blocklist rather than allowlist for `users/{uid}` writes | Several services write profile fields dynamically (`email_sync_service` passes a computed map); an allowlist would break them. The blocklist covers the nine fields that decide entitlement, which is what #29 is actually about |
+| 2026-09-16 | #23 is fixed in two places on purpose | The auth trigger stops *new* accounts being orphaned, but does nothing for accounts already orphaned in production. `set/merge` in the two updaters heals those the moment the user touches a setting. Neither alone covers both populations |
+| 2026-09-16 | #24 recovers the trial in `SubscriptionProvider.initialize`, not at login | It is the one place that already knows whether a subscription exists, and it runs on every session. Safe to retry because the server dedupes — `already-exists` for the user, `failed-precondition` for the device — so it either repairs a genuinely missed trial or is harmlessly refused. Guarded to one attempt per provider instance so a standing refusal is not a callable on every rebuild |
 | 2026-09-16 | **REVERSED same day:** the trial is granted instantly, with no email-verification gate | I first built the gate (the owner picked it from options I wrote), then the owner corrected the product intent: **a registered user gets the 3-day trial immediately and is blocked only when it expires; verification is a step in the signup flow, not a gate on the trial.** The gate is removed and there are now tests asserting an unverified user still gets a trial, so a future hardening pass cannot quietly reverse it. Cost accepted: the trial is only as scarce as email addresses, which is #12's farming exposure. The durable answer is device attestation, not blocking new users at the door |
 | 2026-09-16 | #58 was still worth doing, and stays | It was pulled in to soften the gate, but it is independently correct: it is the "trial expired — subscribe" state the owner wants, and before it that branch rendered nothing at all |
 | 2026-09-16 | #26 anonymises `trialDevices` on account deletion rather than deleting it | The register frames the never-cleaned-up record as unfair to legitimate reinstallers, and deletion is also what risk #13 promises. But **deleting it would make account deletion the easiest possible trial-farming tool** — delete, re-register, collect another trial, repeat. Stripping `firstUserId` / `firstSubscriptionId` and keeping the hash satisfies the deletion promise while the gate keeps working |

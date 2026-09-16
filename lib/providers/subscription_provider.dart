@@ -24,6 +24,11 @@ class SubscriptionProvider extends ChangeNotifier {
   
   // SERVICES
   final SubscriptionManagementService _subscriptionService = SubscriptionManagementService();
+
+  /// Risk #24: one trial-recovery attempt per provider instance. Without this
+  /// guard a user the server keeps refusing would fire a callable on every
+  /// rebuild.
+  bool _trialRecoveryAttempted = false;
   
   // GETTERS
   UserSubscription? get subscription => _subscription;
@@ -137,7 +142,41 @@ class SubscriptionProvider extends ChangeNotifier {
           debugPrint('💳 Has expired paid subscription: $hasExpiredPaidSubscription');
         }
       } else {
-        debugPrint('⚠️ SubscriptionProvider: No subscription found for user - this should not happen!');
+        // Risk #24 — an interrupted signup used to mean no entitlement, ever.
+        // initializeTrial was called from exactly one place, inside signup(),
+        // and never retried: if it failed there (network drop, app killed, a
+        // transient function error) the failure was logged "non-critical",
+        // signup still reported success, and the user was left permanently
+        // without a trial they were entitled to.
+        //
+        // Recovering here is safe because the server is the authority and
+        // dedupes: createTrialSubscription refuses with already-exists if the
+        // user has any subscription, and failed-precondition if the device has
+        // already had one. So this either repairs a genuinely missed trial or
+        // is harmlessly refused.
+        //
+        // Guarded to one attempt per provider instance, so a standing refusal
+        // does not mean a callable on every screen build.
+        debugPrint('ℹ️ SubscriptionProvider: No subscription found for user');
+
+        if (!_trialRecoveryAttempted) {
+          _trialRecoveryAttempted = true;
+          debugPrint('🔁 SubscriptionProvider: attempting trial recovery (risk #24)');
+          try {
+            final recovered = await _subscriptionService.initializeTrial(userId);
+            if (recovered != null) {
+              _subscription = recovered;
+              debugPrint('✅ SubscriptionProvider: trial recovered for $userId');
+            } else {
+              debugPrint('ℹ️ SubscriptionProvider: trial not recovered — '
+                  '${SubscriptionManagementService.lastTrialRejectionReason ?? "unknown reason"}');
+            }
+          } catch (e) {
+            // Never fatal: the user still reaches the app, and the no-subscription
+            // card (risk #58) explains the state.
+            debugPrint('⚠️ SubscriptionProvider: trial recovery failed: $e');
+          }
+        }
       }
       
       debugPrint('✅ SubscriptionProvider: Initialized successfully');

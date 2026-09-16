@@ -651,10 +651,13 @@ export const updateUserLanguage = functions.https.onCall(async (data, context) =
     console.log(`Updating language for user ${userId} to: ${language}`);
     
     // Update user document in Firestore
-    await db.collection('users').doc(userId).update({
+    // Risk #23 — set/merge, not update(): update() throws NOT_FOUND on a
+    // missing document, which is what made an orphaned account permanently
+    // stuck. This heals accounts orphaned before the auth trigger existed.
+    await db.collection('users').doc(userId).set({
       language: language,
       lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    }, { merge: true });
     
     console.log(`Successfully updated language for user ${userId} to: ${language}`);
     
@@ -697,10 +700,11 @@ export const updateUserState = functions.https.onCall(async (data, context) => {
     console.log(`Updating state for user ${userId} to: ${state || 'null'}`);
     
     // Update user document in Firestore (state can be null)
-    await db.collection('users').doc(userId).update({
+    // Risk #23 — set/merge, not update(). See updateUserLanguage above.
+    await db.collection('users').doc(userId).set({
       state: state || null,
       lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    }, { merge: true });
     
     console.log(`Successfully updated state for user ${userId} to: ${state || 'null'}`);
     
@@ -1795,6 +1799,51 @@ export { validatePurchaseReceipt };
 // =============================================================================
 // SUBSCRIPTION SECURITY FUNCTIONS
 // =============================================================================
+
+/**
+ * Provision users/{uid} when an Auth account is created (risk #23).
+ *
+ * Provisioning used to be entirely client-initiated: the app created the Auth
+ * user, then wrote the document itself. If that second write failed — network
+ * drop, app killed mid-signup, a permission hiccup — the Auth account existed
+ * with no document and nothing ever created one. The account was then
+ * unrecoverable from inside the app, because the updaters called `.update()`,
+ * which throws NOT_FOUND on a missing document.
+ *
+ * An auth trigger cannot be skipped by a client that dies halfway, so the
+ * document now exists before the app asks for it.
+ *
+ * merge:true and no overwrite of client-owned fields: the client may well have
+ * written its own document first with a name, language and state the user
+ * actually chose. This fills gaps, it does not win races.
+ */
+export const provisionUserDocument = functions.auth.user().onCreate(async (user) => {
+  const ref = db.collection('users').doc(user.uid);
+
+  try {
+    const existing = await ref.get();
+    if (existing.exists) {
+      console.log(`provisionUserDocument: ${user.uid} already has a document, leaving it alone`);
+      return;
+    }
+
+    await ref.set({
+      email: user.email ?? null,
+      name: user.displayName ?? '',
+      language: 'en',
+      state: null,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+      provisionedBy: 'auth-trigger',
+    }, { merge: true });
+
+    console.log(`provisionUserDocument: created users/${user.uid}`);
+  } catch (error) {
+    // Never throw: a failure here must not break account creation itself. The
+    // set/merge recovery in the updaters below is the second line of defence.
+    console.error(`provisionUserDocument: could not provision ${user.uid}:`, error);
+  }
+});
 
 // Creates a trial subscription server-side on new user signup.
 // Replaces the client-side _createInitialTrialSubscription in direct_auth_service.dart.
