@@ -6,7 +6,6 @@ import 'package:cloud_functions/cloud_functions.dart';
 import '../models/user_subscription.dart';
 import '../models/subscription_package.dart';
 import 'billing_calculator.dart';
-import 'upgrade_calculator.dart';
 import 'device_trial_fingerprint.dart';
 
 class SubscriptionManagementService {
@@ -163,103 +162,6 @@ class SubscriptionManagementService {
     }
   }
 
-  /// Upgrade subscription from monthly to yearly preserving remaining days
-  Future<UserSubscription> upgradeSubscription(
-    String userId, 
-    int newPackageId,
-    String targetPlanType,
-  ) async {
-    debugPrint('⬆️ SubscriptionManagementService: Upgrading subscription for user: $userId');
-    debugPrint('📊 Target plan: $targetPlanType, Package ID: $newPackageId');
-    
-    try {
-      final currentSubscription = await getUserSubscription(userId);
-      if (currentSubscription == null) {
-        throw Exception('No current subscription found');
-      }
-      
-      // Validate upgrade eligibility
-      if (!currentSubscription.isUpgradeEligible(targetPlanType)) {
-        throw Exception('Subscription is not eligible for upgrade to $targetPlanType');
-      }
-      
-      // Validate upgrade using UpgradeCalculator
-      if (!UpgradeCalculator.isUpgradeValid(
-        currentSubscription.planType,
-        targetPlanType,
-        currentSubscription.isValidSubscription,
-      )) {
-        throw Exception('Upgrade validation failed');
-      }
-      
-      final packages = await getSubscriptionPackages();
-      final newPackage = packages.firstWhere(
-        (pkg) => pkg.id == newPackageId,
-        orElse: () => throw Exception('Package not found'),
-      );
-      
-      final now = DateTime.now();
-      
-      // Calculate new billing date preserving remaining days
-      final newBillingDate = currentSubscription.nextBillingDate != null
-          ? UpgradeCalculator.calculateUpgradeBillingDate(
-              currentSubscription.nextBillingDate!,
-              currentSubscription.planType,
-              targetPlanType,
-              currentDate: now,
-            )
-          : now.add(Duration(days: newPackage.duration)); // Fallback
-      
-      debugPrint('⬆️ Upgrade billing calculation:');
-      debugPrint('📅 Current billing date: ${currentSubscription.nextBillingDate?.toIso8601String()}');
-      debugPrint('📅 Upgrade date: ${now.toIso8601String()}');
-      debugPrint('📅 New billing date: ${newBillingDate.toIso8601String()}');
-      
-      final remainingDays = currentSubscription.getDaysRemainingInCurrentPlan();
-      final totalDaysAfterUpgrade = UpgradeCalculator.calculateTotalDaysAfterUpgrade(
-        currentSubscription.nextBillingDate!,
-        currentSubscription.planType,
-        targetPlanType,
-        currentDate: now,
-      );
-      
-      debugPrint('📊 Days remaining in current plan: $remainingDays');
-      debugPrint('📊 Total days after upgrade: $totalDaysAfterUpgrade');
-      
-      // Create upgraded subscription
-      final upgradedSubscription = currentSubscription.copyWith(
-        packageId: newPackageId,
-        planType: targetPlanType,
-        duration: newPackage.duration,
-        nextBillingDate: newBillingDate,
-        updatedAt: now,
-        status: 'active',
-        isActive: true,
-      );
-      
-      // Upgrade via Cloud Function (server-side validation)
-      final callable = FirebaseFunctions.instance.httpsCallable('upgradeSubscription');
-      await callable.call({
-        'targetPlanType': targetPlanType,
-        'packageId': newPackageId,
-      });
-
-      // Re-fetch from Firestore — server is now the source of truth
-      final updated = await getUserSubscription(userId) ?? upgradedSubscription;
-
-      await _saveSubscriptionToCache(updated);
-      await _syncUserBillingDates(userId, now, updated.nextBillingDate ?? newBillingDate);
-
-      debugPrint('✅ SubscriptionManagementService: Subscription upgraded successfully');
-      debugPrint('📊 Plan: ${currentSubscription.planType} → $targetPlanType');
-      debugPrint('📅 New billing date: ${updated.nextBillingDate?.toIso8601String()}');
-
-      return updated;
-    } catch (e) {
-      debugPrint('❌ SubscriptionManagementService: Error upgrading subscription: $e');
-      throw Exception('Failed to upgrade subscription: $e');
-    }
-  }
 
   /// Get user's current subscription - Enhanced to load expired trials and paid subscriptions
   Future<UserSubscription?> getUserSubscription(String userId) async {

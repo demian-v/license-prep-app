@@ -83,7 +83,7 @@ Status: ⬜ not started · 🔄 in progress · ✅ done & verified · ⏸️ blo
 
 | Risk | What | Status | Verified by | Commit |
 |---|---|---|---|---|
-| #2 | `upgradeSubscription` grants 365 days yearly, free, no audit row | ⬜ | function test | **Approach changed 2026-09-16: DELETE it.** Owner confirmed only the 30-day plan is sold. With no yearly product the callable has no legitimate purpose, so removal beats patching |
+| #2 | `upgradeSubscription` grants 365 days yearly, free, no audit row | ✅ **DONE** | `no-free-upgrade.test.ts` | Deleted server-side **and** the whole client path: UI button, confirmation dialog, provider + service methods, model helpers, and the orphaned `UpgradeCalculator` (138 lines). ~480 lines removed in total |
 | #5 | No receipt→account binding — one receipt entitles unlimited accounts | ⬜ | function test | |
 | #6 | `yearly` receipts dropped client-side (`_activeProductIds` = monthly only) | ⬜ | dart test + StoreKit | **Approach changed 2026-09-16: remove yearly**, don't re-enable. Drop from `productIds` and the server allow-list |
 | #7 | Home-grown 18h grace period vs Apple 16d / Google 30d | ⬜ | function test | |

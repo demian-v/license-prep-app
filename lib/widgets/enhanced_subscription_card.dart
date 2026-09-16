@@ -8,7 +8,6 @@ import '../models/user_subscription.dart';
 import '../providers/subscription_provider.dart';
 import '../providers/auth_provider.dart';
 import '../localization/app_localizations.dart';
-import '../services/upgrade_calculator.dart';
 import '../services/in_app_purchase_service.dart';
 
 class EnhancedSubscriptionCard extends StatefulWidget {
@@ -731,14 +730,13 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
     // NEW: Check if this card matches the user's current plan
     final isCurrentPlan = _isCurrentUserPlan();
     
-    // Check if this is an upgrade or downgrade opportunity
-    final isUpgradeOpportunity = _isUpgradeOpportunity();
+    // Risk #2: the monthly→yearly upgrade path is gone. It reached a callable
+    // that granted 365 paid days for free, and only the 30-day plan is sold.
     final isDowngradeOpportunity = _isDowngradeOpportunity();
 
     // LOGIC:
     // 1. Current plan OR downgrade card → Show "Subscribed" message (no subscribe button)
-    // 2. Upgrade opportunity (monthly→yearly) → Show "Upgrade" button
-    // 3. Otherwise → Show "Subscribe" button
+    // 2. Otherwise → Show "Subscribe" button
 
     final isExpiredSamePlan = _isExpiredMatchingPlan();
 
@@ -747,8 +745,6 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
       actionWidget = _buildCanceledExpiredIndicator();
     } else if (isCurrentPlan || isDowngradeOpportunity) {
       actionWidget = _buildSubscriptionStatusIndicator();
-    } else if (isUpgradeOpportunity) {
-      actionWidget = _buildUpgradeButton();
     } else {
       actionWidget = _buildEnhancedSubscribeButton(isActiveTrial);
     }
@@ -778,18 +774,6 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
            widget.subscription!.isValidSubscription;
   }
 
-  bool _isUpgradeOpportunity() {
-    if (widget.subscription == null) return false;
-    
-    // Show upgrade button if:
-    // 1. User has monthly subscription AND this card is yearly
-    // 2. User has valid subscription
-    final isUpgrade = widget.subscription!.isMonthly &&
-                     widget.subscriptionType == SubscriptionType.yearly &&
-                     widget.subscription!.isValidSubscription;
-
-    return isUpgrade;
-  }
 
   /// NEW METHOD: Check if this card represents user's current plan
   bool _isCurrentUserPlan() {
@@ -1382,247 +1366,6 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
     }
   }
 
-  Widget _buildUpgradeButton() {
-    final remainingDays = widget.subscriptionProvider.daysRemainingInCurrentPlan;
-    final totalDays = widget.subscriptionProvider.calculateTotalDaysAfterUpgrade('yearly');
-    
-    return Column(
-      children: [
-        // Upgrade benefit display
-        Container(
-          padding: EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.orange.shade50, Colors.orange.shade100],
-            ),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.orange.shade200),
-          ),
-          child: Column(
-            children: [
-              Text(
-                AppLocalizations.of(context).translate('upgrade_benefit'),
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.orange.shade800,
-                ),
-              ),
-              SizedBox(height: 4),
-              Text(
-                AppLocalizations.of(context).translate('get_days_total').replaceAll('{0}', totalDays.toString()),
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.orange.shade900,
-                ),
-              ),
-              Text(
-                AppLocalizations.of(context).translate('days_remaining_plus_new')
-                    .replaceAll('{0}', remainingDays.toString())
-                    .replaceAll('{1}', '360'),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.orange.shade700,
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: 12),
-        
-        // Upgrade button
-        GestureDetector(
-          onTapDown: (_) => _scaleController.forward(),
-          onTapUp: (_) => _scaleController.reverse(),
-          onTapCancel: () => _scaleController.reverse(),
-          child: ScaleTransition(
-            scale: _buttonScaleAnimation,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.orange.shade400, Colors.orange.shade600],
-                ),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.orange.withOpacity(0.3),
-                    spreadRadius: 0,
-                    blurRadius: 6,
-                    offset: Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: _isProcessing ? null : _handleUpgrade,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    child: Center(
-                      child: _isProcessing
-                          ? CircularProgressIndicator(color: Colors.white)
-                          : Text(
-                              AppLocalizations.of(context).translate('upgrade_to_yearly_price').replaceAll('{0}', widget.price),
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 
-  Future<void> _handleUpgrade() async {
-    // Show confirmation dialog first
-    final confirmed = await _showUpgradeConfirmation();
-    if (!confirmed) return;
-    
-    setState(() {
-      _isProcessing = true;
-      _errorMessage = null;
-    });
-    
-    try {
-      final success = await widget.subscriptionProvider.upgradeSubscription(
-        'yearly',
-        widget.packageId,
-      );
-      
-      if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context).translate('upgrade_success_message')),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
-      } else if (mounted) {
-        setState(() {
-          _errorMessage = widget.subscriptionProvider.errorMessage ?? 
-              AppLocalizations.of(context).translate('upgrade_failed_message');
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = AppLocalizations.of(context).translate('upgrade_failed_message');
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isProcessing = false;
-        });
-      }
-    }
-  }
 
-  Future<bool> _showUpgradeConfirmation() async {
-    final remainingDays = widget.subscriptionProvider.daysRemainingInCurrentPlan;
-    final totalDays = widget.subscriptionProvider.calculateTotalDaysAfterUpgrade('yearly');
-    
-    return await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(AppLocalizations.of(context).translate('upgrade_confirmation_title')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(AppLocalizations.of(context).translate('upgrade_confirmation_intro')),
-            SizedBox(height: 8),
-            Text(AppLocalizations.of(context).translate('upgrade_days_remaining_from_current').replaceAll('{0}', remainingDays.toString())),
-            Text(AppLocalizations.of(context).translate('upgrade_additional_days_yearly').replaceAll('{1}', '360')),
-            Text(AppLocalizations.of(context).translate('upgrade_total_days_access').replaceAll('{0}', totalDays.toString())),
-            SizedBox(height: 12),
-            Text(
-              AppLocalizations.of(context).translate('upgrade_cost').replaceAll('{0}', widget.price),
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        actions: [
-          // Cancel button (red gradient, similar to cancel subscription)
-          Container(
-            height: 40,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Colors.white, Colors.red.shade50.withOpacity(0.4)],
-              ),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () => Navigator.of(context).pop(false),
-                borderRadius: BorderRadius.circular(20),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Center(
-                    child: Text(
-                      AppLocalizations.of(context).translate('cancel'),
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          // Upgrade button (green gradient, similar to keep subscription)
-          Container(
-            height: 40,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Colors.white, Colors.green.shade50.withOpacity(0.4)],
-              ),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
-                  spreadRadius: 0,
-                  blurRadius: 4,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () => Navigator.of(context).pop(true),
-                borderRadius: BorderRadius.circular(20),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Center(
-                    child: Text(
-                      AppLocalizations.of(context).translate('upgrade_now'),
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    ) ?? false;
-  }
 }

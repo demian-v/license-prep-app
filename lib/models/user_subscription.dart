@@ -227,21 +227,8 @@ class UserSubscription {
   @override
   int get hashCode => id.hashCode ^ userId.hashCode;
 
-  // Upgrade eligibility methods
-  bool canUpgradeToYearly() {
-    return isMonthly && isValidSubscription;
-  }
 
-  bool canUpgradeToMonthly() {
-    return false; // No downgrade from yearly to monthly
-  }
 
-  int getDaysRemainingInCurrentPlan() {
-    if (nextBillingDate == null) return 0;
-    final now = DateTime.now();
-    if (now.isAfter(nextBillingDate!)) return 0;
-    return nextBillingDate!.difference(now).inDays + 1;
-  }
 
   bool isUpgradeEligible(String targetPlanType) {
     if (targetPlanType == 'yearly' && isMonthly) return true;

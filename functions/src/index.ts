@@ -1836,43 +1836,6 @@ export const cancelSubscription = functions.https.onCall(async (_data: any, cont
   return { success: true, isActive: shouldStayActive };
 });
 
-// Upgrades an active monthly subscription to yearly (free proration for existing subscribers).
-// Server validates planType === 'monthly' before allowing upgrade.
-export const upgradeSubscription = functions.https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Not logged in');
-  const userId = context.auth.uid;
-  const { targetPlanType, packageId } = data;
-
-  if (targetPlanType !== 'yearly') {
-    throw new functions.https.HttpsError('invalid-argument', 'Only monthly→yearly upgrade supported');
-  }
-
-  // Must already be a paying monthly subscriber (not trial)
-  const snap = await db.collection('subscriptions')
-    .where('userId', '==', userId)
-    .where('isActive', '==', true)
-    .where('planType', '==', 'monthly')
-    .limit(1).get();
-  if (snap.empty) throw new functions.https.HttpsError('not-found', 'No active monthly subscription');
-
-  const sub = snap.docs[0].data();
-  const currentNextBilling = sub.nextBillingDate.toDate() as Date;
-  const now = new Date();
-
-  // Prorate: preserve remaining days from current monthly period
-  const remainingDays = Math.max(0, Math.ceil(
-    (currentNextBilling.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-  ));
-  const newBillingDate = new Date(now.getTime() + (365 + remainingDays) * 24 * 60 * 60 * 1000);
-
-  await snap.docs[0].ref.update({
-    packageId, planType: 'yearly', duration: 365,
-    nextBillingDate: admin.firestore.Timestamp.fromDate(newBillingDate),
-    status: 'active', isActive: true,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
-  return { success: true, newBillingDate: newBillingDate.toISOString() };
-});
 
 // =============================================================================
 // WEBHOOK HANDLERS
