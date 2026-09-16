@@ -35,7 +35,6 @@
   "quiz": "Cuestionario",
   "exam": "Examen",
   "tests": "Pruebas",
-  
   "testing": "Pruebas",
   "take_exam": "Realizar examen",
   "dmv_exam_desc": "Simulación de examen",
@@ -46,7 +45,6 @@
   "questions_by_topics": "Preguntas por Temas",
   "practice_tickets": "Boletos de Práctica",
   "random_questions_no_limit": "Preguntas aleatorias, sin límite",
-  
   "try_again": "Intentar de nuevo",
   "no_questions": "No hay preguntas disponibles para este tema",
   "select_all_correct": "Seleccione todas las respuestas correctas",
@@ -56,12 +54,10 @@
   "traffic_rules": "Reglas de tráfico",
   "modules_count": "módulos",
   "back_to_tests": "Volver a Pruebas",
-  
   "time_60_minutes": "60 minutos",
   "questions_40": "40 preguntas",
   "time_unlimited": "Tiempo ilimitado",
   "questions_100_sorted": "100+ preguntas por temas",
-  
   "exit_test_title": "¿Salir del examen?",
   "exit_test_message": "Si sales del examen, tu progreso no se guardará",
   "exit": "Salir",
@@ -113,7 +109,6 @@
   "plan_ends": "Termina el Plan",
   "plan_type": "Tipo de Plan",
   "trial": "Prueba",
-  
   "verify_email": "Verificar Correo",
   "email_verified": "Correo Verificado",
   "verification_failed": "Verificación Falló",
@@ -125,7 +120,6 @@
   "email_changed_success_title": "¡Correo Cambiado Exitosamente!",
   "email_changed_success_message": "¡Su correo ha sido cambiado exitosamente! Por favor inicie sesión con su nueva dirección de correo.",
   "go_to_signin": "Ir a Iniciar Sesión",
-  
   "report_issue": "Reportar un problema",
   "issue_with_image": "Problema con la imagen",
   "issue_with_text_translation": "Problema con la traducción del texto",
@@ -146,7 +140,6 @@
   "support_response_info": "Normalmente respondemos en 24 horas. Tus comentarios nos ayudan a mejorar la aplicación.",
   "sessionConflictMessage": "Has sido desconectado porque iniciaste sesión en otro dispositivo.",
   "sessionConflictButton": "OK",
-  
   "trial_active": "Prueba Gratuita Activa",
   "trial_expires_soon": "¡La Prueba Expira Pronto!",
   "trial_expired": "Prueba Expirada",
@@ -187,5 +180,9 @@
   "upgrade_total_days_access": "• Total: {0} días de acceso",
   "upgrade_cost": "Costo: ${0}",
   "upgrade_success_message": "¡Actualización exitosa a suscripción anual!",
-  "upgrade_failed_message": "La actualización falló. Por favor, inténtalo de nuevo."
+  "upgrade_failed_message": "La actualización falló. Por favor, inténtalo de nuevo.",
+  "verify_email_title": "Verifica tu correo",
+  "verify_email_message": "Te enviamos un enlace de verificación. Confirma tu correo para comenzar tu prueba gratuita de 3 días.",
+  "no_subscription_title": "Sin suscripción activa",
+  "no_subscription_message": "Suscríbete para desbloquear todos los exámenes de práctica y la teoría."
 }

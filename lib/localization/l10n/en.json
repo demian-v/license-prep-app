@@ -35,7 +35,6 @@
   "quiz": "Quiz",
   "exam": "Exam",
   "tests": "Tests",
-  
   "testing": "Testing",
   "take_exam": "Take Exam",
   "dmv_exam_desc": "Exam Simulation",
@@ -46,7 +45,6 @@
   "questions_by_topics": "Questions by Topics",
   "practice_tickets": "Practice Tickets",
   "random_questions_no_limit": "Random questions, no limit",
-  
   "try_again": "Try Again",
   "no_questions": "No questions available for this topic",
   "select_all_correct": "Select all correct answers",
@@ -56,12 +54,10 @@
   "traffic_rules": "Traffic Rules",
   "modules_count": "modules",
   "back_to_tests": "Back to Tests",
-  
   "time_60_minutes": "60 minutes",
   "questions_40": "40 questions",
   "time_unlimited": "Unlimited time",
   "questions_100_sorted": "100+ questions sorted by topics",
-  
   "exit_test_title": "Exit test?",
   "exit_test_message": "If you exit the test, your progress will not be saved",
   "exit": "Exit",
@@ -86,13 +82,9 @@
   "back_to_theory": "Back to Theory",
   "practice_passed": "Practice passed",
   "practice_not_passed": "Practice not passed",
-  "saved": "Saved",
   "no_saved_questions": "No saved questions",
   "tap_heart_to_save": "Tap the heart in questions to add them to saved list",
-  "select_all_correct_answers": "Select all correct answers",
   "explanation": "Explanation",
-  "try_again": "Try Again",
-  "check": "Check",
   "subscription": "Subscription",
   "monthly_subscription": "Monthly Subscription",
   "features_include": "Features Include:",
@@ -117,7 +109,6 @@
   "plan_ends": "Plan Ends",
   "plan_type": "Plan Type",
   "trial": "Trial",
-  
   "verify_email": "Verify Email",
   "email_verified": "Email Verified",
   "verification_failed": "Verification Failed",
@@ -129,7 +120,6 @@
   "email_changed_success_title": "Email Changed Successfully!",
   "email_changed_success_message": "Your email has been changed successfully! Please sign in with your new email address.",
   "go_to_signin": "Go to Sign In",
-  
   "report_issue": "Report an issue",
   "issue_with_image": "Issue with image",
   "issue_with_text_translation": "Issue with text translation",
@@ -150,7 +140,6 @@
   "support_response_info": "We typically respond within 24 hours. Your feedback helps us improve the app.",
   "sessionConflictMessage": "You have been logged out because you signed in on another device.",
   "sessionConflictButton": "OK",
-  
   "trial_active": "Free Trial Active",
   "trial_expires_soon": "Trial Expires Soon!",
   "trial_expired": "Trial Expired",
@@ -191,5 +180,9 @@
   "upgrade_total_days_access": "• Total: {0} days of access",
   "upgrade_cost": "Cost: ${0}",
   "upgrade_success_message": "Successfully upgraded to yearly subscription!",
-  "upgrade_failed_message": "Upgrade failed. Please try again."
+  "upgrade_failed_message": "Upgrade failed. Please try again.",
+  "verify_email_title": "Verify your email",
+  "verify_email_message": "We sent you a verification link. Confirm your email to start your 3-day free trial.",
+  "no_subscription_title": "No active subscription",
+  "no_subscription_message": "Subscribe to unlock all practice tests and theory."
 }

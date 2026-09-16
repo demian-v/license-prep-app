@@ -158,6 +158,20 @@ class FirebaseAuthApi implements AuthApiInterface {
         password: password,
       );
       
+      // Risk #12 — send the verification email. sendEmailVerification() was
+      // never called anywhere in the app, so `emailVerified` stayed false for
+      // every account forever, and the EmailVerificationScreen deep-link flow
+      // wired up in main.dart was unreachable dead code.
+      //
+      // Deliberately non-fatal: a mail failure must not cost the user the
+      // account they have just created.
+      try {
+        await userCredential.user!.sendEmailVerification();
+        debugPrint('📧 [FirebaseAuthApi] Verification email sent to: $email');
+      } catch (e) {
+        debugPrint('⚠️ [FirebaseAuthApi] Could not send verification email: $e');
+      }
+
       // Update display name
       await userCredential.user!.updateDisplayName(name);
       debugPrint('✅ [FirebaseAuthApi] Display name set to: $name');

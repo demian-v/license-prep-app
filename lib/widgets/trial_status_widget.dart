@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/subscription_provider.dart';
+import '../services/subscription_management_service.dart';
 import '../localization/app_localizations.dart';
 
 class TrialStatusWidget extends StatelessWidget {
@@ -51,15 +52,88 @@ class TrialStatusWidget extends StatelessWidget {
           debugPrint('💳 TrialStatusWidget: Showing expired paid subscription status');
           return _buildExpiredPaidWidget(context, subscriptionProvider);
         } else {
-          // This should theoretically never happen since every user has a trial
-          debugPrint('⚠️ TrialStatusWidget: No subscription state matched - this should not happen!');
-          return SizedBox.shrink();
+          // Risk #58 — this branch is reachable, and used to render nothing at
+          // all. A user with no subscription (the trial was refused, or was
+          // never created) saw a blank space and no explanation. The comment
+          // that used to sit here said it "should theoretically never happen",
+          // which is what stopped anyone treating it as real.
+          debugPrint('ℹ️ TrialStatusWidget: No subscription — reason: '
+              '${SubscriptionManagementService.lastTrialRejectionReason ?? "unknown"}');
+          return _buildNoSubscriptionWidget(context);
         }
       },
     );
   }
 
   // Loading widget with existing design
+  /// Shown when the user holds no subscription at all (risk #58).
+  ///
+  /// Where the server gave a reason, say that specific thing — an unverified
+  /// email is fixable by the user in seconds, but only if we tell them.
+  Widget _buildNoSubscriptionWidget(BuildContext context) {
+    final reason = SubscriptionManagementService.lastTrialRejectionReason;
+    final needsVerification = reason == 'email-not-verified';
+    final localizations = AppLocalizations.of(context);
+
+    // NOTE: translate() returns the KEY itself when a string is missing, never
+    // null (app_localizations.dart), so a `?? fallback` here would be dead code
+    // and the user would see "no_subscription_title" on screen. These four keys
+    // are defined in all five l10n files — see risk #50 for the wider problem.
+    final title = localizations.translate(
+        needsVerification ? 'verify_email_title' : 'no_subscription_title');
+    final message = localizations.translate(
+        needsVerification ? 'verify_email_message' : 'no_subscription_message');
+
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: needsVerification ? Colors.orange.shade200 : Colors.blue.shade100,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            needsVerification ? Icons.mark_email_unread_outlined : Icons.lock_outline,
+            color: needsVerification ? Colors.orange.shade700 : Colors.blue.shade700,
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: needsVerification ? Colors.orange.shade900 : Colors.blue.shade900,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  message,
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                ),
+              ],
+            ),
+          ),
+          if (!needsVerification)
+            TextButton(
+              onPressed: () => Navigator.pushNamed(context, '/subscription'),
+              child: Text(
+                localizations.translate('subscribe_now'),
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildLoadingWidget() {
     return Container(
       margin: EdgeInsets.all(16),

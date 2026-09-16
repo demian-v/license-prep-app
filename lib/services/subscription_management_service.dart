@@ -15,8 +15,17 @@ class SubscriptionManagementService {
   
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  /// Why the most recent trial request was refused, or null if it was not.
+  ///
+  /// Risk #58: rejections used to vanish — initializeTrial returned null and
+  /// the UI rendered nothing at all, leaving a new user staring at a blank
+  /// space with no explanation. The reason is kept so the UI can say something
+  /// true about it.
+  static String? lastTrialRejectionReason;
+
   /// Initialize trial for new user. Returns null when the trial was rejected
-  /// (e.g. device already used trial, simulator) — caller must treat as "no subscription".
+  /// (e.g. email not verified, device already used trial, simulator) — caller
+  /// must treat as "no subscription" and consult [lastTrialRejectionReason].
   Future<UserSubscription?> initializeTrial(String userId) async {
     debugPrint('🆓 SubscriptionManagementService: Initializing trial for user: $userId');
 
@@ -31,11 +40,20 @@ class SubscriptionManagementService {
         });
       } on FirebaseFunctionsException catch (e) {
         if (e.code == 'already-exists' || e.code == 'failed-precondition') {
-          debugPrint('⚠️ SubscriptionManagementService: No trial created: ${e.code} — ${e.message}');
+          // The server sends a machine-readable reason in details where it has
+          // one; fall back to the error code so the UI always has something.
+          final details = e.details;
+          lastTrialRejectionReason =
+              (details is Map && details['reason'] is String)
+                  ? details['reason'] as String
+                  : e.code;
+          debugPrint('⚠️ SubscriptionManagementService: No trial created: '
+              '${e.code} — ${e.message} (reason: $lastTrialRejectionReason)');
           return null;
         }
         rethrow;
       }
+      lastTrialRejectionReason = null;
 
       // Re-fetch from Firestore — server is now the source of truth
       final subscription = await getUserSubscription(userId);

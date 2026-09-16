@@ -22,7 +22,8 @@ import * as fns from '../index';
 import { anonymizeTrialDevicesForUser } from '../trial-devices';
 
 const db = () => admin.firestore();
-const ctx = (uid: string) => ({ auth: { uid, token: { firebase: { sign_in_provider: 'password' } } } });
+const ctx = (uid: string, emailVerified = true) =>
+  ({ auth: { uid, token: { email_verified: emailVerified, firebase: { sign_in_provider: 'password' } } } });
 const hash = (seed: string) => seed.padEnd(64, '0').slice(0, 64);
 
 async function reset(deviceHash: string, ...userIds: string[]) {
@@ -106,5 +107,58 @@ describe('Risk #26 — trialDevices is anonymised, not deleted, on account delet
     const count = await anonymizeTrialDevicesForUser(db(), batch, 'user-with-no-devices');
     await batch.commit();
     expect(count).toBe(0);
+  });
+});
+
+
+/**
+ * Risk #12 — sendEmailVerification() was never called and emailVerified gated
+ * nothing, so a free trial cost an attacker nothing but a throwaway string.
+ * Requiring a reachable inbox is what makes farming cost something — and it is
+ * the only half of risk #26 enforceable server-side, since deviceIdHash is
+ * client-supplied and unverifiable without attestation.
+ */
+describe('Risk #12 — a trial requires a verified email', () => {
+  it('refuses a trial when the email is not verified', async () => {
+    const wrapped = testEnv.wrap(fns.createTrialSubscription as any);
+    await expect(wrapped(
+      { deviceIdHash: hash('unverified-dev'), isPhysicalDevice: true } as any,
+      ctx('unverified-user', false) as any,
+    )).rejects.toMatchObject({ code: 'failed-precondition' });
+  });
+
+  it('tells the client WHY, so it can say something specific', async () => {
+    const wrapped = testEnv.wrap(fns.createTrialSubscription as any);
+    // Risk #58: a refusal with no machine-readable reason is what left the UI
+    // rendering an empty box.
+    await expect(wrapped(
+      { deviceIdHash: hash('unverified-dev2'), isPhysicalDevice: true } as any,
+      ctx('unverified-user2', false) as any,
+    )).rejects.toMatchObject({ details: { reason: 'email-not-verified' } });
+  });
+
+  it('writes nothing when it refuses', async () => {
+    const h = hash('unverified-dev3');
+    const wrapped = testEnv.wrap(fns.createTrialSubscription as any);
+    await expect(wrapped(
+      { deviceIdHash: h, isPhysicalDevice: true } as any,
+      ctx('unverified-user3', false) as any,
+    )).rejects.toBeDefined();
+
+    const device = await db().collection('trialDevices').doc(h).get();
+    expect(device.exists).toBe(false);
+    const subs = await db().collection('subscriptions').where('userId', '==', 'unverified-user3').get();
+    expect(subs.size).toBe(0);
+  });
+
+  it('grants the trial once the email is verified (positive control)', async () => {
+    const h = hash('verified-dev');
+    await reset(h, 'verified-user');
+    const wrapped = testEnv.wrap(fns.createTrialSubscription as any);
+    const res: any = await wrapped(
+      { deviceIdHash: h, isPhysicalDevice: true } as any,
+      ctx('verified-user', true) as any,
+    );
+    expect(res.subscriptionId).toBeTruthy();
   });
 });

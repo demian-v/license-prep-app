@@ -35,7 +35,6 @@
   "quiz": "Quiz",
   "exam": "Egzamin",
   "tests": "Testy",
-  
   "testing": "Testowanie",
   "take_exam": "Zdaj egzamin",
   "dmv_exam_desc": "Symulacja egzaminu",
@@ -46,7 +45,6 @@
   "questions_by_topics": "Pytania według tematów",
   "practice_tickets": "Bilety praktyczne",
   "random_questions_no_limit": "Losowe pytania, bez limitu",
-  
   "try_again": "Spróbuj ponownie",
   "no_questions": "Brak pytań dla tego tematu",
   "select_all_correct": "Wybierz wszystkie poprawne odpowiedzi",
@@ -56,12 +54,10 @@
   "traffic_rules": "Przepisy drogowe",
   "modules_count": "moduły",
   "back_to_tests": "Powrót do Testów",
-  
   "time_60_minutes": "60 minut",
   "questions_40": "40 pytań",
   "time_unlimited": "Nieograniczony czas",
   "questions_100_sorted": "100+ pytań posortowanych według tematów",
-  
   "exit_test_title": "Wyjść z testu?",
   "exit_test_message": "Jeśli wyjdziesz z testu, twój postęp nie zostanie zapisany",
   "exit": "Wyjdź",
@@ -113,7 +109,6 @@
   "plan_ends": "Koniec Planu",
   "plan_type": "Typ Planu",
   "trial": "Próbny",
-  
   "verify_email": "Zweryfikuj E-mail",
   "email_verified": "E-mail Zweryfikowany",
   "verification_failed": "Weryfikacja Nie Powiodła Się",
@@ -125,7 +120,6 @@
   "email_changed_success_title": "E-mail Zmieniony Pomyślnie!",
   "email_changed_success_message": "Twój e-mail został pomyślnie zmieniony! Zaloguj się używając nowego adresu e-mail.",
   "go_to_signin": "Przejdź do Logowania",
-  
   "report_issue": "Zgłoś problem",
   "issue_with_image": "Problem z obrazkiem",
   "issue_with_text_translation": "Problem z tłumaczeniem tekstu",
@@ -146,7 +140,6 @@
   "support_response_info": "Zwykle odpowiadamy w ciągu 24 godzin. Twoja opinia pomaga nam ulepszyć aplikację.",
   "sessionConflictMessage": "Zostałeś wylogowany, ponieważ zalogowałeś się na innym urządzeniu.",
   "sessionConflictButton": "OK",
-  
   "trial_active": "Okres próbny aktywny",
   "trial_expires_soon": "Okres próbny wkrótce wygaśnie!",
   "trial_expired": "Okres próbny wygasł",
@@ -187,5 +180,9 @@
   "upgrade_total_days_access": "• Razem: {0} dni dostępu",
   "upgrade_cost": "Koszt: ${0}",
   "upgrade_success_message": "Pomyślnie uaktualniono do rocznej subskrypcji!",
-  "upgrade_failed_message": "Uaktualnienie nie powiodło się. Spróbuj ponownie."
+  "upgrade_failed_message": "Uaktualnienie nie powiodło się. Spróbuj ponownie.",
+  "verify_email_title": "Zweryfikuj e-mail",
+  "verify_email_message": "Wysłaliśmy link weryfikacyjny. Potwierdź adres e-mail, aby rozpocząć 3-dniowy bezpłatny okres próbny.",
+  "no_subscription_title": "Brak aktywnej subskrypcji",
+  "no_subscription_message": "Wykup subskrypcję, aby odblokować wszystkie testy i teorię."
 }

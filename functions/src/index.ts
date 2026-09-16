@@ -1803,6 +1803,24 @@ export const createTrialSubscription = functions.https.onCall(async (data: any, 
     throw new functions.https.HttpsError('failed-precondition', 'Trial unavailable on this device');
   }
 
+  // Risk #12 — a trial requires a verified email address.
+  //
+  // Without this the free trial costs an attacker nothing but a throwaway
+  // string: sign up, collect three days, repeat. Requiring a reachable inbox
+  // is what makes farming cost something, and it is the only half of risk #26
+  // that can be enforced server-side at all — deviceIdHash is client-supplied
+  // and unverifiable without device attestation.
+  //
+  // `details.reason` is machine-readable so the client can explain this
+  // specifically, instead of silently showing nothing (risk #58).
+  if (context.auth.token?.email_verified !== true) {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'Verify your email address to start your free trial.',
+      { reason: 'email-not-verified' },
+    );
+  }
+
   const trialEnd = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000); // 3 days
   const deviceRef = db.collection('trialDevices').doc(deviceIdHash);
 
