@@ -92,7 +92,14 @@ const GOOGLE_PLAY_STATES = {
 // PHASE 5: RATE LIMITING CONFIGURATION
 // ============================================================================
 
-const RATE_LIMIT_MAX_ATTEMPTS = 10;  // Max validations per hour
+// Successful validations per hour. A real user needs a handful; iOS sandbox
+// renews every 5 minutes, which is why this is not lower.
+const RATE_LIMIT_MAX_VALIDATIONS = 10;
+// Failed attempts per hour, counted SEPARATELY (risk #19). Failures used to
+// share the success budget, so ten transient errors locked out the next real
+// purchase. This still stops a flood, without punishing a paying customer for
+// a bad network or an Apple 21005.
+const RATE_LIMIT_MAX_FAILURES = 30;
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;  // 1 hour in milliseconds
 
 // ============================================================================
@@ -120,25 +127,74 @@ function getGoogleCredentials(): any {
 }
 
 /**
- * Check if user exceeded rate limit (Phase 5: Security)
- * Prevents abuse by limiting validation attempts
+ * Check whether the user has exceeded their validation rate limit (risk #19).
+ *
+ * Successes and failures are counted against SEPARATE budgets. Previously a
+ * single 10/hour cap covered receipt_validated, receipt_validation_failed and
+ * receipt_validation_error together, so ten transient failures exhausted the
+ * quota and the eleventh attempt — the one that would have succeeded — was
+ * refused with resource-exhausted, after the user had already been charged.
+ *
+ * The Firestore query is deliberately UNCHANGED in shape: same userId equality,
+ * same timestamp range, same `action in [...]` triple. It is served by the
+ * existing composite index on subscriptionLogs (userId, timestamp, action).
+ * Splitting it into two queries, or dropping the action filter, would need a
+ * different index — and firebase.json does not deploy indexes (risk #15), so a
+ * query shape change here could break every purchase in production. The
+ * partitioning is done in code instead.
+ *
+ * Fails OPEN. If Firestore cannot answer — a missing index, an outage — this
+ * returns false and the purchase proceeds. A rate limiter exists to deter
+ * abuse; it must never be the reason a paid purchase fails, particularly here,
+ * where the call site sits outside the caller's try block and the money has
+ * already left the customer's account. Abuse remains bounded by store-side
+ * receipt verification and the receipt→account binding (risk #5).
  */
-async function checkRateLimit(userId: string): Promise<boolean> {
+export async function checkRateLimit(userId: string): Promise<boolean> {
   const now = Date.now();
   const windowStart = now - RATE_LIMIT_WINDOW_MS;
-  
-  const db = admin.firestore();
-  const recentAttempts = await db.collection('subscriptionLogs')
-    .where('userId', '==', userId)
-    .where('timestamp', '>', admin.firestore.Timestamp.fromMillis(windowStart))
-    .where('action', 'in', ['receipt_validated', 'receipt_validation_failed', 'receipt_validation_error'])
-    .get();
-  
-  const attemptCount = recentAttempts.size;
-  
-  console.log(`🚦 Rate limit check for ${userId}: ${attemptCount}/${RATE_LIMIT_MAX_ATTEMPTS} attempts in last hour`);
-  
-  return attemptCount >= RATE_LIMIT_MAX_ATTEMPTS;
+
+  try {
+    const db = admin.firestore();
+    const recentAttempts = await db.collection('subscriptionLogs')
+      .where('userId', '==', userId)
+      .where('timestamp', '>', admin.firestore.Timestamp.fromMillis(windowStart))
+      .where('action', 'in', ['receipt_validated', 'receipt_validation_failed', 'receipt_validation_error'])
+      .get();
+
+    let successes = 0;
+    let failures = 0;
+    recentAttempts.forEach((doc) => {
+      if (doc.get('action') === 'receipt_validated') successes++;
+      else failures++;
+    });
+
+    const successExceeded = successes >= RATE_LIMIT_MAX_VALIDATIONS;
+    const failureExceeded = failures >= RATE_LIMIT_MAX_FAILURES;
+
+    console.log(
+      `🚦 Rate limit for ${userId}: ${successes}/${RATE_LIMIT_MAX_VALIDATIONS} validations, ` +
+      `${failures}/${RATE_LIMIT_MAX_FAILURES} failures in the last hour`,
+    );
+
+    if (successExceeded || failureExceeded) {
+      console.warn(
+        `🚦 Rate limit EXCEEDED for ${userId} ` +
+        `(${successExceeded ? 'validation' : 'failure'} budget)`,
+      );
+      return true;
+    }
+    return false;
+  } catch (error) {
+    // See the fail-open note above.
+    console.error(
+      `🚦 Rate limit check FAILED for ${userId}; allowing the purchase through. ` +
+      `If this is FAILED_PRECONDITION the subscriptionLogs (userId, timestamp, action) ` +
+      `composite index is missing — see risk #15. Error: ` +
+      (error instanceof Error ? error.message : String(error)),
+    );
+    return false;
+  }
 }
 
 /**
