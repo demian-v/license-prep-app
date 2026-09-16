@@ -1,6 +1,7 @@
 import * as functions from 'firebase-functions/v1';
 import * as admin from 'firebase-admin';
 import { requireEntitledUser, requireAdmin } from './entitlement';
+import { applyToAllMatches } from './webhook-fanout';
 import * as fs from 'fs';
 import * as path from 'path';
 import { defineInt, defineSecret } from 'firebase-functions/params';
@@ -1986,10 +1987,8 @@ export const appStoreWebhook = functions.https.onRequest(async (req, res) => {
       return;
     }
 
-    const subRef = snap.docs[0].ref;
     const subData = snap.docs[0].data();
     const userId = subData.userId as string;
-    const userRef = db.collection('users').doc(userId);
     const now = admin.firestore.FieldValue.serverTimestamp();
     // expiresDate is Unix milliseconds per JWSTransactionDecodedPayload
     const expiresTimestamp = expiresDate
@@ -2065,10 +2064,11 @@ export const appStoreWebhook = functions.https.onRequest(async (req, res) => {
 
     // Atomic batch: subscription + users (if needed) + dedup record + audit log
     const batch = db.batch();
-    batch.update(subRef, subUpdates);
-    if (userUpdates) {
-      batch.set(userRef, userUpdates, { merge: true });
-    }
+    // Risk #22 — apply to EVERY document sharing this receipt, and to each
+    // one's own user. Updates are derived from the notification type and
+    // expiry, so they are safe to fan out; documents sharing a receipt
+    // represent the same store subscription and must converge.
+    applyToAllMatches(db, batch, snap.docs, subUpdates, userUpdates);
     batch.set(db.collection('processedWebhooks').doc(notificationUUID), {
       processedAt: now,
       notificationType,
@@ -2173,10 +2173,8 @@ export const handleGooglePlayNotifications = functions
         return;
       }
 
-      const subRef = subSnap.docs[0].ref;
       const subData = subSnap.docs[0].data();
       const userId = subData.userId as string;
-      const userRef = db.collection('users').doc(userId);
       const now = admin.firestore.FieldValue.serverTimestamp();
 
       // Notification type integers from Google Play Developer API:
@@ -2267,10 +2265,8 @@ export const handleGooglePlayNotifications = functions
       }
 
       const batch = db.batch();
-      batch.update(subRef, subUpdates);
-      if (userUpdates) {
-        batch.set(userRef, userUpdates, { merge: true });
-      }
+      // Risk #22 — see the appStoreWebhook note above.
+      applyToAllMatches(db, batch, subSnap.docs, subUpdates, userUpdates);
       batch.set(db.collection('processedWebhooks').doc(`gp_${messageId}`), {
         processedAt: now,
         notificationType,

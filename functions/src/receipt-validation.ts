@@ -746,15 +746,56 @@ export async function getSubscriptionMetadata(productId: string): Promise<{
  * null so Scenario A creates a fresh document.  A composite index on
  * (userId, isActive) is simpler and more reliable than (userId, createdAt).
  */
-async function findExistingSubscription(userId: string): Promise<{
+export async function findExistingSubscription(
+  userId: string,
+  receipt?: { platform: 'ios' | 'android'; originalTransactionId?: string; androidPurchaseToken?: string },
+): Promise<{
   id: string;
   planType: string;
   packageId: string;
   [key: string]: any;
 } | null> {
+  const db = admin.firestore();
+
+  // Risk #22 — reuse a document that already represents THIS store
+  // subscription, even if it has been deactivated. Without this, a purchase
+  // made after expiry created a second document for the same store
+  // subscription, and the webhooks (which key on the receipt identity) could
+  // then update the dead one while the live one drifted out of sync.
+  //
+  // This does not reopen BUG RV-C1. A dead trial carries no
+  // originalTransactionId / androidPurchaseToken, so it never matches here and
+  // still falls through to the isActive query below, which correctly returns
+  // null so a clean document is created.
+  if (receipt) {
+    const field = receipt.platform === 'ios' ? 'originalTransactionId' : 'androidPurchaseToken';
+    const value = receipt.platform === 'ios'
+      ? receipt.originalTransactionId
+      : receipt.androidPurchaseToken;
+
+    if (value) {
+      // Two equality filters: served by single-field indexes, no composite
+      // index required (cf. risk #15).
+      const byReceipt = await db.collection('subscriptions')
+        .where(field, '==', value)
+        .where('userId', '==', userId)
+        .limit(1)
+        .get();
+
+      if (!byReceipt.empty) {
+        const doc = byReceipt.docs[0];
+        const data = doc.data();
+        console.log(
+          `✅ Reusing subscription ${doc.id} matched by ${field} ` +
+          `(isActive=${data.isActive}) — avoids a duplicate document`,
+        );
+        return { id: doc.id, planType: data.planType, packageId: data.packageId, ...data };
+      }
+    }
+  }
+
   console.log(`🔍 Searching for active subscription for user: ${userId}`);
 
-  const db = admin.firestore();
   const snapshot = await db.collection('subscriptions')
     .where('userId', '==', userId)
     .where('isActive', '==', true)   // FIX: only consider live subscriptions
@@ -925,8 +966,13 @@ export async function createOrUpdateSubscription(
     // Get subscription metadata from subscriptionsType collection
     const metadata = await getSubscriptionMetadata(productId);
     
-    // Check if user has existing subscription
-    const existingSubscription = await findExistingSubscription(userId);
+    // Check if user has existing subscription. The receipt identity lets this
+    // reuse a lapsed document for the same store subscription (risk #22).
+    const existingSubscription = await findExistingSubscription(userId, {
+      platform,
+      originalTransactionId,
+      androidPurchaseToken: platform === 'android' ? transactionId : undefined,
+    });
 
     // ── IDEMPOTENCY GUARD ────────────────────────────────────────────────────
     // Apple/Google can deliver the same transaction receipt multiple times.
