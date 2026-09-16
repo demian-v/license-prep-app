@@ -87,7 +87,7 @@ Status: ⬜ not started · 🔄 in progress · ✅ done & verified · ⏸️ blo
 | #5 | No receipt→account binding — one receipt entitles unlimited accounts | ✅ **DONE** | `receipt-binding.test.ts` — 8 tests incl. wiring + renewal positive controls | Guard refuses a receipt bound to another `userId`, before any write |
 | #6 | `yearly` receipts dropped client-side (`_activeProductIds` = monthly only) | ⬜ | dart test + StoreKit | **Approach changed 2026-09-16: remove yearly**, don't re-enable. Drop from `productIds` and the server allow-list |
 | #7 | Home-grown 18h grace period vs Apple 16d / Google 30d | ✅ **DONE** | `grace-period.test.ts` — 6 tests | Grace measured in elapsed time (30 days, `billing-grace.ts`), shared by the scheduler **and** the entitlement gate |
-| #8 | Play `PAUSED` / `PAUSE_SCHEDULE_CHANGED` (types 10, 11) not modelled | ⬜ | function test | |
+| #8 | Play `PAUSED` / `PAUSE_SCHEDULE_CHANGED` (types 10, 11) not modelled | ✅ **DONE** | `play-notifications.test.ts` — 8 tests | Mapping extracted to a pure, tested function; types named in code, not in a comment |
 | #9 | Webhooks always return 200, no dead-letter, no reconciliation | ⬜ | function test | |
 | #19 | Rate limit counts failures — paying user locked out for an hour | ✅ **DONE** | `rate-limit.test.ts` — 6 tests, 5 red → green, incl. fail-open | Separate success (10/h) and failure (30/h) budgets; fails open on infrastructure errors |
 | #20 | `subscriptionsType` is a single point of failure for every purchase | ✅ **DONE** | `metadata-resilience.test.ts` — 6 tests, 4 red → green | Built-in defaults for monthly/yearly/trial; Firestore still wins when a row exists. Also stopped the outer catch flattening every `HttpsError` into `internal` |
@@ -195,6 +195,8 @@ fixed, not claimed fixed** — re-check if it recurs on a stable build.
 The answer key and explanation are served to an anonymous stranger. Reproduce with `cd functions && npm test`.
 
 ## Follow-ups created by this work
+
+- **Play type 9 (DEFERRED) and 20 (PENDING_PURCHASE_CANCELED) are still unmodelled.** Both are now *named* in `play-notifications.ts` and fall through to the `handled: false` branch, which logs a warning instead of passing silently. Out of #8's scope (the register names only 10 and 11). DEFERRED matters slightly: it pushes the billing date out, so `nextBillingDate` goes stale and the renewal scheduler reads the subscriber as `past_due` — harmless now that grace is 30 days (#7), but worth modelling if deferrals are ever used.
 
 - **Gap in the #5 work, found during #20 and fixed there.** `validatePurchaseReceipt`'s outer catch flattened every error into `internal`, including the `permission-denied` the receipt-binding guard raises. The #5 tests passed because they call `createOrUpdateSubscription` directly. The catch now rethrows `HttpsError` unchanged. **End-to-end verification of that specific path is still missing** — reaching it needs a live Apple/Google response, so it is verified by the direct-call test plus inspection, not by an end-to-end test.
 

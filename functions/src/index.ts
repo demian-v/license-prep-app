@@ -2,6 +2,7 @@ import * as functions from 'firebase-functions/v1';
 import * as admin from 'firebase-admin';
 import { requireEntitledUser, requireAdmin } from './entitlement';
 import { applyToAllMatches } from './webhook-fanout';
+import { mapPlayNotification, PLAY_NOTIFICATION } from './play-notifications';
 import * as fs from 'fs';
 import * as path from 'path';
 import { defineInt, defineSecret } from 'firebase-functions/params';
@@ -2177,20 +2178,18 @@ export const handleGooglePlayNotifications = functions
       const userId = subData.userId as string;
       const now = admin.firestore.FieldValue.serverTimestamp();
 
-      // Notification type integers from Google Play Developer API:
-      // 1=RECOVERED, 2=RENEWED, 3=CANCELED, 4=PURCHASED, 5=ON_HOLD,
-      // 6=IN_GRACE_PERIOD, 7=RESTARTED, 8=PAUSE_SCHEDULE_CHANGED, 12=REVOKED, 13=EXPIRED
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let subUpdates: Record<string, any> = { updatedAt: now };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let userUpdates: Record<string, any> | null = null;
-      let logAction = `google_play_${notificationType}`;
+      // Notification types and the state each implies live in
+      // play-notifications.ts, named rather than numbered — the comment that
+      // used to sit here mislabelled type 8 (risk #8).
 
       // BUG B4 FIX: For renewal events, fetch the real expiryTime from the Google Play Developer API.
       // Without this, nextBillingDate stays in the past and the 6-hour renewal scheduler re-enters
       // grace period every run, creating a permanent active→past_due flip-flop for Android users.
       let newBillingDate: admin.firestore.Timestamp | null = null;
-      if ([1, 2, 4, 7].includes(notificationType as number)) {
+      if ([
+        PLAY_NOTIFICATION.RECOVERED, PLAY_NOTIFICATION.RENEWED,
+        PLAY_NOTIFICATION.PURCHASED, PLAY_NOTIFICATION.RESTARTED,
+      ].includes(notificationType as any)) {
         try {
           const credsRaw = googleCredentials.value();
           const creds = JSON.parse(Buffer.from(credsRaw, 'base64').toString());
@@ -2228,41 +2227,23 @@ export const handleGooglePlayNotifications = functions
         }
       }
 
-      switch (notificationType as number) {
-        case 1: case 2: case 4: case 7: // RECOVERED, RENEWED, PURCHASED, RESTARTED
-          subUpdates = {
-            ...subUpdates,
-            isActive: true,
-            status: 'active',
-            renewalAttempts: 0,
-            ...(newBillingDate && { nextBillingDate: newBillingDate }),
-          };
-          userUpdates = {
-            isActive: true,
-            ...(newBillingDate && { nextBillingDate: newBillingDate }),
-            lastUpdated: now,
-          };
-          logAction = 'google_renewed';
-          break;
-        case 3: // CANCELED — access continues until nextBillingDate
-          subUpdates = { ...subUpdates, status: 'canceled' };
-          logAction = 'google_cancel_requested';
-          break;
-        case 5: case 6: // ON_HOLD, IN_GRACE_PERIOD
-          subUpdates = { ...subUpdates, status: 'past_due' };
-          break;
-        case 12: case 13: // REVOKED, EXPIRED
-          subUpdates = { ...subUpdates, isActive: false, status: 'inactive' };
-          userUpdates = { isActive: false, lastUpdated: now };
-          logAction = 'google_expired';
-          break;
-        default:
-          console.log(`ℹ️ handleGooglePlayNotifications: Unhandled type ${notificationType}`);
-          await db.collection('processedWebhooks').doc(`gp_${messageId}`).set({
-            processedAt: now, notificationType, result: 'unhandled_type',
-          });
-          return;
+      const mapping = mapPlayNotification(notificationType as number, { now, newBillingDate });
+
+      if (!mapping.handled) {
+        // Loud, not silent: an unmodelled type reaching production is how the
+        // pause states went unnoticed (risk #8).
+        console.warn(
+          `⚠️ handleGooglePlayNotifications: no handler for notification type ` +
+          `${notificationType}. Entitlement left unchanged — check whether this ` +
+          'type should be modelled in play-notifications.ts.',
+        );
+        await db.collection('processedWebhooks').doc(`gp_${messageId}`).set({
+          processedAt: now, notificationType, result: 'unhandled_type',
+        });
+        return;
       }
+
+      const { subUpdates, userUpdates, logAction } = mapping;
 
       const batch = db.batch();
       // Risk #22 — see the appStoreWebhook note above.
