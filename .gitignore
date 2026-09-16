@@ -67,3 +67,7 @@ reports/
 
 # MCP config — symlink into ~/Desktop/DriveUSA/mcp/, won't resolve elsewhere
 .mcp.json
+.emulator-data/
+functions/.secret.local
+*.storekit.local
+.local-export/

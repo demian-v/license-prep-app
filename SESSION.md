@@ -2,7 +2,7 @@
 
 **Branch:** `local/security-money-hardening` (base `84300d0`, off `chore/play-billing-8-migration`)
 **Started:** 2026-09-16
-**Last updated:** 2026-09-16
+**Last updated:** 2026-09-16 (setup phase)
 **Goal:** Fix the Critical + High security and revenue risks from `driveusa-risk-register`, verified locally. **Never deploy. Never touch the live Firebase project.**
 
 > If this session is interrupted, read **How to resume** below. Everything needed to pick up is in this file.
@@ -49,22 +49,22 @@ flutter run -d "iPhone 16 Pro" --dart-define=USE_EMULATOR=true
 |---|---|---|---|
 | E1 | Local branch created | ✅ DONE | `local/security-money-hardening` @ `84300d0` |
 | E2 | Session file | ✅ DONE | this file |
-| E3 | Node 22 installed | ⬜ TODO | **Blocker.** Machine has only Node 20.19.5; `functions/package.json` wants 22. Plan: `brew install node@22` (keg-only, does not change global node) |
-| E4 | `emulators` block in `firebase.json` | ⬜ TODO | auth, functions, firestore, storage, ui |
-| E5 | Local secrets for emulator | ⬜ TODO | `functions/.secret.local` with dummy `APPLE_SHARED_SECRET` / `GOOGLE_CREDENTIALS` |
-| E6 | Content exported from production | ⬜ TODO | read-only via Admin SDK + `functions/service-account.json` → `.emulator-data/` |
+| E3 | Node 22 installed | ✅ DONE | `brew install node@22` (keg-only). Prepend `/opt/homebrew/opt/node@22/bin` to PATH for any functions work |
+| E4 | `emulators` block in `firebase.json` | ✅ DONE | auth 9099, functions 5001, firestore 8080, storage 9199, pubsub 8085, ui 4000 |
+| E5 | Local secrets for emulator | ✅ DONE | `functions/.secret.local`, dummy values, gitignored |
+| E6 | Content exported from production | ⏸️ **BLOCKED** | `functions/service-account.json` is `firebase-receipt-validation@` — Play-scoped, **no Firestore read**. Needs `gcloud auth application-default login` (user action). `subscriptionsType` already captured via MCP into `.local-export/` |
 | E7 | Flutter emulator wiring | ⬜ TODO | `USE_EMULATOR` dart-define in `lib/main.dart` |
-| E8 | iOS pods reinstalled | ⬜ TODO | `Podfile.lock` is from Apr 27, predates Billing 8 |
+| E8 | iOS pods reinstalled | ✅ DONE | 43 pods, Sep 16. **Needs `LANG=en_US.UTF-8`** or CocoaPods dies on a Ruby 3.4 encoding bug |
 | E9 | App runs on simulator against emulators | ⬜ TODO | acceptance gate for setup phase |
 
 ## Test harness (risk #17 — prerequisite, not optional)
 
 | # | Step | Status | Notes |
 |---|---|---|---|
-| T1 | Jest + ts-jest in `functions/` | ⬜ TODO | unit tests for Cloud Functions |
-| T2 | `@firebase/rules-unit-testing` suite | ⬜ TODO | proves `firestore.rules` actually denies what we think |
-| T3 | StoreKit configuration file | ⬜ TODO | local fake store — lets the simulator do purchase / restore / renewal / trial→paid |
-| T4 | One red test per in-scope risk | ⬜ TODO | written before its fix |
+| T1 | Jest + ts-jest in `functions/` | ✅ DONE | `npm test` wraps `firebase emulators:exec --project demo-driveusa`. Emulators spin up, tests run, teardown is automatic |
+| T2 | `@firebase/rules-unit-testing` suite | ⬜ TODO | installed, no suite written yet |
+| T3 | StoreKit configuration file | ⬜ TODO | local fake store for simulator purchase / restore / renewal / trial→paid |
+| T4 | One red test per in-scope risk | 🔄 IN PROGRESS | #3 done (5 tests, 4 red + 1 positive control) |
 
 ---
 
@@ -76,7 +76,7 @@ Status: ⬜ not started · 🔄 in progress · ✅ done & verified · ⏸️ blo
 
 | Risk | What | Status | Verified by | Commit |
 |---|---|---|---|---|
-| #3 | Paid content corpus served with no auth — 7 callables have no `context.auth`; rules gate only on `auth != null` while `main.dart` signs everyone in anonymously | ⬜ | rules test + callable test | |
+| #3 | Paid content corpus served with no auth — 7 callables have no `context.auth`; rules gate only on `auth != null` while `main.dart` signs everyone in anonymously | 🔄 red tests written | `content-auth.test.ts` — 4 red, 1 positive control | |
 | #4 | `handleMockPaymentWebhook` (unauthenticated POST) and test-data callables deployed to production | ⬜ | function test | |
 
 ### High — money path
@@ -121,3 +121,19 @@ Status: ⬜ not started · 🔄 in progress · ✅ done & verified · ⏸️ blo
 - `functions/service-account.json` exists locally and is untracked. It has production write access — only ever use it for the read-only export.
 - `functions/.env.licenseprepapp` is still **tracked in git** (risk #32). `.gitignore` lists it but gitignore does not untrack. Needs `git rm --cached` — separate cleanup, not part of this branch.
 - Do not run `initializeGlobalCounterFromExistingReports` or `resetGlobalCounter` against anything (register Top-7 item 5).
+
+## Reproduced evidence
+
+**Risk #3, 2026-09-16.** An unauthenticated call to `getQuizQuestions` (no `context.auth` whatsoever) returned:
+
+```
+{"id":"q1","correctAnswer":0,"explanation":"A red octagon is always a stop sign.", ...}
+```
+
+The answer key and explanation are served to an anonymous stranger. Reproduce with `cd functions && npm test`.
+
+## Gotchas found during setup
+
+- `pod install` needs `export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8`, otherwise CocoaPods 1.16.2 on Ruby 3.4 dies with `Encoding::CompatibilityError`. It exits non-zero but a piped `tail` will mask it — always check `Podfile.lock`'s date.
+- Xcode warns that `Runner` has a custom base configuration so CocoaPods did not set `Pods-Runner.profile.xcconfig`. Pre-existing, affects Profile builds only. Not touched.
+- `functions/package.json` pins Node 22; the machine's default is Node 20. Every functions command needs the PATH prefix.
