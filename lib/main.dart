@@ -292,7 +292,7 @@ void main() async {
   WidgetsBinding.instance.addObserver(_AppCleanupObserver());
   
   await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
+    options: emulatorAwareOptions(DefaultFirebaseOptions.currentPlatform),
   );
 
   // Local development only. No-op unless built with --dart-define=USE_EMULATOR=true.

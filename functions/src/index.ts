@@ -1,5 +1,6 @@
 import * as functions from 'firebase-functions/v1';
 import * as admin from 'firebase-admin';
+import { requireEntitledUser } from './entitlement';
 import * as fs from 'fs';
 import * as path from 'path';
 import { defineInt, defineSecret } from 'firebase-functions/params';
@@ -52,6 +53,10 @@ const appleRootCAs: Buffer[] = [
 
 // Content functions
 export const getQuizTopics = functions.https.onCall(async (data, context) => {
+  // Risk #3 — server-side entitlement gate. Placed before the try block
+  // so its HttpsError cannot be reshaped by the catch below.
+  await requireEntitledUser(context);
+
   try {
     console.log('getQuizTopics called with data:', data);
     
@@ -115,6 +120,10 @@ export const getQuizTopics = functions.https.onCall(async (data, context) => {
 
 // Alternative function name with content prefix (in case the mapping expects this)
 export const contentGetQuizTopics = functions.https.onCall(async (data, context) => {
+  // Risk #3 — server-side entitlement gate. Placed before the try block
+  // so its HttpsError cannot be reshaped by the catch below.
+  await requireEntitledUser(context);
+
   try {
     console.log('contentGetQuizTopics called with data:', data);
     
@@ -178,6 +187,10 @@ export const contentGetQuizTopics = functions.https.onCall(async (data, context)
 
 // Quiz Questions function
 export const getQuizQuestions = functions.https.onCall(async (data, context) => {
+  // Risk #3 — server-side entitlement gate. Placed before the try block
+  // so its HttpsError cannot be reshaped by the catch below.
+  await requireEntitledUser(context);
+
   try {
     console.log('getQuizQuestions called with data:', data);
     
@@ -275,6 +288,10 @@ export const getQuizQuestions = functions.https.onCall(async (data, context) => 
 
 // Traffic Rule Topics function
 export const getTrafficRuleTopics = functions.https.onCall(async (data, context) => {
+  // Risk #3 — server-side entitlement gate. Placed before the try block
+  // so its HttpsError cannot be reshaped by the catch below.
+  await requireEntitledUser(context);
+
   try {
     console.log('getTrafficRuleTopics called with data:', data);
     
@@ -338,6 +355,10 @@ export const getTrafficRuleTopics = functions.https.onCall(async (data, context)
 
 // Theory Modules function
 export const getTheoryModules = functions.https.onCall(async (data, context) => {
+  // Risk #3 — server-side entitlement gate. Placed before the try block
+  // so its HttpsError cannot be reshaped by the catch below.
+  await requireEntitledUser(context);
+
   try {
     console.log('getTheoryModules called with data:', data);
     
@@ -421,6 +442,10 @@ export const getTheoryModules = functions.https.onCall(async (data, context) => 
 
 // Practice Questions function
 export const getPracticeQuestions = functions.https.onCall(async (data, context) => {
+  // Risk #3 — server-side entitlement gate. Placed before the try block
+  // so its HttpsError cannot be reshaped by the catch below.
+  await requireEntitledUser(context);
+
   try {
     console.log('getPracticeQuestions called with data:', data);
     
@@ -523,6 +548,10 @@ export const getPracticeQuestions = functions.https.onCall(async (data, context)
 
 // Practice Tests function
 export const getPracticeTests = functions.https.onCall(async (data, context) => {
+  // Risk #3 — server-side entitlement gate. Placed before the try block
+  // so its HttpsError cannot be reshaped by the catch below.
+  await requireEntitledUser(context);
+
   try {
     console.log('getPracticeTests called with data:', data);
     

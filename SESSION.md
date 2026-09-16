@@ -83,9 +83,9 @@ Status: ⬜ not started · 🔄 in progress · ✅ done & verified · ⏸️ blo
 
 | Risk | What | Status | Verified by | Commit |
 |---|---|---|---|---|
-| #2 | `upgradeSubscription` grants 365 days yearly, free, no audit row | ⬜ | function test | |
+| #2 | `upgradeSubscription` grants 365 days yearly, free, no audit row | ⬜ | function test | **Approach changed 2026-09-16: DELETE it.** Owner confirmed only the 30-day plan is sold. With no yearly product the callable has no legitimate purpose, so removal beats patching |
 | #5 | No receipt→account binding — one receipt entitles unlimited accounts | ⬜ | function test | |
-| #6 | `yearly` receipts dropped client-side (`_activeProductIds` = monthly only) | ⬜ | dart test + StoreKit | |
+| #6 | `yearly` receipts dropped client-side (`_activeProductIds` = monthly only) | ⬜ | dart test + StoreKit | **Approach changed 2026-09-16: remove yearly**, don't re-enable. Drop from `productIds` and the server allow-list |
 | #7 | Home-grown 18h grace period vs Apple 16d / Google 30d | ⬜ | function test | |
 | #8 | Play `PAUSED` / `PAUSE_SCHEDULE_CHANGED` (types 10, 11) not modelled | ⬜ | function test | |
 | #9 | Webhooks always return 200, no dead-letter, no reconciliation | ⬜ | function test | |
@@ -102,6 +102,12 @@ Status: ⬜ not started · 🔄 in progress · ✅ done & verified · ⏸️ blo
 | #26 | Trial gate forgeable (client-supplied `deviceIdHash`), dedupe non-transactional | ⬜ | function test | |
 | #29 | `users/{uid}` accepts arbitrary client writes including `isActive` | 🔄 red tests written | `firestore-rules.test.ts` | |
 
+### Resolved by product decision
+
+| Risk | What | Status | Notes |
+|---|---|---|---|
+| #43 | Year length disagrees: catalogue `duration: 360` vs `upgradeSubscription` `duration: 365` | ⏭️ MOOT | Only the 30-day plan is sold. The mismatch lives entirely in yearly code being removed under #2 and #6 |
+
 **Out of scope this round** (tracked, not started): #13 #14 privacy/deletion · #21 cross-device sync · #36 CI · #49 Docker · #53 content authoring · #55 #56 store platform (already handled/mitigated) · all remaining Medium rows.
 
 ---
@@ -114,6 +120,8 @@ Status: ⬜ not started · 🔄 in progress · ✅ done & verified · ⏸️ blo
 | 2026-09-16 | Build the test harness before fixing | ~35 of the risks are server-side and invisible in the iOS UI. Without tests they'd ship on trust. Also closes #17 |
 | 2026-09-16 | Export production content read-only rather than hand-seeding | Emulator starts blank; app is unusable without content. Seed script deferred to the #53 fix |
 | 2026-09-16 | Emulators run as `demo-driveusa`, not `licenseprepapp` | `.firebaserc` points at production; a `demo-` project id makes reaching production physically impossible |
+| 2026-09-16 | **Only the 30-day monthly plan is sold. Yearly is removed, not fixed** | Owner decision. Production has **zero** yearly subscriptions ever (register, verified 2026-08-20), so nobody is stranded. Turns #2 from a redesign into a deletion, #6 from an implementation into a removal, and makes #43 moot |
+| 2026-09-16 | Leave the `Pods-Runner.profile.xcconfig` warning alone | Runner's Profile config points at `Flutter/Release.xcconfig`. Debug and Release are correctly wired; only Profile builds (performance profiling, never shipped) are affected. Not a register risk, and editing Xcode build config on a security branch invites unrelated breakage |
 
 ## Gotchas
 
@@ -141,3 +149,8 @@ The answer key and explanation are served to an anonymous stranger. Reproduce wi
 - Since ADC now exists, the functions emulator warns that **non-emulated** Google APIs will hit production with those credentials. Emulated services (Firestore/Auth/Storage/Functions) are unaffected. Run `gcloud auth application-default revoke` once the content export is no longer needed.
 - Test fixtures use the synthetic `state: 'ZZ' / language: 'zz'` so they cannot collide with the 6,627 seeded production documents.
 - When the long-running emulator is already up, run `npx jest` directly. `npm test` wraps `emulators:exec`, which will fail on the already-bound ports.
+
+## Owner action required outside the repo
+
+- **Deactivate the yearly SKU in App Store Connect and Google Play Console.** Removing it from the code stops the app offering it, but if the SKU stays purchasable in either store a user could still buy it through a store-side resubscribe flow and receive nothing. Code alone does not close this.
+- `subscriptionsType/2` (the yearly catalogue row) is left in production untouched — harmless once nothing references yearly, and deleting it would be a production write.
