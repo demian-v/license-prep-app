@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'config/emulator_config.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
 import 'firebase_options.dart';
@@ -293,6 +294,9 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Local development only. No-op unless built with --dart-define=USE_EMULATOR=true.
+  await connectToEmulatorsIfEnabled();
   
   // Initialize Firebase Analytics
   await analyticsService.initialize();
