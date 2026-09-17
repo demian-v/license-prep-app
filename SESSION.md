@@ -5,13 +5,13 @@
 | | |
 |---|---|
 | **Branch** | `local/security-money-hardening` (base `84300d0`) — **pushed to `origin` 2026-09-16 at the owner's request.** `main` untouched, nothing deployed |
-| **Commits** | 45 |
-| **Tests** | 133 Cloud Functions (Jest) + 40 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
+| **Commits** | 47 |
+| **Tests** | 153 Cloud Functions (Jest) + 40 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
 | **Analyzer** | 0 errors |
-| **Register rows addressed** | 33 of 59 |
+| **Register rows addressed** | 34 of 59 |
 | **Deployed?** | **NO.** Nothing here has ever run in production. The deploy path itself has never been exercised |
 
-**Risks fixed on this branch:** #2 #3 #4 #5 #6 #7 #8 #12 #13 #14 #16 #18 #19 #20 #22 #23 #24 #25 #29 #32 #38 #39 #41 #43 #47 #48 #52 #54 #58 #59
+**Risks fixed on this branch:** #2 #3 #4 #5 #6 #7 #8 #12 #13 #14 #16 #18 #19 #20 #22 #23 #24 #25 #29 #32 #38 #39 #40 #41 #43 #47 #48 #52 #54 #58 #59
 **Partial, with reasons below:** #9 (no reconciliation job) · #21 (no sync built) · #26 (needs attestation)
 
 **Biggest open question:** none of this protects anyone until it ships. Everything below is verified locally and nothing has ever run in production.
@@ -249,7 +249,7 @@ Written up in the vault: `wiki/driveusa/Development/infra/app-check-attestation-
 **29 of the 59 rows are still open, and they are all Medium or lower** — the
 Criticals and Highs in the agreed scope are done. Remaining: #1 (history
 cleanup only; the leaked secret is already rotated and dead), #10, #11, #15,
-#17, #27, #28, #30, #31, #33, #34, #35, #36, #37, #40, #42, #44, #45, #46,
+#17, #27, #28, #30, #31, #33, #34, #35, #36, #37, #42, #44, #45, #46,
 #49, #50, #51, #53, #55, #56, #57.
 
 Worth knowing before picking one:
@@ -394,6 +394,8 @@ The answer key and explanation are served to an anonymous stranger. Reproduce wi
 - When the long-running emulator is already up, run `npx jest` directly. `npm test` wraps `emulators:exec`, which will fail on the already-bound ports.
 
 ## Owner action required outside the repo
+
+- **Decide a retention period for `subscriptionLogs`, or leave it off** (from #40, 2026-09-16). `cleanupExpiredRecords` prunes `processedWebhooks` at 30 days automatically, but it will not touch the audit trail unless `SUBSCRIPTION_LOG_RETENTION_DAYS` is set to a positive number. Default is 0 = keep everything, deliberately: risk #4 was a job that deleted rows out of this collection by accident, and how long payment records must be kept is a compliance question. Until this is set, `subscriptionLogs` still grows without bound — that is a cost question, not a correctness one.
 
 - **Bump the content version after editing content** (from #47, 2026-09-16). `getContentVersion` reads `contentMeta/current.version`; changing it makes every device drop cached content on next launch instead of waiting out a 24 h TTL. Without a bump, a content correction still takes up to 24 h to reach people — the mechanism exists now, but somebody has to pull the lever. `scripts/local/bump-content-version.js` does it against the emulator and is the model for production; there is no admin UI (risk #53). In production the document can also be edited by hand in the Firebase console: set `version` to any different integer.
 
