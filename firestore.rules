@@ -89,13 +89,32 @@ service cloud.firestore {
         && counterId == ('user_' + request.auth.uid + '_reports');
     }
     
-    // Global report counter - read-only; updates must be exactly +1 increment
+    // Global report counter - updates must be exactly +1 increment.
+    //
+    // Risk #11. This rule used to contradict the writer it exists to serve.
+    // CounterService increments with set(merge: true), so:
+    //
+    //   - `create: if false` denied the FIRST increment, because a merge-set on
+    //     a document that does not exist yet is a create. The counter could
+    //     never bootstrap, so the first report ever filed failed.
+    //
+    //   - `keys().hasOnly([...])` was evaluated on the MERGED document rather
+    //     than on what changed. initializeGlobalCounterFromExistingReports and
+    //     resetGlobalCounter write createdAt / initializedFrom / initialCount,
+    //     so once either had run those keys came through every later merge and
+    //     every increment was denied permanently.
+    //
+    // `diff(resource.data).affectedKeys()` asks the question the rule meant to
+    // ask: which fields is this write actually changing?
     match /counters/global_report_counter {
       allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.value == 1
+        && request.resource.data.keys().hasOnly(['value', 'lastUpdated', 'description']);
       allow update: if request.auth != null
         && request.resource.data.value == resource.data.value + 1
-        && request.resource.data.keys().hasOnly(['value', 'lastUpdated', 'description']);
-      allow create: if false;
+        && request.resource.data.diff(resource.data)
+             .affectedKeys().hasOnly(['value', 'lastUpdated', 'description']);
       allow delete: if false;
     }
     
