@@ -5,13 +5,13 @@
 | | |
 |---|---|
 | **Branch** | `local/security-money-hardening` (base `84300d0`) — **pushed to `origin` 2026-09-16 at the owner's request.** `main` untouched, nothing deployed |
-| **Commits** | 41 |
-| **Tests** | 119 Cloud Functions (Jest) + 27 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
+| **Commits** | 43 |
+| **Tests** | 119 Cloud Functions (Jest) + 31 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
 | **Analyzer** | 0 errors |
-| **Register rows addressed** | 31 of 59 |
+| **Register rows addressed** | 32 of 59 |
 | **Deployed?** | **NO.** Nothing here has ever run in production. The deploy path itself has never been exercised |
 
-**Risks fixed on this branch:** #2 #3 #4 #5 #6 #7 #8 #12 #13 #14 #16 #18 #19 #20 #22 #23 #24 #25 #29 #32 #38 #39 #43 #48 #52 #54 #58 #59
+**Risks fixed on this branch:** #2 #3 #4 #5 #6 #7 #8 #12 #13 #14 #16 #18 #19 #20 #22 #23 #24 #25 #29 #32 #38 #39 #41 #43 #48 #52 #54 #58 #59
 **Partial, with reasons below:** #9 (no reconciliation job) · #21 (no sync built) · #26 (needs attestation)
 
 **Biggest open question:** none of this protects anyone until it ships. Everything below is verified locally and nothing has ever run in production.
@@ -249,7 +249,7 @@ Written up in the vault: `wiki/driveusa/Development/infra/app-check-attestation-
 **29 of the 59 rows are still open, and they are all Medium or lower** — the
 Criticals and Highs in the agreed scope are done. Remaining: #1 (history
 cleanup only; the leaked secret is already rotated and dead), #10, #11, #15,
-#17, #27, #28, #30, #31, #33, #34, #35, #36, #37, #40, #41, #42, #44, #45, #46,
+#17, #27, #28, #30, #31, #33, #34, #35, #36, #37, #40, #42, #44, #45, #46,
 #47, #49, #50, #51, #53, #55, #56, #57.
 
 Worth knowing before picking one:
@@ -360,6 +360,8 @@ fixed, not claimed fixed** — re-check if it recurs on a stable build.
 The answer key and explanation are served to an anonymous stranger. Reproduce with `cd functions && npm test`.
 
 ## Follow-ups created by this work
+
+- **`ContentLoadingManager` still never reloads content, even now that its listener fires (#41 follow-up).** Both callbacks are guarded by `_hasInitializedContent`, which is only set inside `initializeContent()` — and nothing calls that. So a state or language change reaches the manager and it logs "skipping content update". Fixing #41 was the prerequisite (before it, the state listener could not fire at all); making the manager actually do its job needs someone to decide where `initializeContent()` belongs in the startup sequence, or to conclude the manager is redundant now that each screen fetches its own content and remove it. Not decided here.
 
 - **`preloadRelatedContent` would crash on first use — left alone deliberately.** `content_provider.dart:499` does `orElse: () => null as TrafficRuleTopic`, which throws whenever the topic is not already in `_topics`; the `if (topic == null)` below it is unreachable. `flutter analyze` reports both. It is currently harmless because the method has **zero callers** (`grep -rn "preloadRelatedContent" lib test` finds only its own declaration), so it is dead code rather than a live crash. Not fixed during #38 to keep that change surgical. Either fix it with `firstWhereOrNull` and wire up a caller, or delete it — dead code that crashes on first use is worse than no code.
 
