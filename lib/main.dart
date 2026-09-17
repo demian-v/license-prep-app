@@ -9,6 +9,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'config/emulator_config.dart';
 import 'services/progress_storage.dart';
+import 'utils/release_logging.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
 import 'firebase_options.dart';
@@ -264,7 +265,17 @@ class _AppCleanupObserver extends WidgetsBindingObserver {
   }
 }
 
-void main() async {
+/// Risk #34 — neither `print` nor `debugPrint` is stripped from a Flutter
+/// release build, and about 122 of this app's log lines interpolate a user id,
+/// an email or a report id. `runWithReleaseLogging` drops both in release
+/// builds only; debug and profile behaviour is unchanged. It wraps the whole of
+/// startup rather than just `runApp`, because several of those lines are logged
+/// before the first frame.
+void main() {
+  runWithReleaseLogging(_startApp, isRelease: kReleaseMode);
+}
+
+Future<void> _startApp() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // ⚠️ DO NOT REMOVE without first making validateAppleReceipt format-aware.
