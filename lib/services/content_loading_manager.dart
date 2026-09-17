@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../providers/content_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/state_provider.dart';
+import 'analytics_service.dart';
 
 /// Service for managing content loading operations.
 ///
@@ -70,16 +71,46 @@ class ContentLoadingManager {
   /// which also switches ON the language and state listeners below — so every
   /// later change reloads by itself, which is why settings changes need no
   /// separate wiring. Subsequent calls take the reload path instead.
-  void prefetchInBackground({String reason = 'unspecified'}) {
+  /// [entitled] must be false only when the caller KNOWS there is no
+  /// entitlement. Every content callable calls `requireEntitledUser`, so a
+  /// prefetch for an unentitled user cannot succeed — it is two Cloud Function
+  /// invocations guaranteed to be refused, on every state or language change.
+  ///
+  /// Deliberately asymmetric: an unknown or still-loading subscription
+  /// prefetches anyway. Suppressing on "not sure" would skip exactly the
+  /// new-trial case this exists for, at the end of signup, where the
+  /// subscription may not have been read back yet.
+  void prefetchInBackground({required bool entitled, String reason = 'unspecified'}) {
+    if (!entitled) {
+      // Not an analytics event: this is the expected path for every user
+      // without a subscription, and counting it would drown the signal in the
+      // event that actually matters below.
+      print('ContentLoadingManager: skipping prefetch, no entitlement ($reason)');
+      return;
+    }
+
     final work = _hasInitializedContent
         ? reloadContentIfNeeded(force: true)
         : initializeContent();
 
     work.then((_) {
       print('ContentLoadingManager: prefetch complete ($reason)');
+      // Analytics is the ONLY channel that reports from a release build: #34
+      // silenced print and debugPrint there, and the app has no crash
+      // reporting at all. Without this, a prefetch that quietly stopped working
+      // would be invisible — the app would just get slower.
+      analyticsService.logEvent('content_prefetch', {
+        'outcome': 'success',
+        'reason': reason,
+      });
     }).catchError((Object e) {
-      // Swallowed on purpose — see above.
+      // Swallowed on purpose — see above. Recorded, not raised.
       print('ContentLoadingManager: prefetch failed, ignoring ($reason): $e');
+      analyticsService.logEvent('content_prefetch', {
+        'outcome': 'failure',
+        'reason': reason,
+        'error_type': e.runtimeType.toString(),
+      });
     });
   }
   

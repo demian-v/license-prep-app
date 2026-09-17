@@ -29,6 +29,15 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserver {
+  /// Risk-aware gate for the content prefetch: every content callable requires
+  /// entitlement, so prefetching without one is two guaranteed refusals. Skips
+  /// only when a subscription exists AND is not valid — a null subscription
+  /// means "unknown", which prefetches rather than guessing.
+  bool get _prefetchEntitled {
+    final subs = Provider.of<SubscriptionProvider>(context, listen: false);
+    return !(subs.subscription != null && !subs.hasValidSubscription);
+  }
+
   // Risk #59 — was the literal '1.0.0' on screen, so the About section lied
   // about which build the user was running.
   String _appVersion = '';
@@ -1011,8 +1020,10 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
           await authProvider.updateUserLanguage(code);
 
           // Re-warm the cache for the new language, in the background.
-          ServiceLocatorExtensions.contentLoadingManager
-              .prefetchInBackground(reason: 'language changed in settings');
+          ServiceLocatorExtensions.contentLoadingManager.prefetchInBackground(
+            entitled: _prefetchEntitled,
+            reason: 'language changed in settings',
+          );
           
           // Calculate time spent
           final timeSpent = _languageDialogStartTime != null 
@@ -1168,7 +1179,10 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                                     // which never happened for accounts created
                                     // before the prefetch existed.
                                     ServiceLocatorExtensions.contentLoadingManager
-                                        .prefetchInBackground(reason: 'state changed in settings');
+                                        .prefetchInBackground(
+                                          entitled: _prefetchEntitled,
+                                          reason: 'state changed in settings',
+                                        );
                                     
                                     // Track successful state change
                                     analyticsService.logStateChanged(

@@ -86,7 +86,7 @@ void main() {
   tearDown(() => manager.dispose());
 
   test('a prefetch fetches content', () async {
-    manager.prefetchInBackground(reason: 'test');
+    manager.prefetchInBackground(entitled: true, reason: 'test');
     await Future<void>.delayed(Duration.zero);
     await Future<void>.delayed(Duration.zero);
     expect(content.fetchCount, greaterThan(0));
@@ -97,7 +97,7 @@ void main() {
     // question rather than one the speed of the fake answers for us.
     content.gate = Completer<void>();
 
-    manager.prefetchInBackground(reason: 'test');
+    manager.prefetchInBackground(entitled: true, reason: 'test');
     // Reaching this line at all means the call did not await the fetch.
 
     await Future<void>.delayed(const Duration(milliseconds: 20));
@@ -113,11 +113,11 @@ void main() {
   test('a FAILING prefetch never throws at the caller', () async {
     // The whole point: unrequested background work must not surface an error.
     content.shouldFail = true;
-    expect(() => manager.prefetchInBackground(reason: 'test'), returnsNormally);
+    expect(() => manager.prefetchInBackground(entitled: true, reason: 'test'), returnsNormally);
     await Future<void>.delayed(const Duration(milliseconds: 20));
     // And the failure did not leave the manager wedged — another try works.
     content.shouldFail = false;
-    manager.prefetchInBackground(reason: 'retry');
+    manager.prefetchInBackground(entitled: true, reason: 'retry');
     await Future<void>.delayed(const Duration(milliseconds: 20));
     expect(content.fetchCount, greaterThan(1));
   });
@@ -128,14 +128,14 @@ void main() {
     // nothing called it.
     expect(manager.hasInitializedContent, isFalse);
 
-    manager.prefetchInBackground(reason: 'state selected');
+    manager.prefetchInBackground(entitled: true, reason: 'state selected');
     await Future<void>.delayed(const Duration(milliseconds: 20));
 
     expect(manager.hasInitializedContent, isTrue);
   });
 
   test('a later change reloads on its own once initialised', () async {
-    manager.prefetchInBackground(reason: 'state selected');
+    manager.prefetchInBackground(entitled: true, reason: 'state selected');
     await Future<void>.delayed(const Duration(milliseconds: 20));
     final afterPrefetch = content.fetchCount;
 
@@ -146,14 +146,38 @@ void main() {
   });
 
   test('a repeat prefetch still refreshes rather than silently doing nothing', () async {
-    manager.prefetchInBackground(reason: 'first');
+    manager.prefetchInBackground(entitled: true, reason: 'first');
     await Future<void>.delayed(const Duration(milliseconds: 20));
     final afterFirst = content.fetchCount;
 
-    manager.prefetchInBackground(reason: 'second');
+    manager.prefetchInBackground(entitled: true, reason: 'second');
     await Future<void>.delayed(const Duration(milliseconds: 20));
 
     // initializeContent would have skipped; the reload path must not.
     expect(content.fetchCount, greaterThan(afterFirst));
+  });
+
+  test('a prefetch is SKIPPED when the user is known to be unentitled', () async {
+    // Every content callable calls requireEntitledUser, so this would be two
+    // Cloud Function invocations guaranteed to be refused — on every state or
+    // language change, for every unsubscribed user.
+    manager.prefetchInBackground(entitled: false, reason: 'unentitled');
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+
+    expect(content.fetchCount, 0);
+    expect(manager.hasInitializedContent, isFalse);
+  });
+
+  test('skipping does not poison later prefetches', () async {
+    manager.prefetchInBackground(entitled: false, reason: 'unentitled');
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(content.fetchCount, 0);
+
+    // Entitlement arrives (a trial starts, a purchase completes).
+    manager.prefetchInBackground(entitled: true, reason: 'now entitled');
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+
+    expect(content.fetchCount, 1);
+    expect(manager.hasInitializedContent, isTrue);
   });
 }

@@ -10,6 +10,7 @@ import '../screens/language_selection_screen.dart';
 import '../localization/app_localizations.dart';
 import '../data/state_data.dart';
 import '../services/service_locator_extensions.dart';
+import '../providers/subscription_provider.dart';
 import '../services/analytics_service.dart';
 import '../widgets/enhanced_state_card.dart';
 
@@ -524,8 +525,19 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> with Ticker
     // Not awaited: navigation must not wait on it. It is also what switches on
     // the ContentLoadingManager's language and state listeners, so a later
     // change in settings reloads by itself.
-    ServiceLocatorExtensions.contentLoadingManager
-        .prefetchInBackground(reason: 'state selected');
+    // Skip only when we positively KNOW there is no entitlement — every content
+    // callable requires it, so a prefetch without one is two guaranteed
+    // refusals. A null subscription here means "not read back yet", which at
+    // the end of signup is the common case for a brand-new trial, so it
+    // prefetches rather than suppressing exactly what this exists for.
+    final subs = Provider.of<SubscriptionProvider>(context, listen: false);
+    final knownUnentitled =
+        subs.subscription != null && !subs.hasValidSubscription;
+
+    ServiceLocatorExtensions.contentLoadingManager.prefetchInBackground(
+      entitled: !knownUnentitled,
+      reason: 'state selected',
+    );
 
     // Navigate to home screen
     Navigator.of(context).pushReplacement(
