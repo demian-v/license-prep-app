@@ -573,7 +573,47 @@ not sufficient. Test by tapping a verification link in Mail: it should open the
 app, not Safari. This and the `/__/auth/action` rewrite (owner action below) are
 the two halves of the dead email-verification link — check them together.
 
-### 3. Dependabot — 8 of the 9 alerts are one dead dependency
+### 3. Dependency advisories — nodemailer done, the Firebase tree is not
+
+**nodemailer: done 2026-09-17** (`61e8f22`). Upgraded `^7.0.6` → `^9.1.1`,
+clearing 8 of the 9 Dependabot alerts including both highs. Zero behavioural
+risk — nothing imports it. Upgraded rather than removed so the #35 decision
+stays open; removal is probably right once a provider is picked, since Resend,
+Brevo and SendGrid are all HTTP APIs needing no SMTP client.
+
+**The alerts will not drop on GitHub until this branch merges**, because
+Dependabot raises them against the default branch.
+
+**What remains, and it is bigger than the Dependabot count suggested.**
+`npm audit --omit=dev` — production dependencies only, which is what actually
+deploys — reports **25 advisories (4 critical, 8 high)**. Dependabot showed 9;
+the two tools measure different things, so do not read the smaller number as the
+whole picture.
+
+All four criticals trace to one chain:
+
+```
+firebase-admin@12.7.0 → @firebase/database-compat → @firebase/database
+  → faye-websocket@0.11.4 → websocket-driver@0.7.4   (critical)
+```
+
+That is the Realtime Database client, which this project does not use — it
+arrives with `firebase-admin` regardless. Current versions:
+
+| Package | Current | Latest |
+|---|---|---|
+| `firebase-admin` | 12.7.0 | **14.4.0** (two majors behind) |
+| `firebase-functions` | 7.0.6 | 7.4.0 (minor) |
+| `googleapis` | 169.0.0 | 181.0.0 |
+| `axios` | 1.13.2 | 1.20.0 |
+
+**Do not run `npm audit fix --force`.** It would move `firebase-admin` across
+two majors on the functions that handle every payment, unattended. The sane
+order is `firebase-functions` 7.0.6 → 7.4.0 first (a minor, and the emulator
+already warns about it), then `axios`, then `firebase-admin` as its own piece of
+work with the full suite run after. Treat it as a tracked task, not a quick fix.
+
+### 3b. The original finding, for context
 
 Checked 2026-09-17. All nine open alerts are in `functions/`, and **eight of
 them — including both "high" ones — are `nodemailer`**, pinned at `^7.0.6`
