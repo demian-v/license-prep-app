@@ -198,6 +198,7 @@
 				9705A1C41CF9048500538489 /* Embed Frameworks */,
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
 				F8E86CA56E0C8D0DA7A328DE /* [CP] Embed Pods Frameworks */,
+				C7A5D1F02B9E4A1100FFEE01 /* [Crashlytics] Upload dSYMs */,
 			);
 			buildRules = (
 			);
@@ -360,6 +361,23 @@
 			shellPath = /bin/sh;
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
+		};
+		C7A5D1F02B9E4A1100FFEE01 /* [Crashlytics] Upload dSYMs */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Resources/DWARF/${TARGET_NAME}",
+				"$(SRCROOT)/$(BUILT_PRODUCTS_DIR)/$(INFOPLIST_PATH)",
+			);
+			name = "[Crashlytics] Upload dSYMs";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Uploads debug symbols so release crash reports show real file and line\n# numbers instead of memory addresses. Without it Crashlytics still receives\n# the crash, but it is close to unreadable.\n#\n# Skips simulator builds outright. They produce no dSYM, and the upload\n# script exits non-zero there with \"Could not get GOOGLE_APP_ID\" - which\n# fails the whole build. That regression was introduced and caught on\n# 2026-09-17; do not remove this guard.\nif [ \"${EFFECTIVE_PLATFORM_NAME}\" = \"-iphonesimulator\" ]; then\n  echo \"note: simulator build - skipping Crashlytics dSYM upload\"\n  exit 0\nfi\n\n# -gsp is passed explicitly because GoogleService-Info.plist is not listed in\n# the project's Copy Bundle Resources, so the script cannot discover it.\nif [ -f \"${PODS_ROOT}/FirebaseCrashlytics/run\" ]; then\n  \"${PODS_ROOT}/FirebaseCrashlytics/run\" -gsp \"${PROJECT_DIR}/Runner/GoogleService-Info.plist\" -p ios\nelse\n  echo \"warning: FirebaseCrashlytics run script not found - did pod install run?\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
