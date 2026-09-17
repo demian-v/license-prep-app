@@ -138,6 +138,21 @@ describe("the page's deep links point at schemes that are actually registered", 
     expect(androidManifest).toContain(`android:scheme="driveusa" android:host="${host}"`);
   });
 
+  it('offers the PATH form first, because the host form loses the mode', () => {
+    // Measured on the simulator 2026-09-17:
+    //   driveusa://resetPassword?oobCode=X   -> route "/?oobCode=X"
+    //   driveusa:///resetPassword?oobCode=X  -> route "/resetPassword?oobCode=X"
+    // Flutter drops the host, so only the three-slash form tells the app what
+    // the link was for. That matters because firebase_auth returned
+    // `ActionCodeInfoOperation.unknown` for a valid reset code, leaving the
+    // URL as the only way to route it.
+    const pathForm = landingPage.indexOf("SCHEME + ':///' + cfg.host");
+    const hostForm = landingPage.indexOf("SCHEME + '://' + cfg.host");
+    expect(pathForm).toBeGreaterThan(-1);
+    expect(hostForm).toBeGreaterThan(-1);
+    expect(pathForm).toBeLessThan(hostForm);
+  });
+
   it('the Android intent names the real applicationId', () => {
     expect(appBuildGradle).toContain('applicationId = "com.driveusa.app"');
     expect(landingPage).toContain("const ANDROID_PACKAGE = 'com.driveusa.app'");

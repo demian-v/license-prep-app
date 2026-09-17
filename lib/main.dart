@@ -726,7 +726,12 @@ class MyApp extends StatelessWidget {
                 // Use FutureBuilder to determine route based on action type
                 return MaterialPageRoute(
                   builder: (context) => FutureBuilder<ActionCodeRouteInfo>(
-                    future: ActionCodeRouter.determineRoute(oobCode),
+                    // Pass the route through: it names the mode, which is
+                    // the fallback when firebase_auth reports `unknown`.
+                    future: ActionCodeRouter.determineRoute(
+                      oobCode,
+                      url: settings.name,
+                    ),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return Scaffold(

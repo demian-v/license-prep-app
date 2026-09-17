@@ -24,8 +24,55 @@ class ActionCodeRouteInfo {
 }
 
 class ActionCodeRouter {
-  /// Determines the correct route for an action code by checking its type with Firebase
-  static Future<ActionCodeRouteInfo> determineRoute(String oobCode) async {
+  /// Falls back to the mode named in the incoming URL when Firebase will not
+  /// say what the code is for.
+  ///
+  /// `checkActionCode` is authoritative and is still tried first. But measured
+  /// on 2026-09-17 with a REAL password-reset code, `firebase_auth` 6.0.1 on
+  /// iOS returned `ActionCodeInfoOperation.unknown` even though the server
+  /// answered correctly — `accounts:resetPassword` returns
+  /// `requestType: PASSWORD_RESET`, and the same call reported the right
+  /// email. So the operation enum was wrong while everything around it was
+  /// right, and the user was routed to `/profile`: a dead end with no way to
+  /// reach the new-password screen.
+  ///
+  /// The URL carries the answer independently. `password-reset.html` sends
+  /// `driveusa:///resetPassword?oobCode=…`, which arrives as the route
+  /// `/resetPassword?oobCode=…`, and the web link carries `?mode=…`. Reading
+  /// that is a second source of truth for a link that is otherwise unusable.
+  ///
+  /// Deliberately a FALLBACK and not the primary check: the URL is attacker-
+  /// supplied, so it decides only which screen to open. Every screen still
+  /// hands the `oobCode` to Firebase, which is what actually validates it — a
+  /// forged mode gets you the wrong screen and a refused code, not a
+  /// privilege.
+  @visibleForTesting
+  static ActionCodeType? typeFromUrl(String? url) => _typeFromUrl(url);
+
+  static ActionCodeType? _typeFromUrl(String? url) {
+    if (url == null || url.isEmpty) return null;
+    final u = url.toLowerCase();
+
+    // Hosts and modes as registered in AndroidManifest.xml and as sent by
+    // password-reset.html.
+    if (u.contains('resetpassword') || u.contains('reset-password')) {
+      return ActionCodeType.passwordReset;
+    }
+    if (u.contains('verifyemail') ||
+        u.contains('email-verified') ||
+        u.contains('emailverified') ||
+        u.contains('recoveremail')) {
+      return ActionCodeType.emailVerification;
+    }
+    return null;
+  }
+
+  /// Determines the correct route for an action code by checking its type with
+  /// Firebase, falling back to the mode in [url] when Firebase says `unknown`.
+  static Future<ActionCodeRouteInfo> determineRoute(
+    String oobCode, {
+    String? url,
+  }) async {
     try {
       debugPrint('🔍 ActionCodeRouter: Checking action code type for: ${oobCode.substring(0, 8)}...');
       
@@ -75,6 +122,25 @@ class ActionCodeRouter {
           
         default:
           debugPrint('❓ ActionCodeRouter: Unknown action code type: ${actionCodeInfo.operation}');
+
+          // See _typeFromUrl. Routing to /profile here is what a user actually
+          // hit when firebase_auth misreported a valid reset code.
+          final hinted = _typeFromUrl(url);
+          if (hinted != null) {
+            debugPrint('↩️ ActionCodeRouter: Firebase said unknown; the URL says '
+                '$hinted — using that');
+            return ActionCodeRouteInfo(
+              type: hinted,
+              route: hinted == ActionCodeType.passwordReset
+                  ? '/reset-password'
+                  : '/email-verification',
+              oobCode: oobCode,
+              email: actionCodeInfo.data['email'],
+              error: 'Firebase reported ${actionCodeInfo.operation}; '
+                  'routed from the URL instead',
+            );
+          }
+
           return ActionCodeRouteInfo(
             type: ActionCodeType.unknown,
             route: '/profile', // Default fallback
@@ -97,10 +163,17 @@ class ActionCodeRouter {
         errorType = 'malformed_code';
       }
       
-      // Default to email verification for backward compatibility, but include error
+      // A genuinely expired or invalid code still needs a screen that can
+      // SAY so, and the right screen to say it on depends on what the link
+      // was for. Defaulting everything to email verification told someone
+      // with a dead reset link to check their email instead of requesting a
+      // new password.
+      final hinted = _typeFromUrl(url) ?? ActionCodeType.emailVerification;
       return ActionCodeRouteInfo(
-        type: ActionCodeType.emailVerification,
-        route: '/email-verification',
+        type: hinted,
+        route: hinted == ActionCodeType.passwordReset
+            ? '/reset-password'
+            : '/email-verification',
         oobCode: oobCode,
         error: '$errorType: ${e.toString()}',
       );
