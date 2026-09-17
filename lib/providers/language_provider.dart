@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/crash_reporter.dart';
+
 /// Provider for managing the app's UI language.
 ///
 /// Handles language selection, persistence, and defaults to English
@@ -103,6 +105,7 @@ class LanguageProvider extends ChangeNotifier {
       _language = DEFAULT_LANGUAGE;
     } finally {
       _isLoaded = true;
+      crashReporter.setLanguage(_language);
       notifyListeners();
       print('LanguageProvider: Finished loading language: $_language (isLoaded: $_isLoaded)');
     }
@@ -146,6 +149,10 @@ class LanguageProvider extends ChangeNotifier {
       print('LanguageProvider: Error saving language preference: $e');
     }
     
+    // Content is fetched per language, so a crash that only reproduces in one
+    // of the five is a different bug from the same stack trace in English.
+    crashReporter.setLanguage(_language);
+
     // Notify listeners about the change
     notifyListeners();
     print('LanguageProvider: Notified listeners about language change to $_language');

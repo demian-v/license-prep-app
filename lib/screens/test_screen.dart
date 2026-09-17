@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/crash_reporter.dart';
 import 'package:provider/provider.dart';
 import '../data/license_data.dart';
 import '../widgets/enhanced_test_card.dart';
@@ -350,6 +351,7 @@ class _TestScreenState extends State<TestScreen> {
                       );
                       
                       // Navigate to the exam question screen
+                      crashReporter.log('nav: exam started');
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -390,6 +392,7 @@ class _TestScreenState extends State<TestScreen> {
                       final sessionId = DateTime.now().millisecondsSinceEpoch.toString();
                       
                       // Navigate to themed questions
+                      crashReporter.log('nav: topic quiz started');
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -440,6 +443,7 @@ class _TestScreenState extends State<TestScreen> {
                         licenseType: licenseType,
                       ).then((_) {
                         // Navigate to the practice question screen after loading
+                        crashReporter.log('nav: practice test started');
                         Navigator.push(
                           context,
                           MaterialPageRoute(

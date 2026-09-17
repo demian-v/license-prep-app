@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/crash_reporter.dart';
 import 'package:provider/provider.dart';
 import '../screens/test_screen.dart';
 import '../screens/theory_screen.dart';
@@ -154,6 +155,11 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       _persistentCurrentIndex = index;
     });
     
+    // Breadcrumb: the bottom nav is the app's primary navigation and uses no
+    // route at all, so CrashBreadcrumbObserver cannot see it.
+    const tabs = ['tests', 'theory', 'profile'];
+    crashReporter.log('nav: tab ${index < tabs.length ? tabs[index] : index}');
+
     print('🏠 HomeScreen: Tab changed to index $index, persisted for future rebuilds');
   }
 

@@ -52,5 +52,32 @@ void main() {
       expect(mainDart.contains('FlutterError.onError'), isTrue);
       expect(mainDart.contains('platformDispatcher.onError'), isTrue);
     });
+
+    test('crash context is still wired (positive control)', () {
+      // Added 2026-09-17 with the custom keys, breadcrumbs and user
+      // identifier. Same reasoning as the test above: the scaffolding guards
+      // must not be satisfiable by stripping the reporting back out.
+      //
+      // The user identifier in particular is an owner DECISION, taken on
+      // 2026-09-17 and disclosed in privacy_policy.md. Removing it is a
+      // decision too, not a cleanup — this makes that explicit.
+      expect(
+        mainDart.contains('crashReporter.setUserIdentifier'),
+        isTrue,
+        reason: 'the owner approved linking crashes to a uid; removing it is a '
+            'product decision, not a refactor',
+      );
+      expect(
+        mainDart.contains('authStateChanges()'),
+        isTrue,
+        reason: 'the identifier is driven off the Auth stream so it cannot '
+            'drift as AuthProvider is edited, and so logout CLEARS it',
+      );
+      expect(
+        mainDart.contains('CrashBreadcrumbObserver()'),
+        isTrue,
+        reason: 'named-route breadcrumbs',
+      );
+    });
   });
 }

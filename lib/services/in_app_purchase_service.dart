@@ -5,6 +5,8 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
+import 'crash_reporter.dart';
+
 class InAppPurchaseService {
   static const String monthlyProductId = 'monthly';
   static const String yearlyProductId = 'yearly';
@@ -467,17 +469,55 @@ class InAppPurchaseService {
         final message = data['message'] ?? 'Validation failed';
         debugPrint('❌ Receipt validation failed: $message');
         debugPrint('📋 Full response: $data');
+
+        // The store has ALREADY charged the customer by the time this runs, and
+        // the two debugPrints above are dropped in release builds (#34) — so
+        // without this a paying customer who receives nothing produces no
+        // signal anywhere. A non-fatal, not a crash: the app recovers, the
+        // money does not.
+        //
+        // The receipt itself is deliberately NOT attached. It is a bearer
+        // credential for the subscription (#5) and a diagnostics system is not
+        // the place for one.
+        crashReporter.recordNonFatal(
+          ReceiptValidationRejected(message.toString()),
+          StackTrace.current,
+          reason: 'receipt_validation_rejected',
+          keys: {
+            'receipt_platform': platform,
+            'receipt_product_id': purchaseDetails.productID,
+          },
+        );
       }
       
       return isValid;
       
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('❌ InAppPurchaseService: Receipt validation error: $e');
       // Log error details for debugging
       if (e is FirebaseFunctionsException) {
         debugPrint('🔴 Firebase Functions Error: ${e.code} - ${e.message}');
         debugPrint('🔴 Details: ${e.details}');
       }
+
+      // Same reasoning as the rejection path above, different failure: the
+      // call did not complete at all. Kept as a SEPARATE reason so the two do
+      // not group into one Crashlytics issue — "the server said no" and "we
+      // could not ask" have different causes and different fixes.
+      //
+      // `code` is the useful discriminator here: `permission-denied` is the #5
+      // receipt-binding guard refusing a receipt already bound to another
+      // account, which is abuse, not a bug. `resource-exhausted` is the #19
+      // rate limit. `unavailable` is usually the customer's network.
+      crashReporter.recordNonFatal(
+        e,
+        stack,
+        reason: 'receipt_validation_error',
+        keys: {
+          'receipt_product_id': purchaseDetails.productID,
+          'functions_code': e is FirebaseFunctionsException ? e.code : 'not_a_functions_error',
+        },
+      );
       return false;
     }
   }
@@ -526,4 +566,22 @@ class InAppPurchaseService {
     onPurchaseError = onError;
     onPurchaseCanceled = onCanceled;
   }
+}
+
+/// The server completed receipt validation and answered that the receipt is
+/// **not** valid — as distinct from the call failing, which arrives as
+/// whatever exception the Functions SDK threw.
+///
+/// A named type rather than a bare string so the Crashlytics issue is titled
+/// `ReceiptValidationRejected` instead of being grouped with every other
+/// `_Exception`. It is never thrown: it exists to be recorded.
+class ReceiptValidationRejected implements Exception {
+  ReceiptValidationRejected(this.serverMessage);
+
+  /// The server's own `message` field. Safe to attach — it is our text, not
+  /// the customer's receipt.
+  final String serverMessage;
+
+  @override
+  String toString() => 'ReceiptValidationRejected: $serverMessage';
 }

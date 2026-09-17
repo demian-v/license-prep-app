@@ -21,6 +21,7 @@ import 'services/api/api_implementation.dart';
 import 'services/content_loading_manager.dart';
 import 'services/email_sync_service.dart';
 import 'services/analytics_service.dart';
+import 'services/crash_reporter.dart';
 import 'services/session_manager.dart';
 import 'services/in_app_purchase_service.dart';
 
@@ -298,6 +299,23 @@ Future<void> _wireCrashReporting() async {
     FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
     return true;
   };
+
+  // Links a crash to an account, so support can look someone up from a report.
+  // Approved by the owner on 2026-09-17 as a decision, not just code, and
+  // disclosed in `privacy_policy.md` under Crash Diagnostics.
+  //
+  // Driven off the Auth stream rather than from `AuthProvider`, which assigns
+  // `user` in twenty places — only four of which are an identity CHANGE, the
+  // rest being profile edits on the same uid. `authStateChanges` fires for
+  // exactly the four (login, registration, logout, account deletion) plus the
+  // silent restore at launch, so one subscription covers them all and cannot
+  // drift as that class is edited. It also emits null, which CLEARS the
+  // identifier — without that, the next person to sign in on a shared device
+  // would inherit the previous account's id on their reports.
+  firebase_auth.FirebaseAuth.instance.authStateChanges().listen((user) {
+    crashReporter.setUserIdentifier(user?.uid);
+    crashReporter.log(user == null ? 'auth: signed out' : 'auth: signed in');
+  });
 }
 
 /// Risk #34 — neither `print` nor `debugPrint` is stripped from a Flutter
@@ -641,7 +659,13 @@ class MyApp extends StatelessWidget {
           },
           
           // Initialize a route observer to track navigation
-          navigatorObservers: [RouteObserver<PageRoute>()],
+          navigatorObservers: [
+            RouteObserver<PageRoute>(),
+            // Breadcrumbs for every NAMED route. The unnamed
+            // MaterialPageRoute half logs at its own call sites — see
+            // CrashBreadcrumbObserver's comment.
+            CrashBreadcrumbObserver(),
+          ],
           initialRoute: '/',
           home: Builder(
             builder: (context) {

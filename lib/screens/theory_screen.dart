@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/crash_reporter.dart';
 import '../localization/app_localizations.dart';
 import '../widgets/subscription_required_view.dart';
 import 'package:provider/provider.dart';
@@ -446,6 +447,7 @@ class _TheoryScreenState extends State<TheoryScreen> {
                       if (topic != null) {
                         // 🚀 DIRECT NAVIGATION - Skip TheoryModuleScreen entirely!
                         print('🎉 Navigating directly to content, skipping intermediate screen');
+                        crashReporter.log('nav: theory topic content');
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -458,6 +460,7 @@ class _TheoryScreenState extends State<TheoryScreen> {
                     
                     // FALLBACK: Navigate to TheoryModuleScreen for multi-topic modules or if direct navigation failed
                     print('📋 Navigating to TheoryModuleScreen (multi-topic or fallback)');
+                    crashReporter.log('nav: theory module');
                     Navigator.push(
                       context,
                       MaterialPageRoute(

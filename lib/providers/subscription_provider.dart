@@ -3,6 +3,7 @@ import '../models/user_subscription.dart';
 import '../models/subscription_package.dart';
 import '../services/subscription_management_service.dart';
 import '../services/in_app_purchase_service.dart';
+import '../services/crash_reporter.dart';
 
 class SubscriptionProvider extends ChangeNotifier {
   // STATE MANAGEMENT
@@ -166,6 +167,7 @@ class SubscriptionProvider extends ChangeNotifier {
             final recovered = await _subscriptionService.initializeTrial(userId);
             if (recovered != null) {
               _subscription = recovered;
+              _publishCrashContext();
               debugPrint('✅ SubscriptionProvider: trial recovered for $userId');
             } else {
               debugPrint('ℹ️ SubscriptionProvider: trial not recovered — '
@@ -194,6 +196,7 @@ class SubscriptionProvider extends ChangeNotifier {
       try {
         _subscription = await _subscriptionService.getUserSubscription(userId);
         _clearTrialCache();
+        _publishCrashContext();
         debugPrint('📋 SubscriptionProvider: Loaded subscription on attempt $attempt');
         notifyListeners();
         return;
@@ -223,6 +226,7 @@ class SubscriptionProvider extends ChangeNotifier {
     try {
       _subscription = await _subscriptionService.getUserSubscription(userId);
       _clearTrialCache(); // Clear cache when subscription data changes
+      _publishCrashContext();
       debugPrint('📋 SubscriptionProvider: Loaded subscription: ${_subscription?.planType ?? 'none'}');
       notifyListeners();
     } catch (e) {
@@ -238,6 +242,7 @@ class SubscriptionProvider extends ChangeNotifier {
       if (_subscription != null) {
         _subscription = await _subscriptionService.cancelSubscription(userId);
         _clearTrialCache(); // Clear cache when subscription changes
+        _publishCrashContext();
         notifyListeners();
         debugPrint('✅ SubscriptionProvider: Subscription canceled successfully');
         return true;
@@ -302,6 +307,25 @@ class SubscriptionProvider extends ChangeNotifier {
   Future<void> refreshSubscription(String userId) async {
     debugPrint('🔄 SubscriptionProvider: Refreshing subscription data');
     await initialize(userId);
+  }
+
+  /// Attaches subscription status and entitlement to every later crash report.
+  ///
+  /// Status and entitlement are published separately on purpose: they are
+  /// different questions, and most of this class exists because they disagree.
+  /// A canceled subscription inside its paid period is entitled; a trial past
+  /// its end date is not. `planType` is the more useful of the two status
+  /// fields here — `status` is only ever active/inactive/deleted, while
+  /// planType distinguishes a trial from a paid plan, which is the split every
+  /// entitlement bug so far has turned on.
+  void _publishCrashContext() {
+    final sub = _subscription;
+    crashReporter.setSubscription(
+      status: sub == null
+          ? 'none'
+          : '${sub.planType}/${sub.status}',
+      entitled: hasValidSubscription,
+    );
   }
 
   // STATE MANAGEMENT HELPERS

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/state_info.dart';
 import '../data/state_data.dart';
+import '../services/crash_reporter.dart';
 
 /// Provider for managing state selection.
 ///
@@ -51,6 +52,7 @@ class StateProvider extends ChangeNotifier {
     
     _hasInitialized = true;
     print('✅ StateProvider: Initialization complete, selectedStateId: ${_selectedState?.id}');
+    crashReporter.setUserState(_selectedState?.id);
     notifyListeners();
     
     return;
@@ -80,6 +82,9 @@ class StateProvider extends ChangeNotifier {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('selected_state_id', stateId);
         
+        // A crash on the content path is usually state-specific — questions,
+        // topics and practice tests are all filtered by it (#39).
+        crashReporter.setUserState(stateId);
         notifyListeners();
       }
     } catch (e) {
@@ -110,6 +115,7 @@ class StateProvider extends ChangeNotifier {
       print('Error clearing selected state: $e');
     }
     
+    crashReporter.setUserState(null);
     notifyListeners();
   }
 }

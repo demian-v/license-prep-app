@@ -3,6 +3,7 @@ import '../providers/content_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/state_provider.dart';
 import 'analytics_service.dart';
+import 'crash_reporter.dart';
 
 /// Service for managing content loading operations.
 ///
@@ -103,7 +104,7 @@ class ContentLoadingManager {
         'outcome': 'success',
         'reason': reason,
       });
-    }).catchError((Object e) {
+    }).catchError((Object e, StackTrace stack) {
       // Swallowed on purpose — see above. Recorded, not raised.
       print('ContentLoadingManager: prefetch failed, ignoring ($reason): $e');
       analyticsService.logEvent('content_prefetch', {
@@ -111,6 +112,17 @@ class ContentLoadingManager {
         'reason': reason,
         'error_type': e.runtimeType.toString(),
       });
+      // The analytics event says a prefetch failed and how often; a non-fatal
+      // says WHY, with a stack. Both are wanted: the counter is what you
+      // notice, the stack is what you fix. This path is silent by design, so
+      // without one of them a prefetch that stopped working would only ever
+      // show up as the app getting slower.
+      crashReporter.recordNonFatal(
+        e,
+        stack,
+        reason: 'content_prefetch_failed',
+        keys: {'prefetch_reason': reason},
+      );
     });
   }
   
