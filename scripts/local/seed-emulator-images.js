@@ -7,11 +7,12 @@
  * and quiz question that references an image renders "Image unavailable"
  * locally. That is an empty local bucket, not an app bug — production is fine.
  *
- * This generates one flat-colour PNG per referenced path so the screens can be
- * exercised: layout, sizing, and "is the right image requested for the right
- * question" are all testable. The colour is derived from the path, so two
+ * This generates one hazard-striped PNG per referenced path so the screens can
+ * be exercised: layout, sizing, and "is the right image requested for the right
+ * question" are all testable. The base colour is derived from the path, so two
  * different images are visibly different and a wrong-image bug would still show.
- * They are obviously placeholders — nobody could mistake them for real content.
+ * The stripes are the point: nothing in the real content looks like this, so a
+ * placeholder is never mistaken for a diagram.
  *
  * Refuses to run outside the emulator.
  *
@@ -62,7 +63,11 @@ function chunk(type, data) {
   return Buffer.concat([len, body, crc]);
 }
 
-function solidPng(width, height, [r, g, b]) {
+// A flat rectangle was the first attempt and it was a mistake: a plain coloured
+// block reads as a diagram and the owner reasonably asked what it meant. These
+// are now hazard-striped, which no real content in this app looks like, so
+// nobody has to wonder whether the picture is meaningful.
+function placeholderPng(width, height, [r, g, b]) {
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(width, 0);
   ihdr.writeUInt32BE(height, 4);
@@ -70,21 +75,24 @@ function solidPng(width, height, [r, g, b]) {
   ihdr[9] = 2; // colour type: truecolour
   // 10..12 stay 0: deflate, adaptive filtering, no interlace
 
-  const row = Buffer.alloc(1 + width * 3); // leading filter byte 0
-  for (let x = 0; x < width; x++) {
-    row[1 + x * 3] = r;
-    row[2 + x * 3] = g;
-    row[3 + x * 3] = b;
-  }
-  // a darker band top and bottom, so the placeholder reads as a frame
-  const edge = Buffer.from(row);
-  for (let x = 0; x < width; x++) {
-    edge[1 + x * 3] = Math.max(0, r - 40);
-    edge[2 + x * 3] = Math.max(0, g - 40);
-    edge[3 + x * 3] = Math.max(0, b - 40);
-  }
+  const dark = [Math.max(0, r - 55), Math.max(0, g - 55), Math.max(0, b - 55)];
+  const STRIPE = 28; // px, measured diagonally
+  const BORDER = 10;
+
   const rows = [];
-  for (let y = 0; y < height; y++) rows.push(y < 8 || y >= height - 8 ? edge : row);
+  for (let y = 0; y < height; y++) {
+    const row = Buffer.alloc(1 + width * 3); // leading filter byte 0
+    for (let x = 0; x < width; x++) {
+      const onBorder =
+        y < BORDER || y >= height - BORDER || x < BORDER || x >= width - BORDER;
+      const onStripe = Math.floor((x + y) / STRIPE) % 2 === 0;
+      const [pr, pg, pb] = onBorder || onStripe ? dark : [r, g, b];
+      row[1 + x * 3] = pr;
+      row[2 + x * 3] = pg;
+      row[3 + x * 3] = pb;
+    }
+    rows.push(row);
+  }
 
   return Buffer.concat([
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
@@ -97,7 +105,7 @@ function solidPng(width, height, [r, g, b]) {
 function colourFor(path) {
   let h = 0;
   for (let i = 0; i < path.length; i++) h = (h * 31 + path.charCodeAt(i)) >>> 0;
-  // keep it pale so black placeholder text elsewhere stays readable
+  // pale, so the dark stripes carry the contrast
   return [180 + (h % 60), 180 + ((h >> 8) % 60), 180 + ((h >> 16) % 60)];
 }
 // -------------------------------------------------------------------------
@@ -142,7 +150,7 @@ async function collectPaths() {
 
   let written = 0;
   for (const path of paths) {
-    await bucket.file(path).save(solidPng(WIDTH, HEIGHT, colourFor(path)), {
+    await bucket.file(path).save(placeholderPng(WIDTH, HEIGHT, colourFor(path)), {
       contentType: 'image/png',
       resumable: false,
     });
