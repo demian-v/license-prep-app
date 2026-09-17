@@ -525,11 +525,67 @@ The answer key and explanation are served to an anonymous stranger. Reproduce wi
 - **The functions emulator runs `functions/lib/`, not `functions/src/`.** After any TypeScript change run `npm --prefix functions run build`, or the emulator keeps serving stale compiled JS. `npx jest` uses ts-jest on the source, so tests can pass while the emulator still runs old code — they disagreed for most of this session's first hours.
 - When the long-running emulator is already up, run `npx jest` directly. `npm test` wraps `emulators:exec`, which will fail on the already-bound ports.
 
+## TODO — checks for the real-device test run
+
+Deferred deliberately (owner's call, 2026-09-17): these cannot be verified on
+this Mac, and are not worth chasing before a real device is in hand. Each row
+gives the symptom to watch for and the fix, so nobody has to re-derive it.
+
+### 1. iOS Associated Domains entitlement (#30)
+
+**When:** the first build onto a real iPhone, or the first archive for
+TestFlight. Simulator builds are unaffected and will keep working.
+
+**Likely outcome: nothing happens.** The Runner target uses automatic signing,
+and Xcode usually adds a missing capability to the App ID by itself.
+
+**Symptom if it does go wrong:** the build fails at the signing step, with
+wording like *"Provisioning profile ... doesn't support the Associated Domains
+capability"* or *"doesn't include the com.apple.developer.associated-domains
+entitlement"*.
+
+**Fix, about two minutes:**
+1. [developer.apple.com](https://developer.apple.com/account/resources/identifiers/list) → Identifiers → `com.driveusa.app`
+2. Tick **Associated Domains**, Save
+3. Xcode → Settings → Accounts → **Download Manual Profiles**
+4. Build again
+
+**Escape hatch:** if it blocks a release and there is no time, delete the
+`CODE_SIGN_ENTITLEMENTS` line from the three Runner configurations in
+`ios/Runner.xcodeproj/project.pbxproj`. That restores the previous behaviour —
+the app builds, and universal links stay broken, which is where they were
+before this branch anyway.
+
+**While the device is out:** universal links also need an
+`apple-app-site-association` file served from `licenseprepapp.web.app` and
+`licenseprepapp.firebaseapp.com`. Without it the entitlement is necessary but
+not sufficient. Test by tapping a verification link in Mail: it should open the
+app, not Safari. This and the `/__/auth/action` rewrite (owner action below) are
+the two halves of the dead email-verification link — check them together.
+
+### 2. Practice tests, and the renewal scheduler (found 2026-09-17 via #15)
+
+The index diff showed production was missing two indexes its own code needs.
+Both were deployed on 2026-09-17, so both should now work — but neither has
+been exercised against production, so confirm rather than assume:
+
+- **Practice tests.** Production held **no** `practiceTests` index at all, while
+  `getPracticeTests` filters on three fields and orders by a fourth. That query
+  cannot have been served. On device, open the practice-test list and confirm it
+  populates.
+- **Renewals.** Production held `subscriptions (trialUsed, status, nextBillingDate)`
+  — the query shape from *before* the SM-MOD-2 fix added the `isActive` filter.
+  The index never followed the code, so `renewActiveSubscriptions` was likely
+  failing. Check the Cloud Functions logs for that scheduler after the next run
+  and confirm it no longer reports a FAILED_PRECONDITION / missing-index error.
+
 ## Owner action required outside the repo
 
-- **Enable the Associated Domains capability for `com.driveusa.app`** (from #30, 2026-09-17). The entitlement was previously in `Info.plist`, where iOS ignores it, so it has never been exercised. Now that it is in a real `Runner.entitlements`, a device or archive build **will fail to provision** unless the App ID carries the capability in the Apple Developer portal. Simulator builds are unaffected, which is why this is not visible from this machine. Universal links also need `apple-app-site-association` served from `licenseprepapp.web.app` and `licenseprepapp.firebaseapp.com` — worth checking at the same time as the `/__/auth/action` rewrite problem below, since the two together are why the email-verification deep link is dead.
+- **Enable the Associated Domains capability for `com.driveusa.app`** — **deferred to the real-device test run at the owner's request (2026-09-17); see the TODO section above for the symptom and the fix.** (from #30). The entitlement was previously in `Info.plist`, where iOS ignores it, so it has never been exercised. Now that it is in a real `Runner.entitlements`, a device or archive build **will fail to provision** unless the App ID carries the capability in the Apple Developer portal. Simulator builds are unaffected, which is why this is not visible from this machine. Universal links also need `apple-app-site-association` served from `licenseprepapp.web.app` and `licenseprepapp.firebaseapp.com` — worth checking at the same time as the `/__/auth/action` rewrite problem below, since the two together are why the email-verification deep link is dead.
 
-- **Diff the deployed indexes before the first deploy after #15** (2026-09-17). `firebase.json` now points at `firestore.indexes.json`, so indexes finally deploy — but `firebase deploy` also offers to **delete** indexes that exist in the project and not in the file, and with `--force` it does so without asking. The file was built by enumerating the composite queries in `functions/src`, not by reading production, because this machine has no production credentials. Before the first deploy, run `firebase firestore:indexes --project licenseprepapp` and compare; add anything the project has that the file lacks. Answer **no** to any deletion prompt until that comparison is done. Deleting the `subscriptionLogs (userId, timestamp, action)` index in particular would fail every purchase, because `checkRateLimit` runs before `validatePurchaseReceipt`'s try block.
+- ~~Diff the deployed indexes before the first deploy after #15~~ — **done 2026-09-17, and it mattered.** The owner ran `firebase firestore:indexes --project licenseprepapp`: **8 of production's 11 indexes were absent** from the file derived from the query code, so a `--force` deploy would have offered to delete all eight. Worst of them, this file's own claim was wrong — the receipt rate-limit index is `subscriptionLogs (action, userId, timestamp)`, not `(userId, timestamp, action)`. The two entries that predated this branch were stale too: production holds neither of them. `firestore.indexes.json` is now production's 11 verbatim plus three genuine gaps, and **`firestore:indexes` was deployed to production on 2026-09-17** — 0 deletions, 3 additions, verified by re-reading the index list afterwards. Rules were **not** deployed; the CLI only compile-checks them under `--only firestore:indexes`.
+
+  **Standing rule from here on:** never run `firebase deploy --force` on this project. Re-run the diff whenever a query's filters change, and add the production index to both `firestore.indexes.json` and the `IN_PRODUCTION` list in `firestore-indexes.test.ts` in the same commit.
 
 - **Migrate the web image from `gcr.io` to Artifact Registry** (the open half of #49, 2026-09-17). Google has deprecated Container Registry. This needs an Artifact Registry repository, `roles/artifactregistry.writer` for the Cloud Build service account, and an update to the Cloud Build trigger — whose definition is not in version control (#36). `cloudbuild.yaml` was deliberately left pointing at `gcr.io`, because repointing it before the repository exists breaks the web deploy instead of fixing it.
 
