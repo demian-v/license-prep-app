@@ -5,13 +5,13 @@
 | | |
 |---|---|
 | **Branch** | `local/security-money-hardening` (base `84300d0`) — **pushed to `origin` 2026-09-16 at the owner's request.** `main` untouched, nothing deployed |
-| **Commits** | 51 |
-| **Tests** | 162 Cloud Functions (Jest) + 42 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
+| **Commits** | 53 |
+| **Tests** | 162 Cloud Functions (Jest) + 47 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
 | **Analyzer** | 0 errors |
-| **Register rows addressed** | 36 of 59 |
+| **Register rows addressed** | 37 of 59 |
 | **Deployed?** | **NO.** Nothing here has ever run in production. The deploy path itself has never been exercised |
 
-**Risks fixed on this branch:** #2 #3 #4 #5 #6 #7 #8 #12 #13 #14 #16 #18 #19 #20 #22 #23 #24 #25 #29 #32 #38 #39 #40 #41 #43 #45 #46 #47 #48 #52 #54 #58 #59
+**Risks fixed on this branch:** #2 #3 #4 #5 #6 #7 #8 #12 #13 #14 #16 #18 #19 #20 #22 #23 #24 #25 #29 #32 #38 #39 #40 #41 #43 #45 #46 #47 #48 #51 #52 #54 #58 #59
 **Partial, with reasons below:** #9 (no reconciliation job) · #21 (no sync built) · #26 (needs attestation)
 
 **Biggest open question:** none of this protects anyone until it ships. Everything below is verified locally and nothing has ever run in production.
@@ -250,7 +250,7 @@ Written up in the vault: `wiki/driveusa/Development/infra/app-check-attestation-
 Criticals and Highs in the agreed scope are done. Remaining: #1 (history
 cleanup only; the leaked secret is already rotated and dead), #10, #11, #15,
 #17, #27, #28, #30, #31, #33, #34, #35, #36, #37, #42, #44,
-#49, #50, #51, #53, #55, #56, #57.
+#49, #50, #53, #55, #56, #57.
 
 Worth knowing before picking one:
 - **#33 and #37 are product decisions, not bugs** — whether to widen past IL/NY,
@@ -265,6 +265,31 @@ Worth knowing before picking one:
 **Cross-device sync itself is not built**, and it is a feature, not a fix: five Cloud Functions written from scratch, a Firestore schema and rules for `progress/{uid}` (currently rule-denied), serialisation for `Exam` (which has none), a migration for existing local progress, and a **conflict-resolution decision** — when two devices disagree, which wins? That last one is the owner's call, not a technical one. **Sixteen** mapped callables have no server implementation (the register said ten); they are now listed in a comment at the mapping in `firebase_functions_client.dart` so nobody assumes a name means an endpoint.
 
 **Known gap left by #13/#14:** the client's partial-delete fallback still exists for the case where Cloud Functions is unavailable. It deletes the Auth account and `users/{uid}` but not the other personal data, so a deletion completed that way is incomplete until the callable next succeeds. Closing it properly needs a server-side deletion queue — worth doing alongside the #9 reconciliation job.
+
+## Corrections found in the register
+
+Rows whose stated premise did not survive checking. Recorded so the next reader
+does not act on the wrong cause.
+
+- **#51 — the dead code was not shipping.** The row says debug and example code
+  "ships inside release builds" and costs "dead weight in the shipped binary".
+  Dart compiles from `main.dart`'s import graph and none of the five files was
+  imported, so none reached the binary. Verified against the compiled kernel:
+  `FirebaseDebugTestWidget`, `ApiSwitcherExample` and `QuizCacheIntegrationExample`
+  appeared 0 times each, against 6 for a reachable widget as a control. The real
+  cost was 890 lines in the repo that read as live code. The other half of the
+  row — the analytics helper pointing at `com.example.license_prep_app` — was
+  entirely real.
+- **#40 — the rate-limit query did not degrade with collection size.** It is
+  indexed on (userId, timestamp, action). What it lacked was a limit, so cost
+  scaled with one user's attempts in the window.
+- **#46 — not one orphan per cold start.** Firebase persists the anonymous
+  session across launches, so it is one per install, plus one per logout, plus
+  one per signup. Still unbounded, by a different route.
+- **#21 undercounts.** Sixteen mapped callables have no server implementation,
+  not ten.
+- **#18 listed eight unguarded callables**; four had already been removed by the
+  time the rest were gated.
 
 ## Decisions log
 
