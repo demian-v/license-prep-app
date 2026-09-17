@@ -5,8 +5,8 @@
 | | |
 |---|---|
 | **Branch** | `local/security-money-hardening` (base `84300d0`) — **pushed to `origin` 2026-09-16 at the owner's request.** `main` untouched, nothing deployed |
-| **Commits** | 77 |
-| **Tests** | 255 Cloud Functions (Jest, 27 suites, **serial** — see Gotchas) + 61 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
+| **Commits** | 82 |
+| **Tests** | 255 Cloud Functions (Jest, 27 suites, **serial** — see Gotchas) + 75 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
 | **Analyzer** | 0 errors |
 | **Register rows addressed** | 43 of 59 |
 | **Deployed?** | **NO.** Nothing here has ever run in production. The deploy path itself has never been exercised |
@@ -302,10 +302,33 @@ under the emulator, which prints the code, so the flow is exercisable end to
 end today. In production with no key it **throws** rather than pretending — that
 is #35's lesson encoded, not merely documented.
 
+**The Flutter half is also done** (`fd6ab4e`), with 14 widget tests.
+
+| Piece | Where |
+|---|---|
+| Callable wrapper, typed outcomes instead of string matching | `lib/services/email_verification_service.dart` |
+| Code screen — six boxes, paste, countdown, per-reason errors | `lib/screens/verification_code_screen.dart` |
+| Resume-on-relaunch | `lib/screens/signup_resume_gate.dart` |
+| Strings, five locales, added to the coverage guard | `lib/localization/l10n/*.json` |
+
+Flow is now **email+password → code → language → state**.
+
+Two properties not to break:
+- `SignupResumeGate` is scoped to `user.state == null`. Gating on
+  `emailVerified` alone would send **every existing account** to a verification
+  screen, since all of them predate this and have the flag false.
+- The gate **fails open**: if the status call cannot be answered the user
+  continues to state selection. Verification is a step in signup, not a door in
+  front of entitlement.
+
+**Verified end to end on the simulator** on 2026-09-17: signed up, read the code
+from the log transport, submitted a wrong code (the server's own attempt counter
+came back as "4 attempts left"), then the right one, landing on language
+selection. Auth shows `emailVerified=true` for the completed account and `false`
+for an abandoned one.
+
 **Still to do:**
-- The Flutter code-entry screen (six boxes, paste, resend countdown, resume on relaunch — `getEmailVerificationStatus` exists to drive that).
-- Insert it into signup **after email+password, before state selection** (owner-confirmed ordering, 2026-09-17).
-- The content prefetch, which fires **after state selection**, not during code entry — state and language are both known only at that point.
+- The content prefetch, which fires **after state selection** — state and language are both known only at that point.
 
 **Owner steps outstanding:**
 1. Add the four DNS records Resend listed (DKIM TXT, two SPF CNAMEs, DMARC TXT) in Google Cloud DNS, then click *I've already added the records* and wait for Verified.
