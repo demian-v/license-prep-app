@@ -11,7 +11,7 @@ flutter devices
 
 echo.
 echo Attempting to enable debug mode...
-echo Running: adb shell setprop debug.firebase.analytics.app com.example.license_prep_app
+echo Running: adb shell setprop debug.firebase.analytics.app com.driveusa.app
 echo.
 
 REM Try to find adb in common locations
@@ -22,7 +22,7 @@ if exist "%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe" (
     set "ADB_PATH=%USERPROFILE%\AppData\Local\Android\Sdk\platform-tools\adb.exe"
 ) else (
     echo Trying to use adb from PATH...
-    adb shell setprop debug.firebase.analytics.app com.example.license_prep_app
+    adb shell setprop debug.firebase.analytics.app com.driveusa.app
     if %errorlevel% == 0 (
         echo SUCCESS: Debug mode enabled!
         goto :verify
@@ -34,7 +34,7 @@ if exist "%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe" (
 
 if defined ADB_PATH (
     echo Using adb from: %ADB_PATH%
-    "%ADB_PATH%" shell setprop debug.firebase.analytics.app com.example.license_prep_app
+    "%ADB_PATH%" shell setprop debug.firebase.analytics.app com.driveusa.app
     if %errorlevel% == 0 (
         echo SUCCESS: Debug mode enabled!
         goto :verify
@@ -76,7 +76,7 @@ echo ================================
 echo.
 echo Please run this command manually in your terminal:
 echo.
-echo   adb shell setprop debug.firebase.analytics.app com.example.license_prep_app
+echo   adb shell setprop debug.firebase.analytics.app com.driveusa.app
 echo.
 echo If adb is not found, install Android SDK Platform Tools:
 echo https://developer.android.com/studio/releases/platform-tools
