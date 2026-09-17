@@ -162,7 +162,28 @@ isolate scheme registration from the page.
 **#56** (StoreKit 2 — needs an **Apple** sandbox tester and a Mac; it is *not*
 an Android job, despite arriving with the Billing 8 upgrade) and **#57** (the
 JDK/Gradle trap — the Windows machine, and the first thing that will stop you
-there). Then **#33**/**#37** — product decisions, ask first. Resend (#35) is still blocked on the owner; see
+there). #### #33 and #37 — the owner has decided; both stay as they are
+
+Asked and answered 2026-09-17. Neither is a defect to fix, and the register's
+framing of both was slightly off.
+
+**#33 — DEFERRED, and it is 14 states, not 51.** The register says the flag
+"hides 49 of 51 states". The plan is **not** to open all 51: content for 12
+more states is being prepared on another machine, so the target is **14**. The
+flag gets flipped when that content is ready, which is a future release, not
+now. Do not "fix" this by moving the flag to Firestore in the meantime — that
+is only worth doing if states start being switched on one at a time, and the
+decision is to ship them as a batch.
+
+**#37 — STAYS OFF, deliberately, and stays recorded as not done.** Single-device
+enforcement is written and disabled behind
+`ENABLE_SESSION_CONFLICT_DETECTION = false`, whose own comment says it was
+turned off to work around bugs in the conflict logic. The owner's decision is
+to leave it off and revisit later. So one account still works on unlimited
+devices, and the app still writes a session document on every login — the cost
+without the benefit. **That is knowingly accepted, not overlooked.** Anyone
+tempted to flip the flag should fix the conflict logic first; flipping it alone
+reinstates the bugs it was disabled for. Resend (#35) is still blocked on the owner; see
 `wiki/driveusa/Development/infra/owner-console-actions.md`, which also covers
 the store privacy questionnaires that Crashlytics now makes mandatory.
 
