@@ -1011,17 +1011,63 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
       title: Text(language),
       trailing: provider.language == code ? Icon(Icons.check, color: Colors.green) : null,
       onTap: () async {
+        // Captured here, outside the try, for two reasons: the context is
+        // certainly mounted at this point, and the catch block needs it too.
+        //
+        // This is the other half of the same defect. `Navigator.pop(context,
+        // ...)` below looks up an ancestor through an element that the locale
+        // rebuild has deactivated, and throws "Looking up a deactivated
+        // widget's ancestor is unsafe" — once inside the try, and then AGAIN
+        // inside the catch, where nothing catches it, so an unhandled
+        // exception escaped on every language change from settings. A
+        // NavigatorState survives the rebuild; the element used to find it
+        // does not.
+        final navigator = Navigator.of(context);
+
+        // ...and popping it must also wait for the frame the rebuild is in.
+        // `setLanguage` changes `MaterialApp.locale` synchronously, so when
+        // the continuation after the await resumes, the Navigator is still
+        // locked mid-build and `pop` trips its own `!_debugLocked` assertion.
+        // Deferring to after the frame is the difference between "the work
+        // succeeded" and "the work succeeded and then threw about it".
+        void popAfterFrame(Map<String, dynamic> result) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (navigator.mounted) navigator.pop(result);
+          });
+        }
+
         try {
           // Get current language before change
           final previousLanguage = provider.language;
-          
+
+          // Read entitlement BEFORE the awaits below, and this is not a
+          // tidy-up — it is the fix for a defect found by hand on the
+          // simulator on 2026-09-17.
+          //
+          // `_prefetchEntitled` touches `State.context`. `setLanguage`
+          // notifies its listeners, which changes `MaterialApp.locale`, which
+          // rebuilds the whole tree — and `HomeScreen` rebuilds its `_screens`
+          // list, so THIS State is unmounted before the await returns. Reading
+          // `context` afterwards threw `This widget has been unmounted`, and
+          // because the throw happened while evaluating an argument, three
+          // things never ran: the prefetch itself, the `language_changed`
+          // analytics event, and the success `Navigator.pop`. Every language
+          // change from settings was recorded as `language_change_failed`
+          // while actually succeeding.
+          //
+          // The state handler below has the same shape and does NOT break,
+          // because changing the state does not change the locale, so its
+          // State survives its awaits. That asymmetry is why the state half of
+          // the prefetch was observed working and the language half was not.
+          final wasEntitled = _prefetchEntitled;
+
           // Update both providers (same as signup flow)
           await provider.setLanguage(code);
           await authProvider.updateUserLanguage(code);
 
           // Re-warm the cache for the new language, in the background.
           ServiceLocatorExtensions.contentLoadingManager.prefetchInBackground(
-            entitled: _prefetchEntitled,
+            entitled: wasEntitled,
             reason: 'language changed in settings',
           );
           
@@ -1041,7 +1087,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
           debugPrint('📊 Analytics: language_changed logged (profile: $previousLanguage → $code)');
           
           // Close dialog with success result
-          Navigator.pop(context, {
+          popAfterFrame({
             'success': true,
             'language': code,
             'languageName': language,
@@ -1065,8 +1111,10 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
           debugPrint('📊 Analytics: language_change_failed logged (profile: $code)');
           debugPrint('🚨 Profile Screen: Language change error: $errorMessage');
           
-          // Close dialog with error result
-          Navigator.pop(context, {
+          // Close dialog with error result. Deferred for the same reason as
+          // the success path — this pop is inside the catch, so a throw here
+          // is unhandled.
+          popAfterFrame({
             'success': false,
             'error': 'Error changing language. Please try again.',
             'targetLanguage': code,
