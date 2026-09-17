@@ -5,8 +5,8 @@
 | | |
 |---|---|
 | **Branch** | `local/security-money-hardening` (base `84300d0`) — **pushed to `origin` 2026-09-16 at the owner's request.** `main` untouched, nothing deployed |
-| **Commits** | 86 |
-| **Tests** | 255 Cloud Functions (Jest, 27 suites, **serial** — see Gotchas) + 83 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
+| **Commits** | 88 |
+| **Tests** | 255 Cloud Functions (Jest, 27 suites, **serial** — see Gotchas) + 87 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
 | **Analyzer** | 0 errors |
 | **Register rows addressed** | 43 of 59 |
 | **Deployed?** | **NO.** Nothing here has ever run in production. The deploy path itself has never been exercised |
@@ -16,44 +16,94 @@
 
 **Biggest open question:** none of this protects anyone until it ships. Everything below is verified locally and nothing has ever run in production.
 
-### Start here — #31 is still the next code row
+### Start here — the owner's plan for the next session
 
-**This session (2026-09-17) did not start on #31.** It closed five other rows
-and part of two more, all verified on the iOS simulator and the emulator suite.
-#31 remains the next one, for the reason the previous handoff gave: it is
-Android release signing and ProGuard, and **the release path runs on the Windows
-machine, not this Mac**, so the fix cannot be verified here. Decide with the
-owner how to verify before starting. The groundwork below was checked, not
-copied from the register.
+Agreed 2026-09-17. Four things, in this order.
 
-**What is actually true about #31:**
+#### 0. FIRST, CONFIRM NOTHING DANGEROUS IS IN THE TREE
 
-| Claim | Verified |
-|---|---|
-| `android/key.properties` is untracked | Yes — and that is **correct**, it holds keystore passwords. `android/.gitignore:11` and `.gitignore:51` both ignore it. Not the bug. |
-| No fallback when it is missing | Yes. `android/app/build.gradle:17-20` does `if (keystorePropertiesFile.exists())` and otherwise carries on, so `storeFile` at `:42` becomes `null` and a release build proceeds **without failing**. |
-| `proguard-rules.pro` is missing | Yes. `android/app/build.gradle:63` references it, and the file **has never existed in git history** — `git log --all -- android/app/proguard-rules.pro` is empty. It is not gitignored, so it is genuinely absent. |
-| `minifyEnabled` is on | Yes, `:61`, with `shrinkResources true` at `:62`. Both added in `59f33e1`, the same commit that referenced the missing ProGuard file. |
+```bash
+flutter test test/no_crash_test_scaffolding_test.dart
+```
 
-**The interesting part, and what to check first:** a release build on the
-Windows machine **succeeded** on 2026-08-29 with Billing 8. So the missing
-ProGuard file does not fail the build — AGP tolerates it. That means
-minification has been running with only `proguard-android-optimize.txt` and no
-app-specific keep rules, on a Flutter app using Firebase, `in_app_purchase` and
-reflection-heavy libraries. The classic failure mode is a **release-only runtime
-crash** that never appears in debug. Worth establishing whether that is
-happening before writing rules.
+Verifying Crashlytics needed a temporary change to `lib/main.dart` that forced
+crash collection ON in debug and **deliberately crashed the app 6 seconds after
+launch**. If that ever shipped, every user's app would crash on every launch and
+development crashes would pour into production Crashlytics.
 
-**Suggested shape of the fix** (not prescriptive):
-1. Make a release build **fail loudly** when `key.properties` is absent, instead
-   of silently producing an unsigned or debug-signed artifact. Debug builds must
-   keep working without it.
-2. Add `android/app/proguard-rules.pro` with the keep rules Flutter, Firebase
-   and Play Billing need, or turn `minifyEnabled` off until rules exist. Turning
-   it off is the safer interim if a release crash is already suspected.
+**It has been reverted**, and that test fails the build if it ever comes back —
+including a positive control so the guard cannot be satisfied by deleting
+Crashlytics instead. Run it first anyway. If it is green, the tree is clean.
 
-**After #31,** the remaining rows are listed under *The rest of the risk
-register*. Two are product decisions, not bugs (#33, #37) — ask first.
+#### 1. Finish Crashlytics
+
+The SDK is wired and the dSYM upload phase works, but a crash report today says
+*that* something broke, not *who it happened to*. Four additions, roughly in
+value order:
+
+| What | Why | Size |
+|---|---|---|
+| **Custom keys** | Attach state, language, subscription status and entitlement to every report. Turns "a crash" into "New York user, Russian, expired trial" — which is usually the whole diagnosis | ~10 lines |
+| **Breadcrumb logs** | `FirebaseCrashlytics.instance.log('opened exam')` at a handful of navigation points gives the last actions before a crash | small |
+| **Non-fatal `recordError`** | On paths that are deliberately swallowed today — receipt validation failures above all. You would learn about purchase problems without needing a crash | medium |
+| **`setUserIdentifier`** | Links a crash to a uid so support can look someone up. **A decision, not just code:** it puts a user identifier into a diagnostics system. The privacy policy now covers crash diagnostics, but ask the owner before adding it | small |
+
+**Know the limit:** Crashlytics is **client-side only**. Cloud Functions errors
+do not appear there — they go to Google Cloud Logging. Server-side alerting is a
+separate, still-open gap; nothing currently watches for a spike in failed
+receipt validations.
+
+#### 2. Finish testing Crashlytics, and put the app back to normal
+
+**Not yet verified end to end.** No crash has been sent and nothing has been seen
+in the Firebase console. The owner has approved a test crash writing to
+production Crashlytics.
+
+Release and profile builds are **not supported on the iOS simulator**, so a
+simulator test needs the temporary override described above. Two options:
+
+- **On a real device** (preferred): build release, crash it, reopen, check the
+  console. No temporary code needed, and it also exercises the dSYM upload.
+- **On the simulator**: re-apply the temporary override, test, then revert and
+  confirm `no_crash_test_scaffolding_test.dart` is green again.
+
+Either way, remember Crashlytics uploads on the **next launch** — a crash alone
+sends nothing until the app is reopened.
+
+#### 3. Test the content cache by hand, and watch what happens
+
+The prefetch is covered by tests and was observed working, but it has never been
+driven by a person going through the app normally. Worth doing, because the
+useful bugs here are timing ones:
+
+- Fresh signup → pick language and state → confirm content is already warm when Theory opens.
+- Change state in settings, then immediately open Theory. Does it show new-state content, or briefly the old?
+- Change language and state in quick succession — does the second change win?
+- Kill the app mid-prefetch and reopen.
+- With an **expired** trial, change state: there should be **no** content request at all (every content callable requires entitlement).
+
+Watch the logs for `prefetch complete`, `prefetch failed, ignoring`, and
+`joining in-flight fetch` — the last one is the dedupe working.
+
+#### 4. Then the remaining register rows
+
+Closeable without the owner: **#10** (a config guide that is actively wrong and
+is a trap for whoever deploys — do this before any deploy), **#17** (the six red
+`counter_service_test` failures), **#28** (nginx and Firebase Hosting implement
+different rules for the same paths), **#42** (`packageId` written as three
+types), **#56** (teach the backend to read StoreKit 2, retiring the forced-SK1
+workaround), **#57**.
+
+Blocked on the owner: **#33**/**#37** (product decisions), **#35** (the mail
+provider is chosen — Resend — but DNS records and `RESEND_API_KEY` are not done),
+**#49** (Artifact Registry), **#31** and all Android work (needs the Windows
+machine), **#1** (git history rewrite), **#36**, **#53**.
+
+#### Standing cautions
+
+- **Never `firebase deploy --force`.** It deletes indexes absent from the file. See the 2026-09-17 index diff.
+- **Check `git diff pubspec.lock` after adding any Firebase package.** `flutter pub add firebase_crashlytics` silently bumped 20+ packages including `cloud_firestore` and `firebase_auth`, and broke the iOS build.
+- **The branch holds the two Criticals (#3, #4) that are live in production today.** Every row added widens the gap between fixed and shipped.
 
 ### What 2026-09-17 closed
 
@@ -793,8 +843,21 @@ before trusting it.**
 collected goes to the real project. Verified on the simulator:
 `firebase_crashlytics_enabled = 0`, so nothing was sent to production.
 
+**dSYM upload is now wired** (`487992b`) — and its first version **broke the
+build**: the upload script exits non-zero on simulator builds with "Could not get
+GOOGLE_APP_ID", failing everything. Fixed by skipping simulator builds outright
+(they produce no dSYM) and passing `GoogleService-Info.plist` explicitly with
+`-gsp`, because it is not in Copy Bundle Resources and the script cannot find it
+alone. A clean simulator build was verified afterwards.
+
+**The privacy policy was audited, not borrowed.** The owner asked to copy another
+app's; that would describe someone else's practices. Three real findings: it
+claimed to collect *billing information* (it does not — Apple and Google are
+merchant of record), the hashed trial-deduplication device ID was undisclosed,
+and the "do not collect" list omitted payment credentials and advertising IDs.
+
 **Still open:**
-- **The iOS dSYM upload build phase is not wired.** Release crashes report but arrive unsymbolicated. Its own change.
+- **The store privacy questionnaires must be updated to match**, or the release is rejected: App Store Connect → App Privacy → declare **Diagnostics / Crash Data**, and Play Console → Data safety → **Crash logs**. This is the step people forget and it blocks shipping.
 - **Android is wired but unverified** — no Android SDK here. On the Windows checklist with #31.
 - **The privacy policy wording is a draft** and wants the owner's read. It adds a Crash Diagnostics category and states explicitly that quiz answers, progress and screen contents are not collected.
 - **No test crash has been fired.** That is the only real end-to-end verification and it writes to production Crashlytics, so it needs the owner's say-so.
