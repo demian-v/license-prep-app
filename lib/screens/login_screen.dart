@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../localization/app_localizations.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -50,7 +51,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         errorBuilder: (context, error, stackTrace) {
           debugPrint('❌ LoginScreen: Failed to load logo asset: $error');
           return Text(
-            'USA License Prep',
+            AppLocalizations.of(context).translate('auth_app_title'),
             style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.bold,
@@ -187,7 +188,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 Text(
-                                  'Log In',
+                                  AppLocalizations.of(context).translate('auth_log_in'),
                                   style: TextStyle(
                                     fontSize: 24,
                                     fontWeight: FontWeight.bold,
@@ -221,7 +222,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                 TextFormField(
                                   controller: _emailController,
                                   decoration: InputDecoration(
-                                    labelText: 'Email',
+                                    labelText: AppLocalizations.of(context).translate('email'),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide(color: Colors.grey.shade300),
@@ -242,7 +243,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                   keyboardType: TextInputType.emailAddress,
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
-                                      return 'Please enter your email';
+                                      return AppLocalizations.of(context).translate('auth_enter_email');
                                     }
                                     return null;
                                   },
@@ -251,7 +252,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                 TextFormField(
                                   controller: _passwordController,
                                   decoration: InputDecoration(
-                                    labelText: 'Password',
+                                    labelText: AppLocalizations.of(context).translate('password'),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide(color: Colors.grey.shade300),
@@ -272,7 +273,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                   obscureText: true,
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
-                                      return 'Please enter your password';
+                                      return AppLocalizations.of(context).translate('auth_enter_password');
                                     }
                                     return null;
                                   },
@@ -285,7 +286,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                       Navigator.pushNamed(context, '/forgot-password');
                                     },
                                     child: Text(
-                                      'Forgot password?',
+                                      AppLocalizations.of(context).translate('auth_forgot_password_link'),
                                       style: TextStyle(
                                         color: Colors.indigo.shade400,
                                         fontWeight: FontWeight.w500,
@@ -337,7 +338,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                             ),
                                           )
                                         : Text(
-                                            'Log In',
+                                            AppLocalizations.of(context).translate('auth_log_in'),
                                             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                                           ),
                                   ),
@@ -348,7 +349,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                     Navigator.pushNamed(context, '/signup');
                                   },
                                   child: Text(
-                                    'Don\'t have an account? Sign Up',
+                                    AppLocalizations.of(context).translate('auth_no_account_signup'),
                                     style: TextStyle(
                                       color: Colors.indigo.shade400,
                                       fontWeight: FontWeight.w500,

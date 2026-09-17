@@ -381,7 +381,17 @@ void main() async {
   
   // Create language provider - only force English for non-registered users
   // For registered users, load their saved language preference
-  final languageProvider = LanguageProvider(forceEnglish: user == null);
+  // Risk #50 — this was `forceEnglish: user == null`, which reset the language
+  // to English on every launch where nobody was signed in. That is exactly the
+  // reported symptom: a returning Russian, Ukrainian, Polish or Spanish user
+  // meets an English login screen, no matter what they chose last time.
+  // Localising the auth screens alone would not have shown, because the locale
+  // was overwritten before they rendered.
+  //
+  // A genuinely fresh install still gets English: LanguageProvider's own
+  // first-launch branch handles that. The deliberate reset path
+  // (resetToEnglish, used by the reset-settings screen) is untouched.
+  final languageProvider = LanguageProvider();
   // Wait for language to load properly from SharedPreferences
   await languageProvider.waitForLoad();
   print('Language provider loaded with language: ${languageProvider.language}');

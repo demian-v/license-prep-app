@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/analytics_service.dart';
+import '../localization/app_localizations.dart';
 
 class ResetEmailSentScreen extends StatefulWidget {
   @override
@@ -78,7 +79,7 @@ class _ResetEmailSentScreenState extends State<ResetEmailSentScreen> with Ticker
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Reset email resent'))
+          SnackBar(content: Text(AppLocalizations.of(context).translate('auth_reset_email_resent')))
         );
       }
     } catch (e) {
@@ -92,7 +93,7 @@ class _ResetEmailSentScreenState extends State<ResetEmailSentScreen> with Ticker
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error sending email. Please try again.'))
+          SnackBar(content: Text(AppLocalizations.of(context).translate('auth_error_sending_email')))
         );
       }
     } finally {
@@ -116,7 +117,7 @@ class _ResetEmailSentScreenState extends State<ResetEmailSentScreen> with Ticker
           onPressed: () => Navigator.of(context).pushReplacementNamed('/login'),
         ),
         title: Text(
-          'Check Your Email',
+          AppLocalizations.of(context).translate('auth_check_your_email'),
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         elevation: 0,
@@ -192,7 +193,7 @@ class _ResetEmailSentScreenState extends State<ResetEmailSentScreen> with Ticker
                               ),
                               SizedBox(height: 32),
                               Text(
-                                'Check Your Email',
+                                AppLocalizations.of(context).translate('auth_check_your_email'),
                                 style: TextStyle(
                                   fontSize: 24,
                                   fontWeight: FontWeight.bold,
@@ -203,7 +204,9 @@ class _ResetEmailSentScreenState extends State<ResetEmailSentScreen> with Ticker
                               Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 16),
                                 child: Text(
-                                  'Please check the email address $email for instructions to reset your password.',
+                                  AppLocalizations.of(context)
+                                      .translate('auth_check_email_instructions')
+                                      .replaceAll('{0}', email),
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     fontSize: 16,
@@ -251,7 +254,7 @@ class _ResetEmailSentScreenState extends State<ResetEmailSentScreen> with Ticker
                                           ),
                                         )
                                       : Text(
-                                          'Resend email',
+                                          AppLocalizations.of(context).translate('auth_resend_email'),
                                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                                         ),
                                 ),
@@ -262,7 +265,7 @@ class _ResetEmailSentScreenState extends State<ResetEmailSentScreen> with Ticker
                                   Navigator.pushReplacementNamed(context, '/login');
                                 },
                                 child: Text(
-                                  'Back to Log In',
+                                  AppLocalizations.of(context).translate('auth_back_to_login'),
                                   style: TextStyle(
                                     color: Colors.indigo.shade400,
                                     fontWeight: FontWeight.w500,

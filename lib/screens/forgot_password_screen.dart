@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/analytics_service.dart';
+import '../localization/app_localizations.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   @override
@@ -145,7 +146,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          'Forgot Password',
+          AppLocalizations.of(context).translate('auth_forgot_title'),
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         elevation: 0,
@@ -199,7 +200,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 Text(
-                                  'Forgot Your Password?',
+                                  AppLocalizations.of(context).translate('auth_forgot_heading'),
                                   style: TextStyle(
                                     fontSize: 24,
                                     fontWeight: FontWeight.bold,
@@ -208,7 +209,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
                                 ),
                                 SizedBox(height: 16),
                                 Text(
-                                  'Enter your email address and we will send you instructions to reset your password.',
+                                  AppLocalizations.of(context).translate('auth_forgot_instructions'),
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     color: Colors.grey[700],
@@ -243,8 +244,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
                                   onTap: _onFormStarted,
                                   onChanged: (value) => _onFormStarted(),
                                   decoration: InputDecoration(
-                                    labelText: 'Email address',
-                                    hintText: 'Enter your email',
+                                    labelText: AppLocalizations.of(context).translate('auth_email_address'),
+                                    hintText: AppLocalizations.of(context).translate('auth_enter_your_email'),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide(color: Colors.grey.shade300),
@@ -265,13 +266,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
                                   keyboardType: TextInputType.emailAddress,
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
-                                      return 'Please enter your email';
+                                      return AppLocalizations.of(context).translate('auth_enter_email');
                                     }
                                     
                                     // Basic email validation
                                     final emailRegExp = RegExp(r'^[^@]+@[^@]+\.[^@]+');
                                     if (!emailRegExp.hasMatch(value)) {
-                                      return 'Please enter a valid email address';
+                                      return AppLocalizations.of(context).translate('auth_enter_valid_email');
                                     }
                                     
                                     return null;
@@ -317,7 +318,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
                                             ),
                                           )
                                         : Text(
-                                            'Continue',
+                                            AppLocalizations.of(context).translate('continue'),
                                             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                                           ),
                                   ),
@@ -328,7 +329,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
                                     Navigator.pop(context);
                                   },
                                   child: Text(
-                                    'Back to Log In',
+                                    AppLocalizations.of(context).translate('auth_back_to_login'),
                                     style: TextStyle(
                                       color: Colors.indigo.shade400,
                                       fontWeight: FontWeight.w500,

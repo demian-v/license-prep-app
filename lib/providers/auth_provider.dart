@@ -753,16 +753,17 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Private method to reset language to English (for logout)
+  // Risk #50 — this used to call `setLanguage('en')`, wiping the user's chosen
+  // language on every logout. Together with the forceEnglish flag in main(),
+  // that is what put a returning Russian, Ukrainian, Polish or Spanish user in
+  // front of an English login screen no matter what they had picked.
+  //
+  // The interface language is a device preference, not account data: it has to
+  // survive logout, because the login screen is precisely where a signed-out
+  // person needs to read it. The state IS account data and is still cleared
+  // below. Deliberate resets (the reset-settings screen) are untouched.
   Future<void> _resetLanguageToEnglish() async {
-    if (_languageProvider != null) {
-      try {
-        await _languageProvider!.setLanguage('en');
-        debugPrint('🔄 AuthProvider: Reset LanguageProvider to English on logout');
-      } catch (e) {
-        debugPrint('⚠️ AuthProvider: Error resetting language to English: $e');
-      }
-    }
+    debugPrint('🌐 AuthProvider: Keeping the chosen interface language across logout');
   }
 
   // Private method to reset state to null (for logout)

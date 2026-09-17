@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../providers/auth_provider.dart';
 import '../services/analytics_service.dart';
 import 'language_selection_screen.dart';
+import '../localization/app_localizations.dart';
 
 class SignupScreen extends StatefulWidget {
   @override
@@ -64,7 +65,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
         errorBuilder: (context, error, stackTrace) {
           debugPrint('❌ SignupScreen: Failed to load logo asset: $error');
           return Text(
-            'USA License Prep',
+            AppLocalizations.of(context).translate('auth_app_title'),
             style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.bold,
@@ -144,7 +145,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
         debugPrint('Could not launch $url');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Could not open Terms of Service')),
+            SnackBar(content: Text(AppLocalizations.of(context).translate('auth_error_terms_open'))),
           );
         }
       }
@@ -152,7 +153,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
       debugPrint('Error launching URL: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error opening link')),
+          SnackBar(content: Text(AppLocalizations.of(context).translate('auth_error_link_open'))),
         );
       }
     }
@@ -164,20 +165,20 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
     
     if (errorLower.contains('email-already-in-use') || 
         errorLower.contains('email address is already in use')) {
-      return 'This email is already in use. Please try a different email or log in.';
+      return AppLocalizations.of(context).translate('auth_error_email_in_use');
     } else if (errorLower.contains('weak-password') || 
                errorLower.contains('password is too weak')) {
-      return 'Password is too weak. Please use a stronger password.';
+      return AppLocalizations.of(context).translate('auth_error_weak_password');
     } else if (errorLower.contains('invalid-email')) {
-      return 'Invalid email format. Please check your email address.';
+      return AppLocalizations.of(context).translate('auth_error_invalid_email');
     } else if (errorLower.contains('network')) {
-      return 'Network error. Please check your connection and try again.';
+      return AppLocalizations.of(context).translate('auth_error_network');
     } else {
       // Extract the meaningful part after "Registration failed:" if present
       if (errorMessage.contains('Registration failed:')) {
         return errorMessage.split('Registration failed:').last.trim();
       }
-      return 'An error occurred during signup. Please try again.';
+      return AppLocalizations.of(context).translate('auth_error_signup_generic');
     }
   }
 
@@ -314,7 +315,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
         if (mounted) {
           // Show a toast or snackbar with warning
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Account created but some data could not be saved. Some features may be limited.'))
+            SnackBar(content: Text(AppLocalizations.of(context).translate('auth_warn_partial_save')))
           );
           
           // Still navigate to next screen
@@ -394,7 +395,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 Text(
-                                  'Create Account',
+                                  AppLocalizations.of(context).translate('auth_create_account'),
                                   style: TextStyle(
                                     fontSize: 24,
                                     fontWeight: FontWeight.bold,
@@ -430,7 +431,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
                                   onTap: _onFormStarted,
                                   onChanged: (value) => _onFormStarted(),
                                   decoration: InputDecoration(
-                                    labelText: 'Full Name',
+                                    labelText: AppLocalizations.of(context).translate('auth_full_name'),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide(color: Colors.grey.shade300),
@@ -450,7 +451,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
                                   ),
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
-                                      return 'Please enter your name';
+                                      return AppLocalizations.of(context).translate('auth_enter_name');
                                     }
                                     return null;
                                   },
@@ -461,7 +462,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
                                   onTap: _onFormStarted,
                                   onChanged: (value) => _onFormStarted(),
                                   decoration: InputDecoration(
-                                    labelText: 'Email',
+                                    labelText: AppLocalizations.of(context).translate('email'),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide(color: Colors.grey.shade300),
@@ -482,12 +483,12 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
                                   keyboardType: TextInputType.emailAddress,
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
-                                      return 'Please enter your email';
+                                      return AppLocalizations.of(context).translate('auth_enter_email');
                                     }
                                     // Check for valid email format
                                     final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
                                     if (!emailRegex.hasMatch(value)) {
-                                      return 'Please enter a valid email address';
+                                      return AppLocalizations.of(context).translate('auth_enter_valid_email');
                                     }
                                     return null;
                                   },
@@ -498,7 +499,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
                                   onTap: _onFormStarted,
                                   onChanged: (value) => _onFormStarted(),
                                   decoration: InputDecoration(
-                                    labelText: 'Password',
+                                    labelText: AppLocalizations.of(context).translate('password'),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide(color: Colors.grey.shade300),
@@ -519,10 +520,10 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
                                   obscureText: true,
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
-                                      return 'Please enter a password';
+                                      return AppLocalizations.of(context).translate('auth_enter_a_password');
                                     }
                                     if (value.length < 6) {
-                                      return 'Password must be at least 6 characters';
+                                      return AppLocalizations.of(context).translate('auth_password_min_length');
                                     }
                                     return null;
                                   },
@@ -592,7 +593,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
                                         Padding(
                                           padding: const EdgeInsets.only(left: 12.0, top: 4.0),
                                           child: Text(
-                                            'Please agree to Terms of Service to continue',
+                                            AppLocalizations.of(context).translate('auth_agree_terms_required'),
                                             style: TextStyle(
                                               fontSize: 12,
                                               color: Colors.red.shade800,
@@ -644,7 +645,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
                                             ),
                                           )
                                         : Text(
-                                            'Sign Up',
+                                            AppLocalizations.of(context).translate('signup'),
                                             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                                           ),
                                   ),
@@ -655,7 +656,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
                                     Navigator.pushReplacementNamed(context, '/login');
                                   },
                                   child: Text(
-                                    'Already have an account? Log In',
+                                    AppLocalizations.of(context).translate('auth_have_account_login'),
                                     style: TextStyle(
                                       color: Colors.indigo.shade400,
                                       fontWeight: FontWeight.w500,

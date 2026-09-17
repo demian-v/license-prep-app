@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/analytics_service.dart';
 import '../services/password_reset_handler.dart';
+import '../localization/app_localizations.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   final String code;
@@ -230,7 +231,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Change Your Password',
+          AppLocalizations.of(context).translate('auth_change_password_heading'),
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         elevation: 0,
@@ -294,7 +295,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
                       ),
                       SizedBox(height: 16),
                       Text(
-                        'Password Reset Link Error',
+                        AppLocalizations.of(context).translate('auth_reset_link_error'),
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
@@ -341,7 +342,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
                               minimumSize: Size(double.infinity, 50),
                             ),
                             child: Text(
-                              'Request New Reset Link',
+                              AppLocalizations.of(context).translate('auth_request_new_link'),
                               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                             ),
                           ),
@@ -402,7 +403,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
-                          'Change Your Password',
+                          AppLocalizations.of(context).translate('auth_change_password_heading'),
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
@@ -411,7 +412,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
                         ),
                         SizedBox(height: 16),
                         Text(
-                          'Enter a new password below to change your password.',
+                          AppLocalizations.of(context).translate('auth_change_password_instructions'),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.grey[700],
@@ -444,7 +445,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
                         TextFormField(
                           controller: _passwordController,
                           decoration: InputDecoration(
-                            labelText: 'New password',
+                            labelText: AppLocalizations.of(context).translate('auth_new_password'),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(color: Colors.grey.shade300),
@@ -491,7 +492,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
                           obscureText: _obscurePassword,
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Please enter a password';
+                              return AppLocalizations.of(context).translate('auth_enter_a_password');
                             }
                             
                             _validatePassword(value);
@@ -508,7 +509,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
                         TextFormField(
                           controller: _confirmPasswordController,
                           decoration: InputDecoration(
-                            labelText: 'Re-enter new password',
+                            labelText: AppLocalizations.of(context).translate('auth_confirm_new_password'),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(color: Colors.grey.shade300),
@@ -555,10 +556,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
                           obscureText: _obscureConfirmPassword,
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Please confirm your password';
+                              return AppLocalizations.of(context).translate('auth_confirm_password_required');
                             }
                             if (value != _passwordController.text) {
-                              return 'Passwords do not match';
+                              return AppLocalizations.of(context).translate('auth_passwords_do_not_match');
                             }
                             return null;
                           },
@@ -588,7 +589,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Your password must contain:',
+                                  AppLocalizations.of(context).translate('auth_password_requirements'),
                                   style: TextStyle(fontWeight: FontWeight.bold),
                                 ),
                                 SizedBox(height: 8),
@@ -675,7 +676,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
                                       ),
                                     )
                                   : Text(
-                                      'Reset password',
+                                      AppLocalizations.of(context).translate('auth_reset_password'),
                                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                                     ),
                             ),
