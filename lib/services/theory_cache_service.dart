@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/theory_module.dart';
+import 'content_cache_policy.dart';
 
 /// Service for caching theory modules locally to reduce Firebase calls
 class TheoryCacheService {
@@ -8,9 +9,6 @@ class TheoryCacheService {
   static const String _META_PREFIX = 'theory_cache_meta_';
   static const String _TRAFFIC_TOPICS_PREFIX = 'traffic_topics_';
   static const String _TRAFFIC_META_PREFIX = 'traffic_cache_meta_';
-  
-  // Cache duration - theory content doesn't change often
-  static const Duration _CACHE_DURATION = Duration(hours: 24);
   
   /// Generate cache key for theory modules
   String _generateCacheKey(String state, String language, String licenseType) {
@@ -48,7 +46,7 @@ class TheoryCacheService {
       final cachedTime = DateTime.parse(metadata['timestamp']);
       final now = DateTime.now();
       
-      final isValid = now.difference(cachedTime) < _CACHE_DURATION;
+      final isValid = ContentCachePolicy.isFresh(cachedTime, now: now);
       print('📋 Cache for ${state}_${language}_${licenseType}: ${isValid ? 'VALID' : 'EXPIRED'} (age: ${now.difference(cachedTime).inHours}h)');
       
       return isValid;
@@ -131,7 +129,7 @@ class TheoryCacheService {
       final cachedTime = DateTime.parse(metadata['timestamp']);
       final now = DateTime.now();
       
-      final isValid = now.difference(cachedTime) < _CACHE_DURATION;
+      final isValid = ContentCachePolicy.isFresh(cachedTime, now: now);
       print('📋 Traffic topics cache for ${state}_${language}: ${isValid ? 'VALID' : 'EXPIRED'} (age: ${now.difference(cachedTime).inHours}h)');
       
       return isValid;

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/quiz_topic.dart';
 import '../models/quiz_question.dart';
+import 'content_cache_policy.dart';
 
 /// Service for caching quiz data locally to reduce Firebase calls
 class QuizCacheService {
@@ -11,9 +12,6 @@ class QuizCacheService {
   static const String _PRACTICE_QUESTIONS_PREFIX = 'practice_questions_';
   static const String _EXAM_QUESTIONS_PREFIX = 'exam_questions_';
   static const String _META_PREFIX = 'quiz_cache_meta_';
-  
-  // Cache duration - 24 hours like theory cache
-  static const Duration _CACHE_DURATION = Duration(hours: 24);
   
   // Maximum questions to cache per topic
   static const int _MAX_QUESTIONS_PER_TOPIC = 100;
@@ -77,7 +75,7 @@ class QuizCacheService {
       final cachedTime = DateTime.parse(metadata['timestamp']);
       final now = DateTime.now();
       
-      final isValid = now.difference(cachedTime) < _CACHE_DURATION;
+      final isValid = ContentCachePolicy.isFresh(cachedTime, now: now);
       print('📋 Cache for $metaKey: ${isValid ? 'VALID' : 'EXPIRED'} (age: ${now.difference(cachedTime).inHours}h)');
       
       return isValid;

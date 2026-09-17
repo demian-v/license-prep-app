@@ -5,6 +5,8 @@ import '../models/theory_module.dart';
 import '../models/traffic_rule_topic.dart';
 import '../services/service_locator.dart';
 import '../services/theory_cache_service.dart';
+import '../services/content_cache_policy.dart';
+import '../services/content_version_service.dart';
 
 /// Risk #38 — `checkConnectivity()` in connectivity_plus 7 returns a **list** of
 /// active transports, not one value. The provider used to compare that list
@@ -44,10 +46,19 @@ class ContentProvider extends ChangeNotifier {
   // Cache service
   final TheoryCacheService _cacheService = serviceLocator.theoryCache;
   
+  // Risk #47 — the content cache-bust check, run once per app session before
+  // any cache is trusted.
+  final ContentVersionService _versionService = ContentVersionService();
+  bool _versionChecked = false;
+
+  Future<void> _ensureContentVersionChecked() async {
+    if (_versionChecked) return;
+    _versionChecked = true; // set first: one attempt per session, even on failure
+    await _versionService.syncAndInvalidateIfChanged();
+  }
+
   // Cache timestamps
   DateTime? _lastFetchTime;
-  // Different cache durations based on content type
-  final Duration _cacheValidityDuration = Duration(hours: 2);
   final Map<String, DateTime> _lastFetchTimes = {};
   
   // In-memory content caches
@@ -121,29 +132,21 @@ class ContentProvider extends ChangeNotifier {
   int get firestoreQueries => _firestoreQueries;
   double get cacheHitRatio => (_cacheHits + _cacheMisses) > 0 ? _cacheHits / (_cacheHits + _cacheMisses) : 0.0;
   
-  // Check if cache is valid (enhanced with type-specific cache times)
+  // Risk #47 — one TTL for every content cache, from ContentCachePolicy.
+  // This used to be 2 h here, 6 h for modules and 24 h for topics, against 24 h
+  // on disk in both cache services: whichever expired first decided, so the
+  // real policy was none of the four. Urgency is handled by the content version
+  // (see ContentCachePolicy.shouldInvalidate), not by shortening the clock.
   bool get isCacheValid {
     if (_lastFetchTime == null) return false;
-    
-    final now = DateTime.now();
-    return now.difference(_lastFetchTime!) < _cacheValidityDuration;
+    return ContentCachePolicy.isFresh(_lastFetchTime!);
   }
   
   // Check if a specific cache type is valid
   bool isCacheValidForType(String cacheType) {
-    if (!_lastFetchTimes.containsKey(cacheType)) return false;
-    
-    final now = DateTime.now();
-    final lastFetch = _lastFetchTimes[cacheType]!;
-    
-    // Different cache durations for different content types
-    if (cacheType == 'topics') {
-      return now.difference(lastFetch) < Duration(hours: 24); // Topics change less frequently
-    } else if (cacheType == 'modules') {
-      return now.difference(lastFetch) < Duration(hours: 6); // Modules might change more often
-    }
-    
-    return now.difference(lastFetch) < _cacheValidityDuration; // Default
+    final lastFetch = _lastFetchTimes[cacheType];
+    if (lastFetch == null) return false;
+    return ContentCachePolicy.isFresh(lastFetch);
   }
   
   // Check if device is connected
@@ -262,6 +265,11 @@ class ContentProvider extends ChangeNotifier {
     _isUsingStateFallback = false;
     
     print('📋 ContentProvider: Tracking request - language: $_requestedLanguage, state: $_requestedState');
+    
+    // Risk #47 — before trusting any cache, find out whether the content has
+    // been corrected server-side. Non-blocking on failure: a version check that
+    // could stop content loading would be worse than the staleness it fixes.
+    await _ensureContentVersionChecked();
     
     // 🏗️ ENHANCED CACHING LOGIC - Check both modules AND topics cache
     if (!forceRefresh) {

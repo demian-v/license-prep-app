@@ -14,6 +14,7 @@ import { mapPlayNotification, PLAY_NOTIFICATION } from './play-notifications';
 import { recordWebhookFailure } from './webhook-dead-letter';
 import { anonymizeTrialDevicesForUser } from './trial-devices';
 import { collectUserDataForDeletion, applyDeletionPlan, assertRecentLogin } from './account-deletion';
+import { readContentVersion } from './content-version';
 import * as fs from 'fs';
 import * as path from 'path';
 import { defineInt, defineSecret } from 'firebase-functions/params';
@@ -1863,6 +1864,21 @@ export const provisionUserDocument = functions.auth.user().onCreate(async (user)
 // Creates a trial subscription server-side on new user signup.
 // Replaces the client-side _createInitialTrialSubscription in direct_auth_service.dart.
 // Fixes the 2017-date bug — timestamps are set server-side.
+// Risk #47 — the content cache-bust signal. One integer the client compares
+// against the version it cached; if they differ it drops cached content and
+// refetches, regardless of TTL. Bumping the document is a content-operations
+// step, not a deploy.
+//
+// Deliberately NOT entitlement-gated. A lapsed user who resubscribes must not
+// be left holding content cached before a correction, and the value discloses
+// nothing — it is one integer, no content of any kind.
+export const getContentVersion = functions.https.onCall(async (_data: any, context: any) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Not logged in');
+  }
+  return { version: await readContentVersion(db) };
+});
+
 export const createTrialSubscription = functions.https.onCall(async (data: any, context: any) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Not logged in');
   const userId = context.auth.uid;
