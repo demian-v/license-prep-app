@@ -1,4 +1,5 @@
 import * as admin from 'firebase-admin';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { sweepPaginated, SWEEP_TIME_BUDGET_MS } from './sweep';
 // TODO: Uncomment when implementing real email sending
 // import * as nodemailer from 'nodemailer';
@@ -30,8 +31,8 @@ interface SubscriptionData {
   isActive: boolean;
   status: string;
   trialUsed: number;
-  trialEndsAt?: admin.firestore.Timestamp;
-  nextBillingDate?: admin.firestore.Timestamp;
+  trialEndsAt?: Timestamp;
+  nextBillingDate?: Timestamp;
   planType: string;
   packageId: number;
 }
@@ -110,7 +111,7 @@ async function checkExpiredTrials(deadline: number): Promise<{processed: number,
   const result: {processed: number, emailsSent: number, errors: string[]} = { processed: 0, emailsSent: 0, errors: [] };
 
   try {
-    const now = admin.firestore.Timestamp.now();
+    const now = Timestamp.now();
     
     // Query expired trials.
     // BUG D FIX: added planType == 'trial' filter — without it, any subscription
@@ -164,7 +165,7 @@ async function checkExpiredCanceledSubscriptions(deadline: number): Promise<{pro
   const result: {processed: number, emailsSent: number, errors: string[]} = { processed: 0, emailsSent: 0, errors: [] };
 
   try {
-    const now = admin.firestore.Timestamp.now();
+    const now = Timestamp.now();
     
     // Query expired canceled subscriptions
     const db = getDb();
@@ -215,7 +216,7 @@ async function updateExpiredTrial(subscriptionData: SubscriptionData): Promise<v
     isActive: false,
     status: 'inactive',
     trialUsed: 1, // Prevent reuse of the trial
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
   });
 
   // 2. Revoke premium access on the user document.
@@ -227,7 +228,7 @@ async function updateExpiredTrial(subscriptionData: SubscriptionData): Promise<v
   // missing and merges if present — always safe.
   batch.set(
     db.collection('users').doc(subscriptionData.userId),
-    { isActive: false, lastUpdated: admin.firestore.FieldValue.serverTimestamp() },
+    { isActive: false, lastUpdated: FieldValue.serverTimestamp() },
     { merge: true }
   );
 
@@ -249,7 +250,7 @@ async function updateExpiredCanceledSubscription(subscriptionData: SubscriptionD
     isActive: false,
     status: 'inactive',
     // trialUsed stays as-is (already 1 for paid subscriptions)
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
   });
 
   // 2. Revoke premium access on the user document.
@@ -257,7 +258,7 @@ async function updateExpiredCanceledSubscription(subscriptionData: SubscriptionD
   // NOT_FOUND error if the user document was deleted.
   batch.set(
     db.collection('users').doc(subscriptionData.userId),
-    { isActive: false, lastUpdated: admin.firestore.FieldValue.serverTimestamp() },
+    { isActive: false, lastUpdated: FieldValue.serverTimestamp() },
     { merge: true }
   );
 
@@ -362,7 +363,7 @@ async function logSubscriptionChange(
         status: 'inactive',
         trialUsed: action === 'trial_expired' ? 1 : subscriptionData.trialUsed,
       },
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      timestamp: FieldValue.serverTimestamp(),
       processedBy: 'scheduled_function',
       emailSent,  // FIX: actual value, not hardcoded true
     };
@@ -396,8 +397,8 @@ export async function getSubscriptionStatistics(): Promise<{
   canceledExpiringTomorrow: number;
 }> {
   const now = new Date();
-  const today = admin.firestore.Timestamp.fromDate(now);
-  const tomorrow = admin.firestore.Timestamp.fromDate(new Date(now.getTime() + 24 * 60 * 60 * 1000));
+  const today = Timestamp.fromDate(now);
+  const tomorrow = Timestamp.fromDate(new Date(now.getTime() + 24 * 60 * 60 * 1000));
   
   try {
     // PERF-2 FIX: Run all 4 queries in parallel — they are fully independent.

@@ -1,4 +1,5 @@
 import * as admin from 'firebase-admin';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { isWithinStoreGrace } from './billing-grace';
 import { sweepPaginated, SWEEP_TIME_BUDGET_MS } from './sweep';
 
@@ -19,7 +20,7 @@ interface SubscriptionData {
   isActive: boolean;
   status: string;
   trialUsed: number;
-  nextBillingDate: admin.firestore.Timestamp;
+  nextBillingDate: Timestamp;
   planType: string; // 'monthly' | 'yearly'
   packageId: number;
   renewalAttempts?: number; // tracks consecutive missed billing cycles
@@ -105,7 +106,7 @@ async function checkSubscriptionRenewals(): Promise<{
   const result = { processed: 0, successful: 0, failed: 0, emailsSent: 0, errors: [] as string[] };
 
   try {
-    const now = admin.firestore.Timestamp.now();
+    const now = Timestamp.now();
     const db = getDb();
 
     // Risk #25 — cursor-paginated, no longer capped at 100.
@@ -188,7 +189,7 @@ export async function processOverdueSubscription(
       isActive: false,
       status: 'inactive',
       renewalAttempts: 0, // reset so it can be reactivated cleanly if user re-subscribes
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
     // RM-MOD-1 FIX: Use batch.set(..., {merge:true}) instead of batch.update().
     // batch.update() throws NOT_FOUND if the user document doesn't exist (e.g.
@@ -200,7 +201,7 @@ export async function processOverdueSubscription(
     // updateExpiredTrial and updateExpiredCanceledSubscription (SM-MOD-1).
     batch.set(
       db.collection('users').doc(subscriptionData.userId),
-      { isActive: false, lastUpdated: admin.firestore.FieldValue.serverTimestamp() },
+      { isActive: false, lastUpdated: FieldValue.serverTimestamp() },
       { merge: true }
     );
     await batch.commit();
@@ -215,7 +216,7 @@ export async function processOverdueSubscription(
   await db.collection('subscriptions').doc(subscriptionData.id).update({
     status: 'past_due',
     renewalAttempts: newAttempts,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
   });
 
   // BUG RM-1 FIX: Only email the user on the FIRST missed billing cycle
@@ -324,7 +325,7 @@ async function logRenewalActivity(
         packageId: subscriptionData.packageId,
         renewalSuccess: success,
       },
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      timestamp: FieldValue.serverTimestamp(),
       processedBy: 'renewal_function',
       emailSent,  // FIX: actual value, not hardcoded true
     };
@@ -353,8 +354,8 @@ export async function getRenewalStatistics(): Promise<{
   pastDueCount: number;             // FIX: subscriptions already in grace period
 }> {
   const now = new Date();
-  const today = admin.firestore.Timestamp.fromDate(now);
-  const tomorrow = admin.firestore.Timestamp.fromDate(new Date(now.getTime() + 24 * 60 * 60 * 1000));
+  const today = Timestamp.fromDate(now);
+  const tomorrow = Timestamp.fromDate(new Date(now.getTime() + 24 * 60 * 60 * 1000));
 
   try {
     const db = getDb();

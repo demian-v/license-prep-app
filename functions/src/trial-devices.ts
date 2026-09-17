@@ -1,4 +1,4 @@
-import * as admin from 'firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 /**
  * Anonymise a departing user's trialDevices records (risk #26).
@@ -25,9 +25,9 @@ export async function anonymizeTrialDevicesForUser(
 
   for (const doc of snap.docs) {
     batch.update(doc.ref, {
-      firstUserId: admin.firestore.FieldValue.delete(),
-      firstSubscriptionId: admin.firestore.FieldValue.delete(),
-      anonymizedAt: admin.firestore.FieldValue.serverTimestamp(),
+      firstUserId: FieldValue.delete(),
+      firstSubscriptionId: FieldValue.delete(),
+      anonymizedAt: FieldValue.serverTimestamp(),
     });
   }
 

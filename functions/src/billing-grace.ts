@@ -1,4 +1,4 @@
-import * as admin from 'firebase-admin';
+import { Timestamp } from 'firebase-admin/firestore';
 
 /**
  * How long a lapsed subscription keeps access before we revoke it locally
@@ -39,7 +39,7 @@ const GRACE_MS = STORE_GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
  * requires the field.
  */
 export function isWithinStoreGrace(
-  nextBillingDate: admin.firestore.Timestamp | null | undefined,
+  nextBillingDate: Timestamp | null | undefined,
   now: number = Date.now(),
 ): boolean {
   if (!nextBillingDate) return false;

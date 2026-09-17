@@ -1,4 +1,4 @@
-import * as admin from 'firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 /**
  * Account deletion (risks #13 and #14).
@@ -98,14 +98,14 @@ export async function applyDeletionPlan(
         deleted++;
       } else {
         const update: Record<string, unknown> = {
-          anonymizedAt: admin.firestore.FieldValue.serverTimestamp(),
+          anonymizedAt: FieldValue.serverTimestamp(),
         };
         // Replace rather than remove: these documents are still queried by
         // userId, and a missing field would make them unreachable rather than
         // anonymous.
         update.userId = anonymousId;
         for (const field of PERSONAL_LINK_FIELDS.filter((f) => f !== 'userId')) {
-          update[field] = admin.firestore.FieldValue.delete();
+          update[field] = FieldValue.delete();
         }
         batch.set(target.ref, update, { merge: true });
         anonymized++;

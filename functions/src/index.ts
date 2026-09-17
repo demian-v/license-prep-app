@@ -1,5 +1,13 @@
 import * as functions from 'firebase-functions/v1';
 import * as admin from 'firebase-admin';
+// firebase-tools' Functions emulator stubs `firebase-admin` behind a Proxy and
+// returns `admin.firestore` through Function.prototype.bind, which drops the
+// statics hanging off it (FieldValue, Timestamp, FieldPath). Every
+// `admin.firestore.FieldValue.serverTimestamp()` therefore threw "Cannot read
+// properties of undefined" under the emulator while working fine in production,
+// so local signup never wrote a user document. The modular import below is the
+// same object in both places and is not proxied.
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { requireEntitledUser, requireAdmin } from './entitlement';
 import { applyToAllMatches } from './webhook-fanout';
 import { mapPlayNotification, PLAY_NOTIFICATION } from './play-notifications';
@@ -657,7 +665,7 @@ export const updateUserLanguage = functions.https.onCall(async (data, context) =
     // stuck. This heals accounts orphaned before the auth trigger existed.
     await db.collection('users').doc(userId).set({
       language: language,
-      lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+      lastUpdated: FieldValue.serverTimestamp(),
     }, { merge: true });
     
     console.log(`Successfully updated language for user ${userId} to: ${language}`);
@@ -704,7 +712,7 @@ export const updateUserState = functions.https.onCall(async (data, context) => {
     // Risk #23 — set/merge, not update(). See updateUserLanguage above.
     await db.collection('users').doc(userId).set({
       state: state || null,
-      lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+      lastUpdated: FieldValue.serverTimestamp(),
     }, { merge: true });
     
     console.log(`Successfully updated state for user ${userId} to: ${state || 'null'}`);
@@ -833,7 +841,7 @@ export const createOrUpdateUserDocument = functions.https.onCall(async (data, co
         email: email,
         language: language || 'en',
         state: state || null,
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+        lastUpdated: FieldValue.serverTimestamp(),
       };
       await db.collection('users').doc(userId).update(updateData);
       console.log(`Successfully updated user document for user: ${userId}`);
@@ -844,8 +852,8 @@ export const createOrUpdateUserDocument = functions.https.onCall(async (data, co
         email: email,
         language: language || 'en',
         state: state || null,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
+        lastUpdated: FieldValue.serverTimestamp(),
       };
       await db.collection('users').doc(userId).set(createData);
       console.log(`Successfully created user document for user: ${userId}`);
@@ -921,9 +929,9 @@ export const addSavedQuestion = functions.https.onCall(async (data, context) => 
       
       // Add question to array and update order
       await docRef.update({
-        itemIds: admin.firestore.FieldValue.arrayUnion(questionId),
+        itemIds: FieldValue.arrayUnion(questionId),
         [`order.${questionId}`]: Date.now(),
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+        lastUpdated: FieldValue.serverTimestamp(),
       });
       
     } else {
@@ -932,8 +940,8 @@ export const addSavedQuestion = functions.https.onCall(async (data, context) => 
         userId: userId,
         itemIds: [questionId],
         order: { [questionId]: Date.now() },
-        savedAt: admin.firestore.FieldValue.serverTimestamp(),
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+        savedAt: FieldValue.serverTimestamp(),
+        lastUpdated: FieldValue.serverTimestamp(),
       };
       
       await docRef.set(savedQuestionData);
@@ -1018,9 +1026,9 @@ export const removeSavedQuestion = functions.https.onCall(async (data, context) 
     
     // Remove question from array and order map
     await docRef.update({
-      itemIds: admin.firestore.FieldValue.arrayRemove(questionId),
-      [`order.${questionId}`]: admin.firestore.FieldValue.delete(),
-      lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+      itemIds: FieldValue.arrayRemove(questionId),
+      [`order.${questionId}`]: FieldValue.delete(),
+      lastUpdated: FieldValue.serverTimestamp(),
     });
     
     console.log(`Successfully removed saved question ${questionId} for user ${userId}`);
@@ -1231,7 +1239,7 @@ export const updateProfile = functions.https.onCall(async (data, context) => {
     
     // Build update data object
     const updateData: any = {
-      lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+      lastUpdated: FieldValue.serverTimestamp(),
     };
     
     // Add name if provided
@@ -1439,7 +1447,7 @@ export const deleteUserAccount = functions.https.onCall(async (data, context) =>
         + 'subscription. Cancel it in your device subscription settings, or you will '
         + 'continue to be charged.',
       userId: userId,
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      timestamp: FieldValue.serverTimestamp(),
     };
     
   } catch (error) {
@@ -1492,7 +1500,7 @@ export const checkExpiredSubscriptions = functions
       return {
         success: true,
         result: result,
-        timestamp: admin.firestore.FieldValue.serverTimestamp()
+        timestamp: FieldValue.serverTimestamp()
       };
       
     } catch (error) {
@@ -1503,7 +1511,7 @@ export const checkExpiredSubscriptions = functions
         await db.collection('systemLogs').add({
           type: 'scheduled_subscription_check_error',
           error: error instanceof Error ? error.message : String(error),
-          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          timestamp: FieldValue.serverTimestamp(),
           context: context
         });
       } catch (logError) {
@@ -1546,7 +1554,7 @@ export const processSubscriptionsManualy = functions.https.onCall(async (data, c
       success: true,
       result: result,
       triggeredBy: context.auth.uid,
-      timestamp: admin.firestore.FieldValue.serverTimestamp()
+      timestamp: FieldValue.serverTimestamp()
     };
     
   } catch (error) {
@@ -1593,7 +1601,7 @@ export const getSubscriptionStats = functions.https.onCall(async (data, context)
       success: true,
       statistics: stats,
       retrievedBy: context.auth.uid,
-      timestamp: admin.firestore.FieldValue.serverTimestamp()
+      timestamp: FieldValue.serverTimestamp()
     };
     
   } catch (error) {
@@ -1638,14 +1646,14 @@ export const subscriptionSystemHealth = functions.https.onCall(async (data, cont
     
     // Check recent system logs
     const recentLogs = await db.collection('systemLogs')
-      .where('timestamp', '>', admin.firestore.Timestamp.fromDate(oneHourAgo))
+      .where('timestamp', '>', Timestamp.fromDate(oneHourAgo))
       .orderBy('timestamp', 'desc')
       .limit(10)
       .get();
     
     // Check recent subscription logs
     const recentSubscriptionLogs = await db.collection('subscriptionLogs')
-      .where('timestamp', '>', admin.firestore.Timestamp.fromDate(oneHourAgo))
+      .where('timestamp', '>', Timestamp.fromDate(oneHourAgo))
       .orderBy('timestamp', 'desc')
       .limit(20)
       .get();
@@ -1655,7 +1663,7 @@ export const subscriptionSystemHealth = functions.https.onCall(async (data, cont
     
     const healthReport = {
       status: 'healthy',
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      timestamp: FieldValue.serverTimestamp(),
       systemLogs: {
         count: recentLogs.docs.length,
         recentErrors: recentLogs.docs.filter(doc => doc.data().type?.includes('error')).length
@@ -1727,7 +1735,7 @@ export const renewActiveSubscriptions = functions
       return {
         success: true,
         result: result,
-        timestamp: admin.firestore.FieldValue.serverTimestamp()
+        timestamp: FieldValue.serverTimestamp()
       };
       
     } catch (error) {
@@ -1738,7 +1746,7 @@ export const renewActiveSubscriptions = functions
         await db.collection('systemLogs').add({
           type: 'scheduled_subscription_renewal_error',
           error: error instanceof Error ? error.message : String(error),
-          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          timestamp: FieldValue.serverTimestamp(),
           context: context
         });
       } catch (logError) {
@@ -1779,7 +1787,7 @@ export const getRenewalStats = functions.https.onCall(async (data, context) => {
       success: true,
       statistics: stats,
       retrievedBy: context.auth.uid,
-      timestamp: admin.firestore.FieldValue.serverTimestamp()
+      timestamp: FieldValue.serverTimestamp()
     };
     
   } catch (error) {
@@ -1839,8 +1847,8 @@ export const provisionUserDocument = functions.auth.user().onCreate(async (user)
       name: user.displayName ?? '',
       language: 'en',
       state: null,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+      lastLoginAt: FieldValue.serverTimestamp(),
       provisionedBy: 'auth-trigger',
     }, { merge: true });
 
@@ -1907,16 +1915,16 @@ export const createTrialSubscription = functions.https.onCall(async (data: any, 
     id: subRef.id, userId,
     packageId: 3, status: 'active', isActive: true,
     planType: 'trial', duration: 3, price: 0, trialUsed: 0,
-    trialEndsAt: admin.firestore.Timestamp.fromDate(trialEnd),
-    nextBillingDate: admin.firestore.Timestamp.fromDate(trialEnd),
+    trialEndsAt: Timestamp.fromDate(trialEnd),
+    nextBillingDate: Timestamp.fromDate(trialEnd),
     deviceIdHash,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
     tx.set(deviceRef, {
       firstUserId: userId,
       firstSubscriptionId: subRef.id,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
     });
   // Mirror entitlement onto the user document, exactly as the purchase path does
   // (receipt-validation.ts syncUserDocument) and the schedulers expect.
@@ -1927,8 +1935,8 @@ export const createTrialSubscription = functions.https.onCall(async (data: any, 
       db.collection('users').doc(userId),
       {
         isActive: true,
-        nextBillingDate: admin.firestore.Timestamp.fromDate(trialEnd),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        nextBillingDate: Timestamp.fromDate(trialEnd),
+        updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true },
     );
@@ -1957,7 +1965,7 @@ export const cancelSubscription = functions.https.onCall(async (_data: any, cont
   await snap.docs[0].ref.update({
     status: 'canceled',
     isActive: shouldStayActive,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
   });
   return { success: true, isActive: shouldStayActive };
 });
@@ -2086,7 +2094,7 @@ export const appStoreWebhook = functions.https.onRequest(async (req, res) => {
       console.warn(`⚠️ appStoreWebhook: No subscription found for txn ${originalTransactionId}. ` +
         'Existing subscriber without originalTransactionId — will self-heal on next purchase.');
       await db.collection('processedWebhooks').doc(notificationUUID).set({
-        processedAt: admin.firestore.FieldValue.serverTimestamp(),
+        processedAt: FieldValue.serverTimestamp(),
         notificationType,
         subtype: subtype ?? null,
         originalTransactionId,
@@ -2098,10 +2106,10 @@ export const appStoreWebhook = functions.https.onRequest(async (req, res) => {
 
     const subData = snap.docs[0].data();
     const userId = subData.userId as string;
-    const now = admin.firestore.FieldValue.serverTimestamp();
+    const now = FieldValue.serverTimestamp();
     // expiresDate is Unix milliseconds per JWSTransactionDecodedPayload
     const expiresTimestamp = expiresDate
-      ? admin.firestore.Timestamp.fromMillis(expiresDate)
+      ? Timestamp.fromMillis(expiresDate)
       : null;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2302,7 +2310,7 @@ export const handleGooglePlayNotifications = functions
         console.warn('⚠️ handleGooglePlayNotifications: No subscription found for purchaseToken. ' +
           'Existing subscriber without androidPurchaseToken — will self-heal on next purchase.');
         await db.collection('processedWebhooks').doc(`gp_${messageId}`).set({
-          processedAt: admin.firestore.FieldValue.serverTimestamp(),
+          processedAt: FieldValue.serverTimestamp(),
           notificationType,
           result: 'subscription_not_found',
         });
@@ -2311,7 +2319,7 @@ export const handleGooglePlayNotifications = functions
 
       const subData = subSnap.docs[0].data();
       const userId = subData.userId as string;
-      const now = admin.firestore.FieldValue.serverTimestamp();
+      const now = FieldValue.serverTimestamp();
 
       // Notification types and the state each implies live in
       // play-notifications.ts, named rather than numbered — the comment that
@@ -2320,7 +2328,7 @@ export const handleGooglePlayNotifications = functions
       // BUG B4 FIX: For renewal events, fetch the real expiryTime from the Google Play Developer API.
       // Without this, nextBillingDate stays in the past and the 6-hour renewal scheduler re-enters
       // grace period every run, creating a permanent active→past_due flip-flop for Android users.
-      let newBillingDate: admin.firestore.Timestamp | null = null;
+      let newBillingDate: Timestamp | null = null;
       if ([
         PLAY_NOTIFICATION.RECOVERED, PLAY_NOTIFICATION.RENEWED,
         PLAY_NOTIFICATION.PURCHASED, PLAY_NOTIFICATION.RESTARTED,
@@ -2345,7 +2353,7 @@ export const handleGooglePlayNotifications = functions
           if (expiryTimeStr) {
             const expiryMs = new Date(expiryTimeStr).getTime();
             if (!isNaN(expiryMs) && expiryMs > 0) {
-              newBillingDate = admin.firestore.Timestamp.fromMillis(expiryMs);
+              newBillingDate = Timestamp.fromMillis(expiryMs);
             }
           }
         } catch (apiErr) {
@@ -2353,12 +2361,12 @@ export const handleGooglePlayNotifications = functions
             'falling back to heuristic extension:', apiErr);
           // Heuristic fallback: advance nextBillingDate by one billing cycle so the renewal
           // scheduler does not immediately re-enter grace period before the real date is known.
-          const currentDate = (subData.nextBillingDate as admin.firestore.Timestamp | undefined)
+          const currentDate = (subData.nextBillingDate as Timestamp | undefined)
             ?.toDate() ?? new Date();
           const billingDuration = (subData.duration as number | undefined) ?? 30;
           const extended = new Date(Math.max(currentDate.getTime(), Date.now()));
           extended.setDate(extended.getDate() + billingDuration);
-          newBillingDate = admin.firestore.Timestamp.fromDate(extended);
+          newBillingDate = Timestamp.fromDate(extended);
         }
       }
 

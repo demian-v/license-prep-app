@@ -4,6 +4,7 @@
 import * as functions from 'firebase-functions/v1';
 import { defineSecret } from 'firebase-functions/params';
 import * as admin from 'firebase-admin';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import axios from 'axios';
 import { google } from 'googleapis';
 
@@ -164,7 +165,7 @@ export async function checkRateLimit(userId: string): Promise<boolean> {
     const db = admin.firestore();
     const recentAttempts = await db.collection('subscriptionLogs')
       .where('userId', '==', userId)
-      .where('timestamp', '>', admin.firestore.Timestamp.fromMillis(windowStart))
+      .where('timestamp', '>', Timestamp.fromMillis(windowStart))
       .where('action', 'in', ['receipt_validated', 'receipt_validation_failed', 'receipt_validation_error'])
       .get();
 
@@ -851,15 +852,15 @@ async function syncUserBillingDate(
   db: admin.firestore.Firestore,
   userId: string,
   nextBillingDate: Date,
-  now: admin.firestore.Timestamp
+  now: Timestamp
 ): Promise<void> {
   try {
     await db.collection('users').doc(userId).set(
       {
         isActive: true,   // FIX: restore access after server-side deactivation
-        nextBillingDate: admin.firestore.Timestamp.fromDate(nextBillingDate),
+        nextBillingDate: Timestamp.fromDate(nextBillingDate),
         lastBillingDate: now,
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+        lastUpdated: FieldValue.serverTimestamp(),
       },
       { merge: true }     // FIX: safe whether the doc exists or not
     );
@@ -967,7 +968,7 @@ export async function createOrUpdateSubscription(
 
   try {
     const db = admin.firestore();
-    const now = admin.firestore.Timestamp.now();
+    const now = Timestamp.now();
     
     // Get subscription metadata from subscriptionsType collection
     const metadata = await getSubscriptionMetadata(productId);
@@ -1007,7 +1008,7 @@ export async function createOrUpdateSubscription(
         );
         // Still refresh billing metadata (safe to repeat — keeps Firestore in sync).
         await db.collection('subscriptions').doc(existingSubscription.id).update({
-          nextBillingDate: admin.firestore.Timestamp.fromDate(expiresAt),
+          nextBillingDate: Timestamp.fromDate(expiresAt),
           isActive: true,
           status: 'active',
           renewalAttempts: 0,
@@ -1042,11 +1043,11 @@ export async function createOrUpdateSubscription(
         isActive: true,
         status: 'active',
         platform: platform,  // Track which platform
-        nextBillingDate: admin.firestore.Timestamp.fromDate(expiresAt),
+        nextBillingDate: Timestamp.fromDate(expiresAt),
         duration: metadata.duration,
         price: metadata.price,
         trialUsed: productId === 'trial' ? 0 : 1,
-        trialEndsAt: productId === 'trial' ? admin.firestore.Timestamp.fromDate(expiresAt) : null,
+        trialEndsAt: productId === 'trial' ? Timestamp.fromDate(expiresAt) : null,
         transactions: [transactionRecord],  // Transaction history array
         originalTransactionId: platform === 'ios' && originalTransactionId ? originalTransactionId : null,
         androidPurchaseToken: platform === 'android' ? transactionId : null,
@@ -1070,12 +1071,12 @@ export async function createOrUpdateSubscription(
       // past_due (renewalAttempts=2) would only need one more missed cycle to
       // be permanently deactivated — effectively halving its grace period.
       await db.collection('subscriptions').doc(existingSubscription.id).update({
-        nextBillingDate: admin.firestore.Timestamp.fromDate(expiresAt),
+        nextBillingDate: Timestamp.fromDate(expiresAt),
         isActive: true,
         status: 'active',
         renewalAttempts: 0,  // FIX: clear grace-period counter on successful renewal
         platform: platform,  // Update platform (user might switch devices)
-        transactions: admin.firestore.FieldValue.arrayUnion(transactionRecord),
+        transactions: FieldValue.arrayUnion(transactionRecord),
         ...(platform === 'ios' && originalTransactionId && { originalTransactionId }),
         ...(platform === 'android' && { androidPurchaseToken: transactionId }),
         updatedAt: now
@@ -1105,13 +1106,13 @@ export async function createOrUpdateSubscription(
         packageId: metadata.id,
         duration: metadata.duration,
         price: metadata.price,
-        nextBillingDate: admin.firestore.Timestamp.fromDate(expiresAt),
+        nextBillingDate: Timestamp.fromDate(expiresAt),
         trialUsed: 1,  // Mark trial as used if upgrading from trial
         isActive: true,
         status: 'active',
         renewalAttempts: 0,  // FIX: don't carry over grace-period counter
         platform: platform,
-        transactions: admin.firestore.FieldValue.arrayUnion(upgradeTransaction),
+        transactions: FieldValue.arrayUnion(upgradeTransaction),
         ...(platform === 'ios' && originalTransactionId && { originalTransactionId }),
         ...(platform === 'android' && { androidPurchaseToken: transactionId }),
         updatedAt: now
@@ -1260,7 +1261,7 @@ export const validatePurchaseReceipt = functions
           platform: platform,
           productId: productId,
           error: validationResult.error,
-          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          timestamp: FieldValue.serverTimestamp(),
           success: false
         });
         
@@ -1298,8 +1299,8 @@ export const validatePurchaseReceipt = functions
         productId: productId,
         subscriptionId: subscriptionId,
         transactionId: validationResult.transactionId,
-        expiresAt: admin.firestore.Timestamp.fromDate(validationResult.expiresAt!),
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        expiresAt: Timestamp.fromDate(validationResult.expiresAt!),
+        timestamp: FieldValue.serverTimestamp(),
         success: true
       });
 
@@ -1327,7 +1328,7 @@ export const validatePurchaseReceipt = functions
         platform: platform,
         productId: productId,
         error: error instanceof Error ? error.message : String(error),
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        timestamp: FieldValue.serverTimestamp(),
         success: false
       });
       

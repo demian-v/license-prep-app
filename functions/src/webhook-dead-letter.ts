@@ -1,4 +1,4 @@
-import * as admin from 'firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 /**
  * Dead-letter queue for store webhooks (risk #9).
@@ -76,8 +76,8 @@ export async function recordWebhookFailure(
           : String(failure.error),
         payload: serialised,
         payloadTruncated: truncated,
-        firstSeenAt: snap.exists ? snap.get('firstSeenAt') : admin.firestore.FieldValue.serverTimestamp(),
-        lastSeenAt: admin.firestore.FieldValue.serverTimestamp(),
+        firstSeenAt: snap.exists ? snap.get('firstSeenAt') : FieldValue.serverTimestamp(),
+        lastSeenAt: FieldValue.serverTimestamp(),
       }, { merge: true });
 
       return next;
