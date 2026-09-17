@@ -176,6 +176,15 @@ class CounterService {
     return await getNextGlobalReportId(user.uid);
   }
 
+  /// Risk #45 — a rules-conforming report ID for callers that have to recover
+  /// from `getNextReportId` throwing.
+  ///
+  /// The recovery path in ReportService used `collection('reports').add(...)`,
+  /// which mints a Firestore auto-ID. That matches none of the ID patterns the
+  /// security rules allow, so the write was rejected and the report was lost —
+  /// precisely when something had already gone wrong.
+  String generateFallbackReportId(String userId) => _generateGlobalFallbackId(userId);
+
   /// Generates fallback ID with global format when transaction fails
   String _generateGlobalFallbackId(String userId) {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -252,48 +261,27 @@ class CounterService {
     }
   }
 
-  /// Query all reports for a specific user (supports both old and new formats)
+  /// Query all reports filed by a specific user.
+  ///
+  /// Risk #45 — this used to fetch the ENTIRE `reports` collection and filter
+  /// document IDs in memory, with a `where` on documentId for the legacy shape.
+  /// The unfiltered read is admin-only, so it was denied for every real user;
+  /// the catch below swallowed the denial and returned an empty list, which the
+  /// UI showed as "you have no reports" rather than "we could not read them".
+  ///
+  /// `userId` is now a required, caller-pinned field on every report, so a
+  /// single equality query does the job: it is cheap, it matches the read rule,
+  /// and it covers both ID formats because it does not look at the ID at all.
   Future<List<QueryDocumentSnapshot>> getUserReports(String userId) async {
-    try {
-      // Query for both old format (user_{userId}_report_*) and new format (*_user_{userId}_report_*)
-      final List<QueryDocumentSnapshot> allReports = [];
-      
-      // Query old format reports
-      final oldFormatQuery = await _db.collection('reports')
-        .where(FieldPath.documentId, isGreaterThanOrEqualTo: 'user_${userId}_report_')
-        .where(FieldPath.documentId, isLessThan: 'user_${userId}_report_z')
-        .get();
-      
-      allReports.addAll(oldFormatQuery.docs);
-      
-      // Query new format reports (this is more complex due to the global prefix)
-      // We'll get all reports and filter in memory for now
-      // TODO: Consider adding a userId field to reports for more efficient querying
-      final allReportsQuery = await _db.collection('reports').get();
-      
-      final newFormatReports = allReportsQuery.docs.where((doc) {
-        final id = doc.id;
-        // Check if it matches the new format: {number}_user_{userId}_report_{number}
-        final regex = RegExp(r'^\d+_user_' + userId + r'_report_\d+$');
-        return regex.hasMatch(id);
-      }).toList();
-      
-      allReports.addAll(newFormatReports);
-      
-      // Sort by document ID in descending order
-      allReports.sort((a, b) => b.id.compareTo(a.id));
-      
-      // Remove duplicates (shouldn't happen, but just in case)
-      final uniqueReports = <String, QueryDocumentSnapshot>{};
-      for (final doc in allReports) {
-        uniqueReports[doc.id] = doc;
-      }
-      
-      return uniqueReports.values.toList();
-    } catch (e) {
-      print('CounterService: Error querying user reports: $e');
-      return [];
-    }
+    final snapshot = await _db.collection('reports')
+      .where('userId', isEqualTo: userId)
+      .get();
+
+    final reports = snapshot.docs.toList();
+    // Newest first. IDs are counter-prefixed, so this orders by filing order
+    // without needing a composite index on (userId, createdAt).
+    reports.sort((a, b) => b.id.compareTo(a.id));
+    return reports;
   }
 
   /// Reset global counter (admin function)

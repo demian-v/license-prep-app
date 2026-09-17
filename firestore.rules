@@ -113,7 +113,12 @@ service cloud.firestore {
           // Allow legacy fallback IDs with timestamps (temporary support)
           reportId.matches('user_' + request.auth.uid + '_report_[0-9]+_[0-9]+_[0-9]+')
         )
-        && request.resource.data.keys().hasAll(['createdAt','reason','contentType','status'])
+        // Risk #45 — the body's userId must be the caller's, not just the
+        // document ID. Only the ID was bound to the uid before, so a report
+        // could be filed under your own ID while attributing the complaint to
+        // somebody else — straight into admin triage.
+        && request.resource.data.keys().hasAll(['createdAt','reason','contentType','status','userId'])
+        && request.resource.data.userId == request.auth.uid
         && request.resource.data.status == 'open'
         && request.resource.data.reason in ['image','translation','other']
         && (
@@ -128,11 +133,19 @@ service cloud.firestore {
             (request.resource.data.message is string &&
              request.resource.data.message.size() >= 10));
 
-      // Allow admins to manage all reports
+      // Risk #45 — a user can read back what they filed. Without this the
+      // feature was write-only for everyone: reads were admin-only, and the
+      // `admins` collection does not exist in production (verified 2026-08-20),
+      // so isAdmin() is false for every caller and nothing could read reports
+      // at all. Scoped to the body's userId, which create now pins to the
+      // caller, so this cannot widen into reading someone else's complaint.
+      allow read: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+
+      // Update and delete stay admin-only: triage state is not the reporter's
+      // to change, and a user must not be able to reopen or close their own
+      // complaint.
       allow read, update, delete: if isAdmin();
-      
-      // Allow admins to read legacy reports (preserve existing functionality)
-      allow read: if isAdmin() && !reportId.matches('user_.*_report_[0-9]+');
     }
     
     // Subscriptions collection - read-only for owner, all writes go through Cloud Functions

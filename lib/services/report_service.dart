@@ -54,10 +54,13 @@ class ReportService {
       // Use custom ID with .doc().set() instead of .add()
       await _db.collection('reports').doc(reportId).set(report.toMap());
     } catch (e) {
-      print('ReportService: Error generating custom ID, falling back to random ID: $e');
-      
-      // Fallback to original method if custom ID generation fails
-      await _db.collection('reports').add(report.toMap());
+      // Risk #45 — this used to be `.add()`, which mints a Firestore auto-ID.
+      // No security rule pattern matches an auto-ID, so the write was denied
+      // and the report vanished. Use an ID the rules accept instead.
+      print('ReportService: Counter unavailable, using fallback report ID: $e');
+      await _db.collection('reports')
+          .doc(_counterService.generateFallbackReportId(user.uid))
+          .set(report.toMap());
     }
   }
 
@@ -103,10 +106,13 @@ class ReportService {
       // Use custom ID with .doc().set() instead of .add()
       await _db.collection('reports').doc(reportId).set(report.toMap());
     } catch (e) {
-      print('ReportService: Error generating custom ID, falling back to random ID: $e');
-      
-      // Fallback to original method if custom ID generation fails
-      await _db.collection('reports').add(report.toMap());
+      // Risk #45 — this used to be `.add()`, which mints a Firestore auto-ID.
+      // No security rule pattern matches an auto-ID, so the write was denied
+      // and the report vanished. Use an ID the rules accept instead.
+      print('ReportService: Counter unavailable, using fallback report ID: $e');
+      await _db.collection('reports')
+          .doc(_counterService.generateFallbackReportId(user.uid))
+          .set(report.toMap());
     }
   }
 
@@ -163,8 +169,11 @@ class ReportService {
       final reportId = await _counterService.getNextReportId();
       await _db.collection('reports').doc(reportId).set(report.toMap());
     } catch (e) {
-      print('ReportService: Error generating custom ID, falling back to random ID: $e');
-      await _db.collection('reports').add(report.toMap());
+      // Risk #45 — see the note above: an auto-ID is denied by the rules.
+      print('ReportService: Counter unavailable, using fallback report ID: $e');
+      await _db.collection('reports')
+          .doc(_counterService.generateFallbackReportId(user.uid))
+          .set(report.toMap());
     }
   }
 }

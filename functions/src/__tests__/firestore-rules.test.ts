@@ -113,3 +113,114 @@ describe('Risk #29 — users/{uid} must not accept arbitrary client writes', () 
     );
   });
 });
+
+/**
+ * Risk #45 — `reports` is a write-only black hole, and the `userId` field in the
+ * document body is never checked against the caller.
+ *
+ * Only the document ID was bound to the uid. The body could claim any userId,
+ * which poisons admin triage; and nothing let a user read their own report
+ * back, so the feature was write-only for everyone (verified 2026-08-20: the
+ * `admins` collection does not exist in production, so isAdmin() is false for
+ * everyone and the collection was unreadable, permanently).
+ */
+describe('Risk #45 — reports ownership', () => {
+  const owner = () =>
+    env.authenticatedContext('owner-1', { firebase: { sign_in_provider: 'password' } } as any);
+  const other = () =>
+    env.authenticatedContext('other-1', { firebase: { sign_in_provider: 'password' } } as any);
+
+  const body = (userId: string) => ({
+    userId,
+    createdAt: new Date(),
+    reason: 'image',
+    contentType: 'quiz_question',
+    entity: { questionId: 'q1', path: 'quizQuestions/q1' },
+    status: 'open',
+  });
+
+  const idFor = (uid: string) => `1_user_${uid}_report_1`;
+
+  it('lets a user file a report under their own id (positive control)', async () => {
+    await assertSucceeds(
+      owner().firestore().collection('reports').doc(idFor('owner-1')).set(body('owner-1')),
+    );
+  });
+
+  it('rejects a report whose body claims someone else\'s userId', async () => {
+    // The document ID is the caller's, so the old rule allowed this: the body
+    // could attribute the complaint to any user at all.
+    await assertFails(
+      owner().firestore().collection('reports').doc(idFor('owner-1')).set(body('other-1')),
+    );
+  });
+
+  it('rejects a report with no userId at all', async () => {
+    const { userId, ...withoutUserId } = body('owner-1');
+    await assertFails(
+      owner().firestore().collection('reports').doc(idFor('owner-1')).set(withoutUserId as any),
+    );
+  });
+
+  it('accepts the fallback id shape used when the counter is unavailable', async () => {
+    // The client falls back to a generated id when the counter fails. That id
+    // has to satisfy the rules, or the report is silently lost — which is what
+    // `.add()` did, producing an auto-id matching no allowed pattern.
+    await assertSucceeds(
+      owner().firestore()
+        .collection('reports')
+        .doc(`1789600000000_user_owner-1_report_fallback_12345`)
+        .set(body('owner-1')),
+    );
+  });
+
+  it('lets a user read their own report back', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('reports').doc(idFor('owner-1')).set(body('owner-1'));
+    });
+
+    await assertSucceeds(
+      owner().firestore().collection('reports').doc(idFor('owner-1')).get(),
+    );
+  });
+
+  it('does not let a user read someone else\'s report', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('reports').doc(idFor('owner-1')).set(body('owner-1'));
+    });
+
+    await assertFails(
+      other().firestore().collection('reports').doc(idFor('owner-1')).get(),
+    );
+  });
+
+  it('lets a user list only their own reports', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('reports').doc(idFor('owner-1')).set(body('owner-1'));
+      await ctx.firestore().collection('reports').doc(idFor('other-1')).set(body('other-1'));
+    });
+
+    await assertSucceeds(
+      owner().firestore().collection('reports').where('userId', '==', 'owner-1').get(),
+    );
+  });
+
+  it('does not let a user read the whole collection', async () => {
+    // This is what getUserReports did — an unfiltered .get(). It was denied,
+    // and the client swallowed the error and returned an empty list, so users
+    // were told they had no reports rather than that the read failed.
+    await assertFails(owner().firestore().collection('reports').get());
+  });
+
+  it('still refuses a user editing their own report after filing it', async () => {
+    // Triage state belongs to admins. A user must not be able to reopen or
+    // close their own complaint.
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('reports').doc(idFor('owner-1')).set(body('owner-1'));
+    });
+
+    await assertFails(
+      owner().firestore().collection('reports').doc(idFor('owner-1')).update({ status: 'closed' }),
+    );
+  });
+});
