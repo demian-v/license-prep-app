@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'config/emulator_config.dart';
 import 'services/progress_storage.dart';
@@ -266,6 +267,39 @@ class _AppCleanupObserver extends WidgetsBindingObserver {
   }
 }
 
+
+/// Crash reporting (added 2026-09-17). Before this the app had NO crash
+/// reporting of any kind, so a crash in the field was invisible — and #34
+/// silenced `print` and `debugPrint` in release builds, which is right for the
+/// user ids they carried but removed the last remaining signal.
+///
+/// **Collection is off in debug.** There is no Crashlytics emulator: anything
+/// collected goes to the real Firebase project, whatever the build points at.
+/// Reporting from development would both pollute production crash data and
+/// quietly write to production from a machine whose whole point is not to.
+///
+/// Uses `platformDispatcher.onError` rather than `runZonedGuarded`, which is
+/// the current Flutter guidance and, usefully here, does not fight the zone
+/// `runWithReleaseLogging` already installs for print suppression.
+Future<void> _wireCrashReporting() async {
+  final collect = kReleaseMode || kProfileMode;
+
+  await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(collect);
+  if (!collect) {
+    debugPrint('🛡️ Crashlytics: collection DISABLED (not a release build)');
+    return;
+  }
+
+  // Framework errors — build, layout, paint.
+  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+
+  // Everything outside the framework: async gaps, platform channels, isolates.
+  WidgetsBinding.instance.platformDispatcher.onError = (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true;
+  };
+}
+
 /// Risk #34 — neither `print` nor `debugPrint` is stripped from a Flutter
 /// release build, and about 122 of this app's log lines interpolate a user id,
 /// an email or a report id. `runWithReleaseLogging` drops both in release
@@ -310,6 +344,8 @@ Future<void> _startApp() async {
 
   // Local development only. No-op unless built with --dart-define=USE_EMULATOR=true.
   await connectToEmulatorsIfEnabled();
+
+  await _wireCrashReporting();
   
   // Initialize Firebase Analytics
   await analyticsService.initialize();

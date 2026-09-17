@@ -28,6 +28,7 @@ We automatically collect information about how you use our App:
 - **App Analytics:** Screen views, feature usage, session duration, app performance metrics
 - **Device Information:** App version, platform type (iOS/Android), device model
 - **Session Data:** Login times, session IDs for security purposes
+- **Crash Diagnostics:** If the App crashes or hits an unexpected error, we collect a diagnostic report containing the error and the sequence of code that produced it, your device model and operating system version, the App version, and whether the device was jailbroken or rooted. These reports are used only to find and fix faults. They do not include your quiz answers, your progress, or the contents of any screen.
 
 ### 2.3 Information We Do NOT Collect
 We do NOT collect:
@@ -65,6 +66,7 @@ We share information with trusted third-party services that help us operate our 
 - Authentication services (secure login/logout)
 - Cloud database storage (Firestore)
 - Analytics and app performance monitoring
+- Crash reporting and stability diagnostics (Firebase Crashlytics)
 - Cloud Functions for app functionality
 - File storage for images and content
 

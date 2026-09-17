@@ -38,6 +38,14 @@ dependencies:
   in_app_purchase_storekit: ^0.4.11+2
   url_launcher: ^6.2.1
   crypto: ^3.0.3
+  # Pinned exactly, not ^5.x. `flutter pub add firebase_crashlytics` bumped 20+
+  # packages including cloud_firestore 6.0.0 -> 6.10.0 and firebase_auth, and
+  # the newer Firebase iOS SDK then demanded a deployment target above 15.0 —
+  # so the build broke. This is the release that pairs with the firebase_core
+  # 4.0.0 already in the lock; upgrading the whole Firebase stack under the
+  # payment path is its own piece of work, not a side effect of adding crash
+  # reporting.
+  firebase_crashlytics: 5.0.0
 
 # Removing overrides as they may be causing conflicts
 
