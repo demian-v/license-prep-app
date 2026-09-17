@@ -21,6 +21,14 @@ QuestionType _parseQuestionType(String type) {
   }
 }
 
+/// True when an error is the server refusing for lack of an active
+/// subscription or trial (risk #3's entitlement gate), rather than a fault.
+bool isEntitlementDenial(Object error) {
+  final text = error.toString();
+  return text.contains('permission-denied')
+      && (text.contains('subscription') || text.contains('Anonymous'));
+}
+
 class FirebaseContentApi implements ContentApiInterface {
   final FirebaseFunctionsClient _functionsClient;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -332,6 +340,12 @@ class FirebaseContentApi implements ContentApiInterface {
         }
       } catch (e) {
         print('❌ Error with Firebase Functions: $e');
+        // Risk #3 follow-up — an entitlement refusal is not a transient error.
+        // Falling through to the direct Firestore fallback below is pointless
+        // (the rules require the same entitlement and deny it too) and, worse,
+        // it converts a clear "you need a subscription" into an empty list that
+        // every screen then reports as missing content. Let it propagate.
+        if (isEntitlementDenial(e)) rethrow;
       }
       
       // Second attempt: Direct Firestore query (especially if we got less than expected)
@@ -454,6 +468,9 @@ class FirebaseContentApi implements ContentApiInterface {
     } catch (e) {
       print('💥 Critical error fetching quiz topics: $e');
       print('📍 Stack trace: ${StackTrace.current}');
+      // Risk #3 follow-up — an entitlement refusal must reach the caller.
+      // Returning [] here turns "you need a subscription" into "no content".
+      if (isEntitlementDenial(e)) rethrow;
       
       // Return empty list instead of fallback data
       return [];
@@ -669,6 +686,12 @@ class FirebaseContentApi implements ContentApiInterface {
         }
       } catch (e) {
         print('❌ Error with Firebase Functions: $e');
+        // Risk #3 follow-up — an entitlement refusal is not a transient error.
+        // Falling through to the direct Firestore fallback below is pointless
+        // (the rules require the same entitlement and deny it too) and, worse,
+        // it converts a clear "you need a subscription" into an empty list that
+        // every screen then reports as missing content. Let it propagate.
+        if (isEntitlementDenial(e)) rethrow;
       }
       
       // Second attempt: Direct Firestore query (FALLBACK METHOD)
@@ -781,6 +804,9 @@ class FirebaseContentApi implements ContentApiInterface {
     } catch (e) {
       print('💥 Critical error fetching quiz questions: $e');
       print('📍 Stack trace: ${StackTrace.current}');
+      // Risk #3 follow-up — an entitlement refusal must reach the caller.
+      // Returning [] here turns "you need a subscription" into "no content".
+      if (isEntitlementDenial(e)) rethrow;
       
       // Return empty list instead of throwing
       return [];
@@ -960,6 +986,12 @@ class FirebaseContentApi implements ContentApiInterface {
         }
       } catch (e) {
         print('❌ Error with Firebase Functions: $e');
+        // Risk #3 follow-up — an entitlement refusal is not a transient error.
+        // Falling through to the direct Firestore fallback below is pointless
+        // (the rules require the same entitlement and deny it too) and, worse,
+        // it converts a clear "you need a subscription" into an empty list that
+        // every screen then reports as missing content. Let it propagate.
+        if (isEntitlementDenial(e)) rethrow;
       }
       
       // Second attempt: Direct Firestore query (FALLBACK METHOD)
@@ -1033,6 +1065,9 @@ class FirebaseContentApi implements ContentApiInterface {
     } catch (e) {
       print('💥 Critical error fetching traffic rule topics: $e');
       print('📍 Stack trace: ${StackTrace.current}');
+      // Risk #3 follow-up — an entitlement refusal must reach the caller.
+      // Returning [] here turns "you need a subscription" into "no content".
+      if (isEntitlementDenial(e)) rethrow;
       
       // Return empty list - UI will show "Coming soon" message
       return [];
@@ -1207,6 +1242,12 @@ class FirebaseContentApi implements ContentApiInterface {
         }
       } catch (e) {
         print('❌ Error with Firebase Functions: $e');
+        // Risk #3 follow-up — an entitlement refusal is not a transient error.
+        // Falling through to the direct Firestore fallback below is pointless
+        // (the rules require the same entitlement and deny it too) and, worse,
+        // it converts a clear "you need a subscription" into an empty list that
+        // every screen then reports as missing content. Let it propagate.
+        if (isEntitlementDenial(e)) rethrow;
       }
       
       // Second attempt: Direct Firestore query (FALLBACK METHOD)
@@ -1269,6 +1310,9 @@ class FirebaseContentApi implements ContentApiInterface {
     } catch (e) {
       print('💥 Critical error fetching theory modules: $e');
       print('📍 Stack trace: ${StackTrace.current}');
+      // Risk #3 follow-up — an entitlement refusal must reach the caller.
+      // Returning [] here turns "you need a subscription" into "no content".
+      if (isEntitlementDenial(e)) rethrow;
       
       // Return empty list instead of throwing
       return [];

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../widgets/subscription_required_view.dart';
+import '../providers/content_provider.dart';
 import 'package:provider/provider.dart';
 import '../models/quiz_topic.dart';
 import '../providers/language_provider.dart';
@@ -602,7 +604,10 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> with TickerProviderSt
           
           // Enhanced topic list
           Expanded(
-            child: topics.isEmpty 
+            // Risk #3 follow-up — distinguish a refusal from an empty shelf.
+            child: Provider.of<ContentProvider>(context).contentRequiresSubscription
+            ? const SubscriptionRequiredView()
+            : topics.isEmpty 
             ? Container(
                 padding: EdgeInsets.all(32),
                 child: Column(

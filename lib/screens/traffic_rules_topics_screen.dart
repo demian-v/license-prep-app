@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/subscription_required_view.dart';
 import 'package:provider/provider.dart';
 import '../models/traffic_rule_topic.dart';
 import '../providers/content_provider.dart';
@@ -97,6 +98,13 @@ class _TrafficRulesTopicsScreenState extends State<TrafficRulesTopicsScreen> {
             );
           }
           
+          // Risk #3 follow-up — a refusal is not an empty shelf, and the
+          // hardcoded fallback below must not serve content to someone the
+          // server just refused.
+          if (contentProvider.contentRequiresSubscription) {
+            return const SubscriptionRequiredView();
+          }
+
           // Use either topics from Firestore or fallback to hardcoded if empty
           final topics = contentProvider.topics.isNotEmpty 
               ? contentProvider.topics 

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../localization/app_localizations.dart';
+import '../widgets/subscription_required_view.dart';
 import 'package:provider/provider.dart';
 import '../models/theory_module.dart';
 import '../models/traffic_rule_topic.dart';
@@ -104,7 +106,13 @@ class _TheoryScreenState extends State<TheoryScreen> {
 
   void _trackModuleListEmpty(ContentProvider contentProvider, {String? overrideReason}) {
     final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
-    final reason = overrideReason ?? contentProvider.contentNotFoundReason ?? 'unknown';
+    // Risk #3 follow-up — a paywall is not an empty content shelf. Reporting
+    // it as `reason: state` put a content gap in the metrics where there was
+    // really a subscription boundary, which is how this went unnoticed on
+    // screen too.
+    final reason = contentProvider.contentRequiresSubscription
+        ? 'subscription_required'
+        : (overrideReason ?? contentProvider.contentNotFoundReason ?? 'unknown');
     
     // Calculate loading time if this is a loading event
     int? loadingTimeMs;
@@ -268,6 +276,16 @@ class _TheoryScreenState extends State<TheoryScreen> {
                 final friendlyLanguage = languageNames[requestedLanguage] ?? requestedLanguage;
                 final friendlyState = requestedState ?? 'selected state';
                 
+                // Risk #3 follow-up — a refusal is not an empty shelf. Before the
+                // entitlement gate existed this branch could only mean "no
+                // content", so every message here assumes a content or language
+                // problem. Saying that to someone without a subscription sends
+                // them hunting for a bug that does not exist, and logs a false
+                // `reason: state` analytics event on the way.
+                if (contentProvider.contentRequiresSubscription) {
+                  return const SubscriptionRequiredView();
+                }
+
                 // Generate context-aware message
                 switch (reason) {
                   case 'language':

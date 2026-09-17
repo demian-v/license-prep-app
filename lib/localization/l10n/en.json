@@ -185,5 +185,7 @@
   "verify_email_message": "We sent you a verification link. Confirm your email to start your 3-day free trial.",
   "no_subscription_title": "No active subscription",
   "no_subscription_message": "Subscribe to unlock all practice tests and theory.",
-  "delete_subscription_warning": "Deleting your account does not cancel an active App Store or Google Play subscription. Cancel it in your device subscription settings, or you will continue to be charged."
+  "delete_subscription_warning": "Deleting your account does not cancel an active App Store or Google Play subscription. Cancel it in your device subscription settings, or you will continue to be charged.",
+  "subscription_required_title": "Subscription required",
+  "subscription_required_message": "Subscribe to unlock all theory modules and practice tests."
 }

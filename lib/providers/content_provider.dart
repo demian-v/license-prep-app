@@ -54,6 +54,23 @@ class ContentProvider extends ChangeNotifier {
   String get currentLicenseId => _currentLicenseId;
   String? get lastError => _lastError;
   bool get isOffline => _isOffline;
+
+  /// True when the last content fetch was refused because the user has no
+  /// active subscription or trial (risk #3's entitlement gate).
+  ///
+  /// Before that gate existed, a content fetch could only come back empty, so
+  /// every screen treated "no results" as a content or language problem. Now a
+  /// refusal is also possible and looks identical from the outside — which sent
+  /// people hunting for a content bug that was really a paywall.
+  bool _contentRequiresSubscription = false;
+  bool get contentRequiresSubscription => _contentRequiresSubscription;
+
+  /// Recognise the server's entitlement refusal without matching on prose.
+  static bool _isEntitlementDenial(Object error) {
+    final text = error.toString();
+    return text.contains('permission-denied')
+        && (text.contains('subscription') || text.contains('Anonymous'));
+  }
   
   // New getters for empty state detection
   String get requestedLanguage => _requestedLanguage;
@@ -300,6 +317,8 @@ class ContentProvider extends ChangeNotifier {
     print('🔥 Fetching fresh data from Firebase - cache ${forceRefresh ? 'bypassed' : 'not available/invalid'}');
     
     _isLoading = true;
+    // Cleared per fetch: a refusal must not persist after the user subscribes.
+    _contentRequiresSubscription = false;
     _lastError = null;
     notifyListeners();
     
@@ -353,6 +372,12 @@ class ContentProvider extends ChangeNotifier {
         print('✅ Parallel fetch completed: ${_modules.length} modules, ${_topics.length} topics');
         
       } catch (parallelError) {
+        if (_isEntitlementDenial(parallelError)) {
+          // No point retrying sequentially — the refusal is not transient.
+          _contentRequiresSubscription = true;
+          print('🔒 Content refused: an active subscription or trial is required');
+          rethrow;
+        }
         print('⚠️  Parallel fetching failed, trying sequential fallback: $parallelError');
         
         // Sequential fallback - fetch modules first
@@ -438,8 +463,19 @@ class ContentProvider extends ChangeNotifier {
     } catch (e) {
       _lastError = 'Error fetching content: $e';
       print('❌ $_lastError');
-      
-      if (_topics.isEmpty && _modules.isEmpty) {
+
+      // Risk #3 follow-up — distinguish "you are not entitled" from "there is
+      // no content". They are different problems and need different screens.
+      if (_isEntitlementDenial(e)) {
+        _contentRequiresSubscription = true;
+        print('🔒 Content refused: an active subscription or trial is required');
+      }
+
+      // Risk #3 follow-up — do NOT fall back to hardcoded content when the
+      // server refused for lack of entitlement. That fallback exists for
+      // outages, and using it here quietly served paid content to someone the
+      // server had just told us was not entitled to it.
+      if (_topics.isEmpty && _modules.isEmpty && !_contentRequiresSubscription) {
         // If error occurred and no data is available, try loading hardcoded content
         loadHardcodedTopics();
       }
