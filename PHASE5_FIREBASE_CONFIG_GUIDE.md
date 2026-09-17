@@ -1,305 +1,241 @@
-# Phase 5: Firebase Configuration Guide
+# Firebase Configuration Guide — Cloud Functions secrets and params
 
-## 🎉 Phase 5 Code Implementation: COMPLETE! ✅
+> **Rewritten 2026-09-17 (risk register #10).** Every step in the previous
+> version of this file was wrong in a way that leaves the payment path dead,
+> and one of them deletes production Firestore indexes. What it got wrong, and
+> why it mattered, is recorded at the bottom under
+> [What the old guide said](#what-the-old-guide-said-and-why-it-failed-silently) —
+> read that if you followed it before today.
 
-All code changes have been successfully implemented:
-- ✅ Apple shared secret moved to Firebase Config
-- ✅ Google service account credentials secured
-- ✅ Rate limiting (10 attempts/hour)
-- ✅ Retry logic with exponential backoff
-- ✅ Compilation successful (warnings are expected)
+This is the configuration an operator has to do **outside the repo** before
+`firebase deploy --only functions` produces a working backend.
 
----
-
-## 📋 What's Next: Firebase Configuration (3 Steps)
-
-You need to set the secrets in Firebase so your deployed functions can access them securely.
+Project: `licenseprepapp` (there is only one — debug builds, TestFlight and
+store releases all share it).
 
 ---
 
-## 🔧 Step 1: Set Apple Shared Secret in Firebase Config
+## The one rule that matters most
 
-### **Command to run:**
+```
+NEVER run firebase deploy --force on this project.
+```
+
+`--force` skips the confirmation prompt that asks whether to **delete**
+Firestore indexes present in the project but absent from
+`firestore.indexes.json`. On 2026-09-17 that prompt would have offered to
+delete **8 of production's 11 indexes**. Answering it is the only thing that
+stops a deploy from silently breaking every query behind those indexes.
+
+Re-run the diff whenever a query's filters change:
 
 ```bash
-cd /Users/demianvyrozub/projects/license-prep-app/functions
-firebase functions:config:set apple.shared_secret="[REDACTED]"
+firebase firestore:indexes --project licenseprepapp
 ```
 
-### **What this does:**
-- Stores your Apple shared secret in Firebase's secure config system
-- **NOT stored in source code** ✅
-- Can be rotated without redeploying code
-- Only accessible by deployed Firebase Functions
-
-### **Expected output:**
-```
-✔  Functions config updated.
-```
-
-### **To verify it was set:**
-```bash
-firebase functions:config:get
-```
-
-**Expected output:**
-```json
-{
-  "apple": {
-    "shared_secret": "[REDACTED]"
-  }
-}
-```
+This rule is about **`deploy`** specifically. `functions:secrets:set -f` is a
+different command with a different meaning — it updates the functions that use
+a secret to pick up the new version — and is fine.
 
 ---
 
-## 🔧 Step 2: Set Google Service Account Credentials
+## Step 1 — the three secrets
 
-### **Important Note:**
-Your `service-account.json` file should be in:
-```
-/Users/demianvyrozub/projects/license-prep-app/functions/service-account.json
-```
+Secrets live in **Google Secret Manager**, declared in code with
+`defineSecret()`. There are three, and each is attached to specific functions
+with `.runWith({ secrets: [...] })`:
 
-### **Command to run:**
+| Secret | Read by | Format |
+|---|---|---|
+| `APPLE_SHARED_SECRET` | `validatePurchaseReceipt` (`receipt-validation.ts`) | the App-Specific Shared Secret, verbatim |
+| `GOOGLE_CREDENTIALS` | `validatePurchaseReceipt`, `handleGooglePlayNotifications` | **base64** of the service-account JSON |
+| `RESEND_API_KEY` | the email-verification callables (`email/verification-callables.ts`) | the Resend key, verbatim |
 
 ```bash
-cd /Users/demianvyrozub/projects/license-prep-app/functions
-firebase functions:config:set google.credentials="$(cat service-account.json | base64)"
+firebase functions:secrets:set APPLE_SHARED_SECRET --project licenseprepapp
+firebase functions:secrets:set RESEND_API_KEY --project licenseprepapp
 ```
 
-### **What this does:**
-- Converts your service account JSON to base64
-- Stores it securely in Firebase config
-- Your code will decode it when deployed
-- **File never goes into git** (already in .gitignore) ✅
+Each prompts and reads the value from stdin. **Type or paste it at that
+prompt and nowhere else** — not into a file, not into a commit, not into a
+chat. The Apple shared secret leaked into git exactly once (risk #1) and had to
+be rotated.
 
-### **Expected output:**
-```
-✔  Functions config updated.
-```
+`GOOGLE_CREDENTIALS` is base64-encoded, because the code does
+`Buffer.from(value, 'base64')` and then `JSON.parse`. Pipe it in rather than
+letting it touch the shell history:
 
-### **To verify both secrets:**
 ```bash
-firebase functions:config:get
+base64 -i functions/service-account.json | \
+  firebase functions:secrets:set GOOGLE_CREDENTIALS --project licenseprepapp --data-file -
 ```
 
-**Expected output:**
-```json
-{
-  "apple": {
-    "shared_secret": "[REDACTED]"
-  },
-  "google": {
-    "credentials": "ewogICJ0eXBlIjogInNlcnZpY2VfYWNjb3VudC...[long base64 string]"
-  }
-}
+Verify the versions exist — this prints metadata, never the value:
+
+```bash
+firebase functions:secrets:describe APPLE_SHARED_SECRET --project licenseprepapp
 ```
+
+**A newly set secret does not reach a running function.** Secret versions are
+bound at deploy time, so after setting or rotating one you must redeploy the
+functions that declare it, or they keep reading the old version.
 
 ---
 
-## 🚀 Step 3: Deploy to Firebase
+## Step 2 — the two params, or the deploy hangs forever
 
-### **Command to run:**
+These are **not** secrets. They are `defineInt` params, and if either is
+unset the Firebase CLI stops and asks for it interactively:
 
-```bash
-cd /Users/demianvyrozub/projects/license-prep-app
-firebase deploy --only functions
+```
+? Enter an integer value for APPLE_APP_ID
 ```
 
-### **What this does:**
-- Compiles your TypeScript to JavaScript
-- Uploads functions to Google Cloud
-- Applies the config you set in steps 1 & 2
-- Makes your receipt validation function live!
+`firebase deploy` and `firebase emulators:start` both hang there, with no
+timeout. **A declared `default: 0` does not suppress the prompt** — both of
+these declare one and both still prompt.
 
-### **Expected output:**
+| Param | What it is | Value |
+|---|---|---|
+| `APPLE_APP_ID` | Apple's numeric app id, used to verify App Store Server Notifications | the numeric id from App Store Connect |
+| `SUBSCRIPTION_LOG_RETENTION_DAYS` | pruning window for the `subscriptionLogs` audit trail | **`0`** — deliberately disabled; see below |
+
+They are supplied by `functions/.env.licenseprepapp` (deploy) and
+`functions/.env.local` (emulator):
+
 ```
-=== Deploying to 'licenseprepapp'...
-
-i  deploying functions
-i  functions: ensuring required API cloudfunctions.googleapis.com is enabled...
-✔  functions: required API cloudfunctions.googleapis.com is enabled
-i  functions: preparing functions directory for uploading...
-i  functions: packaged functions (XX.XX KB) for uploading
-✔  functions: functions folder uploaded successfully
-i  functions: creating Node.js 18 function validatePurchaseReceipt(us-central1)...
-✔  functions[validatePurchaseReceipt(us-central1)] Successful create operation.
-Function URL (validatePurchaseReceipt): https://us-central1-licenseprepapp.cloudfunctions.net/validatePurchaseReceipt
-
-✔  Deploy complete!
+APPLE_APP_ID=<numeric id>
+SUBSCRIPTION_LOG_RETENTION_DAYS=0
 ```
 
-### **Deployment time:** ~2-5 minutes
+**Both files are untracked**, so a fresh clone hits the hang again. That is
+deliberate — `functions/.env.licenseprepapp` used to be committed (risk #32) —
+but it means recreating them is part of setting up a new machine. If a future
+param is added, add it to both files in the same commit.
+
+> **`APPLE_APP_ID` unset in production is not harmless.** The default is `0`,
+> so Apple notification verification would run against app id `0` and fail to
+> verify anything, silently. This is why it is a checklist item and not a
+> nice-to-have.
+
+> **Leave `SUBSCRIPTION_LOG_RETENTION_DAYS` at `0`.** `subscriptionLogs` is the
+> money-state audit trail, deletion is irreversible, and a scheduled job that
+> deleted rows out of it by accident is what risk #4 was. The privacy policy
+> does not require pruning it: deleted users' rows are anonymised rather than
+> deleted (risk #14), so they are no longer personal data, and subscription
+> data is retained "as required for billing and tax purposes". Cost is about
+> ten cents a month at 10,000 subscribers.
 
 ---
 
-## 🎯 After Deployment: Testing
+## Step 3 — deploy
 
-### **1. Check Function Status**
 ```bash
-firebase functions:log --only validatePurchaseReceipt
+firebase deploy --only functions --project licenseprepapp
 ```
 
-### **2. Test with Flutter App**
-Your app can now call the function:
-```dart
-final result = await FirebaseFunctions.instance
-  .httpsCallable('validatePurchaseReceipt')
-  .call({
-    'receipt': receiptData,
-    'platform': 'ios', // or 'android'
-    'productId': 'monthly'
-  });
+`firebase.json` has a `predeploy` hook that runs
+`npm --prefix functions run build`, so the TypeScript is compiled first. Before
+that hook existed (risk #16), `functions/lib/index.js` was **five months
+stale** and a deploy shipped the previous payment logic. Do not remove it, and
+do not deploy with `--only functions` from a tree that will not compile.
+
+**Node 22.** `functions/package.json` pins it and this machine's default is
+Node 20, so every functions command needs:
+
+```bash
+export PATH="/opt/homebrew/opt/node@22/bin:$PATH"
 ```
 
-### **3. Monitor Logs**
-- Go to: https://console.firebase.google.com
-- Navigate to: **Functions → Logs**
-- Look for your function calls and any errors
+30 functions are exported from `functions/src/index.ts`.
 
 ---
 
-## 🔄 Working on Multiple Devices (Your Question)
+## Step 4 — the platform wiring the old guide omitted entirely
 
-### **Scenario:** You set up on Mac, now want to work on Windows
+Secrets alone do not make subscriptions work. Three things live in consoles, not
+in this repo, and nothing in the code can check them for you.
 
-### **What you need on the new device:**
+### 4a. Google Play — Pub/Sub topic `play-rtdn`
 
-**Option A: Use Firebase Config (Recommended) ✅**
-1. Install Firebase CLI: `npm install -g firebase-tools`
-2. Login: `firebase login`
-3. **That's it!** Secrets are in Firebase, not in git
+`handleGooglePlayNotifications` is a Pub/Sub trigger on the topic **`play-rtdn`**
+(the name is exact — it was renamed from `google-play-rtdn` to satisfy GCP
+naming rules, and the function will simply never fire on the wrong name).
 
-**On Windows:**
-```bash
-git clone your-repo
-cd license-prep-app/functions
-npm install
-firebase login
-firebase functions:config:get  # View existing config
-firebase deploy --only functions  # Deploy with same secrets
+1. GCP Console → Pub/Sub → **Create topic**: `play-rtdn`
+2. Grant `roles/pubsub.publisher` on that topic to
+   `google-play-developer-notifications@system.gserviceaccount.com`
+3. Play Console → Monetisation setup → **Real-time developer notifications** →
+   topic `projects/licenseprepapp/topics/play-rtdn`
+4. Use Play Console's **Send test notification** and confirm the function logs a run
+
+### 4b. App Store Connect — Server Notifications URL
+
+The endpoint is `appStoreWebhook`:
+
+```
+https://us-central1-licenseprepapp.cloudfunctions.net/appStoreWebhook
 ```
 
-**Option B: Local Development (For testing locally)**
-If you want to test functions locally on Windows:
+Register it in App Store Connect → your app → **App Information → App Store
+Server Notifications** (Version 2). Without it, Apple renewals, cancellations
+and refunds never reach the backend: the subscription document goes stale and
+the renewal scheduler is the only thing left holding entitlement together.
 
-1. **Don't** copy service-account.json via git (it's gitignored)
-2. **Do** one of these:
-   - Download fresh from Firebase Console
-   - Copy via secure method (USB, encrypted email, password manager)
-   - Use environment variables for local testing
+### 4c. Check both after the first deploy
 
-**For local testing on Windows:**
 ```bash
-# Set environment variable (Windows CMD)
-set APPLE_SHARED_SECRET=[REDACTED]
-
-# Or PowerShell
-$env:APPLE_SHARED_SECRET="[REDACTED]"
-
-# Then run local emulator
-firebase emulators:start --only functions
+firebase functions:log --only validatePurchaseReceipt --project licenseprepapp
+firebase functions:log --only handleGooglePlayNotifications --project licenseprepapp
+firebase functions:log --only appStoreWebhook --project licenseprepapp
 ```
 
-### **Security Best Practice:**
-- ✅ Secrets in Firebase Config (for deployed functions)
-- ✅ .gitignore has service-account.json
-- ✅ Environment variables for local testing
-- ❌ Never commit secrets to git
+Also check `renewActiveSubscriptions` for `FAILED_PRECONDITION` or
+missing-index errors after its next scheduled run — production held the
+pre-`isActive` index shape until 2026-09-17, so it was very likely failing.
 
 ---
 
-## 📊 Summary: What Phase 5 Accomplished
+## Where things go wrong
 
-| Security Feature | Before | After Phase 5 |
-|------------------|---------|---------------|
-| **Apple Secret** | ❌ Hardcoded in source | ✅ Firebase Config |
-| **Google Credentials** | ❌ File on disk | ✅ Firebase Config (base64) |
-| **Rate Limiting** | ❌ None | ✅ 10 attempts/hour |
-| **Retry Logic** | ❌ None | ✅ 3 retries with backoff |
-| **Production Ready** | ❌ Not secure | ✅ YES! |
-
----
-
-## 🎓 Complete Command Sequence (Copy & Paste)
-
-```bash
-# Navigate to functions directory
-cd /Users/demianvyrozub/projects/license-prep-app/functions
-
-# Step 1: Set Apple shared secret
-firebase functions:config:set apple.shared_secret="[REDACTED]"
-
-# Step 2: Set Google credentials
-firebase functions:config:set google.credentials="$(cat service-account.json | base64)"
-
-# Step 3: Verify configuration
-firebase functions:config:get
-
-# Step 4: Deploy to Firebase
-cd ..
-firebase deploy --only functions
-
-# Step 5: Check logs
-firebase functions:log --only validatePurchaseReceipt
-```
+| Symptom | Cause |
+|---|---|
+| Deploy or emulator hangs on `? Enter an integer value for ...` | A `defineInt` param has no value. Step 2. `default: 0` does not help |
+| Apple validation fails with status **21004** | `APPLE_SHARED_SECRET` missing or wrong. 21004 means "shared secret does not match" |
+| Apple validation fails with status **21002** | The receipt is a StoreKit 2 JWS, not a base64 app receipt. This is register #56, not a config problem — the client must keep `enableStoreKit1()` until the backend can read SK2 |
+| `GOOGLE_CREDENTIALS secret not set in Secret Manager!` in the logs | Step 1, and remember it must be **base64** |
+| Android validation and Play billing-date recovery both fail | Same secret; both paths use it |
+| Email verification throws instead of sending | `RESEND_API_KEY` unset. It throws **on purpose** in production rather than pretending to send (risk #35). Locally it uses a log transport and prints the code |
+| Play notifications never arrive | Topic name is not exactly `play-rtdn`, or the publisher IAM binding is missing. Step 4a |
+| Config "isn't applying" after a deploy | A secret version is bound at deploy time. **Redeploy** — do not reach for `--force`, which is how indexes get deleted |
 
 ---
 
-## ❓ Troubleshooting
+## What the old guide said, and why it failed silently
 
-### **Issue: "service-account.json not found"**
-```bash
-# Check if file exists
-ls -la /Users/demianvyrozub/projects/license-prep-app/functions/service-account.json
+Kept because the failure mode is worth recognising, and because anyone who
+followed the old version has values set that nothing reads.
 
-# If missing, download from Firebase Console:
-# 1. Go to: https://console.firebase.google.com
-# 2. Project Settings → Service Accounts
-# 3. Click "Generate New Private Key"
-# 4. Save as service-account.json in functions/ directory
-```
-
-### **Issue: "Firebase CLI not installed"**
-```bash
-npm install -g firebase-tools
-firebase login
-```
-
-### **Issue: "Not authenticated"**
-```bash
-firebase login
-firebase projects:list  # Verify you can see your project
-```
-
-### **Issue: "Config not applying after deploy"**
-```bash
-# Functions need to be redeployed after config changes
-firebase deploy --only functions --force
-```
-
----
-
-## 🎯 Next Steps After This Guide
-
-1. **Run the 3 commands** above to configure Firebase
-2. **Deploy your functions**
-3. **Test with your Flutter app**
-4. **Monitor logs** for any issues
-
----
-
-## 🎉 Congratulations!
-
-Once you complete these 3 steps, your receipt validation system will be:
-- ✅ Fully secure (no secrets in code)
-- ✅ Production-ready
-- ✅ Protected from abuse (rate limiting)
-- ✅ Resilient to network issues (retry logic)
-- ✅ Working on iOS and Android
-- ✅ Creating subscriptions in Firestore automatically
-
----
-
-**Questions?** Feel free to ask! I'm here to help. 🚀
+- **It used `firebase functions:config:set apple.shared_secret=...`.** That is
+  the v1 runtime-config API. This project is on `firebase-functions ^7`, where
+  `functions.config()` no longer exists — and there is not a single call to it
+  anywhere in `functions/src`. So the command *succeeded*, printed
+  `✔ Functions config updated`, and stored values in a system the code never
+  consults. Apple validation then failed with 21004 and Android validation
+  failed outright, while the verification step in the guide reported success.
+  That combination — a confirming command, a passing check, and a dead payment
+  path — is why this row was ranked High for a documentation file.
+  Clean up any leftovers with `firebase functions:config:unset apple google`.
+- **It recommended `firebase deploy --only functions --force`** to make config
+  apply. `--force` suppresses the index-deletion prompt.
+- **It said Node 18.** It is Node 22.
+- **It omitted `APPLE_APP_ID` and `SUBSCRIPTION_LOG_RETENTION_DAYS`**, the two
+  things that make a deploy hang with no output.
+- **It omitted `RESEND_API_KEY`**, the `play-rtdn` topic, and the App Store
+  Connect webhook registration — so even a correct secret setup left Play and
+  Apple notifications unwired.
+- **It contained the pre-rotation Apple shared secret** in four places, and
+  hardcoded one developer's absolute home directory into every command.
+- **It claimed "Production Ready: ✅ YES!"** The register lists 59 risks against
+  this system, two of them Critical and live in production at the time that
+  line was written.
