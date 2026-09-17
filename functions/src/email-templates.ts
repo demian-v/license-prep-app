@@ -1380,3 +1380,176 @@ export function replaceTemplateVariables(
 
   return { html, text, subject };
 }
+
+
+/**
+ * Risk #12 — verification code email, in the five languages this file already
+ * carries. `{{code}}` is filled by replaceTemplateVariables.
+ *
+ * TRANSLATION CAVEAT: as with the 48 auth keys from #50, the Spanish, Ukrainian,
+ * Russian and Polish here were written by the assistant, not a native speaker.
+ * They are standard transactional-email phrasing and read naturally, but they
+ * deserve one review pass before this reaches users.
+ */
+export const VERIFICATION_CODE_TEMPLATES: LocalizedTemplates = {
+  en: {
+    subject: "Your DriveUSA verification code: {{code}}",
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #007bff; color: white; padding: 20px; text-align: center; }
+          .content { padding: 20px; text-align: center; }
+          .code { font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #007bff; margin: 24px 0; }
+          .footer { font-size: 12px; color: #666; text-align: center; margin-top: 30px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header"><h1>DriveUSA</h1></div>
+          <div class="content">
+            <h2>Confirm your email</h2>
+            <p>Enter this code in the app to finish creating your account.</p>
+            <div class="code">{{code}}</div>
+          </div>
+          <div class="footer"><p>This code expires in 10 minutes. If you did not sign up for DriveUSA, you can ignore this email.</p></div>
+        </div>
+      </body>
+      </html>
+    `,
+    text: `Confirm your email\n\nEnter this code in the app to finish creating your account.\n\n    {{code}}\n\nThis code expires in 10 minutes. If you did not sign up for DriveUSA, you can ignore this email.`,
+  },
+  es: {
+    subject: "Tu código de verificación de DriveUSA: {{code}}",
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #007bff; color: white; padding: 20px; text-align: center; }
+          .content { padding: 20px; text-align: center; }
+          .code { font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #007bff; margin: 24px 0; }
+          .footer { font-size: 12px; color: #666; text-align: center; margin-top: 30px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header"><h1>DriveUSA</h1></div>
+          <div class="content">
+            <h2>Confirma tu correo electrónico</h2>
+            <p>Introduce este código en la aplicación para terminar de crear tu cuenta.</p>
+            <div class="code">{{code}}</div>
+          </div>
+          <div class="footer"><p>Este código caduca en 10 minutos. Si no te registraste en DriveUSA, puedes ignorar este mensaje.</p></div>
+        </div>
+      </body>
+      </html>
+    `,
+    text: `Confirma tu correo electrónico\n\nIntroduce este código en la aplicación para terminar de crear tu cuenta.\n\n    {{code}}\n\nEste código caduca en 10 minutos. Si no te registraste en DriveUSA, puedes ignorar este mensaje.`,
+  },
+  uk: {
+    subject: "Ваш код підтвердження DriveUSA: {{code}}",
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #007bff; color: white; padding: 20px; text-align: center; }
+          .content { padding: 20px; text-align: center; }
+          .code { font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #007bff; margin: 24px 0; }
+          .footer { font-size: 12px; color: #666; text-align: center; margin-top: 30px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header"><h1>DriveUSA</h1></div>
+          <div class="content">
+            <h2>Підтвердьте свою електронну пошту</h2>
+            <p>Введіть цей код у застосунку, щоб завершити створення облікового запису.</p>
+            <div class="code">{{code}}</div>
+          </div>
+          <div class="footer"><p>Термін дії коду — 10 хвилин. Якщо ви не реєструвалися в DriveUSA, просто проігноруйте цей лист.</p></div>
+        </div>
+      </body>
+      </html>
+    `,
+    text: `Підтвердьте свою електронну пошту\n\nВведіть цей код у застосунку, щоб завершити створення облікового запису.\n\n    {{code}}\n\nТермін дії коду — 10 хвилин. Якщо ви не реєструвалися в DriveUSA, просто проігноруйте цей лист.`,
+  },
+  ru: {
+    subject: "Ваш код подтверждения DriveUSA: {{code}}",
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #007bff; color: white; padding: 20px; text-align: center; }
+          .content { padding: 20px; text-align: center; }
+          .code { font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #007bff; margin: 24px 0; }
+          .footer { font-size: 12px; color: #666; text-align: center; margin-top: 30px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header"><h1>DriveUSA</h1></div>
+          <div class="content">
+            <h2>Подтвердите вашу электронную почту</h2>
+            <p>Введите этот код в приложении, чтобы завершить создание аккаунта.</p>
+            <div class="code">{{code}}</div>
+          </div>
+          <div class="footer"><p>Срок действия кода — 10 минут. Если вы не регистрировались в DriveUSA, просто проигнорируйте это письмо.</p></div>
+        </div>
+      </body>
+      </html>
+    `,
+    text: `Подтвердите вашу электронную почту\n\nВведите этот код в приложении, чтобы завершить создание аккаунта.\n\n    {{code}}\n\nСрок действия кода — 10 минут. Если вы не регистрировались в DriveUSA, просто проигнорируйте это письмо.`,
+  },
+  pl: {
+    subject: "Twój kod weryfikacyjny DriveUSA: {{code}}",
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #007bff; color: white; padding: 20px; text-align: center; }
+          .content { padding: 20px; text-align: center; }
+          .code { font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #007bff; margin: 24px 0; }
+          .footer { font-size: 12px; color: #666; text-align: center; margin-top: 30px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header"><h1>DriveUSA</h1></div>
+          <div class="content">
+            <h2>Potwierdź swój adres e-mail</h2>
+            <p>Wpisz ten kod w aplikacji, aby dokończyć tworzenie konta.</p>
+            <div class="code">{{code}}</div>
+          </div>
+          <div class="footer"><p>Kod wygasa po 10 minutach. Jeśli nie rejestrowałeś się w DriveUSA, zignoruj tę wiadomość.</p></div>
+        </div>
+      </body>
+      </html>
+    `,
+    text: `Potwierdź swój adres e-mail\n\nWpisz ten kod w aplikacji, aby dokończyć tworzenie konta.\n\n    {{code}}\n\nKod wygasa po 10 minutach. Jeśli nie rejestrowałeś się w DriveUSA, zignoruj tę wiadomość.`,
+  },
+};
+
+export function getVerificationCodeTemplate(language: string): EmailTemplate {
+  const lang = language as keyof LocalizedTemplates;
+  return VERIFICATION_CODE_TEMPLATES[lang] || VERIFICATION_CODE_TEMPLATES.en;
+}

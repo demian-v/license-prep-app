@@ -2529,3 +2529,16 @@ export const handleGooglePlayNotifications = functions
       // letter remains for manual replay.
     }
   });
+
+// ============================================================================
+// EMAIL VERIFICATION (risk #12)
+// ============================================================================
+//
+// The trial is deliberately NOT gated on verification — a registered user gets
+// the 3-day trial immediately (owner decision, 2026-09-16). These exist so the
+// address is confirmed real during signup, not to withhold entitlement.
+export {
+  sendEmailVerificationCode,
+  verifyEmailCode,
+  getEmailVerificationStatus,
+} from './email/verification-callables';

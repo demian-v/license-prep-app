@@ -193,6 +193,17 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // emailVerificationCodes — outstanding 6-digit codes (risk #12).
+    //
+    // Client-deny in both directions, and the read side is the important one:
+    // the codes are stored hashed and salted, but a readable record would still
+    // leak the attempt count and expiry, and a writable one would let a user
+    // reset their own attempt counter — which would turn the 5-guess cap into
+    // no cap at all on a 10^6 space. Only the Admin SDK touches this.
+    match /emailVerificationCodes/{uid} {
+      allow read, write: if false;
+    }
+
     // processedWebhooks — written by Cloud Functions admin SDK only (webhook dedup)
     match /processedWebhooks/{docId} {
       allow read, write: if false;
