@@ -5,8 +5,8 @@
 | | |
 |---|---|
 | **Branch** | `local/security-money-hardening` (base `84300d0`) — **pushed to `origin` 2026-09-16 at the owner's request.** `main` untouched, nothing deployed |
-| **Commits** | 82 |
-| **Tests** | 255 Cloud Functions (Jest, 27 suites, **serial** — see Gotchas) + 75 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
+| **Commits** | 84 |
+| **Tests** | 255 Cloud Functions (Jest, 27 suites, **serial** — see Gotchas) + 81 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
 | **Analyzer** | 0 errors |
 | **Register rows addressed** | 43 of 59 |
 | **Deployed?** | **NO.** Nothing here has ever run in production. The deploy path itself has never been exercised |
@@ -327,8 +327,26 @@ came back as "4 attempts left"), then the right one, landing on language
 selection. Auth shows `emailVerified=true` for the completed account and `false`
 for an abandoned one.
 
-**Still to do:**
-- The content prefetch, which fires **after state selection** — state and language are both known only at that point.
+**The content prefetch is done too** (`f6106fa`), with 6 tests.
+
+Fires on state-confirm at the end of signup, and on state or language change in
+the profile screen. Almost all of it already existed: `ContentLoadingManager`
+had `initializeContent()` and `reloadContentIfNeeded()` from the start, and its
+listeners are gated on a flag only `initializeContent()` sets — which nothing
+ever called. **That is the #41 follow-up closed**: the manager had been inert
+for the life of the app.
+
+Two properties:
+- **Fire-and-forget and silent.** Nobody asked for this work, so a failure must
+  never surface to the user; the content screens still fetch on demand.
+- **`ContentProvider.fetchContent` now dedupes in-flight identical fetches.**
+  Without it this feature would cost duplicate requests rather than save
+  anything — the cache check inside only helps once a fetch has finished.
+
+Verified on the simulator: a state change produced three would-be identical
+fetches (listener, explicit prefetch, in-flight original) and the functions
+emulator recorded exactly **one** `getTheoryModules` and **one**
+`getTrafficRuleTopics`.
 
 **Owner steps outstanding:**
 1. Add the four DNS records Resend listed (DKIM TXT, two SPF CNAMEs, DMARC TXT) in Google Cloud DNS, then click *I've already added the records* and wait for Verified.
