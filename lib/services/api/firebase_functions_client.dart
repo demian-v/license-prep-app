@@ -237,15 +237,13 @@ class FirebaseFunctionsClient {
       final auth = firebase_auth.FirebaseAuth.instance;
       
       if (auth.currentUser == null) {
-        print('⚠️ [FUNCTION DEBUG] No user detected, attempting anonymous sign-in...');
-        try {
-          await auth.signInAnonymously();
-          print('✅ [FUNCTION DEBUG] Anonymous sign-in successful');
-          await _debugAuthenticationState(); // Re-check after sign-in
-        } catch (signInError) {
-          print('❌ [FUNCTION DEBUG] Anonymous sign-in failed: $signInError');
-          throw 'Authentication failed: Unable to sign in anonymously - $signInError';
-        }
+        // Risk #46 — this used to sign in anonymously here and retry. That
+        // created a permanent Auth account to make a call that every content
+        // callable now refuses anyway (they require isNotAnonymous since risk
+        // #3), so the only lasting effect was one more orphaned user. Fail with
+        // the real reason instead of manufacturing an identity.
+        print('❌ [FUNCTION DEBUG] No signed-in user; cannot call $functionName');
+        throw 'Authentication required: sign in before calling $functionName';
       } else {
         print('✅ [FUNCTION DEBUG] User already authenticated: ${auth.currentUser!.uid}');
         print('🔍 [FUNCTION DEBUG] User type: ${auth.currentUser!.isAnonymous ? "Anonymous" : "Registered"}');

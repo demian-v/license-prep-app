@@ -321,19 +321,20 @@ void main() async {
     }
   }
   
-  // Sign in anonymously to Firebase - this will help with storage permissions
-  try {
-    final auth = firebase_auth.FirebaseAuth.instance;
-    if (auth.currentUser == null) {
-      print('No user logged in, signing in anonymously...');
-      await auth.signInAnonymously();
-      print('Anonymous sign-in successful');
-    } else {
-      print('User already signed in: ${auth.currentUser?.uid}');
-    }
-  } catch (e) {
-    print('Error signing in anonymously: $e');
-  }
+  // Risk #46 — this used to sign in anonymously whenever nobody was logged in,
+  // "to help with storage permissions". Two things make that wrong now:
+  //
+  // 1. It leaked accounts. Signup uses createUserWithEmailAndPassword rather
+  //    than linkWithCredential, so the anonymous account was abandoned, not
+  //    upgraded. Measured on the emulator: a fresh install plus one signup left
+  //    two Auth users. Every logout-then-signup added another, forever.
+  // 2. It buys nothing since risk #3. Content callables and Firestore rules
+  //    both require isNotAnonymous(), so an anonymous session can read nothing
+  //    — the account existed only to be refused, while still counting towards
+  //    the Auth user total and its billing.
+  //
+  // Nothing before the login screen needs Firebase auth: it is logo assets and
+  // local preferences. Content loading happens after sign-in.
   
   // Initialize service locator with Firebase implementation
   serviceLocator.initializeWithApiImplementation(ApiImplementation.firebase);
