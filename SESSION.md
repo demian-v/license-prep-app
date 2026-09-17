@@ -70,6 +70,15 @@ Seed content into a fresh emulator (data is in-memory and lost on restart):
 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 GCLOUD_PROJECT=licenseprepapp node scripts/local/seed-emulator.js
 ```
 
+Then seed placeholder images, or every theory section and quiz question with a
+picture shows "Image unavailable". The content export copies Firestore documents
+only; the real picture files are in production Cloud Storage and this machine has
+no credential to read them:
+
+```bash
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199 GCLOUD_PROJECT=licenseprepapp node scripts/local/seed-emulator-images.js
+```
+
 Run the tests. **After ANY TypeScript change, build first** — the emulator runs
 `functions/lib/`, not `functions/src/`, so tests and the emulator will otherwise
 disagree silently:
@@ -282,6 +291,7 @@ list; the largest remaining Highs are #13 and #14 (privacy and account deletion)
 
 ## Gotchas
 
+- **Images are missing locally until you seed them.** "Image unavailable" on a theory section or quiz question means the Storage emulator is empty, not that the app is broken — the log line is `Firebase Storage: Unknown error - No object exists at the desired reference`. Run `scripts/local/seed-emulator-images.js` (144 flat-colour placeholders, colour derived from the path so different images stay visibly different). They are obvious placeholders; the real pictures only exist in production.
 - **The emulator restarts empty.** No import/export is configured, so stopping the emulators wipes Firestore and Auth. After every restart, re-run `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 node scripts/local/seed-emulator.js` (6,627 content docs) and sign up again.
 - **The simulator can never get a trial through the app.** `createTrialSubscription` refuses with `failed-precondition: Trial unavailable on this device` unless `isPhysicalDevice === true`. That gate is pre-existing (commit `eab687b`) and correct — a real iPhone gets the 3-day trial instantly on signup. Locally, use `scripts/local/grant-local-trial.js <email>`, which writes exactly what a real device would have received. Verified end to end 2026-09-16: trial banner shows "Free Trial Active — Days left: 3" and the Theory tab lists all modules.
 - **firebase-tools stubs `firebase-admin` and breaks `admin.firestore.*` statics.** Fixed in commit `6028011` by importing `FieldValue`/`Timestamp` from `firebase-admin/firestore`. If this ever regresses, the symptom is every timestamp-writing callable failing with `internal: INTERNAL` and the emulator logging "Cannot read properties of undefined (reading 'serverTimestamp')" — production is unaffected, so it only ever shows up locally.
