@@ -525,7 +525,8 @@ The answer key and explanation are served to an anonymous stranger. Reproduce wi
 - **The functions emulator runs `functions/lib/`, not `functions/src/`.** After any TypeScript change run `npm --prefix functions run build`, or the emulator keeps serving stale compiled JS. `npx jest` uses ts-jest on the source, so tests can pass while the emulator still runs old code — they disagreed for most of this session's first hours.
 - When the long-running emulator is already up, run `npx jest` directly. `npm test` wraps `emulators:exec`, which will fail on the already-bound ports.
 
-## TODO — checks for the real-device test run
+## TODO — work that needs another machine, or a decision
+
 
 Deferred deliberately (owner's call, 2026-09-17): these cannot be verified on
 this Mac, and are not worth chasing before a real device is in hand. Each row
@@ -562,6 +563,58 @@ before this branch anyway.
 not sufficient. Test by tapping a verification link in Mail: it should open the
 app, not Safari. This and the `/__/auth/action` rewrite (owner action below) are
 the two halves of the dead email-verification link — check them together.
+
+### 3. Dependabot — 8 of the 9 alerts are one dead dependency
+
+Checked 2026-09-17. All nine open alerts are in `functions/`, and **eight of
+them — including both "high" ones — are `nodemailer`**, pinned at `^7.0.6`
+against a fix in `9.1.1`.
+
+The useful part: **nothing imports nodemailer.** The import at
+`subscription-manager.ts:5` is commented out, the `createEmailTransporter`
+helper that would have used it is inside a comment block, and the remaining
+matches are prose. It is a direct dependency shipped in the functions bundle
+that no code path can reach — the same dead weight risk #35 describes, now also
+carrying the repo's only high-severity alerts.
+
+Two ways to close it, and the choice belongs with #35:
+
+- **Upgrade** `nodemailer` and `@types/nodemailer` to `^9.1.1`. One line, zero
+  behavioural risk because nothing imports it. Clears 8 alerts.
+- **Remove both packages.** Also clears 8 alerts and deletes the dead weight.
+  Worth preferring *if* #35 lands on Resend, Brevo or SendGrid, because those
+  are HTTP APIs and need no SMTP client at all. Nodemailer is only worth keeping
+  if the decision is to send over raw SMTP.
+
+The ninth alert is `qs` (medium, `>= 2.2.5 < 6.16.0`), which is **transitive**,
+not declared in `functions/package.json`. It most likely arrives via
+`firebase-functions` — which the emulator already warns is outdated — so
+updating that dependency is the thing to try before reaching for an `overrides`
+entry.
+
+None of this is a register row and none of it is urgent: the vulnerable code is
+unreachable. But it is cheap, and it is the whole of the repo's alert list.
+
+### 4. Gradle build to verify the dead-buildscript removal
+
+`chore/remove-dead-buildscript` was merged into `main` on 2026-09-17 at the
+owner's request (`004d043`). Its own commit message asks for a Gradle build
+before merging, and **that has still not happened** — neither the authoring
+machine nor this Mac has an Android SDK.
+
+The static reasoning is sound and the evidence is good: the Windows release
+build of `84300d0` stamped `androidGradlePluginVersion=8.13.0`, the version from
+`settings.gradle:21`, proving the removed block's `8.4.0` classpath was ignored.
+The failure mode is also contained — if that block were load-bearing, Gradle
+fails loudly at build time rather than shipping anything broken.
+
+**Fold this into the same Windows session as #31**, which needs that machine
+anyway: run a release build, confirm it succeeds, and confirm the bundle still
+reports AGP 8.13.0. If it fails, `git revert 004d043` restores the block.
+
+Note that `main` is no longer byte-identical to the commit that produced the
+live 1.0.5 build — `84300d0` is, and `004d043` adds this one unverified change
+on top.
 
 ### 2. Practice tests, and the renewal scheduler (found 2026-09-17 via #15)
 
