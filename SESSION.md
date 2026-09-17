@@ -5,13 +5,13 @@
 | | |
 |---|---|
 | **Branch** | `local/security-money-hardening` (base `84300d0`) — **pushed to `origin` 2026-09-16 at the owner's request.** `main` untouched, nothing deployed |
-| **Commits** | 53 |
-| **Tests** | 162 Cloud Functions (Jest) + 47 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
+| **Commits** | 55 |
+| **Tests** | 162 Cloud Functions (Jest) + 53 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
 | **Analyzer** | 0 errors |
-| **Register rows addressed** | 37 of 59 |
+| **Register rows addressed** | 38 of 59 |
 | **Deployed?** | **NO.** Nothing here has ever run in production. The deploy path itself has never been exercised |
 
-**Risks fixed on this branch:** #2 #3 #4 #5 #6 #7 #8 #12 #13 #14 #16 #18 #19 #20 #22 #23 #24 #25 #29 #32 #38 #39 #40 #41 #43 #45 #46 #47 #48 #51 #52 #54 #58 #59
+**Risks fixed on this branch:** #2 #3 #4 #5 #6 #7 #8 #12 #13 #14 #16 #18 #19 #20 #22 #23 #24 #25 #29 #32 #38 #39 #40 #41 #43 #45 #46 #47 #48 #50 #51 #52 #54 #58 #59
 **Partial, with reasons below:** #9 (no reconciliation job) · #21 (no sync built) · #26 (needs attestation)
 
 **Biggest open question:** none of this protects anyone until it ships. Everything below is verified locally and nothing has ever run in production.
@@ -250,7 +250,7 @@ Written up in the vault: `wiki/driveusa/Development/infra/app-check-attestation-
 Criticals and Highs in the agreed scope are done. Remaining: #1 (history
 cleanup only; the leaked secret is already rotated and dead), #10, #11, #15,
 #17, #27, #28, #30, #31, #33, #34, #35, #36, #37, #42, #44,
-#49, #50, #53, #55, #56, #57.
+#49, #53, #55, #56, #57.
 
 Worth knowing before picking one:
 - **#33 and #37 are product decisions, not bugs** — whether to widen past IL/NY,
@@ -270,6 +270,14 @@ Worth knowing before picking one:
 
 Rows whose stated premise did not survive checking. Recorded so the next reader
 does not act on the wrong cause.
+
+- **#50 — the strings were only a third of it.** Six auth screens really did
+  have zero `translate()` calls, but translating them alone would have changed
+  nothing on screen: `main.dart` passed `forceEnglish: user == null`, and
+  `AuthProvider` called `setLanguage('en')` on every logout. Either one alone
+  reproduces "a returning Russian user meets an English login screen". Also, the
+  "33 keys referenced in code exist in no JSON file" count is stale — measured
+  109 distinct keys, of which 2 were missing.
 
 - **#51 — the dead code was not shipping.** The row says debug and example code
   "ships inside release builds" and costs "dead weight in the shipped binary".
@@ -385,6 +393,9 @@ fixed, not claimed fixed** — re-check if it recurs on a stable build.
 The answer key and explanation are served to an anonymous stranger. Reproduce with `cd functions && npm test`.
 
 ## Follow-ups created by this work
+
+- **The auth translations want a native-speaker review (#50).** The Spanish, Polish, Russian and Ukrainian strings for the 48 new auth keys are mine. They are standard UI phrasing and read naturally, and the Russian login screen was checked on device, but nobody who speaks these languages has read them. Worth one pass before release.
+- **~441 inline `_translate` literals remain in 9 screens (#50, deliberately not touched).** `profile_screen`, `state_selection_screen`, `personal_info_screen`, `exam_screen`, `test_screen`, `quiz_question_screen` and three widgets keep per-file translation maps instead of using the JSON files. Nothing renders in the wrong language today — those maps do carry real translations — so this is consistency, not a bug. Moving them is a large refactor whose main risk is introducing the raw-key rendering that `localization_coverage_test.dart` now guards against. Do it only with that test in place.
 
 - **There is still no "my reports" screen (#45 follow-up).** The rules and the query are correct now — a user may read reports carrying their own `userId`, and `getUserReports` is a cheap equality query instead of a denied whole-collection read. But `getCurrentUserReports` has **no callers in `lib/`**, so nothing surfaces reports to the person who filed them. Building that is a feature, deliberately out of scope here. Until it exists, reporting is still one-way from the user's point of view, even though the data layer no longer prevents it.
 - **The 6 failing `counter_service_test.dart` tests are a harness gap, not a bug** (diagnosed 2026-09-16). Every one fails with `[core/no-app] No Firebase App '[DEFAULT]' has been created` — `CounterService` builds `FirebaseFirestore.instance` in a field initialiser, and the test never calls `Firebase.initializeApp`. Pre-existing on base `84300d0`. Fixing it means either a mock Firebase in `setUpAll` or injecting the Firestore instance; neither is in any register row.
