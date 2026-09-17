@@ -16,7 +16,7 @@ if (admin.apps.length === 0) {
   admin.initializeApp({ projectId: process.env.GCLOUD_PROJECT });
 }
 
-import { checkRateLimit } from '../receipt-validation';
+import { checkRateLimit, RATE_LIMIT_SCAN_LIMIT } from '../receipt-validation';
 
 const db = () => admin.firestore();
 
@@ -73,5 +73,30 @@ describe('Risk #19 — the limiter fails open, never blocking a paid purchase', 
     }) as any);
 
     await expect(checkRateLimit('rl-infra-failure')).resolves.toBe(false);
+  });
+});
+
+describe('Risk #40 — the rate-limit query is bounded', () => {
+  it('blocks a user far past the cap without reading all their rows', async () => {
+    // Before this bound the query had no limit, so a client hammering
+    // validation made every later check read every one of its own attempts —
+    // on the purchase path, where slow means a failed sale. The row count here
+    // is well past the cap; the limiter must still answer, and answer "blocked".
+    await seed('rl-cap', 'receipt_validation_failed', RATE_LIMIT_SCAN_LIMIT + 25);
+
+    await expect(checkRateLimit('rl-cap')).resolves.toBe(true);
+  });
+
+  it('the cap can only be reached when a budget is already blown', () => {
+    // Acting on "cap reached" without counting is only sound because the cap
+    // sits above the largest total that could still be under both budgets.
+    const maxUnderBothBudgets = (10 - 1) + (30 - 1);
+    expect(RATE_LIMIT_SCAN_LIMIT).toBeGreaterThan(maxUnderBothBudgets);
+  });
+
+  it('still lets a normal purchase through (positive control)', async () => {
+    // The bound must not turn into a blanket block.
+    await seed('rl-normal', 'receipt_validated', 1);
+    await expect(checkRateLimit('rl-normal')).resolves.toBe(false);
   });
 });

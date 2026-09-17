@@ -109,6 +109,19 @@ const RATE_LIMIT_MAX_VALIDATIONS = 10;
 const RATE_LIMIT_MAX_FAILURES = 30;
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;  // 1 hour in milliseconds
 
+// Risk #40 — cap on how many log rows one rate-limit check will read.
+//
+// The query is indexed on (userId, timestamp, action), so it does not get
+// slower as subscriptionLogs grows overall — only as one user's attempts in the
+// window grow. It had no limit, so a client hammering validation made every
+// subsequent check read every one of its own attempts, on the purchase path.
+//
+// This bound is safe to act on without counting further: if the query returns
+// this many rows then successes >= MAX_VALIDATIONS or failures >= MAX_FAILURES
+// must already hold, because otherwise the total could be at most
+// (MAX_VALIDATIONS - 1) + (MAX_FAILURES - 1), which is smaller.
+export const RATE_LIMIT_SCAN_LIMIT = RATE_LIMIT_MAX_VALIDATIONS + RATE_LIMIT_MAX_FAILURES;
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -167,7 +180,16 @@ export async function checkRateLimit(userId: string): Promise<boolean> {
       .where('userId', '==', userId)
       .where('timestamp', '>', Timestamp.fromMillis(windowStart))
       .where('action', 'in', ['receipt_validated', 'receipt_validation_failed', 'receipt_validation_error'])
+      .limit(RATE_LIMIT_SCAN_LIMIT)
       .get();
+
+    // Hitting the cap is itself a decision: see RATE_LIMIT_SCAN_LIMIT.
+    if (recentAttempts.size >= RATE_LIMIT_SCAN_LIMIT) {
+      console.warn(
+        `🚦 Rate limit EXCEEDED for ${userId} (scan cap of ${RATE_LIMIT_SCAN_LIMIT} reached)`,
+      );
+      return true;
+    }
 
     let successes = 0;
     let failures = 0;

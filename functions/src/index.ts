@@ -15,6 +15,13 @@ import { recordWebhookFailure } from './webhook-dead-letter';
 import { anonymizeTrialDevicesForUser } from './trial-devices';
 import { collectUserDataForDeletion, applyDeletionPlan, assertRecentLogin } from './account-deletion';
 import { readContentVersion } from './content-version';
+import { sweepPaginated, SWEEP_TIME_BUDGET_MS } from './sweep';
+import {
+  retentionCutoff,
+  isRetentionEnabled,
+  WEBHOOK_DEDUP_RETENTION_DAYS,
+  SUBSCRIPTION_LOG_RETENTION_DISABLED,
+} from './retention';
 import * as fs from 'fs';
 import * as path from 'path';
 import { defineInt, defineSecret } from 'firebase-functions/params';
@@ -48,6 +55,14 @@ const googleCredentials = defineSecret('GOOGLE_CREDENTIALS');
 // Apple numeric App ID — set via: firebase functions:params:set APPLE_APP_ID="YOUR_NUMERIC_ID"
 // Found in: App Store Connect → Your App → General → App Information → Apple ID
 const appleAppId = defineInt('APPLE_APP_ID', { default: 0 });
+
+// Risk #40 — how many days of subscriptionLogs to keep. Zero (the default)
+// keeps everything. This is the money-state audit trail and risk #4 was a job
+// that deleted rows out of it by accident, so pruning it is opt-in and the
+// number is an operator's decision, not a default anyone inherits.
+const subscriptionLogRetentionDays = defineInt('SUBSCRIPTION_LOG_RETENTION_DAYS', {
+  default: SUBSCRIPTION_LOG_RETENTION_DISABLED,
+});
 
 // VERIFY this bundle ID matches App Store Connect before deploying.
 // If wrong, ALL webhook verifications fail silently (caught → 200, no processing).
@@ -1878,6 +1893,69 @@ export const getContentVersion = functions.https.onCall(async (_data: any, conte
   }
   return { version: await readContentVersion(db) };
 });
+
+// Risk #40 — both of these collections grow forever: one document per store
+// notification, one row per validation attempt, webhook and scheduler action.
+// Nothing ever removed either, and no TTL policy was configured anywhere.
+//
+// Only the dedup records are pruned by default. subscriptionLogs is the audit
+// trail and is left alone unless SUBSCRIPTION_LOG_RETENTION_DAYS is set.
+export const cleanupExpiredRecords = functions
+  .runWith({ timeoutSeconds: 540, memory: '512MB' })
+  .pubsub
+  .schedule('every 24 hours')
+  .timeZone('America/Chicago')
+  .onRun(async () => {
+    const deadline = Date.now() + SWEEP_TIME_BUDGET_MS;
+
+    const dedupCutoff = retentionCutoff(WEBHOOK_DEDUP_RETENTION_DAYS);
+    const dedupSweep = await sweepPaginated({
+      label: 'processedWebhooks-retention',
+      // orderBy is what makes the cursor meaningful, and the inequality field
+      // has to be ordered first in Firestore anyway.
+      baseQuery: db.collection('processedWebhooks')
+        .where('processedAt', '<', admin.firestore.Timestamp.fromDate(dedupCutoff))
+        .orderBy('processedAt'),
+      deadline,
+      handle: async (doc) => { await doc.ref.delete(); },
+    });
+
+    let logsDeleted = 0;
+    let logsRemaining = false;
+    let logErrors: string[] = [];
+    const retentionDays = subscriptionLogRetentionDays.value();
+
+    if (isRetentionEnabled(retentionDays)) {
+      const logCutoff = retentionCutoff(retentionDays);
+      console.log(
+        `🧹 subscriptionLogs retention is ON at ${retentionDays} days; ` +
+        `pruning rows older than ${logCutoff.toISOString()}`,
+      );
+      const logSweep = await sweepPaginated({
+        label: 'subscriptionLogs-retention',
+        baseQuery: db.collection('subscriptionLogs')
+          .where('timestamp', '<', admin.firestore.Timestamp.fromDate(logCutoff))
+          .orderBy('timestamp'),
+        deadline,
+        handle: async (doc) => { await doc.ref.delete(); },
+      });
+      logsDeleted = logSweep.processed;
+      logsRemaining = logSweep.moreRemaining;
+      logErrors = logSweep.errors;
+    } else {
+      console.log('🧹 subscriptionLogs retention is OFF; the audit trail is kept in full.');
+    }
+
+    const summary = {
+      processedWebhooksDeleted: dedupSweep.processed,
+      processedWebhooksRemaining: dedupSweep.moreRemaining,
+      subscriptionLogsDeleted: logsDeleted,
+      subscriptionLogsRemaining: logsRemaining,
+      errors: [...dedupSweep.errors, ...logErrors],
+    };
+    console.log(`🧹 cleanupExpiredRecords: ${JSON.stringify(summary)}`);
+    return summary;
+  });
 
 export const createTrialSubscription = functions.https.onCall(async (data: any, context: any) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Not logged in');
