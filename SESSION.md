@@ -63,6 +63,14 @@ register*. Two are product decisions, not bugs (#33, #37) — ask first.
 
 Do not start a deploy. That is a separate decision the owner has not made.
 
+**The vault register is current as of 2026-09-17** and can be trusted: it lists
+the 38 fixed rows, the deliberately-partial ones, and — importantly — five rows
+whose stated *cause* turned out to be wrong (#40, #46, #50, #51, #52). Read its
+dated section before acting on any row's wording. Three Open Questions that this
+work settled were promoted into `platform-config`, `auth-flows` and
+`build-and-release`; the ProGuard finding in `platform-config` is groundwork for
+#31.
+
 **Before touching anything, run the bring-up in *How to resume*.** The emulator
 starts empty every time: re-seed content AND images, then grant a local trial,
 or every screen will look broken and you will debug a phantom.
