@@ -9,80 +9,73 @@ void main() {
       counterService = CounterService();
     });
 
-    test('should create CounterService instance', () {
+    test('constructing the service does not require a Firebase app', () {
+      // Risk #17. This is the whole reason the six tests below used to fail:
+      // the constructor reached for FirebaseFirestore.instance in a field
+      // initialiser, so every one of them died with
+      // `[core/no-app] No Firebase App '[DEFAULT]' has been created` before
+      // reaching its first expect.
       expect(counterService, isNotNull);
     });
 
-    test('should validate ID format patterns', () {
-      const userId = 'abc123def456';
-      const expectedPattern = r'^user_abc123def456_report_\d+$';
-      
-      // Test various generated IDs match the expected pattern
-      const testIds = [
-        'user_abc123def456_report_1',
-        'user_abc123def456_report_123',
-        'user_abc123def456_report_9999',
-      ];
-      
-      final regex = RegExp(expectedPattern);
-      
-      for (final id in testIds) {
-        expect(regex.hasMatch(id), isTrue, 
-               reason: 'ID "$id" should match pattern $expectedPattern');
-      }
-    });
-
-    test('should validate fallback ID format', () {
+    test('the fallback ID carries the user and is unique per call', () {
+      // Calls the REAL generator. The previous version of this test built the
+      // string itself and asserted on its own literal, so it would have passed
+      // against a service that produced anything at all.
       const userId = 'test_user_error';
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final fallbackId = 'user_${userId}_report_${timestamp}_123';
-      
-      // Fallback ID should contain user ID and timestamp
-      expect(fallbackId, contains('user_test_user_error_report_'));
-      expect(fallbackId.length, greaterThan('user_test_user_error_report_'.length));
+
+      final first = counterService.generateFallbackReportId(userId);
+      final second = counterService.generateFallbackReportId(userId);
+
+      expect(first, contains('_user_${userId}_report_fallback_'));
+      expect(
+        first,
+        matches(RegExp(r'^\d+_user_test_user_error_report_fallback_\d{3}$')),
+        reason: 'timestamp prefix, then the user, then a 3-digit suffix',
+      );
+
+      // A fallback is used when the transaction failed, so two reports filed in
+      // the same millisecond must not collide on the same document id.
+      expect(first, isNot(equals(second)));
     });
 
-    test('should handle user ID validation', () {
-      const validUserIds = [
-        'abc123',
-        'user_test_123',
-        'abcDEF123xyz',
-        '1234567890',
-      ];
-      
-      for (final userId in validUserIds) {
-        final expectedId = 'user_${userId}_report_1';
-        expect(expectedId, startsWith('user_'));
-        expect(expectedId, contains('_report_'));
-        expect(expectedId, endsWith('_1'));
+    test('the fallback ID keeps the global timestamp prefix', () {
+      // The legacy format had no leading global segment. Reports are sorted and
+      // grouped on it, so losing it would silently reorder them.
+      final before = DateTime.now().millisecondsSinceEpoch;
+      final id = counterService.generateFallbackReportId('u1');
+      final after = DateTime.now().millisecondsSinceEpoch;
+
+      final prefix = int.parse(id.split('_').first);
+      expect(prefix, greaterThanOrEqualTo(before));
+      expect(prefix, lessThanOrEqualTo(after));
+    });
+
+    test('different users get different fallback IDs', () {
+      final ids = ['user1', 'user2', 'user3']
+          .map(counterService.generateFallbackReportId)
+          .toList();
+
+      expect(ids.toSet().length, equals(ids.length));
+      for (final pair in [('user1', ids[0]), ('user2', ids[1]), ('user3', ids[2])]) {
+        expect(pair.$2, contains('_user_${pair.$1}_report_fallback_'));
       }
     });
 
-    test('should generate different formats for different users', () {
-      const userIds = ['user1', 'user2', 'user3'];
-      final reportCounter = 5;
-      
-      final generatedIds = userIds.map((userId) => 
-        'user_${userId}_report_$reportCounter').toList();
-      
-      expect(generatedIds, [
-        'user_user1_report_5',
-        'user_user2_report_5', 
-        'user_user3_report_5',
-      ]);
-      
-      // All IDs should be different
-      final uniqueIds = generatedIds.toSet();
-      expect(uniqueIds.length, equals(generatedIds.length));
+    test('a user id with underscores still round-trips', () {
+      // 'user_test_123' contains the same separator the format uses, which is
+      // the case most likely to produce an id that parses back wrongly.
+      final id = counterService.generateFallbackReportId('user_test_123');
+      expect(id, contains('_user_user_test_123_report_fallback_'));
     });
 
-    test('should create proper counter document ID format', () {
-      const userId = 'test123';
-      final counterDocId = 'user_${userId}_reports';
-      
-      expect(counterDocId, equals('user_test123_reports'));
-      expect(counterDocId, startsWith('user_'));
-      expect(counterDocId, endsWith('_reports'));
+    test('counter document names come from one place', () {
+      // These names were built inline at five call sites. A counter is only
+      // correct if every reader and writer agrees on its name.
+      expect(CounterService.globalCounterDoc, equals('global_report_counter'));
+      expect(CounterService.userCounterDoc('test123'), equals('user_test123_reports'));
+      expect(CounterService.userCounterDoc('test123'), startsWith('user_'));
+      expect(CounterService.userCounterDoc('test123'), endsWith('_reports'));
     });
   });
 

@@ -3,13 +3,33 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class CounterService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  /// Risk #17 — these were field initialisers, so `CounterService()` reached
+  /// for `FirebaseFirestore.instance` at construction. That made the class
+  /// impossible to instantiate without a live Firebase app, which is why all
+  /// six of `counter_service_test.dart`'s constructing tests failed with
+  /// `[core/no-app] No Firebase App '[DEFAULT]' has been created` — before
+  /// asserting anything.
+  ///
+  /// Lazy getters instead of injection: nothing here needs a substitute
+  /// Firestore, only the ability to exist without one. The pure ID and
+  /// document-name logic below is what the tests actually exercise.
+  FirebaseFirestore get _db => FirebaseFirestore.instance;
+  FirebaseAuth get _auth => FirebaseAuth.instance;
+
+  /// The document names this service reads and writes, in one place.
+  ///
+  /// They were built inline at five call sites. A counter is only correct if
+  /// every reader and writer agrees on its name, so a typo in one of them is
+  /// a silently split counter — and #11 was already two defects in the rules
+  /// guarding these exact documents.
+  static const String globalCounterDoc = 'global_report_counter';
+
+  static String userCounterDoc(String userId) => 'user_${userId}_reports';
 
   /// Generates next global report ID in format: {globalId}_user_{userId}_report_{userNumber}
   Future<String> getNextGlobalReportId(String userId) async {
-    final globalCounterRef = _db.collection('counters').doc('global_report_counter');
-    final userCounterRef = _db.collection('counters').doc('user_${userId}_reports');
+    final globalCounterRef = _db.collection('counters').doc(globalCounterDoc);
+    final userCounterRef = _db.collection('counters').doc(userCounterDoc(userId));
     
     print('CounterService: Attempting to get next global ID for user: $userId');
     print('CounterService: Global counter ref: global_report_counter');
@@ -220,7 +240,7 @@ class CounterService {
   /// Gets current global counter value (useful for debugging)
   Future<int> getCurrentGlobalCounterValue() async {
     try {
-      final doc = await _db.collection('counters').doc('global_report_counter').get();
+      final doc = await _db.collection('counters').doc(globalCounterDoc).get();
       
       if (doc.exists) {
         final data = doc.data();
@@ -245,7 +265,7 @@ class CounterService {
       print('CounterService: Found $existingReportsCount existing reports');
       
       // Set global counter to existing count (new reports will start from count + 1)
-      await _db.collection('counters').doc('global_report_counter').set({
+      await _db.collection('counters').doc(globalCounterDoc).set({
         'value': existingReportsCount,
         'lastUpdated': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
@@ -287,7 +307,7 @@ class CounterService {
   /// Reset global counter (admin function)
   Future<void> resetGlobalCounter({int newValue = 0}) async {
     try {
-      await _db.collection('counters').doc('global_report_counter').set({
+      await _db.collection('counters').doc(globalCounterDoc).set({
         'value': newValue,
         'lastUpdated': FieldValue.serverTimestamp(),
         'resetAt': FieldValue.serverTimestamp(),
