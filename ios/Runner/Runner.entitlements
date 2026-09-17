@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Risk #30. This key lived in Info.plist, where iOS ignores it: Associated
+	     Domains is an entitlement, so universal links have never worked. Moving it
+	     here makes it real, which also means the App ID must carry the Associated
+	     Domains capability or a device/archive build will fail to provision. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:licenseprepapp.web.app</string>
+		<string>applinks:licenseprepapp.firebaseapp.com</string>
+	</array>
+</dict>
+</plist>
