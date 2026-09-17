@@ -436,6 +436,9 @@ void main() async {
   // Register providers with service locator for our extensions
   serviceLocator.registerLanguageProvider(languageProvider);
   serviceLocator.registerContentProvider(contentProvider);
+  // Risk #41 — the state provider has to be registered too, or the extensions
+  // build their own blank copy that never sees the user's selected state.
+  serviceLocator.registerStateProvider(stateProvider);
   
   // Initialize service locator extensions
   ServiceLocatorExtensions.initialize();

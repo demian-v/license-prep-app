@@ -17,10 +17,13 @@ class ServiceLocatorExtensions {
   
   /// Initialize provider and manager components
   static void initialize() {
-    // Create providers if they don't exist
-    _stateProvider ??= StateProvider();
-    
-    // Get existing providers from the app
+    // Risk #41 — this used to be `_stateProvider ??= StateProvider()`, which
+    // built a SECOND provider alongside the one `main()` puts in the widget
+    // tree. That copy was never initialised from preferences and no screen ever
+    // wrote to it, so it reported a null state forever — and the
+    // ContentLoadingManager below listened to it, meaning its state-change
+    // reload could never fire. Take the app's own provider, like the other two.
+    _stateProvider = serviceLocator.$stateProvider;
     _languageProvider = serviceLocator.$languageProvider;
     _contentProvider = serviceLocator.$contentProvider;
     
@@ -54,11 +57,16 @@ class ServiceLocatorExtensions {
     _languageProvider = null;
     _contentProvider = null;
     _contentLoadingManager = null;
+    clearProviderRegistry();
   }
 }
 
 /// Global map to store provider references
 final Map<String, dynamic> _providerRegistry = {};
+
+/// Drop every registered provider. Paired with [ServiceLocatorExtensions.reset]
+/// so a test can start from a clean registry; nothing in the app calls either.
+void clearProviderRegistry() => _providerRegistry.clear();
 
 /// Extension to add provider access methods to ServiceLocator
 extension ServiceLocatorProviderExtension on ServiceLocator {
@@ -70,6 +78,11 @@ extension ServiceLocatorProviderExtension on ServiceLocator {
   /// Register a ContentProvider
   void registerContentProvider(ContentProvider provider) {
     _providerRegistry['contentProvider'] = provider;
+  }
+
+  /// Register a StateProvider
+  void registerStateProvider(StateProvider provider) {
+    _providerRegistry['stateProvider'] = provider;
   }
   
   /// Get the registered LanguageProvider
@@ -86,6 +99,15 @@ extension ServiceLocatorProviderExtension on ServiceLocator {
     final provider = _providerRegistry['contentProvider'] as ContentProvider?;
     if (provider == null) {
       throw Exception('ContentProvider not registered in ServiceLocator');
+    }
+    return provider;
+  }
+
+  /// Get the registered StateProvider
+  StateProvider get $stateProvider {
+    final provider = _providerRegistry['stateProvider'] as StateProvider?;
+    if (provider == null) {
+      throw Exception('StateProvider not registered in ServiceLocator');
     }
     return provider;
   }
