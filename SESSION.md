@@ -5,13 +5,13 @@
 | | |
 |---|---|
 | **Branch** | `local/security-money-hardening` (base `84300d0`) — **pushed to `origin` 2026-09-16 at the owner's request.** `main` untouched, nothing deployed |
-| **Commits** | 32 |
-| **Tests** | 109 Cloud Functions (Jest) + 21 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
+| **Commits** | 38 |
+| **Tests** | 109 Cloud Functions (Jest) + 27 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
 | **Analyzer** | 0 errors |
-| **Register rows addressed** | 29 of 59 |
+| **Register rows addressed** | 30 of 59 |
 | **Deployed?** | **NO.** Nothing here has ever run in production. The deploy path itself has never been exercised |
 
-**Risks fixed on this branch:** #2 #3 #4 #5 #6 #7 #8 #12 #13 #14 #16 #18 #19 #20 #22 #23 #24 #25 #29 #32 #39 #43 #48 #54 #58 #59
+**Risks fixed on this branch:** #2 #3 #4 #5 #6 #7 #8 #12 #13 #14 #16 #18 #19 #20 #22 #23 #24 #25 #29 #32 #38 #39 #43 #48 #54 #58 #59
 **Partial, with reasons below:** #9 (no reconciliation job) · #21 (no sync built) · #26 (needs attestation)
 
 **Biggest open question:** none of this protects anyone until it ships. Everything below is verified locally and nothing has ever run in production.
@@ -246,11 +246,21 @@ Written up in the vault: `wiki/driveusa/Development/infra/app-check-attestation-
 
 ### 3. The rest of the risk register
 
-**40 of the 59 rows are still open.** This branch covered the agreed
-security-and-money scope, not the register. See the register itself for the full
-list; the largest remaining Highs are #13 and #14 (privacy and account deletion),
-#21 (cross-device sync does not exist), #10 (a config guide that is actively wrong),
-#11 and #17.
+**29 of the 59 rows are still open, and they are all Medium or lower** — the
+Criticals and Highs in the agreed scope are done. Remaining: #1 (history
+cleanup only; the leaked secret is already rotated and dead), #10, #11, #15,
+#17, #27, #28, #30, #31, #33, #34, #35, #36, #37, #40, #41, #42, #44, #45, #46,
+#47, #49, #50, #51, #52, #53, #55, #56, #57.
+
+Worth knowing before picking one:
+- **#33 and #37 are product decisions, not bugs** — whether to widen past IL/NY,
+  and whether to switch single-device enforcement on. Ask the owner first.
+- **#52 is cheap and is a privacy item** — real user UIDs sitting in the working
+  tree from a past destructive run.
+- **#50** overlaps something already seen on screen this session: a missing
+  translation key renders as the raw key string, because `translate()` returns
+  the key rather than null when it misses.
+- **#55/#56 are store-deadline work** and need sandbox access, like #9.
 
 **#21 is deliberately partial.** Two of its three problems are closed: progress is no longer stored under one unscoped key (two accounts on one device shared quiz scores, exam results and study progress), and the failure is no longer dressed up as offline tolerance. Legacy unscoped data migrates once to whoever signs in first — a guess, but the same data they can already see, and each account is separate from then on.
 
@@ -352,6 +362,8 @@ fixed, not claimed fixed** — re-check if it recurs on a stable build.
 The answer key and explanation are served to an anonymous stranger. Reproduce with `cd functions && npm test`.
 
 ## Follow-ups created by this work
+
+- **`preloadRelatedContent` would crash on first use — left alone deliberately.** `content_provider.dart:499` does `orElse: () => null as TrafficRuleTopic`, which throws whenever the topic is not already in `_topics`; the `if (topic == null)` below it is unreachable. `flutter analyze` reports both. It is currently harmless because the method has **zero callers** (`grep -rn "preloadRelatedContent" lib test` finds only its own declaration), so it is dead code rather than a live crash. Not fixed during #38 to keep that change surgical. Either fix it with `firstWhereOrNull` and wire up a caller, or delete it — dead code that crashes on first use is worse than no code.
 
 - **#3 follow-up, done 2026-09-16 (commit `15a662f`).** The gate worked but the app never said so: the Theory tab showed *"No theory modules found ... for state 'ILLINOIS' with your current language settings"*, blaming state and language for a paywall, and logged `theory_module_list_empty(reason: state)`. Three layers were swallowing the refusal, and fixing only the inner one did nothing — `firebase_content_api.dart` has an inner catch around the Functions call **and** an outer catch that returns `[]`, so the inner rethrow was caught again one line later. Both now rethrow when `isEntitlementDenial(e)`, across all four content fetchers. `ContentProvider` exposes `contentRequiresSubscription` (cleared on every fetch, so a refusal cannot outlive a purchase) and no longer calls `loadHardcodedTopics()` on a denial — that outage fallback had been serving bundled content to exactly the users the server had just refused, a partial paywall bypass. Theory, traffic-rules and topic-quiz screens render `SubscriptionRequiredView`. Verified on the simulator with an unentitled account.
 
