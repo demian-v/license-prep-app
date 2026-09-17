@@ -5,13 +5,13 @@
 | | |
 |---|---|
 | **Branch** | `local/security-money-hardening` (base `84300d0`) — **pushed to `origin` 2026-09-16 at the owner's request.** `main` untouched, nothing deployed |
-| **Commits** | 49 |
-| **Tests** | 153 Cloud Functions (Jest) + 42 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
+| **Commits** | 51 |
+| **Tests** | 162 Cloud Functions (Jest) + 42 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
 | **Analyzer** | 0 errors |
-| **Register rows addressed** | 35 of 59 |
+| **Register rows addressed** | 36 of 59 |
 | **Deployed?** | **NO.** Nothing here has ever run in production. The deploy path itself has never been exercised |
 
-**Risks fixed on this branch:** #2 #3 #4 #5 #6 #7 #8 #12 #13 #14 #16 #18 #19 #20 #22 #23 #24 #25 #29 #32 #38 #39 #40 #41 #43 #46 #47 #48 #52 #54 #58 #59
+**Risks fixed on this branch:** #2 #3 #4 #5 #6 #7 #8 #12 #13 #14 #16 #18 #19 #20 #22 #23 #24 #25 #29 #32 #38 #39 #40 #41 #43 #45 #46 #47 #48 #52 #54 #58 #59
 **Partial, with reasons below:** #9 (no reconciliation job) · #21 (no sync built) · #26 (needs attestation)
 
 **Biggest open question:** none of this protects anyone until it ships. Everything below is verified locally and nothing has ever run in production.
@@ -249,7 +249,7 @@ Written up in the vault: `wiki/driveusa/Development/infra/app-check-attestation-
 **29 of the 59 rows are still open, and they are all Medium or lower** — the
 Criticals and Highs in the agreed scope are done. Remaining: #1 (history
 cleanup only; the leaked secret is already rotated and dead), #10, #11, #15,
-#17, #27, #28, #30, #31, #33, #34, #35, #36, #37, #42, #44, #45,
+#17, #27, #28, #30, #31, #33, #34, #35, #36, #37, #42, #44,
 #49, #50, #51, #53, #55, #56, #57.
 
 Worth knowing before picking one:
@@ -360,6 +360,9 @@ fixed, not claimed fixed** — re-check if it recurs on a stable build.
 The answer key and explanation are served to an anonymous stranger. Reproduce with `cd functions && npm test`.
 
 ## Follow-ups created by this work
+
+- **There is still no "my reports" screen (#45 follow-up).** The rules and the query are correct now — a user may read reports carrying their own `userId`, and `getUserReports` is a cheap equality query instead of a denied whole-collection read. But `getCurrentUserReports` has **no callers in `lib/`**, so nothing surfaces reports to the person who filed them. Building that is a feature, deliberately out of scope here. Until it exists, reporting is still one-way from the user's point of view, even though the data layer no longer prevents it.
+- **The 6 failing `counter_service_test.dart` tests are a harness gap, not a bug** (diagnosed 2026-09-16). Every one fails with `[core/no-app] No Firebase App '[DEFAULT]' has been created` — `CounterService` builds `FirebaseFirestore.instance` in a field initialiser, and the test never calls `Firebase.initializeApp`. Pre-existing on base `84300d0`. Fixing it means either a mock Firebase in `setUpAll` or injecting the Firestore instance; neither is in any register row.
 
 - **The `anonymous_user_configured` analytics event is now misnamed** (#46 follow-up, `main.dart:491`). It fires on the branch where no local user is loaded — which used to coincide with an anonymous Auth session and now just means "not signed in". Left alone deliberately: renaming an analytics event breaks continuity in whatever dashboards already chart it, which is the owner's call, not a code cleanup.
 
