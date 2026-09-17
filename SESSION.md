@@ -5,24 +5,28 @@
 | | |
 |---|---|
 | **Branch** | `local/security-money-hardening` (base `84300d0`) — **pushed to `origin` 2026-09-16 at the owner's request.** `main` untouched, nothing deployed |
-| **Commits** | 58 |
-| **Tests** | 162 Cloud Functions (Jest) + 53 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
+| **Commits** | 66 |
+| **Tests** | 199 Cloud Functions (Jest, 24 suites) + 61 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
 | **Analyzer** | 0 errors |
-| **Register rows addressed** | 38 of 59 |
+| **Register rows addressed** | 43 of 59 |
 | **Deployed?** | **NO.** Nothing here has ever run in production. The deploy path itself has never been exercised |
 
-**Risks fixed on this branch:** #2 #3 #4 #5 #6 #7 #8 #12 #13 #14 #16 #18 #19 #20 #22 #23 #24 #25 #29 #32 #38 #39 #40 #41 #43 #45 #46 #47 #48 #50 #51 #52 #54 #58 #59
-**Partial, with reasons below:** #9 (no reconciliation job) · #21 (no sync built) · #26 (needs attestation)
+**Risks fixed on this branch:** #2 #3 #4 #5 #6 #7 #8 #11 #12 #13 #14 #15 #16 #18 #19 #20 #22 #23 #24 #25 #27 #29 #30 #32 #34 #38 #39 #40 #41 #43 #45 #46 #47 #48 #50 #51 #52 #54 #58 #59
+**Partial, with reasons below:** #9 (no reconciliation job) · #21 (no sync built) · #26 (needs attestation) · #35 (no mail transport exists) · #49 (Artifact Registry migration is an owner action)
 
 **Biggest open question:** none of this protects anyone until it ships. Everything below is verified locally and nothing has ever run in production.
 
-### Start here — begin with #31
+### Start here — #31 is still the next code row
 
-The owner's instruction closing the last session: **start with #31 (Android
-release signing and ProGuard).** Groundwork is done — the facts below were
-checked, not copied from the register, which has been wrong on several rows.
+**This session (2026-09-17) did not start on #31.** It closed five other rows
+and part of two more, all verified on the iOS simulator and the emulator suite.
+#31 remains the next one, for the reason the previous handoff gave: it is
+Android release signing and ProGuard, and **the release path runs on the Windows
+machine, not this Mac**, so the fix cannot be verified here. Decide with the
+owner how to verify before starting. The groundwork below was checked, not
+copied from the register.
 
-**What is actually true:**
+**What is actually true about #31:**
 
 | Claim | Verified |
 |---|---|
@@ -47,29 +51,28 @@ happening before writing rules.
 2. Add `android/app/proguard-rules.pro` with the keep rules Flutter, Firebase
    and Play Billing need, or turn `minifyEnabled` off until rules exist. Turning
    it off is the safer interim if a release crash is already suspected.
-3. Verification is awkward here: this machine is a Mac and the release path runs
-   on Windows (see the JDK/Gradle note in the register). Decide with the owner
-   how to verify before starting — an unverified signing change is worse than
-   the current state.
 
 **After #31,** the remaining rows are listed under *The rest of the risk
 register*. Two are product decisions, not bugs (#33, #37) — ask first.
 
-**Blocked on the owner, not on code:**
-- **Email verification by 6-digit code** — agreed and specced below. Needs a mail
-  provider, a verified sending domain and `MAIL_API_KEY`. Code-side work can
-  start behind a pluggable sender that logs codes locally.
-- **App Check / attestation** — deferred, plan in the vault.
+### What 2026-09-17 closed
 
-Do not start a deploy. That is a separate decision the owner has not made.
+| Row | What | Verified by |
+|---|---|---|
+| #30 | iOS had **no entitlements file at all** and `com.apple.developer.associated-domains` sat in `Info.plist`, where iOS ignores it. Universal links have therefore never worked — the other half of the dead email-verification deep link | `plutil -lint`, `xcodebuild -showBuildSettings` for all three Runner configs, simulator build + launch |
+| #15 | `firebase.json` had no `firestore.indexes` key, so indexes have **never been deployed**; the file listed 3 of them. Now enumerates all 18 composite queries in `functions/src` | `firestore-indexes.test.ts` — 19 tests, 15 red before |
+| #11 | The counter rule contradicted its own writer: `create: if false` blocked the first-ever increment, and `hasOnly` ran against the **merged** document, so one run of an admin helper bricked every later increment | `counter-rules.test.ts` — 10 tests, 2 red before |
+| #27 | Apple's sandbox flag and Google's `testPurchase` were logged and discarded, so test subscriptions were stored as real revenue | `store-environment.test.ts` — 5 tests, all red before |
+| #34 | ~1,839 `print`/`debugPrint` calls reach release logs, ~122 carrying a user id, email or report id. Fixed structurally in ~10 lines rather than at 122 call sites | `release_logging_test.dart` — 8 tests |
+| #35 | **PARTIAL.** The three notification helpers returned a hardcoded `true`, which callers wrote into `subscriptionLogs.emailSent` — an audit trail claiming mail nobody received. They now return `false`. Actually *sending* mail is still blocked on a provider | `email-honesty.test.ts` — 3 tests, 2 red before |
+| #49 | **PARTIAL.** Base images pinned (`flutter:3.41.7`, `nginx:1.27-alpine`); both tags confirmed to resolve before pinning. The gcr.io → Artifact Registry half is an owner action | registry manifest checks |
 
-**The vault register is current as of 2026-09-17** and can be trusted: it lists
-the 38 fixed rows, the deliberately-partial ones, and — importantly — five rows
-whose stated *cause* turned out to be wrong (#40, #46, #50, #51, #52). Read its
-dated section before acting on any row's wording. Three Open Questions that this
-work settled were promoted into `platform-config`, `auth-flows` and
-`build-and-release`; the ProGuard finding in `platform-config` is groundwork for
-#31.
+**Also fixed, not a register row:** the emulator would not start. The #40 work
+added `defineInt('SUBSCRIPTION_LOG_RETENTION_DAYS')`, which no env file
+supplied, so `firebase emulators:start` hung forever on an interactive prompt —
+and so would a real `firebase deploy`. A `default: 0` does **not** suppress the
+prompt, the same trap `APPLE_APP_ID` already had. Added to both
+`functions/.env.local` and `functions/.env.licenseprepapp` (both untracked).
 
 **Before touching anything, run the bring-up in *How to resume*.** The emulator
 starts empty every time: re-seed content AND images, then grant a local trial,
@@ -77,7 +80,7 @@ or every screen will look broken and you will debug a phantom.
 
 **Branch:** `local/security-money-hardening` (base `84300d0`, off `chore/play-billing-8-migration`)
 **Started:** 2026-09-16
-**Last updated:** 2026-09-16 — handed off to start on #31
+**Last updated:** 2026-09-17 — closed #11 #15 #27 #30 #34, part of #35 and #49; #31 still next
 **Goal:** Fix the Critical + High security and revenue risks from `driveusa-risk-register`, verified locally. **Never deploy. Never touch the live Firebase project.**
 
 > If this session is interrupted, read **How to resume** below. Everything needed to pick up is in this file.
@@ -256,6 +259,18 @@ Status: ⬜ not started · 🔄 in progress · ✅ done & verified · ⏸️ blo
 | #25 | Schedulers capped at 100 documents per run, no cursor, no queue-depth signal | ✅ **DONE** | `sweep.test.ts` (4) + `scheduler-uncapped.test.ts` — 150 expired trials all swept | Cursor pagination + a wall-clock budget; scheduler timeouts raised 60s → 540s |
 | #16 | No `predeploy` hook — `firebase deploy --only functions` ships stale compiled JS | ✅ **DONE** | Not optional after all: `functions/lib/index.js` was compiled **Apr 27**, five months stale. The emulator runs `lib/`, so every local verification was against April code until this was found. Added `predeploy` to `firebase.json` and deleted the dead root `index.js` shim |
 
+### Taken in on 2026-09-17
+
+| Risk | What | Status | Verified by | Notes |
+|---|---|---|---|---|
+| #30 | iOS has no entitlements file and `associated-domains` is misplaced in `Info.plist` | ✅ **DONE** | `plutil -lint`, `xcodebuild -showBuildSettings` × 3 configs, simulator build + launch | The key was inert where it sat, so universal links have **never** worked. Making it real means the App ID must now carry the Associated Domains capability — **owner action, see below**, or a device/archive build will fail to provision where it previously succeeded doing nothing |
+| #15 | `firestore.indexes.json` never deployed, and incomplete | ✅ **DONE** | `firestore-indexes.test.ts` — 19 tests, 15 red → green | Enumerated all 18 composite queries in `functions/src`. The three pre-existing entries were **kept, not rewritten**: `firebase deploy` offers to DELETE indexes absent from the file, so removing an entry is how a deploy drops a working production index |
+| #11 | The counter rule contradicts its own writer | ✅ **DONE** | `counter-rules.test.ts` — 10 tests, 2 red → green | Two defects: `create: if false` blocked the first-ever increment (a merge-set on a missing document is a create), and `hasOnly` ran against the **merged** document, so one run of `initializeGlobalCounterFromExistingReports` bricked every later increment. Now `diff(resource.data).affectedKeys()` |
+| #27 | Sandbox vs production detected but never persisted | ✅ **DONE** | `store-environment.test.ts` — 5 tests, 5 red → green | Unknown stores as `null`, never `production` — a default would recreate the defect. A renewal that does not know omits the key rather than promoting a sandbox subscription into a real one |
+| #34 | ~1,839 `print`/`debugPrint` calls reach release logs, ~122 carrying PII | ✅ **DONE** | `release_logging_test.dart` — 8 tests | Fixed structurally in ~10 lines, not at 122 call sites: `debugPrint` is reassigned and the app runs inside a Zone that drops `print`. Wraps all of startup, not just `runApp` |
+| #35 | Email mocks return `true`; `emailSent` records mail nobody received | ⚠️ **PARTIAL** | `email-honesty.test.ts` — 3 tests, 2 red → green | The three helpers now return `false`. **Sending mail is still not possible** — same provider blocker as the email-verification work. These tests will fail when a transport is wired in; that is the right moment to revisit them |
+| #49 | Unpinned Docker base images; deprecated `gcr.io` | ⚠️ **PARTIAL** | registry manifest checks (both tags return 200) | Pinned `flutter:3.41.7` and `nginx:1.27-alpine`. **Artifact Registry migration deliberately not done** — it needs a repository, IAM for the Cloud Build service account and a trigger update (#36), and repointing the paths without those breaks the web deploy rather than fixing it |
+
 **Out of scope this round** (tracked, not started): #13 #14 privacy/deletion · #21 cross-device sync · #36 CI · #49 Docker · #53 content authoring · #55 #56 store platform (already handled/mitigated) · all remaining Medium rows.
 
 ---
@@ -309,11 +324,18 @@ Written up in the vault: `wiki/driveusa/Development/infra/app-check-attestation-
 
 ### 3. The rest of the risk register
 
-**21 of the 59 rows are still open, and they are all Medium or lower** — the
+**16 of the 59 rows are still open, and they are all Medium or lower** — the
 Criticals and Highs in the agreed scope are done. Remaining: #1 (history
-cleanup only; the leaked secret is already rotated and dead), #10, #11, #15,
-#17, #27, #28, #30, **#31 (start here)**, #33, #34, #35, #36, #37, #42, #44,
-#49, #53, #55, #56, #57.
+cleanup only; the leaked secret is already rotated and dead), #10, #17, #28,
+**#31 (next)**, #33, #35 (the sending half), #36, #37, #42, #44, #49 (the
+Artifact Registry half), #53, #55, #56, #57.
+
+Of those, the ones that are **not** blocked on an owner decision, store
+sandbox access or the Windows machine are #10 (a wrong config guide — docs
+only), #17 (the 6 `counter_service_test.dart` failures, a harness gap),
+#28 (`nginx.conf` and Firebase Hosting implement different rules for the same
+paths) and #42 (`packageId` written as three different types). Those four are
+the natural next batch after #31.
 
 Worth knowing before picking one:
 - **#33 and #37 are product decisions, not bugs** — whether to widen past IL/NY,
@@ -392,6 +414,11 @@ does not act on the wrong cause.
 | 2026-09-16 | The rate limiter now fails OPEN | It exists to deter abuse, not to be the reason a paid purchase fails. Its call site sits outside `validatePurchaseReceipt`'s try block, so a Firestore error there surfaced as a bare `internal` **after the customer was charged**. Abuse stays bounded by store-side receipt verification and the #5 receipt→account binding. Tradeoff accepted knowingly: during a Firestore outage, validation rate limiting is off |
 | 2026-09-16 | #5 fixes the binding; the webhook `.limit(1)` fan-out is deferred to #22 | The register lists `.limit(1)` as a *compounding* factor of #5, not part of its fix. Fanning a webhook update across N documents means restructuring two large handlers that build one update block for one ref — that is exactly what #22 is about. Interim: the limit is removed and duplicates are logged, so the condition is visible instead of silent |
 | 2026-09-16 | Superseded the 2026-04-21 "accept receipt sharing as known-issue" decision | Owner asked for #5 directly on 2026-09-16. The earlier reasoning (time-limited, self-healing, zero revenue impact) was about shipping under deadline, not about the defect being acceptable long-term |
+| 2026-09-17 | #15 **adds** index entries and keeps every existing one | `firebase deploy` offers to delete indexes that are in the project but not in the file. Rewriting the file from scratch — even to something more "correct" — is therefore a way to drop working production indexes. Keeping the three original entries means the first deploy can only add. The remaining exposure is indexes production has that nobody here can see, which is why the pre-deploy diff is an owner action rather than something claimed done |
+| 2026-09-17 | #27 stores an unknown environment as `null`, never `production` | Defaulting to production would recreate the exact defect the row describes: something we are not certain about still counted as a real sale. For the same reason a renewal that does not know the environment omits the key instead of writing one, so it cannot quietly promote a known sandbox subscription into real revenue |
+| 2026-09-17 | #34 is fixed structurally, not at the call sites | The register frames it as ~1,839 `print` calls, which reads as a 1,839-edit change. Rewriting that many call sites is a large diff with real regression risk, and `avoid_print` would then report 1,839 findings that bury real ones. Suppressing both paths in release — `debugPrint` reassigned, `print` dropped by the Zone — is ~10 lines, covers every call site including ones added later, and leaves debug diagnosis untouched. `avoid_print` stays off deliberately |
+| 2026-09-17 | #35 makes the mocks return `false` rather than building a mail sender | The row has two halves: an audit trail that lies, and no way to send mail. The first is closed now and is the one that matters for the money-state log — `emailSent: true` for mail nobody received is worse than no record. The second needs a provider, a verified domain and `MAIL_API_KEY`, which are owner steps already specced. Building a half-real sender in between would produce the same false confidence in a new place |
+| 2026-09-17 | #30 is done even though it can make a device build start failing | The entitlement was inert where it sat, so universal links have never worked and the email-verification deep link cannot be fixed without this. Making it real surfaces a latent provisioning gap rather than creating one — the App ID either has the capability or it never did. Recorded as an owner action so the failure is expected rather than mysterious |
 | 2026-09-16 | Leave the `Pods-Runner.profile.xcconfig` warning alone | Runner's Profile config points at `Flutter/Release.xcconfig`. Debug and Release are correctly wired; only Profile builds (performance profiling, never shipped) are affected. Not a register risk, and editing Xcode build config on a security branch invites unrelated breakage |
 
 ## Gotchas
@@ -491,6 +518,7 @@ The answer key and explanation are served to an anonymous stranger. Reproduce wi
 - `pod install` needs `export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8`, otherwise CocoaPods 1.16.2 on Ruby 3.4 dies with `Encoding::CompatibilityError`. It exits non-zero but a piped `tail` will mask it — always check `Podfile.lock`'s date.
 - Xcode warns that `Runner` has a custom base configuration so CocoaPods did not set `Pods-Runner.profile.xcconfig`. Pre-existing, affects Profile builds only. Not touched.
 - `functions/package.json` pins Node 22; the machine's default is Node 20. Every functions command needs the PATH prefix.
+- **A `defineInt` with `default: 0` still prompts.** Both `APPLE_APP_ID` and `SUBSCRIPTION_LOG_RETENTION_DAYS` declare a default of `0`, and the Firebase CLI asks for them anyway — `firebase emulators:start` hangs forever on `? Enter an integer value for ...`, and a real `firebase deploy` would do the same. Both are now supplied in `functions/.env.local` (emulator) and `functions/.env.licenseprepapp` (deploy); **both files are untracked**, so a fresh clone hits this again. If a future param is added with a falsy default, add it to both files in the same commit.
 - The functions emulator prompts for `APPLE_APP_ID` and hangs forever if unanswered. `functions/.env.local` supplies it. **Note:** the code declares `defineInt('APPLE_APP_ID', { default: 0 })` — so if it is unset in *production*, Apple notification verification runs against app id `0`. That is the unverified item in the register's Top-7 #5, and the default confirms the failure mode is real.
 - Since ADC now exists, the functions emulator warns that **non-emulated** Google APIs will hit production with those credentials. Emulated services (Firestore/Auth/Storage/Functions) are unaffected. Run `gcloud auth application-default revoke` once the content export is no longer needed.
 - Test fixtures use the synthetic `state: 'ZZ' / language: 'zz'` so they cannot collide with the 6,627 seeded production documents.
@@ -498,6 +526,15 @@ The answer key and explanation are served to an anonymous stranger. Reproduce wi
 - When the long-running emulator is already up, run `npx jest` directly. `npm test` wraps `emulators:exec`, which will fail on the already-bound ports.
 
 ## Owner action required outside the repo
+
+- **Enable the Associated Domains capability for `com.driveusa.app`** (from #30, 2026-09-17). The entitlement was previously in `Info.plist`, where iOS ignores it, so it has never been exercised. Now that it is in a real `Runner.entitlements`, a device or archive build **will fail to provision** unless the App ID carries the capability in the Apple Developer portal. Simulator builds are unaffected, which is why this is not visible from this machine. Universal links also need `apple-app-site-association` served from `licenseprepapp.web.app` and `licenseprepapp.firebaseapp.com` — worth checking at the same time as the `/__/auth/action` rewrite problem below, since the two together are why the email-verification deep link is dead.
+
+- **Diff the deployed indexes before the first deploy after #15** (2026-09-17). `firebase.json` now points at `firestore.indexes.json`, so indexes finally deploy — but `firebase deploy` also offers to **delete** indexes that exist in the project and not in the file, and with `--force` it does so without asking. The file was built by enumerating the composite queries in `functions/src`, not by reading production, because this machine has no production credentials. Before the first deploy, run `firebase firestore:indexes --project licenseprepapp` and compare; add anything the project has that the file lacks. Answer **no** to any deletion prompt until that comparison is done. Deleting the `subscriptionLogs (userId, timestamp, action)` index in particular would fail every purchase, because `checkRateLimit` runs before `validatePurchaseReceipt`'s try block.
+
+- **Migrate the web image from `gcr.io` to Artifact Registry** (the open half of #49, 2026-09-17). Google has deprecated Container Registry. This needs an Artifact Registry repository, `roles/artifactregistry.writer` for the Cloud Build service account, and an update to the Cloud Build trigger — whose definition is not in version control (#36). `cloudbuild.yaml` was deliberately left pointing at `gcr.io`, because repointing it before the repository exists breaks the web deploy instead of fixing it.
+
+- **Split sandbox out of the revenue figures** (follow-up to #27, 2026-09-17). Subscriptions and `subscriptionLogs` now carry an `environment` field, but `getSubscriptionStats` does not filter on it, and every document written before this change has no field at all — which reads as unknown, not as production. Deciding how to treat those historical rows is an owner call; the honest options are to leave them unknown, or to backfill from the store reports.
+
 
 - **Delete the anonymous Auth users already in production** (from #46, 2026-09-16). The app no longer creates them, but every one made before this change is still there, inflating the Auth user count and its billing. They are identifiable in the Firebase console by having no provider and no email, and none of them has a `users/{uid}` document. Deleting them needs Admin SDK access against production, which this machine deliberately does not have. Safe to remove: an anonymous account that was never linked cannot be signed back into, and nothing in Firestore references it.
 
