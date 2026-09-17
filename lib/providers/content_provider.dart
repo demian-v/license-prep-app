@@ -6,6 +6,17 @@ import '../models/traffic_rule_topic.dart';
 import '../services/service_locator.dart';
 import '../services/theory_cache_service.dart';
 
+/// Risk #38 — `checkConnectivity()` in connectivity_plus 7 returns a **list** of
+/// active transports, not one value. The provider used to compare that list
+/// against `ConnectivityResult.none` directly, which is always false (the
+/// analyzer flags it as `unrelated_type_equality_checks`), so `_isOffline` never
+/// became true and every offline branch in this file was unreachable.
+///
+/// Offline means no transport at all: an empty list, or nothing in it but
+/// `none`. A single real transport alongside `none` still counts as online.
+bool isOfflineFromConnectivity(List<ConnectivityResult> results) =>
+    results.isEmpty || results.every((r) => r == ConnectivityResult.none);
+
 class ContentProvider extends ChangeNotifier {
   bool _isLoading = false;
   List<TrafficRuleTopic> _topics = [];
@@ -137,8 +148,8 @@ class ContentProvider extends ChangeNotifier {
   
   // Check if device is connected
   Future<bool> _isConnected() async {
-    final result = await _connectivity.checkConnectivity();
-    _isOffline = result == ConnectivityResult.none;
+    final results = await _connectivity.checkConnectivity();
+    _isOffline = isOfflineFromConnectivity(results);
     return !_isOffline;
   }
   
