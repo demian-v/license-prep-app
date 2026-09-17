@@ -45,6 +45,20 @@ interface ValidationResult {
 // CONSTANTS
 // ============================================================================
 
+/**
+ * Risk #27 — which store environment a purchase came from.
+ *
+ * Both validators already work this out (Apple via status 21007, Google via
+ * `testPurchase`) and both used to throw it away after logging it, so a
+ * TestFlight or internal-test subscription was indistinguishable from real
+ * revenue in Firestore.
+ *
+ * `null` means the environment is genuinely unknown — it is deliberately NOT
+ * defaulted to 'production', because a default would recreate the defect:
+ * an unknown would be silently counted as a real sale.
+ */
+export type StoreEnvironment = 'sandbox' | 'production';
+
 // Apple App Store verification URLs
 const APPLE_SANDBOX_URL = 'https://sandbox.itunes.apple.com/verifyReceipt';
 const APPLE_PRODUCTION_URL = 'https://buy.itunes.apple.com/verifyReceipt';
@@ -279,7 +293,7 @@ async function retryWithBackoff<T>(
 async function validateAppleReceipt(
   receiptData: string,
   productId: string
-): Promise<{ valid: boolean; expiresAt?: Date; transactionId?: string; originalTransactionId?: string; actualProductId?: string; error?: string }> {
+): Promise<{ valid: boolean; expiresAt?: Date; transactionId?: string; originalTransactionId?: string; actualProductId?: string; environment?: StoreEnvironment; error?: string }> {
   console.log('🍎 Starting Apple receipt validation');
   console.log(`📦 Product ID: ${productId}`);
   console.log(`📄 Receipt length: ${receiptData.length} characters`);
@@ -437,6 +451,8 @@ async function validateAppleReceipt(
       transactionId: transactionId,
       originalTransactionId: originalTransactionId,
       actualProductId: productId,
+      // Risk #27 — carry the environment out instead of only logging it.
+      environment: isSandbox ? 'sandbox' : 'production',
     };
     
   } catch (error) {
@@ -475,7 +491,7 @@ async function validateAppleReceipt(
 async function validateGooglePlayReceipt(
   purchaseToken: string,
   productId: string
-): Promise<{ valid: boolean; expiresAt?: Date; transactionId?: string; error?: string }> {
+): Promise<{ valid: boolean; expiresAt?: Date; transactionId?: string; environment?: StoreEnvironment; error?: string }> {
   console.log('🤖 Starting Google Play receipt validation');
   console.log(`📦 Product ID: ${productId}`);
   console.log(`📄 Purchase token length: ${purchaseToken.length} characters`);
@@ -624,20 +640,23 @@ async function validateGooglePlayReceipt(
     const transactionId = subscriptionData.latestOrderId || subscriptionData.linkedPurchaseToken || purchaseToken;
     console.log(`🔑 Transaction ID: ${transactionId}`);
     
-    // Check for test purchase (log for information)
+    // Risk #27 — `testPurchase` marks a licence-tester or internal-track
+    // purchase. It used to be logged and dropped, so those subscriptions were
+    // stored as ordinary revenue.
     const testPurchase = subscriptionData.testPurchase;
     if (testPurchase) {
       console.log('🧪 This is a TEST PURCHASE (sandbox)');
     }
-    
+
     // SUCCESS! Return valid subscription data
     console.log('🎉 Google Play receipt validation successful!');
     console.log(`✅ Valid subscription until: ${expiresAt.toISOString()}`);
-    
+
     return {
       valid: true,
       expiresAt: expiresAt,
-      transactionId: transactionId
+      transactionId: transactionId,
+      environment: testPurchase ? 'sandbox' : 'production',
     };
     
   } catch (error: any) {
@@ -971,7 +990,8 @@ export async function createOrUpdateSubscription(
   expiresAt: Date,
   platform: 'ios' | 'android',
   transactionId: string,
-  originalTransactionId?: string
+  originalTransactionId?: string,
+  environment?: StoreEnvironment
 ): Promise<string> {
   console.log('💾 Starting createOrUpdateSubscription...');
   console.log(`   User: ${userId}, Product: ${productId}, Platform: ${platform}`);
@@ -1073,6 +1093,8 @@ export async function createOrUpdateSubscription(
         transactions: [transactionRecord],  // Transaction history array
         originalTransactionId: platform === 'ios' && originalTransactionId ? originalTransactionId : null,
         androidPurchaseToken: platform === 'android' ? transactionId : null,
+        // Risk #27 — null means unknown, never assume production.
+        environment: environment ?? null,
         createdAt: now,
         updatedAt: now
       };
@@ -1101,6 +1123,10 @@ export async function createOrUpdateSubscription(
         transactions: FieldValue.arrayUnion(transactionRecord),
         ...(platform === 'ios' && originalTransactionId && { originalTransactionId }),
         ...(platform === 'android' && { androidPurchaseToken: transactionId }),
+        // Risk #27 — only write it when this renewal actually told us. An
+        // omitted key leaves whatever the document already had, rather than
+        // overwriting a known environment with a guess.
+        ...(environment && { environment }),
         updatedAt: now
       });
       
@@ -1137,6 +1163,7 @@ export async function createOrUpdateSubscription(
         transactions: FieldValue.arrayUnion(upgradeTransaction),
         ...(platform === 'ios' && originalTransactionId && { originalTransactionId }),
         ...(platform === 'android' && { androidPurchaseToken: transactionId }),
+        ...(environment && { environment }),  // risk #27
         updatedAt: now
       });
       
@@ -1259,6 +1286,7 @@ export const validatePurchaseReceipt = functions
         transactionId?: string;
         originalTransactionId?: string;  // iOS only — stable ID across renewals, used for webhook matching
         actualProductId?: string;  // BUG RV-MATCH FIX: real product from Apple receipt
+        environment?: StoreEnvironment;  // risk #27 — sandbox vs production
         error?: string;
       };
       
@@ -1310,7 +1338,8 @@ export const validatePurchaseReceipt = functions
         validationResult.expiresAt!,
         platform,
         validationResult.transactionId!,
-        platform === 'ios' ? validationResult.originalTransactionId : undefined
+        platform === 'ios' ? validationResult.originalTransactionId : undefined,
+        validationResult.environment
       );
 
       // Log successful validation with subscription creation
@@ -1322,6 +1351,7 @@ export const validatePurchaseReceipt = functions
         subscriptionId: subscriptionId,
         transactionId: validationResult.transactionId,
         expiresAt: Timestamp.fromDate(validationResult.expiresAt!),
+        environment: validationResult.environment ?? null,  // risk #27
         timestamp: FieldValue.serverTimestamp(),
         success: true
       });
