@@ -111,6 +111,17 @@ looks worse than either alone.
 
 ---
 
+## Status 2026-09-17: all four DONE
+
+Verified against the live page: the advertising-ID claim is gone, the trial-hash
+wording is in, Crash Diagnostics is present including the account-identifier
+sentence, the do-NOT-collect list covers ad IDs and payment details, and the
+date reads September 17, 2026.
+
+One cosmetic thing left, deliberately ignored: the paste kept hard line breaks,
+so some sentences wrap mid-way. It renders as broken paragraphs but says the
+right thing.
+
 ## After you have made all four
 
 Then, and only then, fill in the store forms — `owner-console-actions.md` in
