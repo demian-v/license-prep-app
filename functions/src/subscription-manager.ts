@@ -277,9 +277,18 @@ async function sendTrialExpiredNotification(userId: string): Promise<boolean> {
       return false;
     }
 
-    // For now, we'll mock the email sending
-    // In production, replace with actual email implementation
-    return true; // Mock successful send
+    // Risk #35 — there is no mail transport. `nodemailer` is commented out at
+    // the top of this file and email-templates.ts is imported by nothing, so
+    // nothing here can send anything.
+    //
+    // This used to `return true`, and the caller wrote that straight into
+    // subscriptionLogs.emailSent. The audit trail therefore recorded a
+    // notification that was never sent, for every expired trial — which is
+    // worse than sending nothing, because it hides that nothing was sent.
+    // Returning false is the truthful answer until a provider exists; see the
+    // email plan in SESSION.md.
+    console.warn(`✉️ No mail transport configured — trial-expired notice NOT sent to ${userId}`);
+    return false;
   } catch (error) {
     console.error(`❌ Error sending trial expired email to ${userId}:`, error);
     return false;
@@ -298,9 +307,9 @@ async function sendSubscriptionExpiredNotification(userId: string): Promise<bool
       return false;
     }
 
-    // For now, we'll mock the email sending
-    // In production, replace with actual email implementation
-    return true; // Mock successful send
+    // Risk #35 — no mail transport exists; see sendTrialExpiredNotification.
+    console.warn(`✉️ No mail transport configured — expiry notice NOT sent to ${userId}`);
+    return false;
   } catch (error) {
     console.error(`❌ Error sending subscription expired email to ${userId}:`, error);
     return false;

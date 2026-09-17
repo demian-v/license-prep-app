@@ -247,9 +247,12 @@ async function sendRenewalFailureNotification(userId: string): Promise<boolean> 
       return false;
     }
 
-    // Mock email sending - replace with actual implementation
-    
-    return true;
+    // Risk #35 — no mail transport exists, so nothing is sent. This used to
+    // return true and the caller wrote that into subscriptionLogs.emailSent,
+    // recording a past-due warning the customer never received. False is the
+    // truthful answer until a provider is configured.
+    console.warn(`✉️ No mail transport configured — renewal-failure notice NOT sent to ${userId}`);
+    return false;
   } catch (error) {
     console.error(`❌ Error sending renewal failure email to ${userId}:`, error);
     return false;
