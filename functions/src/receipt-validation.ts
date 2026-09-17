@@ -733,6 +733,55 @@ const SUBSCRIPTION_DEFAULTS: Record<string, { id: string; duration: number; pric
 };
 
 /**
+ * Risk #42 — `packageId` is written as a NUMBER, always, by every writer.
+ *
+ * It was written as three different types: the trial function wrote the int
+ * `3`, receipt validation wrote a `subscriptionsType` **document id** (a
+ * string), and the deleted `upgradeSubscription` wrote a raw client value —
+ * while `user_subscription.dart` parses it with `_parseInt`. That worked only
+ * because production's document ids happen to be "1", "2" and "3". Rename one
+ * to something descriptive and `_parseInt` returns null, `packageId` becomes
+ * `0`, `getPackageById` returns null, and the paywall degrades with no error
+ * anywhere. A documentation change would break purchases.
+ *
+ * Normalising on the SERVER rather than loosening the Dart parser is the right
+ * side to fix: the client cannot invent a number the catalogue does not have,
+ * and every reader would otherwise need the same leniency.
+ *
+ * When the id is not numeric this falls back to the built-in default for that
+ * plan and logs an error, rather than throwing. That is #20's decision applied
+ * consistently: by the time this runs the customer has already been charged,
+ * so a catalogue misconfiguration must cost an operational alarm, not their
+ * purchase. Unlike the old silent `0`, the alarm is now real — the fallback is
+ * logged, and an unknown plan with no default is still refused.
+ */
+export function toPackageId(rawId: string | number, planType: string): number {
+  if (typeof rawId === 'number' && Number.isInteger(rawId)) return rawId;
+
+  const parsed = Number.parseInt(String(rawId), 10);
+  if (Number.isInteger(parsed) && String(parsed) === String(rawId).trim()) {
+    return parsed;
+  }
+
+  const fallback = SUBSCRIPTION_DEFAULTS[planType];
+  if (fallback) {
+    console.error(
+      `🚨 subscriptionsType document id "${rawId}" for plan "${planType}" is not ` +
+      `numeric. The app parses packageId as an int, so this would have been ` +
+      `stored as 0 and broken package lookup. Falling back to ${fallback.id}. ` +
+      `Rename the document back to a numeric id.`,
+    );
+    return Number.parseInt(fallback.id, 10);
+  }
+
+  // No default for this plan either. Refusing is right: an unknown product
+  // with an unusable id is not something to guess at.
+  throw new Error(
+    `Cannot derive a numeric packageId from "${rawId}" for unknown plan "${planType}"`,
+  );
+}
+
+/**
  * Get subscription metadata from the subscriptionsType collection, falling back
  * to built-in defaults for known products (risk #20).
  */
@@ -800,7 +849,10 @@ export async function findExistingSubscription(
 ): Promise<{
   id: string;
   planType: string;
-  packageId: string;
+  // Reads back whatever is already stored. Documents written before risk #42
+  // hold a string here; new ones hold a number. Narrowing this to `number`
+  // would be a lie about the historical data.
+  packageId: string | number;
   [key: string]: any;
 } | null> {
   const db = admin.firestore();
@@ -1081,7 +1133,7 @@ export async function createOrUpdateSubscription(
       const newSubscription = {
         userId: userId,
         planType: productId,
-        packageId: metadata.id,
+        packageId: toPackageId(metadata.id, productId),
         isActive: true,
         status: 'active',
         platform: platform,  // Track which platform
@@ -1151,7 +1203,7 @@ export async function createOrUpdateSubscription(
       // instead of the full 3-run grace period.
       await db.collection('subscriptions').doc(existingSubscription.id).update({
         planType: productId,  // Change plan
-        packageId: metadata.id,
+        packageId: toPackageId(metadata.id, productId),
         duration: metadata.duration,
         price: metadata.price,
         nextBillingDate: Timestamp.fromDate(expiresAt),
