@@ -1,28 +1,21 @@
 import * as admin from 'firebase-admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { sweepPaginated, SWEEP_TIME_BUDGET_MS } from './sweep';
-// TODO: Uncomment when implementing real email sending
-// import * as nodemailer from 'nodemailer';
+
+// Risk #35 — a commented-out `nodemailer` import and a commented-out
+// `createEmailTransporter` using Gmail SMTP used to sit here. The package was
+// removed on 2026-09-17: the owner chose Resend, which is an HTTP API, so no
+// SMTP client is needed. nodemailer was also carrying 8 of the repo's 9
+// Dependabot alerts while being imported by nothing.
+//
+// The transport now lives in ./email/sender.ts. The notification helpers below
+// still return false — wiring them to it is follow-on work, separate from the
+// verification-code flow that transport was built for.
 
 // Function to get Firestore instance (ensures Firebase is initialized)
 function getDb() {
   return admin.firestore();
 }
-
-// Email transporter configuration
-// TODO: Uncomment and use this function when implementing real email sending
-/*
-const createEmailTransporter = () => {
-  // For production, replace with your actual SMTP settings
-  return nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER || 'noreply@yourapp.com',
-      pass: process.env.EMAIL_PASSWORD || 'mock-password'
-    }
-  });
-};
-*/
 
 // Interface definitions
 interface SubscriptionData {
@@ -277,9 +270,11 @@ async function sendTrialExpiredNotification(userId: string): Promise<boolean> {
       return false;
     }
 
-    // Risk #35 — there is no mail transport. `nodemailer` is commented out at
-    // the top of this file and email-templates.ts is imported by nothing, so
-    // nothing here can send anything.
+    // Risk #35 — this notification is still not sent. A transport now exists
+    // (./email/sender.ts, built for the verification-code flow), but wiring
+    // these subscription notices to it is separate work: it needs its own
+    // templates, per-user language, and a decision about what to do when a
+    // send fails mid-sweep. Until that happens the honest answer is false.
     //
     // This used to `return true`, and the caller wrote that straight into
     // subscriptionLogs.emailSent. The audit trail therefore recorded a
