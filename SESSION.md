@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Branch** | `local/security-money-hardening` (base `84300d0`) — **local only, never pushed** |
-| **Commits** | 28 |
+| **Commits** | 30 |
 | **Tests** | 109 Cloud Functions (Jest) + 21 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
 | **Analyzer** | 0 errors |
 | **Register rows addressed** | 29 of 59 |
@@ -19,7 +19,7 @@
 
 **Branch:** `local/security-money-hardening` (base `84300d0`, off `chore/play-billing-8-migration`)
 **Started:** 2026-09-16
-**Last updated:** 2026-09-16 — handed off for a fresh session
+**Last updated:** 2026-09-16 — after the #3 follow-up (paywall messaging)
 **Goal:** Fix the Critical + High security and revenue risks from `driveusa-risk-register`, verified locally. **Never deploy. Never touch the live Firebase project.**
 
 > If this session is interrupted, read **How to resume** below. Everything needed to pick up is in this file.
@@ -338,6 +338,8 @@ fixed, not claimed fixed** — re-check if it recurs on a stable build.
 The answer key and explanation are served to an anonymous stranger. Reproduce with `cd functions && npm test`.
 
 ## Follow-ups created by this work
+
+- **#3 follow-up, done 2026-09-16 (commit `15a662f`).** The gate worked but the app never said so: the Theory tab showed *"No theory modules found ... for state 'ILLINOIS' with your current language settings"*, blaming state and language for a paywall, and logged `theory_module_list_empty(reason: state)`. Three layers were swallowing the refusal, and fixing only the inner one did nothing — `firebase_content_api.dart` has an inner catch around the Functions call **and** an outer catch that returns `[]`, so the inner rethrow was caught again one line later. Both now rethrow when `isEntitlementDenial(e)`, across all four content fetchers. `ContentProvider` exposes `contentRequiresSubscription` (cleared on every fetch, so a refusal cannot outlive a purchase) and no longer calls `loadHardcodedTopics()` on a denial — that outage fallback had been serving bundled content to exactly the users the server had just refused, a partial paywall bypass. Theory, traffic-rules and topic-quiz screens render `SubscriptionRequiredView`. Verified on the simulator with an unentitled account.
 
 - **App Check / attestation is planned but deferred** — written up in the vault at `wiki/driveusa/Development/infra/app-check-attestation-plan.md` (linked from the infra index). Covers what it fixes, what it does not, the console/Apple/Play prerequisites, and why enforcement must be staged against a single production project.
 - **#26 is partial, and the remaining part is not a code fix.** `deviceIdHash` and `isPhysicalDevice` arrive from the client, so a modified build sends any 64-hex string with `isPhysicalDevice: true` and collects an endless supply of trials. No server-side check can close that: the server cannot tell a real device from a claim about one. It needs **device attestation** — Firebase App Check with DeviceCheck (iOS) and Play Integrity (Android). The register already calls for App Check under risk #3. Until then the device gate is a speed bump, not a control, and `isPhysicalDevice` in particular blocks only honest simulator users — which is why local testing needs `scripts/local/grant-local-trial.js`.
