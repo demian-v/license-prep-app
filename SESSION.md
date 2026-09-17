@@ -527,6 +527,15 @@ The answer key and explanation are served to an anonymous stranger. Reproduce wi
 
 ## TODO — work that needs another machine, or a decision
 
+> **The Android half of this list now lives in the vault**, at
+> `wiki/driveusa/Development/infra/android-verification-checklist.md`, because
+> the vault is what syncs to the Windows PC — a checklist buried on a branch
+> would not be readable from the machine that has to run it. It covers the
+> missing Gradle verification, #31 signing and ProGuard, the #34 release-logging
+> change, `minSdkVersion`, and the post-deploy purchase checks. Keep it there,
+> not here.
+
+
 
 Deferred deliberately (owner's call, 2026-09-17): these cannot be verified on
 this Mac, and are not worth chasing before a real device is in hand. Each row
