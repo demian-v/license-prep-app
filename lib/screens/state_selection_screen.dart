@@ -517,6 +517,16 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> with Ticker
       authProvider.updateUserState(stateId); // Pass the two-letter code to the auth provider
     }
     
+    // Warm the content cache for the state and language just chosen, in the
+    // background. This is the last point in signup where both are known and
+    // nothing is waiting on content, so the fetch costs the user no waiting.
+    //
+    // Not awaited: navigation must not wait on it. It is also what switches on
+    // the ContentLoadingManager's language and state listeners, so a later
+    // change in settings reloads by itself.
+    ServiceLocatorExtensions.contentLoadingManager
+        .prefetchInBackground(reason: 'state selected');
+
     // Navigate to home screen
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (context) => HomeScreen()),

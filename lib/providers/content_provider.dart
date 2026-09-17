@@ -257,7 +257,44 @@ class ContentProvider extends ChangeNotifier {
   }
   
   // Fetch all content
-  Future<void> fetchContent({bool forceRefresh = false}) async {
+  /// In-flight identical fetches, so two callers cannot both hit the network
+  /// for the same content (prefetch work, 2026-09-17).
+  ///
+  /// The cache check inside `_fetchContent` only helps once a fetch has
+  /// FINISHED. Two calls that start together both miss it and both go to the
+  /// server — which is exactly what the state-selection prefetch would cause if
+  /// the user reached a content screen before it completed.
+  ///
+  /// Keyed on what actually determines the response. A `forceRefresh` call is
+  /// deliberately never joined to a non-forced one: the caller asked for fresh
+  /// data and must not be handed the result of a request that was allowed to
+  /// use a cache.
+  Future<void>? _inFlightFetch;
+  String? _inFlightKey;
+
+  Future<void> fetchContent({bool forceRefresh = false}) {
+    final key = '${_currentState ?? 'ALL'}|$_currentLanguage|$_currentLicenseId';
+
+    if (!forceRefresh && _inFlightFetch != null && _inFlightKey == key) {
+      print('⏳ ContentProvider: joining in-flight fetch for $key');
+      return _inFlightFetch!;
+    }
+
+    final future = _fetchContent(forceRefresh: forceRefresh);
+    _inFlightFetch = future;
+    _inFlightKey = key;
+
+    return future.whenComplete(() {
+      // Only clear if this future is still the current one; a forceRefresh
+      // started meanwhile must not be cleared by an older call finishing.
+      if (identical(_inFlightFetch, future)) {
+        _inFlightFetch = null;
+        _inFlightKey = null;
+      }
+    });
+  }
+
+  Future<void> _fetchContent({bool forceRefresh = false}) async {
     // Track what user actually requested (for empty state messaging)
     _requestedLanguage = _currentLanguage;
     _requestedState = _currentState;

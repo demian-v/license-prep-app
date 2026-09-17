@@ -53,6 +53,35 @@ class ContentLoadingManager {
   
   /// Check if content has been initialized
   bool get hasInitializedContent => _hasInitializedContent;
+
+  /// Warm the content cache in the background, without blocking the caller.
+  ///
+  /// Called when the user confirms their state at the end of signup, and after
+  /// a state or language change in settings. At that moment both selections are
+  /// known, the user is about to be navigated somewhere, and nothing is waiting
+  /// on content — so the fetch is free from their point of view.
+  ///
+  /// Deliberately NOT awaited by its callers, and deliberately silent. A
+  /// prefetch is an optimisation: if it fails, the content screens still fetch
+  /// on demand exactly as they did before, and the user must never see an error
+  /// for work they did not ask for.
+  ///
+  /// Safe to call more than once. The first call runs `initializeContent`,
+  /// which also switches ON the language and state listeners below — so every
+  /// later change reloads by itself, which is why settings changes need no
+  /// separate wiring. Subsequent calls take the reload path instead.
+  void prefetchInBackground({String reason = 'unspecified'}) {
+    final work = _hasInitializedContent
+        ? reloadContentIfNeeded(force: true)
+        : initializeContent();
+
+    work.then((_) {
+      print('ContentLoadingManager: prefetch complete ($reason)');
+    }).catchError((Object e) {
+      // Swallowed on purpose — see above.
+      print('ContentLoadingManager: prefetch failed, ignoring ($reason): $e');
+    });
+  }
   
   /// Initialize content after both language and state are selected
   ///

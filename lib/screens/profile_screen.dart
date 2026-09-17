@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/service_locator_extensions.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -1008,6 +1009,10 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
           // Update both providers (same as signup flow)
           await provider.setLanguage(code);
           await authProvider.updateUserLanguage(code);
+
+          // Re-warm the cache for the new language, in the background.
+          ServiceLocatorExtensions.contentLoadingManager
+              .prefetchInBackground(reason: 'language changed in settings');
           
           // Calculate time spent
           final timeSpent = _languageDialogStartTime != null 
@@ -1154,6 +1159,16 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                                     await stateProvider.setSelectedState(stateId);
                                     
                                     debugPrint('🔄 ProfileScreen: Updated both AuthProvider and StateProvider with state: $stateId');
+
+                                    // Re-warm the cache for the new state, in
+                                    // the background. Called explicitly rather
+                                    // than relying on the manager's state
+                                    // listener, because that listener is only
+                                    // live once initializeContent has run —
+                                    // which never happened for accounts created
+                                    // before the prefetch existed.
+                                    ServiceLocatorExtensions.contentLoadingManager
+                                        .prefetchInBackground(reason: 'state changed in settings');
                                     
                                     // Track successful state change
                                     analyticsService.logStateChanged(
