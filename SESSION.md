@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Branch** | `local/security-money-hardening` (base `84300d0`) — **pushed to `origin` 2026-09-16 at the owner's request.** `main` untouched, nothing deployed |
-| **Commits** | 84 |
+| **Commits** | 86 |
 | **Tests** | 255 Cloud Functions (Jest, 27 suites, **serial** — see Gotchas) + 83 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
 | **Analyzer** | 0 errors |
 | **Register rows addressed** | 43 of 59 |
@@ -772,22 +772,32 @@ been exercised against production, so confirm rather than assume:
   failing. Check the Cloud Functions logs for that scheduler after the next run
   and confirm it no longer reports a FAILED_PRECONDITION / missing-index error.
 
-## The app has no crash reporting at all
+## Crash reporting — added 2026-09-17 (`8ae1f8a`)
 
-Found 2026-09-17 while deciding how to make the content prefetch observable.
-There is **no Crashlytics and no Sentry** — nothing in `pubspec.yaml`, the
-lockfile, `lib/`, `ios/Podfile`, the Android config, or the Firebase config.
+The app previously had **none** — no Crashlytics, no Sentry, nothing anywhere.
+Combined with #34 silencing logs in release, a crash in the field was invisible.
 
-So for an app shipping to both stores, the only signal from a release build is
-Firebase Analytics. `print` and `debugPrint` are deliberately silenced in
-release by #34, which is correct for PII but means a crash or a silent
-degradation in the field is currently invisible.
+**Pinned to `firebase_crashlytics: 5.0.0`, exactly, and that matters.**
+`flutter pub add` resolved 22 dependencies: it bumped `cloud_firestore`
+6.0.0 → 6.10.0, `firebase_auth`, `firebase_storage` and 17 others, and the newer
+Firebase iOS SDK then demanded a deployment target above 15.0 — **the iOS build
+failed outright**. Hiding in that were two things nobody asked for: a Firebase
+SDK upgrade underneath the payment code, and a rise in the minimum iOS version.
+5.0.0 matches the `firebase_core` 4.0.0 already in the lock, reducing it to a
+two-package addition with `in_app_purchase_android` 0.5.0 untouched.
 
-This is not a register row and was not added as one — it deserves its own
-decision rather than being folded into whatever piece of work happens to notice
-it. `firebase_crashlytics` is the obvious candidate given Firebase is already
-throughout the app, and it needs a privacy-policy line about crash diagnostics
-before it ships.
+**If you ever add another Firebase package here, check `git diff pubspec.lock`
+before trusting it.**
+
+**Collection is OFF in debug.** There is no Crashlytics emulator — anything
+collected goes to the real project. Verified on the simulator:
+`firebase_crashlytics_enabled = 0`, so nothing was sent to production.
+
+**Still open:**
+- **The iOS dSYM upload build phase is not wired.** Release crashes report but arrive unsymbolicated. Its own change.
+- **Android is wired but unverified** — no Android SDK here. On the Windows checklist with #31.
+- **The privacy policy wording is a draft** and wants the owner's read. It adds a Crash Diagnostics category and states explicitly that quiz answers, progress and screen contents are not collected.
+- **No test crash has been fired.** That is the only real end-to-end verification and it writes to production Crashlytics, so it needs the owner's say-so.
 
 ## Owner action required outside the repo
 
