@@ -395,7 +395,13 @@ The answer key and explanation are served to an anonymous stranger. Reproduce wi
 
 ## Owner action required outside the repo
 
-- **Decide a retention period for `subscriptionLogs`, or leave it off** (from #40, 2026-09-16). `cleanupExpiredRecords` prunes `processedWebhooks` at 30 days automatically, but it will not touch the audit trail unless `SUBSCRIPTION_LOG_RETENTION_DAYS` is set to a positive number. Default is 0 = keep everything, deliberately: risk #4 was a job that deleted rows out of this collection by accident, and how long payment records must be kept is a compliance question. Until this is set, `subscriptionLogs` still grows without bound — that is a cost question, not a correctness one.
+- **`subscriptionLogs` retention: no action needed — leave `SUBSCRIPTION_LOG_RETENTION_DAYS` at 0** (from #40, revisited 2026-09-16). The switch exists if it is ever wanted, but checking the actual constraints says not to use it:
+  - `privacy_policy.md:107` promises subscription data is *"retained as required for billing and tax purposes"* — open-ended, so keeping it breaks no commitment.
+  - `privacy_policy.md:108` promises personal data is gone within 30 days of account deletion, and #14 satisfies that by **anonymising** these rows (userId replaced), not deleting them. So a deleted user's rows are no longer personal data and retention does not conflict with the promise.
+  - Cost is negligible: roughly 3 rows per active subscriber per month at ~1.5 KB all-in including index entries. At 10,000 subscribers that is ~45 MB/month, about ten cents a month of Firestore storage after a full year.
+  - The query-performance half of #40 is already fixed by the scan cap, and does not depend on collection size.
+
+  If a number is ever needed for a policy document, **24 months** is the usual range for billing audit logs. Note that the 7-year figure people reach for applies to financial and tax records — Apple and Google are the merchant of record here, so the authoritative tax records are the store payout reports, not these rows. Worth confirming with whoever handles compliance before publishing a number. Setting it is one config value and the sweep already handles it.
 
 - **Bump the content version after editing content** (from #47, 2026-09-16). `getContentVersion` reads `contentMeta/current.version`; changing it makes every device drop cached content on next launch instead of waiting out a 24 h TTL. Without a bump, a content correction still takes up to 24 h to reach people — the mechanism exists now, but somebody has to pull the lever. `scripts/local/bump-content-version.js` does it against the emulator and is the model for production; there is no admin UI (risk #53). In production the document can also be edited by hand in the Firebase console: set `version` to any different integer.
 
