@@ -5,8 +5,8 @@
 | | |
 |---|---|
 | **Branch** | `local/security-money-hardening` (base `84300d0`) — **pushed to `origin` 2026-09-16 at the owner's request.** `main` untouched, nothing deployed |
-| **Commits** | 69 |
-| **Tests** | 204 Cloud Functions (Jest, 24 suites) + 61 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
+| **Commits** | 77 |
+| **Tests** | 255 Cloud Functions (Jest, 27 suites, **serial** — see Gotchas) + 61 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
 | **Analyzer** | 0 errors |
 | **Register rows addressed** | 43 of 59 |
 | **Deployed?** | **NO.** Nothing here has ever run in production. The deploy path itself has never been exercised |
@@ -279,7 +279,40 @@ Status: ⬜ not started · 🔄 in progress · ✅ done & verified · ⏸️ blo
 
 Agreed but not started. Nothing here is in the current branch.
 
-### 1. Email verification by 6-digit code (owner request, 2026-09-16)
+### 1. Email verification by 6-digit code — SERVER HALF BUILT 2026-09-17
+
+**Provider chosen: Resend** (owner, 2026-09-17), sending from
+`driveusaservice@driveusallc.com` on the `driveusallc.com` domain.
+
+**Done** (`52452b6`): the whole server side, with 51 tests.
+
+| Piece | Where |
+|---|---|
+| Policy — code generation, hashing, expiry, attempt cap, send throttling | `functions/src/email/verification-code.ts` (pure, no Firestore or network) |
+| Transport, behind a swappable interface | `functions/src/email/sender.ts` |
+| Callables — send, verify, status | `functions/src/email/verification-callables.ts` |
+| Templates, five languages | `email-templates.ts` (`VERIFICATION_CODE_TEMPLATES`) |
+| Rules | `emailVerificationCodes/{uid}` client-deny both ways |
+
+Limits: 10-minute expiry · 5 wrong guesses then the code is burned · 60s
+resend cooldown · 5 sends per hour.
+
+**It works locally without a key.** `createEmailSender` returns a log transport
+under the emulator, which prints the code, so the flow is exercisable end to
+end today. In production with no key it **throws** rather than pretending — that
+is #35's lesson encoded, not merely documented.
+
+**Still to do:**
+- The Flutter code-entry screen (six boxes, paste, resend countdown, resume on relaunch — `getEmailVerificationStatus` exists to drive that).
+- Insert it into signup **after email+password, before state selection** (owner-confirmed ordering, 2026-09-17).
+- The content prefetch, which fires **after state selection**, not during code entry — state and language are both known only at that point.
+
+**Owner steps outstanding:**
+1. Add the four DNS records Resend listed (DKIM TXT, two SPF CNAMEs, DMARC TXT) in Google Cloud DNS, then click *I've already added the records* and wait for Verified.
+2. Create a Resend API key with sending access, then `firebase functions:secrets:set RESEND_API_KEY --project licenseprepapp`. **Never paste it into a file** (cf. #1, #32).
+3. Free tier is 3,000/month and 100/day — the daily cap is the tighter one, worth checking against expected signup volume.
+
+### 1b. The original plan, for context
 
 Replaces the link flow. A code typed in the app avoids both broken paths: the
 hosting rewrite that sends every `/__/auth/action` to `password-reset.html`
@@ -414,6 +447,11 @@ does not act on the wrong cause.
 | 2026-09-16 | The rate limiter now fails OPEN | It exists to deter abuse, not to be the reason a paid purchase fails. Its call site sits outside `validatePurchaseReceipt`'s try block, so a Firestore error there surfaced as a bare `internal` **after the customer was charged**. Abuse stays bounded by store-side receipt verification and the #5 receipt→account binding. Tradeoff accepted knowingly: during a Firestore outage, validation rate limiting is off |
 | 2026-09-16 | #5 fixes the binding; the webhook `.limit(1)` fan-out is deferred to #22 | The register lists `.limit(1)` as a *compounding* factor of #5, not part of its fix. Fanning a webhook update across N documents means restructuring two large handlers that build one update block for one ref — that is exactly what #22 is about. Interim: the limit is removed and duplicates are logged, so the condition is visible instead of silent |
 | 2026-09-16 | Superseded the 2026-04-21 "accept receipt sharing as known-issue" decision | Owner asked for #5 directly on 2026-09-16. The earlier reasoning (time-limited, self-healing, zero revenue impact) was about shipping under deadline, not about the defect being acceptable long-term |
+| 2026-09-17 | Email verification is a **code**, not a link | A link has to travel through `/__/auth/action`, which `firebase.json` rewrites to `password-reset.html` for every mode — a page with no `verifyEmail` handling at all — and it needs the Associated Domains entitlement that only became real in #30 and is still unverified on a device. A 6-digit code avoids both and was testable the day it was written. It also closes register owner-action 3 by design rather than by fixing the rewrite |
+| 2026-09-17 | The mail transport **throws** in production rather than falling back | #35 was not "we picked the wrong mail library", it was "the code claimed to send mail it never sent". A silent fallback to a logging transport would reproduce that exactly, one layer down. Locally the log transport is used and says so (`transport: 'log'`); in production a missing key is a misconfiguration and must be loud |
+| 2026-09-17 | nodemailer **removed**, not kept at the upgraded version | Resend is an HTTP API, so no SMTP client has any future role here. Removal clears the same 8 Dependabot alerts as the upgrade did, and also deletes a dependency that shipped in the deployed bundle while being imported by nothing |
+| 2026-09-17 | The verification code screen sits **after email+password, before state selection** | Owner-confirmed. It also fixes the original cache-prefetch plan: prefetching "while the user types the code" is impossible, because state and language are not known until the state screen. The prefetch moves to state-confirm instead |
+| 2026-09-17 | The functions suite runs serially | Two suites both call `processExpiredSubscriptions`, which is global by nature. Scoping fixtures is not enough when the function under test ignores scope. See Gotchas |
 | 2026-09-17 | #15 **adds** index entries and keeps every existing one | `firebase deploy` offers to delete indexes that are in the project but not in the file. Rewriting the file from scratch — even to something more "correct" — is therefore a way to drop working production indexes. Keeping the three original entries means the first deploy can only add. The remaining exposure is indexes production has that nobody here can see, which is why the pre-deploy diff is an owner action rather than something claimed done |
 | 2026-09-17 | #27 stores an unknown environment as `null`, never `production` | Defaulting to production would recreate the exact defect the row describes: something we are not certain about still counted as a real sale. For the same reason a renewal that does not know the environment omits the key instead of writing one, so it cannot quietly promote a known sandbox subscription into real revenue |
 | 2026-09-17 | #34 is fixed structurally, not at the call sites | The register frames it as ~1,839 `print` calls, which reads as a 1,839-edit change. Rewriting that many call sites is a large diff with real regression risk, and `avoid_print` would then report 1,839 findings that bury real ones. Suppressing both paths in release — `debugPrint` reassigned, `print` dropped by the Zone — is ~10 lines, covers every call site including ones added later, and leaves debug diagnosis untouched. `avoid_print` stays off deliberately |
@@ -518,6 +556,8 @@ The answer key and explanation are served to an anonymous stranger. Reproduce wi
 - `pod install` needs `export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8`, otherwise CocoaPods 1.16.2 on Ruby 3.4 dies with `Encoding::CompatibilityError`. It exits non-zero but a piped `tail` will mask it — always check `Podfile.lock`'s date.
 - Xcode warns that `Runner` has a custom base configuration so CocoaPods did not set `Pods-Runner.profile.xcconfig`. Pre-existing, affects Profile builds only. Not touched.
 - `functions/package.json` pins Node 22; the machine's default is Node 20. Every functions command needs the PATH prefix.
+- **The functions suite runs SERIALLY (`maxWorkers: 1`), on purpose.** All 27 suites share one Firestore and Auth emulator, and several call functions that are global by nature — `processExpiredSubscriptions` sweeps every expired trial in the collection, whoever created it. Two suites calling that at once cannot be scoped apart: one deactivates the other's fixtures. That failed roughly one run in three before it was pinned. Do not "speed the suite up" by restoring parallel workers without solving that first; it costs ~100s against ~60s, which is the right trade for a suite that is emulator-IO bound anyway.
+- **Tests must scope their queries to their own data.** `scheduler-uncapped` used to assert on the whole `subscriptions` collection and delete every trial in it during setup. Global assertions against a shared emulator are fragile by construction — prefer asserting on documents the suite created itself.
 - **A `defineInt` with `default: 0` still prompts.** Both `APPLE_APP_ID` and `SUBSCRIPTION_LOG_RETENTION_DAYS` declare a default of `0`, and the Firebase CLI asks for them anyway — `firebase emulators:start` hangs forever on `? Enter an integer value for ...`, and a real `firebase deploy` would do the same. Both are now supplied in `functions/.env.local` (emulator) and `functions/.env.licenseprepapp` (deploy); **both files are untracked**, so a fresh clone hits this again. If a future param is added with a falsy default, add it to both files in the same commit.
 - The functions emulator prompts for `APPLE_APP_ID` and hangs forever if unanswered. `functions/.env.local` supplies it. **Note:** the code declares `defineInt('APPLE_APP_ID', { default: 0 })` — so if it is unset in *production*, Apple notification verification runs against app id `0`. That is the unverified item in the register's Top-7 #5, and the default confirms the failure mode is real.
 - Since ADC now exists, the functions emulator warns that **non-emulated** Google APIs will hit production with those credentials. Emulated services (Firestore/Auth/Storage/Functions) are unaffected. Run `gcloud auth application-default revoke` once the content export is no longer needed.
@@ -575,8 +615,9 @@ the two halves of the dead email-verification link — check them together.
 
 ### 3. Dependency advisories — nodemailer done, the Firebase tree is not
 
-**nodemailer: done 2026-09-17** (`61e8f22`). Upgraded `^7.0.6` → `^9.1.1`,
-clearing 8 of the 9 Dependabot alerts including both highs. Zero behavioural
+**nodemailer: REMOVED 2026-09-17** (`c857083`, superseding the earlier upgrade in
+`61e8f22`). Resend is an HTTP API, so no SMTP client is needed at all. This
+clears 8 of the 9 Dependabot alerts including both highs. Zero behavioural
 risk — nothing imports it. Upgraded rather than removed so the #35 decision
 stays open; removal is probably right once a provider is picked, since Resend,
 Brevo and SendGrid are all HTTP APIs needing no SMTP client.
