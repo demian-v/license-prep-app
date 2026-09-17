@@ -5,8 +5,8 @@
 | | |
 |---|---|
 | **Branch** | `local/security-money-hardening` (base `84300d0`) — **pushed to `origin` 2026-09-16 at the owner's request.** `main` untouched, nothing deployed |
-| **Commits** | 84 |
-| **Tests** | 255 Cloud Functions (Jest, 27 suites, **serial** — see Gotchas) + 81 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
+| **Commits** | 86 |
+| **Tests** | 255 Cloud Functions (Jest, 27 suites, **serial** — see Gotchas) + 83 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
 | **Analyzer** | 0 errors |
 | **Register rows addressed** | 43 of 59 |
 | **Deployed?** | **NO.** Nothing here has ever run in production. The deploy path itself has never been exercised |
@@ -336,7 +336,16 @@ listeners are gated on a flag only `initializeContent()` sets — which nothing
 ever called. **That is the #41 follow-up closed**: the manager had been inert
 for the life of the app.
 
-Two properties:
+Three properties:
+- **It skips users who cannot be served.** Every content callable requires
+  entitlement, so prefetching without one is two guaranteed refusals. The skip is
+  asymmetric on purpose: it suppresses only on a *known* lack of entitlement,
+  because an unread subscription at the end of signup is the new-trial case this
+  exists for.
+- **The outcome is reported to analytics** (`content_prefetch`, success/failure),
+  which is the only channel that reports from a release build. Skips are not
+  counted — they are the normal path for unsubscribed users and would drown the
+  signal.
 - **Fire-and-forget and silent.** Nobody asked for this work, so a failure must
   never surface to the user; the content screens still fetch on demand.
 - **`ContentProvider.fetchContent` now dedupes in-flight identical fetches.**
@@ -762,6 +771,23 @@ been exercised against production, so confirm rather than assume:
   The index never followed the code, so `renewActiveSubscriptions` was likely
   failing. Check the Cloud Functions logs for that scheduler after the next run
   and confirm it no longer reports a FAILED_PRECONDITION / missing-index error.
+
+## The app has no crash reporting at all
+
+Found 2026-09-17 while deciding how to make the content prefetch observable.
+There is **no Crashlytics and no Sentry** — nothing in `pubspec.yaml`, the
+lockfile, `lib/`, `ios/Podfile`, the Android config, or the Firebase config.
+
+So for an app shipping to both stores, the only signal from a release build is
+Firebase Analytics. `print` and `debugPrint` are deliberately silenced in
+release by #34, which is correct for PII but means a crash or a silent
+degradation in the field is currently invisible.
+
+This is not a register row and was not added as one — it deserves its own
+decision rather than being folded into whatever piece of work happens to notice
+it. `firebase_crashlytics` is the obvious candidate given Firebase is already
+throughout the app, and it needs a privacy-policy line about crash diagnostics
+before it ships.
 
 ## Owner action required outside the repo
 
