@@ -5,99 +5,125 @@
 | | |
 |---|---|
 | **Branch** | `local/security-money-hardening` (base `84300d0`) — **pushed to `origin` 2026-09-16 at the owner's request.** `main` untouched, nothing deployed |
-| **Commits** | 88 |
-| **Tests** | 255 Cloud Functions (Jest, 27 suites, **serial** — see Gotchas) + 87 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
+| **Commits** | 94 |
+| **Tests** | 255 Cloud Functions (Jest, 27 suites, **serial** — see Gotchas) + **115 Dart, all green**. The 6 long-standing `counter_service_test.dart` failures are **fixed** (#17, 2026-09-17) — the tree has no red tests for the first time |
 | **Analyzer** | 0 errors |
-| **Register rows addressed** | 43 of 59 |
+| **Register rows addressed** | 45 of 59 (#10 and #17 closed 2026-09-17; #39 re-opened and properly closed) |
 | **Deployed?** | **NO.** Nothing here has ever run in production. The deploy path itself has never been exercised |
 
-**Risks fixed on this branch:** #2 #3 #4 #5 #6 #7 #8 #11 #12 #13 #14 #15 #16 #18 #19 #20 #22 #23 #24 #25 #27 #29 #30 #32 #34 #38 #39 #40 #41 #43 #45 #46 #47 #48 #50 #51 #52 #54 #58 #59
+**Risks fixed on this branch:** #2 #3 #4 #5 #6 #7 #8 #10 #11 #12 #13 #14 #15 #16 #17 #18 #19 #20 #22 #23 #24 #25 #27 #29 #30 #32 #34 #38 #39 #40 #41 #43 #45 #46 #47 #48 #50 #51 #52 #54 #58 #59
 **Partial, with reasons below:** #9 (no reconciliation job) · #21 (no sync built) · #26 (needs attestation) · #35 (no mail transport exists) · #49 (Artifact Registry migration is an owner action)
 
 **Biggest open question:** none of this protects anyone until it ships. Everything below is verified locally and nothing has ever run in production.
 
-### Start here — the owner's plan for the next session
+### 2026-09-17, second session — what happened
 
-Agreed 2026-09-17. Four things, in this order.
+The four-item plan below was worked through. Outcome, then what is left.
 
-#### 0. FIRST, CONFIRM NOTHING DANGEROUS IS IN THE TREE
+#### 0. Safety check — PASSED
 
-```bash
-flutter test test/no_crash_test_scaffolding_test.dart
-```
+`flutter test test/no_crash_test_scaffolding_test.dart` was green at the start,
+and is green now. The temporary crash override **was** re-applied during this
+session to test Crashlytics on the simulator, and **has been reverted**:
+`git diff lib/main.dart` against its commit is empty, the guard is 5/5, and the
+crash-test build was uninstalled from the simulator so it cannot fire again.
 
-Verifying Crashlytics needed a temporary change to `lib/main.dart` that forced
-crash collection ON in debug and **deliberately crashed the app 6 seconds after
-launch**. If that ever shipped, every user's app would crash on every launch and
-development crashes would pour into production Crashlytics.
+#### 1. Crashlytics — DONE, and verified end to end
 
-**It has been reverted**, and that test fails the build if it ever comes back —
-including a positive control so the guard cannot be satisfied by deleting
-Crashlytics instead. Run it first anyway. If it is green, the tree is clean.
+Custom keys, breadcrumbs, non-fatal `recordError`, and `setUserIdentifier`
+(owner-approved 2026-09-17). Commit `2f3a6e8`.
 
-#### 1. Finish Crashlytics
+**A real crash was fired and the report inspected.** Not "it should work" — the
+report was read off disk in the simulator's Crashlytics store before it was
+consumed:
 
-The SDK is wired and the dSYM upload phase works, but a crash report today says
-*that* something broke, not *who it happened to*. Four additions, roughly in
-value order:
+| On the report | Value |
+|---|---|
+| `state` | `IL` |
+| `language` | `en` |
+| `subscription_status` | `trial/inactive` |
+| `entitled` | `false` |
+| `com.crashlytics.user-id` | the test account's real uid |
+| breadcrumbs | `auth: signed in`, `nav: push /`, plus Analytics' own |
+| exception | `FirebaseCrashlyticsTestCrash` |
 
-| What | Why | Size |
-|---|---|---|
-| **Custom keys** | Attach state, language, subscription status and entitlement to every report. Turns "a crash" into "New York user, Russian, expired trial" — which is usually the whole diagnosis | ~10 lines |
-| **Breadcrumb logs** | `FirebaseCrashlytics.instance.log('opened exam')` at a handful of navigation points gives the last actions before a crash | small |
-| **Non-fatal `recordError`** | On paths that are deliberately swallowed today — receipt validation failures above all. You would learn about purchase problems without needing a crash | medium |
-| **`setUserIdentifier`** | Links a crash to a uid so support can look someone up. **A decision, not just code:** it puts a user identifier into a diagnostics system. The privacy policy now covers crash diagnostics, but ask the owner before adding it | small |
+`subscription_status: trial/inactive` next to `entitled: false` is the
+status-vs-entitlement split doing its job. The report then left `active/` with
+nothing in `prepared/` or `processing/`, which is the queue draining.
 
-**Know the limit:** Crashlytics is **client-side only**. Cloud Functions errors
-do not appear there — they go to Google Cloud Logging. Server-side alerting is a
-separate, still-open gap; nothing currently watches for a spike in failed
-receipt validations.
+**What was NOT verified: the report appearing in the Firebase console.** That
+needs the owner's Google login. Everything up to the upload is confirmed;
+seeing it land is one click the owner has to make. Firebase → Crashlytics →
+iOS app; look for `FirebaseCrashlyticsTestCrash` around 14:42 on 2026-09-17.
 
-#### 2. Finish testing Crashlytics, and put the app back to normal
+#### 2. Content cache — tested by hand, and it found a dead code path
 
-**Not yet verified end to end.** No crash has been sent and nothing has been seen
-in the Firebase console. The owner has approved a test crash writing to
-production Crashlytics.
+All five scenarios driven on the simulator against the emulator, with the
+functions emulator counting the actual requests rather than trusting the app's
+own logs. Four behaved exactly as designed. The fifth did not.
 
-Release and profile builds are **not supported on the iOS simulator**, so a
-simulator test needs the temporary override described above. Two options:
+| Scenario | Result |
+|---|---|
+| signup → language → state → Theory | `prefetch complete (state selected)`; 1 `getTheoryModules` + 1 `getTrafficRuleTopics`; Theory opened on `Cache VALID (age: 0h)` with **zero** further requests |
+| change state, then immediately open Theory | 3 fetch intentions → **2 joins** → 1 request pair. New-state content (NY 7/7/7 vs IL 6/10/5), no flash of the old |
+| language + state in quick succession | second change wins; 5 intentions → 2 real pairs (the superseded `NY|ru` had already started and cannot be retracted; the dedupe correctly did **not** join a different cache key) |
+| kill mid-prefetch | recovers clean, no errors, the change persisted |
+| **expired trial, change state** | `skipping prefetch, no entitlement` and **zero** content callables |
 
-- **On a real device** (preferred): build release, crash it, reopen, check the
-  console. No temporary code needed, and it also exercises the dSYM upload.
-- **On the simulator**: re-apply the temporary override, test, then revert and
-  confirm `no_crash_test_scaffolding_test.dart` is green again.
+**The defect (`09a5723`): the prefetch never ran on a language change at all.**
+`_prefetchEntitled` reads `State.context`, but `setLanguage` changes the app
+locale, which rebuilds the tree and unmounts the profile screen before the
+await returns. The throw happened while evaluating an *argument*, so
+`prefetchInBackground` was never called — and nor was the `language_changed`
+analytics event, so **every language change from settings was recorded as
+`language_change_failed` while actually succeeding**. Two more throws sat
+behind it (`Navigator.pop` on a deactivated element, then `!_debugLocked`), one
+of them unhandled.
 
-Either way, remember Crashlytics uploads on the **next launch** — a crash alone
-sends nothing until the app is reopened.
+Measured before and after on the same cache-cold change: 0 → 1
+`getTheoryModules`, and no exception of any kind.
 
-#### 3. Test the content cache by hand, and watch what happens
+The state handler has the same shape and was fine, because changing the state
+does not change the locale. That asymmetry is exactly why "the state half
+works" was not evidence for the language half — and why this was only ever
+going to be found by driving it.
 
-The prefetch is covered by tests and was observed working, but it has never been
-driven by a person going through the app normally. Worth doing, because the
-useful bugs here are timing ones:
+#### 3. Register rows
 
-- Fresh signup → pick language and state → confirm content is already warm when Theory opens.
-- Change state in settings, then immediately open Theory. Does it show new-state content, or briefly the old?
-- Change language and state in quick succession — does the second change win?
-- Kill the app mid-prefetch and reopen.
-- With an **expired** trial, change state: there should be **no** content request at all (every content callable requires entitlement).
+- **#10 DONE** (`c1f97e1`) — the config guide. See below; it was worse than
+  "out of date".
+- **#17 DONE** (`3d5ae62`) — the suite is green. Also rewrote the six tests to
+  call the real service instead of asserting on strings they built themselves.
+- **#39 was marked DONE and was still broken** (`2e63c37`). `7fa9a6c` replaced
+  a hardcoded `'IL'` inside `ExamProvider`/`PracticeProvider` with their
+  `state` parameter — but `test_screen.dart` kept passing the literal `'IL'`
+  **into** that parameter. The constant moved one layer up. A New York user has
+  been getting Illinois exam and practice questions this whole time. What hid
+  it: the analytics helper resolved the real state from `7fa9a6c` onwards, so
+  `exam_started` reported New York while the request asked for Illinois.
 
-Watch the logs for `prefetch complete`, `prefetch failed, ignoring`, and
-`joining in-flight fetch` — the last one is the dedupe working.
+#### Still open, in the order they are worth doing
 
-#### 4. Then the remaining register rows
+**#28** (nginx vs Firebase Hosting rules), **#42** (`packageId` as three
+types), **#56** (StoreKit 2), **#57** (the JDK/Gradle trap). Then **#33**/**#37**
+— product decisions, ask first. Resend (#35) is still blocked on the owner; see
+`wiki/driveusa/Development/infra/owner-console-actions.md`, which also covers
+the store privacy questionnaires that Crashlytics now makes mandatory.
 
-Closeable without the owner: **#10** (a config guide that is actively wrong and
-is a trap for whoever deploys — do this before any deploy), **#17** (the six red
-`counter_service_test` failures), **#28** (nginx and Firebase Hosting implement
-different rules for the same paths), **#42** (`packageId` written as three
-types), **#56** (teach the backend to read StoreKit 2, retiring the forced-SK1
-workaround), **#57**.
-
-Blocked on the owner: **#33**/**#37** (product decisions), **#35** (the mail
-provider is chosen — Resend — but DNS records and `RESEND_API_KEY` are not done),
-**#49** (Artifact Registry), **#31** and all Android work (needs the Windows
-machine), **#1** (git history rewrite), **#36**, **#53**.
+**Known and deliberately not fixed:**
+- `traffic_rules_topics_screen.dart:60` hardcodes `'IL'` the same way #39 did,
+  but nothing pushes `/theory` and the screen is reachable only through an
+  `onGenerateRoute` fallback for a dead deep link. Near-dead code.
+- `ContentLoadingManager`'s language listener logs *"Language changed during
+  initialization, skipping content update"* when the manager has not finished
+  initialising, so that path is racy on its own. It stopped mattering once the
+  explicit call started working — which is why the explicit call exists.
+- The signup terms checkbox uses `MaterialTapTargetSize.shrinkWrap`, giving it
+  a tap target of roughly 18pt. It took four attempts to hit deliberately.
+- The six-box verification input drops characters when they arrive faster than
+  it can move focus. Genuine clipboard paste was not tested; worth checking,
+  because the screen advertises paste support.
+- Profile briefly shows *"State: Loading…"* on first open before resolving.
 
 #### Standing cautions
 
@@ -130,7 +156,7 @@ or every screen will look broken and you will debug a phantom.
 
 **Branch:** `local/security-money-hardening` (base `84300d0`, off `chore/play-billing-8-migration`)
 **Started:** 2026-09-16
-**Last updated:** 2026-09-17 — closed #11 #15 #27 #30 #34, part of #35 and #49; #31 still next
+**Last updated:** 2026-09-17 (second session) — closed #10 #17, re-closed #39 (was marked done and still broken), finished and verified Crashlytics, and found a dead prefetch path by hand-testing the cache
 **Goal:** Fix the Critical + High security and revenue risks from `driveusa-risk-register`, verified locally. **Never deploy. Never touch the live Firebase project.**
 
 > If this session is interrupted, read **How to resume** below. Everything needed to pick up is in this file.
