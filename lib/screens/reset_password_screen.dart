@@ -694,44 +694,74 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
     );
   }
   
+  /// One password requirement, as an icon and a line of text.
+  ///
+  /// The text is `Expanded` so it WRAPS instead of overflowing. Without it,
+  /// "All of the following criteria are required:" ran 11 pixels past the
+  /// panel on an iPhone 16 Pro — the widest phone this app supports — which
+  /// means it overflowed on every device, and by more on the narrow ones.
+  ///
+  /// Wrapping rather than shrinking the font on purpose: a smaller font only
+  /// moves the width at which this breaks. These strings are still hardcoded
+  /// English, and the app ships in five languages whose translations of them
+  /// are longer, so the next occurrence would arrive with the translations
+  /// rather than being fixed by them.
   Widget _buildValidationItem(String text, bool isValid) {
     final bool highlightError = _showValidationErrors && !isValid;
     
     return Row(
+      // Keeps the icon on the FIRST line once the text wraps to two.
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          isValid ? Icons.check_circle : (highlightError ? Icons.cancel : Icons.circle_outlined),
-          color: isValid ? Colors.green.shade600 : (highlightError ? Colors.red.shade600 : Colors.grey),
-          size: 16,
+        Padding(
+          // Nudges the icon onto the text's optical baseline; without it the
+          // icon sits slightly high against the first line.
+          padding: const EdgeInsets.only(top: 2),
+          child: Icon(
+            isValid ? Icons.check_circle : (highlightError ? Icons.cancel : Icons.circle_outlined),
+            color: isValid ? Colors.green.shade600 : (highlightError ? Colors.red.shade600 : Colors.grey),
+            size: 16,
+          ),
         ),
         SizedBox(width: 8),
-        Text(
-          text,
-          style: TextStyle(
-            color: highlightError ? Colors.red.shade800 : (isValid ? Colors.grey.shade800 : Colors.grey.shade700),
-            fontWeight: highlightError ? FontWeight.bold : null,
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              color: highlightError ? Colors.red.shade800 : (isValid ? Colors.grey.shade800 : Colors.grey.shade700),
+              fontWeight: highlightError ? FontWeight.bold : null,
+            ),
           ),
         ),
       ],
     );
   }
   
+  /// A nested requirement. Same fix as `_buildValidationItem`, and it needs it
+  /// more: these sit inside a 16px indent, so they have less room, and
+  /// "Special characters (e.g. !@#\$%^&*)" is the longest string on the panel.
   Widget _buildValidationSubItem(String text, bool isValid) {
     final bool highlightError = _showValidationErrors && !isValid;
     
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          isValid ? Icons.check_circle : (highlightError ? Icons.cancel : Icons.circle_outlined),
-          color: isValid ? Colors.green.shade600 : (highlightError ? Colors.red.shade600 : Colors.grey),
-          size: 16,
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Icon(
+            isValid ? Icons.check_circle : (highlightError ? Icons.cancel : Icons.circle_outlined),
+            color: isValid ? Colors.green.shade600 : (highlightError ? Colors.red.shade600 : Colors.grey),
+            size: 16,
+          ),
         ),
         SizedBox(width: 8),
-        Text(
-          text,
-          style: TextStyle(
-            color: highlightError ? Colors.red.shade800 : (isValid ? Colors.grey.shade800 : Colors.grey.shade700),
-            fontWeight: highlightError ? FontWeight.bold : null,
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              color: highlightError ? Colors.red.shade800 : (isValid ? Colors.grey.shade800 : Colors.grey.shade700),
+              fontWeight: highlightError ? FontWeight.bold : null,
+            ),
           ),
         ),
       ],
