@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Branch** | `local/security-money-hardening` (base `84300d0`) — **pushed to `origin` 2026-09-16 at the owner's request.** `main` untouched, nothing deployed |
-| **Commits** | 55 |
+| **Commits** | 57 |
 | **Tests** | 162 Cloud Functions (Jest) + 53 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
 | **Analyzer** | 0 errors |
 | **Register rows addressed** | 38 of 59 |
@@ -16,22 +16,60 @@
 
 **Biggest open question:** none of this protects anyone until it ships. Everything below is verified locally and nothing has ever run in production.
 
-### Start here — what the next session picks up
+### Start here — begin with #31
 
-The owner's instruction closing the last session: **continue bug fixes.** In order:
+The owner's instruction closing the last session: **start with #31 (Android
+release signing and ProGuard).** Groundwork is done — the facts below were
+checked, not copied from the register, which has been wrong on several rows.
 
-1. **The ~30 remaining register rows**, all Medium. See *The rest of the risk register* below. Nothing in them blocks the others, so work cheapest-first unless the owner names one.
-2. **Email verification by 6-digit code** is agreed and specced (below) but **blocked on the owner**: pick a mail provider, verify the sending domain, set `MAIL_API_KEY`. The code-side work can start behind a pluggable sender that just logs the code locally.
-3. **App Check / attestation** stays deferred — plan is in the vault.
+**What is actually true:**
+
+| Claim | Verified |
+|---|---|
+| `android/key.properties` is untracked | Yes — and that is **correct**, it holds keystore passwords. `android/.gitignore:11` and `.gitignore:51` both ignore it. Not the bug. |
+| No fallback when it is missing | Yes. `android/app/build.gradle:17-20` does `if (keystorePropertiesFile.exists())` and otherwise carries on, so `storeFile` at `:42` becomes `null` and a release build proceeds **without failing**. |
+| `proguard-rules.pro` is missing | Yes. `android/app/build.gradle:63` references it, and the file **has never existed in git history** — `git log --all -- android/app/proguard-rules.pro` is empty. It is not gitignored, so it is genuinely absent. |
+| `minifyEnabled` is on | Yes, `:61`, with `shrinkResources true` at `:62`. Both added in `59f33e1`, the same commit that referenced the missing ProGuard file. |
+
+**The interesting part, and what to check first:** a release build on the
+Windows machine **succeeded** on 2026-08-29 with Billing 8. So the missing
+ProGuard file does not fail the build — AGP tolerates it. That means
+minification has been running with only `proguard-android-optimize.txt` and no
+app-specific keep rules, on a Flutter app using Firebase, `in_app_purchase` and
+reflection-heavy libraries. The classic failure mode is a **release-only runtime
+crash** that never appears in debug. Worth establishing whether that is
+happening before writing rules.
+
+**Suggested shape of the fix** (not prescriptive):
+1. Make a release build **fail loudly** when `key.properties` is absent, instead
+   of silently producing an unsigned or debug-signed artifact. Debug builds must
+   keep working without it.
+2. Add `android/app/proguard-rules.pro` with the keep rules Flutter, Firebase
+   and Play Billing need, or turn `minifyEnabled` off until rules exist. Turning
+   it off is the safer interim if a release crash is already suspected.
+3. Verification is awkward here: this machine is a Mac and the release path runs
+   on Windows (see the JDK/Gradle note in the register). Decide with the owner
+   how to verify before starting — an unverified signing change is worse than
+   the current state.
+
+**After #31,** the remaining rows are listed under *The rest of the risk
+register*. Two are product decisions, not bugs (#33, #37) — ask first.
+
+**Blocked on the owner, not on code:**
+- **Email verification by 6-digit code** — agreed and specced below. Needs a mail
+  provider, a verified sending domain and `MAIL_API_KEY`. Code-side work can
+  start behind a pluggable sender that logs codes locally.
+- **App Check / attestation** — deferred, plan in the vault.
 
 Do not start a deploy. That is a separate decision the owner has not made.
 
-**Before touching anything, run the bring-up in *How to resume*.** The emulator starts empty every time: re-seed the content and grant a local trial, or every screen will look broken and you will debug a phantom.
-
+**Before touching anything, run the bring-up in *How to resume*.** The emulator
+starts empty every time: re-seed content AND images, then grant a local trial,
+or every screen will look broken and you will debug a phantom.
 
 **Branch:** `local/security-money-hardening` (base `84300d0`, off `chore/play-billing-8-migration`)
 **Started:** 2026-09-16
-**Last updated:** 2026-09-16 — branch pushed; handed off for a fresh session
+**Last updated:** 2026-09-16 — handed off to start on #31
 **Goal:** Fix the Critical + High security and revenue risks from `driveusa-risk-register`, verified locally. **Never deploy. Never touch the live Firebase project.**
 
 > If this session is interrupted, read **How to resume** below. Everything needed to pick up is in this file.
@@ -87,6 +125,19 @@ disagree silently:
 npm --prefix functions run build && (cd functions && npx jest)
 ```
 
+Two things about the functions suite that will otherwise waste your time:
+
+- **`npm test` cannot run while the dev emulator is up.** It starts its own
+  emulators via `firebase emulators:exec` and dies with *"Could not start
+  Authentication Emulator, port taken."* Stop the long-running emulator, run
+  `npm test`, then start it again and re-seed. `npx jest <file>` on its own does
+  NOT do this — it reuses whatever emulator is already running, which is why it
+  is the right choice for iterating on one suite.
+- **The emulator only serves the functions it loaded at startup.** Adding a new
+  Cloud Function and rebuilding is not enough; it will not appear until the
+  emulator restarts. Tests see it immediately because they build and load fresh,
+  so a new function can pass its suite while being absent from the running app.
+
 ```bash
 flutter test
 ```
@@ -107,6 +158,10 @@ false there, by design). Grant one the way a real device would:
 ```bash
 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 GCLOUD_PROJECT=licenseprepapp node scripts/local/grant-local-trial.js <email>
 ```
+
+It looks the account up in the `users` collection, so sign up in the app first —
+after an emulator restart every account is gone and it will report *"No user
+with email ..."* until you do.
 
 ---
 
@@ -246,10 +301,10 @@ Written up in the vault: `wiki/driveusa/Development/infra/app-check-attestation-
 
 ### 3. The rest of the risk register
 
-**29 of the 59 rows are still open, and they are all Medium or lower** — the
+**21 of the 59 rows are still open, and they are all Medium or lower** — the
 Criticals and Highs in the agreed scope are done. Remaining: #1 (history
 cleanup only; the leaked secret is already rotated and dead), #10, #11, #15,
-#17, #27, #28, #30, #31, #33, #34, #35, #36, #37, #42, #44,
+#17, #27, #28, #30, **#31 (start here)**, #33, #34, #35, #36, #37, #42, #44,
 #49, #53, #55, #56, #57.
 
 Worth knowing before picking one:
@@ -306,7 +361,7 @@ does not act on the wrong cause.
 | 2026-09-16 | Skip Agent Orchestrator; Claude Code subagents + worktrees instead | ~20 of the fixes touch `functions/src/index.ts`; parallel agents on one file means merge conflicts, and with no tests nobody notices a bad merge |
 | 2026-09-16 | Build the test harness before fixing | ~35 of the risks are server-side and invisible in the iOS UI. Without tests they'd ship on trust. Also closes #17 |
 | 2026-09-16 | Export production content read-only rather than hand-seeding | Emulator starts blank; app is unusable without content. Seed script deferred to the #53 fix |
-| 2026-09-16 | Keep striped placeholder images locally; do NOT pull the real ones | Owner's call. The real files are only in production Cloud Storage and ADC is revoked, so fetching them means briefly restoring production access. None of the ~30 remaining register rows are about artwork, and layout/sizing are already testable with placeholders. Pointing Storage at production instead does not work: the rules need `request.auth != null` and the local user's token comes from the Auth emulator, which production rejects. **Do not re-open this without asking** — review artwork on a real device instead |
+| 2026-09-16 | Keep striped placeholder images locally; do NOT pull the real ones | Owner's call. The real files are only in production Cloud Storage and ADC is revoked, so fetching them means briefly restoring production access. None of the remaining register rows are about artwork, and layout/sizing are already testable with placeholders. Pointing Storage at production instead does not work: the rules need `request.auth != null` and the local user's token comes from the Auth emulator, which production rejects. **Do not re-open this without asking** — review artwork on a real device instead |
 | 2026-09-16 | Emulators run as `demo-driveusa`, not `licenseprepapp` | `.firebaserc` points at production; a `demo-` project id makes reaching production physically impossible |
 | 2026-09-16 | **Only the 30-day monthly plan is sold. Yearly is removed, not fixed** | Owner decision. Production has **zero** yearly subscriptions ever (register, verified 2026-08-20), so nobody is stranded. Turns #2 from a redesign into a deletion, #6 from an implementation into a removal, and makes #43 moot |
 | 2026-09-16 | Emulators run under the REAL project id, not `demo-driveusa` | `FirebaseOptions` is a matched set; overriding only `projectId` leaves the real API key, so Firebase Installations calls `projects/demo-*/installations` with a key that does not belong to it. Owner chose to **revoke ADC first** (`gcloud auth application-default revoke`), so the machine now holds no production credentials at all — a stronger position than the `demo-` prefix gave |
@@ -450,13 +505,13 @@ The answer key and explanation are served to an anonymous stranger. Reproduce wi
 
 - **Decide what happens to `scripts/deletion-manifest.json`** (raised 2026-09-16 during #52). It is the plan from a real destructive run against production — 452 users and 208 subscriptions deleted on 2026-04-18 — and it lists real Firebase Auth UIDs for the 7 accounts that were kept. It is untracked and gitignored, so it cannot reach git; the only remaining question is whether that record should stay on a dev machine at all. **Not deleted, because it is not reversible and it may be the only record of who was preserved.** The companion `deletion-log-20260418-122749.txt` holds counts only, no UIDs, and is harmless.
 
-- **Four translation keys were missing in all five languages and rendered as raw keys on screen** (`verify_email_title`, `verify_email_message`, `no_subscription_title`, `no_subscription_message`). Added. This is risk #50 in miniature: `AppLocalizations.translate()` returns the KEY when a string is missing, never null, so a `?? 'fallback'` in calling code is dead and the user sees `no_subscription_title`. The register counts **33** such keys still referenced in code with no JSON entry — worth a sweep.
+- ~~Four translation keys rendered as raw keys on screen~~ — **done, and the sweep is done too (#50).** `AppLocalizations.translate()` returns the KEY when a string is missing, never null, so a `?? 'fallback'` in calling code is dead and the user sees `no_subscription_title`. The register's count of 33 such keys was stale: a measured sweep found 109 distinct `translate()` keys in `lib/`, of which 2 were missing everywhere. All five locale files now carry identical key sets, and `test/localization_coverage_test.dart` fails the build if that ever drifts again. **No owner action.**
 - **Check the email-verification deep link works in production.** `firebase.json` rewrites *every* `/__/auth/action` to `password-reset.html`, but verification links arrive as `/__/auth/action?mode=verifyEmail`. The app routes an `oobCode` to `EmailVerificationScreen` (`main.dart`), and that flow was dead code until now, so it has never been exercised with a real link. Worth testing end to end before this reaches users, or verification emails will land on the password-reset page.
 - **`webhookDeadLetter` is a new collection holding raw Apple/Google payloads.** It is client-deny by rule, but it is store data about real users and has **no retention policy**. Fold it into the deletion and TTL work of risks #13 and #40, and check it periodically for `status: 'exhausted'` records, which are failures nobody has replayed.
 
 - **Check production for receipts already shared across accounts.** The binding guard stops new sharing, but says nothing about rows created before it. Query `subscriptions` grouped by `originalTransactionId` / `androidPurchaseToken` and look for any value held by more than one `userId`. The webhooks now log `🚨 ... subscriptions share ...` if it happens live. Needs a production read, which this machine no longer has credentials for.
 
-- **Provision an `admins/{uid}` document** (register risk #45). The collection is empty, so `processSubscriptionsManualy`, `getSubscriptionStats`, `subscriptionSystemHealth` and `getRenewalStats` are now callable by nobody — deliberate, but it means those stats endpoints stay closed until an admin exists. It also unblocks reading the 27 filed `reports`, which today are reachable only through the Firebase console. Create it in the console; the collection is client-deny by rule.
+- **Provision an `admins/{uid}` document** (register risk #45). The collection is empty, so `processSubscriptionsManualy`, `getSubscriptionStats`, `subscriptionSystemHealth` and `getRenewalStats` are now callable by nobody — deliberate, but it means those stats endpoints stay closed until an admin exists. It also unblocks **admin triage** of filed `reports`. Note #45 changed half of this: a user can now read back reports carrying their own `userId`, so reporting is no longer write-only at the data layer — but nothing reads other people's reports without an admin document, and no screen surfaces reports to users yet either. Create it in the console; the collection is client-deny by rule.
 
 - **Deactivate the yearly SKU in App Store Connect and Google Play Console.** Removing it from the code stops the app offering it, but if the SKU stays purchasable in either store a user could still buy it through a store-side resubscribe flow and receive nothing. Code alone does not close this.
 - `subscriptionsType/2` (the yearly catalogue row) is left in production untouched — harmless once nothing references yearly, and deleting it would be a production write.
