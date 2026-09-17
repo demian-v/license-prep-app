@@ -235,5 +235,21 @@
   "auth_return_to_login": "Powrót do logowania",
   "content_coming_soon": "Wkrótce",
   "new_content_being_prepared": "Przygotowujemy nowe treści.",
-  "auth_check_email_instructions": "Sprawdź skrzynkę {0}, aby znaleźć instrukcje resetowania hasła."
+  "auth_check_email_instructions": "Sprawdź skrzynkę {0}, aby znaleźć instrukcje resetowania hasła.",
+  "verify_title": "Sprawdź pocztę",
+  "verify_subtitle": "Wysłaliśmy 6-cyfrowy kod na {email}",
+  "verify_cta": "Zweryfikuj",
+  "verify_resend": "Wyślij nowy kod",
+  "verify_resend_in": "Wyślij nowy kod za {seconds} s",
+  "verify_sent": "Kod wysłany",
+  "verify_err_wrong": "Ten kod jest nieprawidłowy. Pozostało prób: {attempts}.",
+  "verify_err_wrong_last": "Ten kod jest nieprawidłowy. To ostatnia próba.",
+  "verify_err_expired": "Kod wygasł. Wyślij nowy.",
+  "verify_err_attempts": "Zbyt wiele prób. Wyślij nowy kod.",
+  "verify_err_none": "Brak aktywnego kodu. Wyślij nowy.",
+  "verify_err_changed": "Twój adres e-mail się zmienił. Wyślij nowy kod.",
+  "verify_err_generic": "Coś poszło nie tak. Spróbuj ponownie.",
+  "verify_err_send": "Nie udało się wysłać wiadomości. Spróbuj ponownie.",
+  "verify_err_throttled": "Poczekaj przed poproszeniem o kolejny kod.",
+  "verify_change_email": "Zły adres? Wróć"
 }

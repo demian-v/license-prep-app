@@ -235,5 +235,21 @@
   "auth_return_to_login": "Volver a Iniciar Sesión",
   "content_coming_soon": "Próximamente",
   "new_content_being_prepared": "Se está preparando nuevo contenido.",
-  "auth_check_email_instructions": "Revisa el correo electrónico {0} para ver las instrucciones de restablecimiento de contraseña."
+  "auth_check_email_instructions": "Revisa el correo electrónico {0} para ver las instrucciones de restablecimiento de contraseña.",
+  "verify_title": "Revisa tu correo",
+  "verify_subtitle": "Enviamos un código de 6 dígitos a {email}",
+  "verify_cta": "Verificar",
+  "verify_resend": "Enviar un código nuevo",
+  "verify_resend_in": "Enviar un código nuevo en {seconds} s",
+  "verify_sent": "Código enviado",
+  "verify_err_wrong": "Ese código no es correcto. Te quedan {attempts} intentos.",
+  "verify_err_wrong_last": "Ese código no es correcto. Este es tu último intento.",
+  "verify_err_expired": "Ese código ha caducado. Envía uno nuevo.",
+  "verify_err_attempts": "Demasiados intentos. Envía un código nuevo.",
+  "verify_err_none": "No hay ningún código pendiente. Envía uno nuevo.",
+  "verify_err_changed": "Tu dirección de correo cambió. Envía un código nuevo.",
+  "verify_err_generic": "Algo salió mal. Inténtalo de nuevo.",
+  "verify_err_send": "No pudimos enviar el correo. Inténtalo de nuevo.",
+  "verify_err_throttled": "Espera antes de solicitar otro código.",
+  "verify_change_email": "¿Dirección incorrecta? Volver"
 }

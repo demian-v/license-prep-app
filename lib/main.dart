@@ -31,6 +31,7 @@ import 'screens/profile_screen.dart';
 import 'screens/subscription_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/state_selection_screen.dart';
+import 'screens/signup_resume_gate.dart';
 import 'screens/traffic_rules_topics_screen.dart';
 import 'screens/test_screen.dart';
 import 'screens/reset_app_settings_screen.dart';
@@ -621,7 +622,11 @@ class MyApp extends StatelessWidget {
               if (user != null && user.state != null) {
                 return HomeScreen(); // User is fully set up
               } else if (user != null && user.state == null) {
-                return StateSelectionScreen(); // User needs to complete signup
+                // Risk #12 — signup was interrupted. The gate decides between
+                // the verification step and state selection. Scoped to
+                // state == null on purpose: every existing account has a state,
+                // so none of them are routed to verification by this change.
+                return SignupResumeGate(email: user.email ?? '');
               } else {
                 return LoginScreen(); // User not logged in
               }

@@ -235,5 +235,21 @@
   "auth_password_changed_title": "Пароль змінено!",
   "auth_password_changed_message": "Ваш пароль успішно змінено.",
   "auth_return_to_login": "Повернутися до входу",
-  "auth_check_email_instructions": "Перевірте пошту {0} — там інструкції для скидання пароля."
+  "auth_check_email_instructions": "Перевірте пошту {0} — там інструкції для скидання пароля.",
+  "verify_title": "Перевірте пошту",
+  "verify_subtitle": "Ми надіслали 6-значний код на {email}",
+  "verify_cta": "Підтвердити",
+  "verify_resend": "Надіслати новий код",
+  "verify_resend_in": "Надіслати новий код через {seconds} с",
+  "verify_sent": "Код надіслано",
+  "verify_err_wrong": "Цей код неправильний. Залишилось спроб: {attempts}.",
+  "verify_err_wrong_last": "Цей код неправильний. Це остання спроба.",
+  "verify_err_expired": "Термін дії коду минув. Надішліть новий.",
+  "verify_err_attempts": "Забагато спроб. Надішліть новий код.",
+  "verify_err_none": "Активного коду немає. Надішліть новий.",
+  "verify_err_changed": "Вашу адресу змінено. Надішліть новий код.",
+  "verify_err_generic": "Щось пішло не так. Спробуйте ще раз.",
+  "verify_err_send": "Не вдалося надіслати лист. Спробуйте ще раз.",
+  "verify_err_throttled": "Зачекайте, перш ніж запитувати новий код.",
+  "verify_change_email": "Не та адреса? Назад"
 }

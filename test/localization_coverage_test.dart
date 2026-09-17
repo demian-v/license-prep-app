@@ -18,6 +18,7 @@ const authScreens = [
   'lib/screens/reset_password_screen.dart',
   'lib/screens/reset_email_sent_screen.dart',
   'lib/screens/password_reset_success_screen.dart',
+  'lib/screens/verification_code_screen.dart',
 ];
 
 Map<String, Map<String, dynamic>> loadLocales() {

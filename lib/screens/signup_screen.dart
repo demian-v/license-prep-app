@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../providers/auth_provider.dart';
 import '../services/analytics_service.dart';
 import 'language_selection_screen.dart';
+import 'verification_code_screen.dart';
 import '../localization/app_localizations.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -261,9 +262,18 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
         
         if (mounted) {
           debugPrint('🔄 [SignupScreen] Navigating to language selection screen');
+          // Risk #12 — the verification step sits here, between signup and
+          // language selection (owner-confirmed ordering, 2026-09-17). The
+          // 3-day trial has already been granted and is NOT gated on getting
+          // through it; this only confirms the address is real.
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
-              builder: (context) => LanguageSelectionScreen(),
+              builder: (context) => VerificationCodeScreen(
+                email: email,
+                onVerified: () => Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (context) => LanguageSelectionScreen()),
+                ),
+              ),
             ),
           );
         }
@@ -319,9 +329,18 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
           );
           
           // Still navigate to next screen
+          // Risk #12 — the verification step sits here, between signup and
+          // language selection (owner-confirmed ordering, 2026-09-17). The
+          // 3-day trial has already been granted and is NOT gated on getting
+          // through it; this only confirms the address is real.
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
-              builder: (context) => LanguageSelectionScreen(),
+              builder: (context) => VerificationCodeScreen(
+                email: email,
+                onVerified: () => Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (context) => LanguageSelectionScreen()),
+                ),
+              ),
             ),
           );
         }

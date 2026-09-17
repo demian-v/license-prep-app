@@ -235,5 +235,21 @@
   "auth_return_to_login": "Вернуться ко входу",
   "content_coming_soon": "Скоро",
   "new_content_being_prepared": "Готовится новый контент.",
-  "auth_check_email_instructions": "Проверьте почту {0} — там инструкции по сбросу пароля."
+  "auth_check_email_instructions": "Проверьте почту {0} — там инструкции по сбросу пароля.",
+  "verify_title": "Проверьте почту",
+  "verify_subtitle": "Мы отправили 6-значный код на {email}",
+  "verify_cta": "Подтвердить",
+  "verify_resend": "Отправить новый код",
+  "verify_resend_in": "Отправить новый код через {seconds} с",
+  "verify_sent": "Код отправлен",
+  "verify_err_wrong": "Код неверный. Осталось попыток: {attempts}.",
+  "verify_err_wrong_last": "Код неверный. Это последняя попытка.",
+  "verify_err_expired": "Срок действия кода истёк. Отправьте новый.",
+  "verify_err_attempts": "Слишком много попыток. Отправьте новый код.",
+  "verify_err_none": "Активного кода нет. Отправьте новый.",
+  "verify_err_changed": "Ваш адрес изменился. Отправьте новый код.",
+  "verify_err_generic": "Что-то пошло не так. Попробуйте ещё раз.",
+  "verify_err_send": "Не удалось отправить письмо. Попробуйте ещё раз.",
+  "verify_err_throttled": "Подождите, прежде чем запрашивать новый код.",
+  "verify_change_email": "Не тот адрес? Назад"
 }

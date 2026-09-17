@@ -235,5 +235,21 @@
   "auth_return_to_login": "Return to Login",
   "content_coming_soon": "Coming soon",
   "new_content_being_prepared": "New content is being prepared.",
-  "auth_check_email_instructions": "Please check the email address {0} for instructions to reset your password."
+  "auth_check_email_instructions": "Please check the email address {0} for instructions to reset your password.",
+  "verify_title": "Check your email",
+  "verify_subtitle": "We sent a 6-digit code to {email}",
+  "verify_cta": "Verify",
+  "verify_resend": "Send a new code",
+  "verify_resend_in": "Send a new code in {seconds}s",
+  "verify_sent": "Code sent",
+  "verify_err_wrong": "That code is not right. {attempts} attempts left.",
+  "verify_err_wrong_last": "That code is not right. This is your last attempt.",
+  "verify_err_expired": "That code has expired. Send a new one.",
+  "verify_err_attempts": "Too many attempts. Send a new code.",
+  "verify_err_none": "No code outstanding. Send a new one.",
+  "verify_err_changed": "Your email address changed. Send a new code.",
+  "verify_err_generic": "Something went wrong. Please try again.",
+  "verify_err_send": "We could not send the email. Please try again.",
+  "verify_err_throttled": "Please wait before requesting another code.",
+  "verify_change_email": "Wrong address? Go back"
 }
