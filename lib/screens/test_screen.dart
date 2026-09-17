@@ -62,6 +62,27 @@ class _TestScreenState extends State<TestScreen> {
     }
   }
   
+  /// The state whose questions should be served.
+  ///
+  /// Risk #39, second half. The `7fa9a6c` fix replaced a hardcoded `'IL'`
+  /// inside `ExamProvider` and `PracticeProvider` with their `state`
+  /// parameter — but the two call sites in this file kept passing the literal
+  /// `'IL'` INTO that parameter, so the defect survived one layer up: a New
+  /// York user still got Illinois exam and practice questions. The commit
+  /// message's own argument ("topics above already honour the user's selected
+  /// state") applies here too.
+  ///
+  /// Resolution order is copied from `_logExamStartedAnalytics` on purpose. If
+  /// the analytics event and the actual request disagreed about the state, the
+  /// event would be evidence for the wrong thing — which is how this went
+  /// unnoticed: analytics has reported the real state since `7fa9a6c`, while
+  /// the request did not.
+  String _questionState() {
+    final stateProvider = Provider.of<StateProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    return authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'IL';
+  }
+
   /// Analytics method for exam started event
   void _logExamStartedAnalytics(LanguageProvider languageProvider) async {
     try {
@@ -346,7 +367,7 @@ class _TestScreenState extends State<TestScreen> {
                       // Start new exam with required parameters
                       examProvider.startNewExam(
                         language: language,
-                        state: 'IL', // Use 'IL' to match Firebase data structure
+                        state: _questionState(), // Risk #39 — was hardcoded 'IL'
                         licenseType: licenseType,
                       );
                       
@@ -439,7 +460,7 @@ class _TestScreenState extends State<TestScreen> {
                       // Start new practice with required parameters
                       practiceProvider.startNewPractice(
                         language: language,
-                        state: 'IL', // Use 'IL' to match Firebase data structure
+                        state: _questionState(), // Risk #39 — was hardcoded 'IL'
                         licenseType: licenseType,
                       ).then((_) {
                         // Navigate to the practice question screen after loading
