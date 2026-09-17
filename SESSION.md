@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| **Branch** | `local/security-money-hardening` (base `84300d0`) — **local only, never pushed** |
+| **Branch** | `local/security-money-hardening` (base `84300d0`) — **pushed to `origin` 2026-09-16 at the owner's request.** `main` untouched, nothing deployed |
 | **Commits** | 32 |
 | **Tests** | 109 Cloud Functions (Jest) + 21 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
 | **Analyzer** | 0 errors |
@@ -14,12 +14,24 @@
 **Risks fixed on this branch:** #2 #3 #4 #5 #6 #7 #8 #12 #13 #14 #16 #18 #19 #20 #22 #23 #24 #25 #29 #32 #39 #43 #48 #54 #58 #59
 **Partial, with reasons below:** #9 (no reconciliation job) · #21 (no sync built) · #26 (needs attestation)
 
-**Biggest open question:** none of this protects anyone until it ships. The next conversation is probably about deploying and verifying, not about more fixes.
+**Biggest open question:** none of this protects anyone until it ships. Everything below is verified locally and nothing has ever run in production.
+
+### Start here — what the next session picks up
+
+The owner's instruction closing the last session: **continue bug fixes.** In order:
+
+1. **The ~30 remaining register rows**, all Medium. See *The rest of the risk register* below. Nothing in them blocks the others, so work cheapest-first unless the owner names one.
+2. **Email verification by 6-digit code** is agreed and specced (below) but **blocked on the owner**: pick a mail provider, verify the sending domain, set `MAIL_API_KEY`. The code-side work can start behind a pluggable sender that just logs the code locally.
+3. **App Check / attestation** stays deferred — plan is in the vault.
+
+Do not start a deploy. That is a separate decision the owner has not made.
+
+**Before touching anything, run the bring-up in *How to resume*.** The emulator starts empty every time: re-seed the content and grant a local trial, or every screen will look broken and you will debug a phantom.
 
 
 **Branch:** `local/security-money-hardening` (base `84300d0`, off `chore/play-billing-8-migration`)
 **Started:** 2026-09-16
-**Last updated:** 2026-09-16 — after the #3 follow-up (paywall messaging)
+**Last updated:** 2026-09-16 — branch pushed; handed off for a fresh session
 **Goal:** Fix the Critical + High security and revenue risks from `driveusa-risk-register`, verified locally. **Never deploy. Never touch the live Firebase project.**
 
 > If this session is interrupted, read **How to resume** below. Everything needed to pick up is in this file.
@@ -28,8 +40,8 @@
 
 ## Ground rules
 
-1. All work stays on `local/security-money-hardening`. Not pushed. `main` and `chore/play-billing-8-migration` are untouched.
-2. Emulators run under project id **`demo-driveusa`**. Firebase treats any `demo-` project as offline-only — the SDK physically cannot reach production, even if misconfigured.
+1. All work stays on `local/security-money-hardening`. The owner asked for it to be pushed on 2026-09-16, so `origin/local/security-money-hardening` now exists and pushing further commits there is fine. **`main` and `chore/play-billing-8-migration` stay untouched, and nothing here is deployed** — pushing a branch is not shipping. No PR has been opened; that is the owner's call.
+2. Emulators run under the real project id **`licenseprepapp`**. The `demo-driveusa` idea was abandoned: `FirebaseOptions` is a matched set, so a fake project id breaks the API key. The safety net instead is that **ADC was revoked** — this machine holds no credential that can reach production Firestore. Do not re-run `gcloud auth application-default login` without a reason.
 3. Production is **read-only**, and only for the one-time content export. No writes, no deploys, no rule pushes.
 4. Every fix needs a verification that fails before the fix and passes after. No fix is marked DONE on inspection alone.
 5. Emulator wiring in the Flutter app is behind `--dart-define=USE_EMULATOR=true`, default off, so a release build can never point at localhost.
@@ -85,19 +97,6 @@ false there, by design). Grant one the way a real device would:
 
 ```bash
 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 GCLOUD_PROJECT=licenseprepapp node scripts/local/grant-local-trial.js <email>
-```
-
-Then bring the environment up (see **Environment** for current state):
-
-```bash
-export PATH="/opt/homebrew/opt/node@22/bin:$PATH"   # functions need Node 22
-firebase emulators:start --project demo-driveusa --import=.emulator-data
-```
-
-Run the app against it:
-
-```bash
-flutter run -d "iPhone 16 Pro" --dart-define=USE_EMULATOR=true
 ```
 
 ---
