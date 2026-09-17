@@ -5,13 +5,13 @@
 | | |
 |---|---|
 | **Branch** | `local/security-money-hardening` (base `84300d0`) — **pushed to `origin` 2026-09-16 at the owner's request.** `main` untouched, nothing deployed |
-| **Commits** | 38 |
-| **Tests** | 109 Cloud Functions (Jest) + 27 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
+| **Commits** | 41 |
+| **Tests** | 119 Cloud Functions (Jest) + 27 Dart. **6 Dart failures are pre-existing** in `counter_service_test.dart` — verified identical on base commit `84300d0` |
 | **Analyzer** | 0 errors |
-| **Register rows addressed** | 30 of 59 |
+| **Register rows addressed** | 31 of 59 |
 | **Deployed?** | **NO.** Nothing here has ever run in production. The deploy path itself has never been exercised |
 
-**Risks fixed on this branch:** #2 #3 #4 #5 #6 #7 #8 #12 #13 #14 #16 #18 #19 #20 #22 #23 #24 #25 #29 #32 #38 #39 #43 #48 #54 #58 #59
+**Risks fixed on this branch:** #2 #3 #4 #5 #6 #7 #8 #12 #13 #14 #16 #18 #19 #20 #22 #23 #24 #25 #29 #32 #38 #39 #43 #48 #52 #54 #58 #59
 **Partial, with reasons below:** #9 (no reconciliation job) · #21 (no sync built) · #26 (needs attestation)
 
 **Biggest open question:** none of this protects anyone until it ships. Everything below is verified locally and nothing has ever run in production.
@@ -250,13 +250,11 @@ Written up in the vault: `wiki/driveusa/Development/infra/app-check-attestation-
 Criticals and Highs in the agreed scope are done. Remaining: #1 (history
 cleanup only; the leaked secret is already rotated and dead), #10, #11, #15,
 #17, #27, #28, #30, #31, #33, #34, #35, #36, #37, #40, #41, #42, #44, #45, #46,
-#47, #49, #50, #51, #52, #53, #55, #56, #57.
+#47, #49, #50, #51, #53, #55, #56, #57.
 
 Worth knowing before picking one:
 - **#33 and #37 are product decisions, not bugs** — whether to widen past IL/NY,
   and whether to switch single-device enforcement on. Ask the owner first.
-- **#52 is cheap and is a privacy item** — real user UIDs sitting in the working
-  tree from a past destructive run.
 - **#50** overlaps something already seen on screen this session: a missing
   translation key renders as the raw key string, because `translate()` returns
   the key rather than null when it misses.
@@ -394,6 +392,8 @@ The answer key and explanation are served to an anonymous stranger. Reproduce wi
 - When the long-running emulator is already up, run `npx jest` directly. `npm test` wraps `emulators:exec`, which will fail on the already-bound ports.
 
 ## Owner action required outside the repo
+
+- **Decide what happens to `scripts/deletion-manifest.json`** (raised 2026-09-16 during #52). It is the plan from a real destructive run against production — 452 users and 208 subscriptions deleted on 2026-04-18 — and it lists real Firebase Auth UIDs for the 7 accounts that were kept. It is untracked and gitignored, so it cannot reach git; the only remaining question is whether that record should stay on a dev machine at all. **Not deleted, because it is not reversible and it may be the only record of who was preserved.** The companion `deletion-log-20260418-122749.txt` holds counts only, no UIDs, and is harmless.
 
 - **Four translation keys were missing in all five languages and rendered as raw keys on screen** (`verify_email_title`, `verify_email_message`, `no_subscription_title`, `no_subscription_message`). Added. This is risk #50 in miniature: `AppLocalizations.translate()` returns the KEY when a string is missing, never null, so a `?? 'fallback'` in calling code is dead and the user sees `no_subscription_title`. The register counts **33** such keys still referenced in code with no JSON entry — worth a sweep.
 - **Check the email-verification deep link works in production.** `firebase.json` rewrites *every* `/__/auth/action` to `password-reset.html`, but verification links arrive as `/__/auth/action?mode=verifyEmail`. The app routes an `oobCode` to `EmailVerificationScreen` (`main.dart`), and that flow was dead code until now, so it has never been exercised with a real link. Worth testing end to end before this reaches users, or verification emails will land on the password-reset page.
