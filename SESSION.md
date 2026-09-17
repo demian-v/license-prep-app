@@ -6,12 +6,12 @@
 |---|---|
 | **Branch** | `local/security-money-hardening` (base `84300d0`) — **pushed to `origin` 2026-09-16 at the owner's request.** `main` untouched, nothing deployed |
 | **Commits** | 94 |
-| **Tests** | 255 Cloud Functions (Jest, 27 suites, **serial** — see Gotchas) + **115 Dart, all green** (Jest is now 283 across 29 suites). The 6 long-standing `counter_service_test.dart` failures are **fixed** (#17, 2026-09-17) — the tree has no red tests for the first time |
+| **Tests** | 255 Cloud Functions (Jest, 27 suites, **serial** — see Gotchas) + **115 Dart, all green** (Jest is now 294 across 29 suites). The 6 long-standing `counter_service_test.dart` failures are **fixed** (#17, 2026-09-17) — the tree has no red tests for the first time |
 | **Analyzer** | 0 errors |
-| **Register rows addressed** | 47 of 59 (#10 #17 #42 closed 2026-09-17, #28 pinned; #39 re-opened and properly closed) |
+| **Register rows addressed** | 48 of 59 (#10 #17 #28 #42 closed 2026-09-17; #39 re-opened and properly closed) |
 | **Deployed?** | **NO.** Nothing here has ever run in production. The deploy path itself has never been exercised |
 
-**Risks fixed on this branch:** #2 #3 #4 #5 #6 #7 #8 #10 #11 #12 #13 #14 #15 #16 #17 #18 #19 #20 #22 #23 #24 #25 #27 #29 #30 #32 #34 #38 #39 #40 #41 #42 #43 #45 #46 #47 #48 #50 #51 #52 #54 #58 #59
+**Risks fixed on this branch:** #2 #3 #4 #5 #6 #7 #8 #10 #11 #12 #13 #14 #15 #16 #17 #18 #19 #20 #22 #23 #24 #25 #27 #29 #30 #32 #34 #28 #38 #39 #40 #41 #42 #43 #45 #46 #47 #48 #50 #51 #52 #54 #58 #59
 **Partial, with reasons below:** #9 (no reconciliation job) · #21 (no sync built) · #26 (needs attestation) · #35 (no mail transport exists) · #49 (Artifact Registry migration is an owner action)
 
 **Biggest open question:** none of this protects anyone until it ships. Everything below is verified locally and nothing has ever run in production.
@@ -102,42 +102,67 @@ going to be found by driving it.
   it: the analytics helper resolved the real state from `7fa9a6c` onwards, so
   `exam_started` reported New York while the request asked for Illinois.
 
-#### #28 — PARTIAL on purpose, and here is the shape of it
+#### #28 — DONE, and the recommendation in the previous version of this file was WRONG
 
-`host-parity.test.ts` (8 tests) now fails the build if the two hosts drift
-further, and pins the three facts. **It does not pick a winner**, because
-resolving this changes a live auth path and cannot be tested without a deploy.
+It said nginx's behaviour was probably correct and Firebase's was the bug.
+**It was the other way round**, and the reason is worth keeping:
 
-| | `/__/auth/action` |
+`ActionCodeRouter` routes an `oobCode` by its real operation via
+`checkActionCode`, which is better than guessing from a query string. But
+**this URL never reaches it.** Nothing in `lib/` calls `usePathUrlStrategy`, so
+Flutter web uses **hash** routing — `/__/auth/action` is not part of Flutter's
+route, `onGenerateRoute` never fires, and the code is dropped. A user clicking
+a reset link on the nginx host landed on the login screen. Good code the URL
+cannot get to.
+
+So nginx now serves `password-reset.html` for that path too, via `location =`
+(exact match, which outranks `location /` and every regex block below it).
+
+**Three more dead things surfaced while confirming what the page does:**
+
+| What | Reality |
 |---|---|
-| Firebase Hosting | rewritten to `/password-reset.html` |
-| nginx / Cloud Run | no rule at all → falls through to `index.html`, the Flutter app |
+| Six deep links using `licenseprep://` / `licenseprepapp://` | Neither scheme is registered on either platform. The registered one is **`driveusa`** |
+| The Android intent's `package=com.license.prep.app` | `applicationId` is `com.driveusa.app` |
+| A web fallback to `licenseprepapp.web.app/resetPassword?oobCode=` | Not a route, and it **dropped `mode`** on the way — observed landing on a page reporting *"Mode: Not provided"* |
 
-Two things make it hard to reason about, and both are now asserted:
+So the automatic hand-off to the app has **never** worked. Only the "copy this
+code" fallback did, which nobody knew they were relying on.
 
-1. **`password-reset.html` implements `resetPassword` and nothing else.**
-   Firebase sends *every* mode to that one URL, so `verifyEmail` and
-   `recoverEmail` land on a page that ignores them. `recoverEmail` is the live
-   one to care about — it is the "revert this email change" link, and the app
-   does let people change their email.
-2. **Firebase Hosting rewrites cannot match query strings.** The
-   `/__/auth/action?**` and `?mode=resetPassword&oobCode=**` entries in
-   `firebase.json` read like mode-aware routing and can never fire; all three
-   collapse onto the plain path rule. Nobody should spend an afternoon
-   adjusting them.
+Plus the mode-blindness #28 names: one `MODES` table now drives heading,
+message and target per mode. `recoverEmail` — Firebase's "undo this email
+change" link, and the live one since the app does let people change their
+email — has no screen in the app, so the page says so and hands over the code
+instead of showing a password-reset screen.
 
-**The likely right answer is the nginx behaviour, not Firebase's** — serve the
-SPA and let `ActionCodeRouter` route the `oobCode` by mode, which it already
-does. Copying Firebase's rule into nginx to "make them agree" would spread the
-mode-blind bug to the host that currently handles it correctly. But password
-reset works today via `password-reset.html`, so changing it is a
-deploy-and-test job, not a config edit. **Do it with a real reset link in hand.**
+**Verified by running it.** `crossplane` (nginx's own parser) parses
+`nginx.conf` clean with `= /__/auth/action` as an exact-match location; no
+nginx or Docker on this Mac, so it is **parsed, not served**. The page was then
+driven in a browser for five cases, reading the DOM it built:
+
+```
+resetPassword -> "Password Reset"      driveusa://resetPassword?oobCode=
+verifyEmail   -> "Email Verification"  driveusa://email-verified?oobCode=
+recoverEmail  -> "Email Change"        button hidden, code shown
+unknown mode  -> "Account Action"      button hidden, code shown
+no oobCode    -> opens driveusa:// root
+```
+
+All five stayed local instead of escaping to production.
+`host-parity.test.ts`: **10 red before, 19 green after.**
+
+**Still open:** whether `driveusa://` actually opens the installed app cannot be
+tested from a desktop browser. Pointing at a registered target is necessary,
+not sufficient — it needs a device with the app installed, on both platforms.
+On the Windows/device checklist as §4d, with `adb`/`simctl` one-liners that
+isolate scheme registration from the page.
 
 #### Still open, in the order they are worth doing
 
-**#56** (StoreKit 2 — needs store sandbox access), **#57** (the JDK/Gradle trap
-— needs the Windows machine), and **#28**'s resolution (needs a deploy test).
-Then **#33**/**#37** — product decisions, ask first. Resend (#35) is still blocked on the owner; see
+**#56** (StoreKit 2 — needs an **Apple** sandbox tester and a Mac; it is *not*
+an Android job, despite arriving with the Billing 8 upgrade) and **#57** (the
+JDK/Gradle trap — the Windows machine, and the first thing that will stop you
+there). Then **#33**/**#37** — product decisions, ask first. Resend (#35) is still blocked on the owner; see
 `wiki/driveusa/Development/infra/owner-console-actions.md`, which also covers
 the store privacy questionnaires that Crashlytics now makes mandatory.
 
