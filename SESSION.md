@@ -65,7 +65,8 @@ hosting-only deploy.
 | `APPLE_APP_ID` in `functions/.env.licenseprepapp` | ✅ real 10-digit id, **not** the dangerous `0` |
 | `APPLE_SHARED_SECRET`, `GOOGLE_CREDENTIALS`, `RESEND_API_KEY` | ✅ all three present and ENABLED in Secret Manager |
 | `predeploy` compiles TypeScript | ✅ (risk #16 — without it the deploy ships months-old JS) |
-| Tests | ✅ 295 Jest / 137 Dart, all green |
+| Tests | ✅ 332 Jest / 137 Dart, all green |
+| Deploy surface unchanged by the #56 backend work | ✅ zero new `export const` in `index.ts`, so the 6 deletions / 6 creations below still hold |
 
 #### What the deploy will do
 
@@ -275,12 +276,54 @@ not sufficient — it needs a device with the app installed, on both platforms.
 On the Windows/device checklist as §4d, with `adb`/`simctl` one-liners that
 isolate scheme registration from the page.
 
+#### #56 — the backend half is DONE (2026-09-18), the sandbox half is not
+
+**My earlier framing of this row was too coarse.** "#56 needs a Mac and an
+Apple sandbox tester" is true of its *second* step only. The register's first
+step is pure backend — make `validateAppleReceipt` format-aware — and needs no
+Mac, no device and no Apple account.
+
+Done now, and now rather than later for three reasons: it rides the functions
+deploy that is already held, so it costs no second deploy; there are **zero
+active subscriptions** (register reading 2026-08-29: 10 paid rows, all
+inactive sandbox), which makes this the cheapest moment in the app's life to
+touch receipt validation; and iOS is currently held together by
+`enableStoreKit1()`, which is deprecated.
+
+| File | What |
+|---|---|
+| `apple-receipt-format.ts` | The decision, pure and dependency-free. Three dot-separated segments with an `eyJ` header → `jws`; no dots and base64-only → `app-receipt`; **everything else → the legacy path** |
+| `apple-jws-validation.ts` | `SignedDataVerifier`, production first, sandbox only on `INVALID_ENVIRONMENT` — mirroring `appStoreWebhook`. Same return shape as the legacy path |
+| `receipt-validation.ts` | 13 lines: detect, and route before the `receipt-data` body is built |
+
+**The asymmetry is the design.** Reading an app receipt as a JWS breaks a
+purchase the customer has already paid for. Reading a JWS as an app receipt
+reproduces the 21002 we have today. Only a confident JWS match takes the new
+path, so the expensive mistake is unreachable — there is a test class for
+exactly that property.
+
+`index.ts`'s `APPLE_BUNDLE_ID` was **not** refactored onto the new module,
+deliberately: the webhook is live money-path code and no test imports
+`SignedDataVerifier`. A guard test asserts the two literals agree, and that
+both match the Android `applicationId`. Editing working code with no net, to
+save a duplicated constant, is the worse trade.
+
+**What these 37 tests do NOT cover:** signature verification itself. A real
+JWS needs Apple's signing key, so the verifier is mocked. Everything decided
+*after* the signature is covered — environment, product matching, revocation,
+expiry, failure reporting. The sandbox matrix in the register (fresh purchase,
+restore, auto-renewal, trial→paid) remains the only thing that can verify the
+real path, and it still needs an Apple sandbox tester and a Mac.
+
+**Do not drop `enableStoreKit1()` yet.** The order is: deploy this, verify in
+sandbox, *then* let the client move to StoreKit 2.
+
 #### Still open, in the order they are worth doing
 
-**#56** (StoreKit 2 — needs an **Apple** sandbox tester and a Mac; it is *not*
-an Android job, despite arriving with the Billing 8 upgrade) and **#57** (the
-JDK/Gradle trap — the Windows machine, and the first thing that will stop you
-there). #### #33 and #37 — the owner has decided; both stay as they are
+**#56's sandbox matrix** (needs an **Apple** sandbox tester and a Mac; it is
+*not* an Android job, despite arriving with the Billing 8 upgrade) and **#57**
+(the JDK/Gradle trap — the Windows machine, and the first thing that will stop
+you there). #### #33 and #37 — the owner has decided; both stay as they are
 
 Asked and answered 2026-09-17. Neither is a defect to fix, and the register's
 framing of both was slightly off.
