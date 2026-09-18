@@ -9,12 +9,80 @@
 | **Tests** | 255 Cloud Functions (Jest, 27 suites, **serial** — see Gotchas) + **115 Dart, all green** (Jest is now 294 across 29 suites). The 6 long-standing `counter_service_test.dart` failures are **fixed** (#17, 2026-09-17) — the tree has no red tests for the first time |
 | **Analyzer** | 0 errors |
 | **Register rows addressed** | 48 of 59 (#10 #17 #28 #42 closed 2026-09-17; #39 re-opened and properly closed) |
-| **Deployed?** | **NO.** Nothing here has ever run in production. The deploy path itself has never been exercised |
+| **Deployed?** | **NO, and deliberately held.** Owner's decision 2026-09-18: more Android testing and fixes first. See *The deploy gate* below — it is pre-flighted and ready, waiting only on the owner |
 
 **Risks fixed on this branch:** #2 #3 #4 #5 #6 #7 #8 #10 #11 #12 #13 #14 #15 #16 #17 #18 #19 #20 #22 #23 #24 #25 #27 #29 #30 #32 #34 #28 #38 #39 #40 #41 #42 #43 #45 #46 #47 #48 #50 #51 #52 #54 #58 #59
 **Partial, with reasons below:** #9 (no reconciliation job) · #21 (no sync built) · #26 (needs attestation) · #35 (no mail transport exists) · #49 (Artifact Registry migration is an owner action)
 
 **Biggest open question:** none of this protects anyone until it ships. Everything below is verified locally and nothing has ever run in production.
+
+### THE DEPLOY GATE — read before releasing anything
+
+**Held by the owner on 2026-09-18**, to allow Android testing and further
+fixes first. Nothing is blocking it technically; this is a timing decision, and
+the pre-flight below was run and passed on 2026-09-17.
+
+**The order is forced, and this is the part not to get wrong.** The new client
+calls `sendEmailVerificationCode`, `verifyEmailCode` and
+`getEmailVerificationStatus`, none of which exist in production. **Ship the app
+before the functions and signup breaks for every new user.** So:
+
+```
+functions deploy  ->  then  ->  app store submission
+```
+
+Never the other way round.
+
+#### Pre-flight, verified 2026-09-17
+
+| Check | State |
+|---|---|
+| `APPLE_APP_ID` in `functions/.env.licenseprepapp` | ✅ real 10-digit id, **not** the dangerous `0` |
+| `APPLE_SHARED_SECRET`, `GOOGLE_CREDENTIALS`, `RESEND_API_KEY` | ✅ all three present and ENABLED in Secret Manager |
+| `predeploy` compiles TypeScript | ✅ (risk #16 — without it the deploy ships months-old JS) |
+| Tests | ✅ 295 Jest / 137 Dart, all green |
+
+#### What the deploy will do
+
+**Deletes 6 functions**, which is the point:
+
+| Function | Why |
+|---|---|
+| `handleMockPaymentWebhook` | unauthenticated payment endpoint — **Critical #4** |
+| `generateSubscriptionTestData`, `createQuickSubscriptionTest`, `verifySubscriptionTestData`, `cleanupSubscriptionTestData` | test-data tooling live in production — **Critical #4** |
+| `upgradeSubscription` | granted a free 365 days with no audit row — **High #2** |
+
+**Creates 6:** `sendEmailVerificationCode`, `verifyEmailCode`,
+`getEmailVerificationStatus`, `provisionUserDocument`, `getContentVersion`,
+`cleanupExpiredRecords`.
+
+Run it as `firebase deploy --only functions --project licenseprepapp`.
+**Never `--force`** — the deletion prompt must be answered deliberately.
+
+#### Two things WILL change for the app already in the store
+
+The store build is the old client and will run against the new server until the
+next release clears review. Both are traced, both are non-destructive, and both
+resolve when the app ships:
+
+1. **The "Upgrade" button will error.** `enhanced_subscription_card.dart:1495`
+   on `main` calls `upgradeSubscription`, which is being deleted. Today that
+   button hands out a free year, so this closes a revenue hole and the cost is
+   an error message.
+2. **Unentitled users lose content and see a confusing message.** #3 makes
+   content callables require entitlement — correct — but the friendly
+   "Subscription required" screen is client-side and unshipped, so the old app
+   shows *"No theory modules found for state ILLINOIS with your current
+   language settings"*, blaming state and language for a paywall.
+
+#### Not included in a functions deploy
+
+`--only functions` does **not** deploy security rules. #3's rules half and #29
+stay un-deployed, so direct Firestore content reads remain open under the old
+rules. Rules are a separate, riskier step — a bad rule locks users out — so do
+functions first, confirm production is healthy, then rules on their own.
+
+`firestore:indexes` was already deployed on 2026-09-17.
 
 ### 2026-09-17, second session — what happened
 
