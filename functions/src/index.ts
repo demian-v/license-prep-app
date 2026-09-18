@@ -42,6 +42,8 @@ import {
   getRenewalStatistics 
 } from './subscription-renewal-manager';
 import { validatePurchaseReceipt } from './receipt-validation';
+// Risk #56 — the single definition of the bundle id both Apple verifiers use.
+import { APPLE_BUNDLE_ID } from './apple-jws-validation';
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -64,9 +66,11 @@ const subscriptionLogRetentionDays = defineInt('SUBSCRIPTION_LOG_RETENTION_DAYS'
   default: SUBSCRIPTION_LOG_RETENTION_DISABLED,
 });
 
-// VERIFY this bundle ID matches App Store Connect before deploying.
-// If wrong, ALL webhook verifications fail silently (caught → 200, no processing).
-const APPLE_BUNDLE_ID = 'com.driveusa.app';
+// APPLE_BUNDLE_ID now has exactly one definition, in ./apple-jws-validation.
+// It used to be declared here as well, for the webhook verifier, and the two
+// copies could drift — which this file's own warning said costs you EVERY
+// webhook verification, silently (caught → 200, no processing). A guard test
+// is no substitute for the value only existing once.
 
 // ⚠️  Path: __dirname = functions/lib at runtime (tsconfig outDir:"lib", rootDir:"src")
 // functions/lib/../certs/ = functions/certs/  — ONE "../" not two "../../"

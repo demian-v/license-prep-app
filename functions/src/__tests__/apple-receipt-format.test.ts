@@ -142,37 +142,63 @@ describe('the routing is wired into validateAppleReceipt', () => {
   });
 });
 
-describe('one bundle id, not two', () => {
+describe('exactly one bundle id', () => {
   /**
-   * `index.ts` carries its own `APPLE_BUNDLE_ID` for the webhook verifier, and
-   * its comment says what a wrong value costs: **every** webhook verification
-   * fails silently, caught and answered 200 with no processing. The JWS path
-   * needs the same constant.
+   * A wrong bundle id costs **every** webhook verification, silently: the
+   * error is caught, the request answered 200, and no subscription state moves.
+   * `index.ts` used to declare its own copy alongside the JWS path's, so the
+   * two could drift into exactly that.
    *
-   * The webhook is live money-path code with no test coverage of its own, so
-   * it was left untouched rather than refactored onto a shared import. This
-   * test is the price of that decision: if the two literals ever diverge, it
-   * fails here instead of going quiet in production.
+   * The first version of this test only asserted the two literals *agreed*,
+   * which catches divergence solely when someone runs the suite. The constant
+   * now exists once and `index.ts` imports it, so these tests defend the
+   * stronger property: there is nothing to diverge.
    */
   const read = (p: string) =>
     fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
-  const bundleIdIn = (file: string) =>
-    read(file).match(/APPLE_BUNDLE_ID\s*=\s*'([^']+)'/)?.[1];
 
-  it('index.ts and the JWS verifier agree', () => {
-    const webhook = bundleIdIn('index.ts');
-    const jws = bundleIdIn('apple-jws-validation.ts');
-    expect(webhook).toBeDefined();
-    expect(jws).toBeDefined();
-    expect(jws).toBe(webhook);
+  it('is defined in apple-jws-validation and nowhere else', () => {
+    const definition = /APPLE_BUNDLE_ID\s*=\s*'([^']+)'/;
+
+    expect(read('apple-jws-validation.ts').match(definition)?.[1]).toBe(
+      'com.driveusa.app',
+    );
+
+    // Any other module that assigns it has reintroduced the second copy.
+    const others = fs
+      .readdirSync(path.join(__dirname, '..'))
+      .filter((f) => f.endsWith('.ts') && f !== 'apple-jws-validation.ts');
+    for (const file of others) {
+      expect(read(file)).not.toMatch(definition);
+    }
   });
 
-  it('and both match the Android applicationId, which is the real one', () => {
+  it('is imported by index.ts rather than redeclared', () => {
+    const src = read('index.ts');
+    expect(src).toMatch(
+      /import\s*\{[^}]*APPLE_BUNDLE_ID[^}]*\}\s*from\s*'\.\/apple-jws-validation'/,
+    );
+    // And still reaches the webhook's verifier.
+    expect(src).toMatch(/new SignedDataVerifier\([\s\S]{0,200}APPLE_BUNDLE_ID/);
+  });
+
+  it('matches the Android applicationId, which is the real one', () => {
     const gradle = fs.readFileSync(
       path.join(__dirname, '../../../android/app/build.gradle'),
       'utf8',
     );
     expect(gradle).toContain('applicationId = "com.driveusa.app"');
-    expect(bundleIdIn('apple-jws-validation.ts')).toBe('com.driveusa.app');
+  });
+
+  it('and the compiled output carries the literal into the verifier', () => {
+    // The refactor's real risk is that the value stops reaching the verifier
+    // at runtime, which a source-level check cannot see. tsconfig emits to
+    // lib/, so if a build is present, read what actually ships. Skipped rather
+    // than failed when lib/ is stale or absent — `npm run build` runs in
+    // predeploy, so the deployed artefact is always freshly compiled.
+    const compiled = path.join(__dirname, '../../lib/index.js');
+    if (!fs.existsSync(compiled)) return;
+    const js = fs.readFileSync(compiled, 'utf8');
+    expect(js).toMatch(/SignedDataVerifier\([\s\S]{0,300}APPLE_BUNDLE_ID/);
   });
 });

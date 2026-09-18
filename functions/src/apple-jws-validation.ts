@@ -25,10 +25,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 /**
- * Must match `APPLE_BUNDLE_ID` in `index.ts`, whose comment spells out the
- * cost of getting it wrong: every verification fails. The webhook copy was
- * deliberately not refactored onto this one — it is live money-path code with
- * no test coverage — so `apple-receipt-format.test.ts` asserts the two agree.
+ * The **only** definition of the bundle id, used by this JWS path and by
+ * `appStoreWebhook` in `index.ts`, which imports it from here.
+ *
+ * VERIFY it matches App Store Connect before deploying. If it is wrong, every
+ * webhook verification fails **silently** — the error is caught, answered 200,
+ * and no subscription state is updated. It was briefly declared in two places;
+ * one value that cannot disagree with itself beats a test that notices when two
+ * do.
  */
 export const APPLE_BUNDLE_ID = 'com.driveusa.app';
 
