@@ -255,6 +255,19 @@ reinstates the bugs it was disabled for. Resend (#35) is still blocked on the ow
 `wiki/driveusa/Development/infra/owner-console-actions.md`, which also covers
 the store privacy questionnaires that Crashlytics now makes mandatory.
 
+**Store privacy forms — DONE 2026-09-18, one submission pending.** Apple's App
+Privacy was already correct. Play's Data safety now declares Crash logs under
+*App info and performance* (not App activity), purpose **Analytics** — Play's
+own definition of Analytics covers "diagnose and fix bugs or crashes", where
+Apple's covers user behaviour, so the same data gets the opposite answer in the
+two stores and that is correct. Play's "Data deletion not supported" is the
+*optional* data-only-deletion question and is correctly **No**; account
+deletion is declared through the URL. That URL's page was the real gap — it
+gave no deletion steps and never said what is kept — and privacy policy §5.1
+now does, verified live. Play shows the Data safety change un-submitted with
+**managed publishing off**; submitting publishes listing metadata only, ships
+no code, and does not touch the deploy gate.
+
 **Known and deliberately not fixed:**
 - `traffic_rules_topics_screen.dart:60` hardcodes `'IL'` the same way #39 did,
   but nothing pushes `/theory` and the screen is reachable only through an
