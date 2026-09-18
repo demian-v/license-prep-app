@@ -7,6 +7,8 @@ import * as admin from 'firebase-admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import axios from 'axios';
 import { google } from 'googleapis';
+import { usesStoreKit2 } from './apple-receipt-format';
+import { validateAppleJwsTransaction } from './apple-jws-validation';
 
 // ============================================================================
 // SECRETS (Firebase Secret Manager)
@@ -297,7 +299,17 @@ async function validateAppleReceipt(
   console.log('🍎 Starting Apple receipt validation');
   console.log(`📦 Product ID: ${productId}`);
   console.log(`📄 Receipt length: ${receiptData.length} characters`);
-  
+
+  // Risk #56 — two formats arrive in this one field. A StoreKit 2 JWS cannot
+  // be read by verifyReceipt (status 21002), so it is verified locally
+  // instead. Anything not confidently a JWS continues to the legacy endpoint,
+  // which is what the shipped iOS build sends today.
+  if (usesStoreKit2(receiptData)) {
+    console.log('🔐 Detected a StoreKit 2 JWS — verifying the signature locally');
+    return validateAppleJwsTransaction(receiptData.trim(), productId);
+  }
+  console.log('📜 Treating this as a base64 app receipt (StoreKit 1)');
+
   try {
     // Prepare request body for Apple API
     const requestBody = {
