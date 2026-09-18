@@ -89,7 +89,12 @@ Run it as `firebase deploy --only functions --project licenseprepapp`.
 
 The store build is the old client and will run against the new server until the
 next release clears review. Both are traced, both are non-destructive, and both
-resolve when the app ships:
+resolve when the app ships. **Two, still — the #56 receipt work adds nothing
+here.** The shipped iOS build sends base64 app receipts, `usesStoreKit2` returns
+false for them, and they take the identical code path they take today: the
+`receipt-data` body, `verifyReceipt`, the same production-then-21007 dance. The
+new branch is unreachable for every client currently installed. That is the
+whole point of the conservative default.
 
 1. **The "Upgrade" button will error.** `enhanced_subscription_card.dart:1495`
    on `main` calls `upgradeSubscription`, which is being deleted. Today that
