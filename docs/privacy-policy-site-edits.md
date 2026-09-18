@@ -149,3 +149,84 @@ repo file (it is Markdown, and `firebase.json` already serves `web/`) and point
 the app and both stores at that URL, so there is one document that changes with
 the code. Until then, the Google Sites page is the one that counts and the repo
 file is a draft.
+
+---
+
+# Edit 5 — ADD a deletion section (added 2026-09-18, for Play)
+
+Play's Data safety form states three requirements for the **Delete account URL**,
+and that URL is this page. Read against the live page on **2026-09-18**, two of
+the three are not met:
+
+| Play requires the page to… | Live page |
+|---|---|
+| refer to the app or developer name on the store listing | ✅ DriveUSA, DEMROS WEST LLC (§8) |
+| **prominently feature the steps to request account deletion** | ❌ nothing — §6 says only "email us" for CCPA rights |
+| **specify what is deleted or kept, and any retention period** | ⚠️ partial — "purged within 30 days", but never says what is *kept* |
+
+Reviewers fetch this URL. A page with no deletion steps is a known rejection
+cause, and it is the last thing standing between the form and submission.
+
+**Add as a new section, after §5 Data Security, Retention, and Storage:**
+
+```
+5.1 How to Delete Your Account and Your Data
+
+You can delete your account yourself, at any time, from inside the App:
+
+  Profile → Edit profile → Delete Account → confirm
+
+For your security you may be asked to sign in again first. Deletion is
+immediate and cannot be undone.
+
+If you cannot open the App, email driveusaservice@driveusallc.com from the
+address on your account and we will delete it for you within 30 days.
+
+What is deleted: your sign-in credentials, your profile, your selected state
+and language, your saved questions, your exam and practice progress and
+history, your sign-in sessions, and any problem reports you sent us.
+
+What is kept, and why: records of subscription purchases and billing events
+are retained for tax and accounting purposes as the law requires, with your
+user ID, email address and device identifier stripped out so that the record
+can no longer be connected to you. The one-way trial device hash described in
+section 2.2 is also kept, de-linked from your account, so that deleting an
+account cannot be used to claim the free trial again. It cannot be reversed to
+identify you or your device.
+
+Important: deleting your account does NOT cancel an active App Store or Google
+Play subscription. Only Apple or Google can cancel it. Cancel it in your
+device's subscription settings, or you will continue to be charged.
+```
+
+Every claim above is the code, verified 2026-09-18:
+
+- the path is `profile_screen.dart:742` → `PersonalInfoScreen` → the confirm
+  dialog at `personal_info_screen.dart:627`
+- the delete/keep split is `collectUserDataForDeletion`
+  (`functions/src/account-deletion.ts:34`): **delete** `users`,
+  `savedQuestions`, `progress`, `users/{uid}/sessions`,
+  `counters/user_{uid}_reports`, `reports` where `userId ==`; **anonymize**
+  `subscriptions` and `subscriptionLogs` by clearing `userId`, `email`,
+  `deviceIdHash` (risk #13)
+- `trialDevices` is anonymised, not deleted — risk #26, or deletion becomes a
+  free-trial farm
+- the store-subscription warning is the `storeSubscriptionWarning` the callable
+  already returns (risk #14), and the dialog already shows
+  `delete_subscription_warning`; the policy was the only place it was missing
+- the Auth user goes last, `admin.auth().deleteUser` (`index.ts:1434`)
+
+## Also worth fixing while on the page
+
+The contact address is inconsistent: §6 says `driveusaservice@driveusallc.com`,
+the footer says `driveusaservice@gmail.com`. Now that domain mail is live
+(2026-09-17), make both the domain address.
+
+## What NOT to change
+
+Play also asks, optionally, whether users can request deletion of *some* data
+**without** deleting their account. The honest answer is **No**, and that is
+what the form already says. The only in-app "reset" (`/settings/reset` →
+`reset_app_settings_screen.dart`) clears three `SharedPreferences` keys on the
+device — `app_initialized`, `language`, `selected_state` — and touches nothing
+on the server. Answering Yes would be a claim with no feature behind it.
