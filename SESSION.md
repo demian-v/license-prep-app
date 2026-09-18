@@ -144,6 +144,31 @@ consumed:
 status-vs-entitlement split doing its job. The report then left `active/` with
 nothing in `prepared/` or `processing/`, which is the queue draining.
 
+**Automatic dSYM upload — VERIFIED 2026-09-18, and it was already built.** The
+`[Crashlytics] Upload dSYMs` build phase exists (`project.pbxproj:365`) with
+`alwaysOutOfDate = 1`, so it runs on every build; it had simply never been
+*exercised*, because its guard exits early on simulator builds and that is all
+we had done. A device-targeted release build — `flutter build ios --release
+--no-codesign`, no certificate needed — took it through the real path:
+
+```
+Running upload-symbols in Build Phase mode
+Validating build environment for Crashlytics...
+Validation succeeded. Symbol uploading will proceed in the background.
+```
+
+The guard let a device build through, and `-gsp` resolved (otherwise this is
+where "Could not get GOOGLE_APP_ID" appears). Build-phase mode then uploads
+asynchronously and leaves no log, so the same uploader was run in foreground
+against the same dSYM: **`Successfully uploaded Crashlytics symbols`**, arm64,
+UUID `c1af676af61a3d3fa385b09c6dd8bc4a`. Symbolication therefore needs no
+manual step on a real release.
+
+Two honest limits: the *background* upload's completion is inferred from the
+foreground run of the identical binary with identical credentials, not observed
+directly; and these symbols are inert — they belong to an unsigned local build
+whose UUIDs no shipped binary will ever carry.
+
 **What was NOT verified: the report appearing in the Firebase console.** That
 needs the owner's Google login. Everything up to the upload is confirmed;
 seeing it land is one click the owner has to make. Firebase → Crashlytics →
