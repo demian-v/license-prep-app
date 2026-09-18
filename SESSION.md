@@ -990,6 +990,14 @@ The answer key and explanation are served to an anonymous stranger. Reproduce wi
 
 ## TODO — work that needs another machine, or a decision
 
+> **The full list now lives in the vault:**
+> `wiki/driveusa/Development/driveusa-remaining-work.md` — every open item split
+> Mac / Windows / either machine / owner. **40 items, 12 of which block a
+> release.** Built 2026-09-18 from the union of the risk register, this file,
+> the Android checklist and `owner-console-actions`, so it is the one place to
+> look for "what is left". The sections below stay because they carry the
+> *reasoning* the list only summarises.
+
 > **The Android half of this list now lives in the vault**, at
 > `wiki/driveusa/Development/infra/android-verification-checklist.md`, because
 > the vault is what syncs to the Windows PC — a checklist buried on a branch
