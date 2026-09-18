@@ -379,13 +379,35 @@ no code, and does not touch the deploy gate.
 **Known and deliberately not fixed:**
 - **`functions/` has no linting at all, and never has** — no `eslint`
   devDependency, no config file, no `lint` script. `npx eslint` only appears to
-  "fail" because it downloads v10 on the fly and finds nothing to read. The
-  `// eslint-disable-next-line @typescript-eslint/no-explicit-any` comments in
-  `index.ts` are template leftovers suppressing a rule that has never run.
+  "fail" because it downloads v10 on the fly and finds nothing to read.
   **Not a deploy risk:** `predeploy` runs `npm run build` (`tsc`), not lint.
-  Left alone on purpose — standing it up now would surface a pile of
-  pre-existing findings across ~10k lines with no budget to triage them, which
-  is a separate piece of work, not a line in this branch.
+
+  **Measured 2026-09-18 before deciding** (ESLint 9 + typescript-eslint 8
+  installed with `npm install --no-save`, so nothing in the repo changed, then
+  `npm prune`d away). `typescript-eslint@8` needs only `typescript >=4.8.4`, so
+  there is **no** forced TypeScript bump — a risk I had asserted and was wrong
+  about. Findings across `src` excluding tests:
+
+  | Rule | Findings | Verdict |
+  |---|---|---|
+  | `no-floating-promises` | **0** | the one that could find real money bugs — an unawaited Firestore write in a function that then returns |
+  | `no-misused-promises` | **0** | |
+  | `require-await` | 1 | `email/sender.ts:56` — `LoggingEmailSender.send` is async to satisfy the interface. Correct as written |
+  | `switch-exhaustiveness-check` | 2 | `index.ts:2219`, `receipt-validation.ts:561`. **Both already have `default:`** — the rule objects to `undefined` not having its own case. Option noise, not defects |
+  | `no-explicit-any` | 28 | style; 10 already carry deliberate `eslint-disable` comments |
+
+  **Zero real defects.** `strict: true` plus `noImplicitReturns` and
+  `noUnusedLocals` already cover most of what a TS lint setup adds, and the
+  async code is clean.
+
+  I also had the `eslint-disable` comments wrong: I called them "template
+  leftovers suppressing a rule that has never run". With `no-explicit-any`
+  actually enabled, **every one of them is load-bearing** — `--report-unused-
+  disable-directives` found none unused. They are accurate, not vestigial.
+
+  **Decision: do it as part of #36 (CI), not before.** A linter's value is as a
+  gate that runs without being remembered; there is no CI, so it would be a
+  command nobody types. Revisit when #36 lands or a second developer joins.
 - `traffic_rules_topics_screen.dart:60` hardcodes `'IL'` the same way #39 did,
   but nothing pushes `/theory` and the screen is reachable only through an
   `onGenerateRoute` fallback for a dead deep link. Near-dead code.
