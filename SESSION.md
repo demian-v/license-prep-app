@@ -307,11 +307,21 @@ reproduces the 21002 we have today. Only a confident JWS match takes the new
 path, so the expensive mistake is unreachable — there is a test class for
 exactly that property.
 
-`index.ts`'s `APPLE_BUNDLE_ID` was **not** refactored onto the new module,
-deliberately: the webhook is live money-path code and no test imports
-`SignedDataVerifier`. A guard test asserts the two literals agree, and that
-both match the Android `applicationId`. Editing working code with no net, to
-save a duplicated constant, is the worse trade.
+**`APPLE_BUNDLE_ID` now has exactly one definition** — in
+`apple-jws-validation.ts`, which `index.ts` imports. I first left the webhook's
+own copy in place and guarded it with a parity test, reasoning that editing live
+money-path code with no test net was the worse trade. The owner pushed back on
+2026-09-18 and was right: the deploy is **held**, so nothing was at risk now,
+and a constant's correctness does not need a unit test on the webhook to
+establish. Verified three ways instead — `tsc` clean; the **compiled**
+`lib/index.js:1616` passes `apple_jws_validation_1.APPLE_BUNDLE_ID` into
+`SignedDataVerifier`, which is runtime evidence no source check can give; and
+the guard test now asserts the stronger property (no *other* module assigns it,
+`index.ts` imports it, it still reaches the verifier). A control run that
+reintroduces the duplicate makes that test fail, so it is load-bearing.
+
+One value that cannot disagree with itself beats a test that notices when two
+do.
 
 **What these 37 tests do NOT cover:** signature verification itself. A real
 JWS needs Apple's signing key, so the verifier is mocked. Everything decided
@@ -367,6 +377,15 @@ now does, verified live. Play shows the Data safety change un-submitted with
 no code, and does not touch the deploy gate.
 
 **Known and deliberately not fixed:**
+- **`functions/` has no linting at all, and never has** — no `eslint`
+  devDependency, no config file, no `lint` script. `npx eslint` only appears to
+  "fail" because it downloads v10 on the fly and finds nothing to read. The
+  `// eslint-disable-next-line @typescript-eslint/no-explicit-any` comments in
+  `index.ts` are template leftovers suppressing a rule that has never run.
+  **Not a deploy risk:** `predeploy` runs `npm run build` (`tsc`), not lint.
+  Left alone on purpose — standing it up now would surface a pile of
+  pre-existing findings across ~10k lines with no budget to triage them, which
+  is a separate piece of work, not a line in this branch.
 - `traffic_rules_topics_screen.dart:60` hardcodes `'IL'` the same way #39 did,
   but nothing pushes `/theory` and the screen is reachable only through an
   `onGenerateRoute` fallback for a dead deep link. Near-dead code.
