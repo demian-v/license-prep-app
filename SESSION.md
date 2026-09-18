@@ -28,10 +28,35 @@ calls `sendEmailVerificationCode`, `verifyEmailCode` and
 before the functions and signup breaks for every new user.** So:
 
 ```
-functions deploy  ->  then  ->  app store submission
+functions deploy  ->  then  ->  app store submission  ->  then  ->  hosting deploy
 ```
 
-Never the other way round.
+Never the other way round — and note where **hosting** sits, which is the
+opposite end from functions.
+
+**Do NOT deploy hosting early, even though it looks like the safe half.**
+Verified against the published build `84300d0` on 2026-09-18:
+
+- the live 1.0.5 app **already registers** `driveusa://resetPassword` (and the
+  `email-verified` hosts) in both `AndroidManifest.xml` and `Info.plist`
+- it already extracts `oobCode` in `onGenerateRoute` and calls
+  `ActionCodeRouter.determineRoute(oobCode)` — but the **one-argument** form,
+  without this branch's URL fallback
+- and `firebase_auth` was observed returning
+  `ActionCodeInfoOperation.unknown` for a *valid* reset code, which in the
+  published router's `default:` branch returns `route: '/profile'`
+  (`action_code_router.dart:80`)
+
+So today the old page's `licenseprep://` links open nothing, every user falls
+through to entering the code by hand, and that works. Deploy the fixed page
+ahead of the app and the link *would* open the installed app — and land it on
+the **profile screen**. A working manual path replaced by a silent dead end is
+a regression, caused by deploying a fix. The URL fallback that saves it
+(`typeFromUrl`) only exists in the new client.
+
+Hosting is therefore gated on the app release, not on the functions deploy.
+This also means Android checklist **§4d cannot be unblocked early** by a
+hosting-only deploy.
 
 #### Pre-flight, verified 2026-09-17
 
