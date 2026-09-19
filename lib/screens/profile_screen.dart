@@ -1209,6 +1209,12 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                                 trailing: isSelected ? Icon(Icons.check, color: Colors.green) : null,
                                 enabled: !_isDialogLoading, // Disable during loading
                                 onTap: () async {
+                                  // Set loading state. Safe today — this runs
+                                  // synchronously from the tap, before any
+                                  // await — but guarded anyway so the rule is
+                                  // "every setDialogState is guarded" with no
+                                  // exceptions to reason about. See #70.
+                                  if (!dialogContext.mounted) return;
                                   // Set loading state
                                   setDialogState(() {
                                     _isDialogLoading = true;
@@ -1262,6 +1268,11 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                                       });
                                     }
                                     
+                                    // Risk #70 — every line below this point runs
+                                    // AFTER an await, so the dialog may already
+                                    // be gone. Guard the pop the way line 1046
+                                    // already does.
+                                    if (!dialogContext.mounted) return;
                                     // Close dialog with success result
                                     Navigator.pop(dialogContext, {
                                       'success': true,
@@ -1287,6 +1298,27 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                                     debugPrint('📊 Analytics: state_change_failed logged (profile: $state)');
                                     debugPrint('🚨 Profile Screen: State change error: $errorMessage');
                                     
+                                    // Risk #70 — THIS was the crash, and it is
+                                    // the error path specifically. `setState`
+                                    // does `_element!.markNeedsBuild()`, so on
+                                    // an unmounted State the `!` throws
+                                    // "Null check operator used on a null
+                                    // value" from framework.dart:1219 — a Dart
+                                    // error inside Flutter, not a `!` of ours.
+                                    //
+                                    // Reproduced on a Galaxy S10 Lite
+                                    // 2026-09-19: change state with no network,
+                                    // then dismiss the dialog by tapping
+                                    // outside while `updateUserState` is still
+                                    // in flight. It then fails, this catch
+                                    // runs, and the StatefulBuilder is gone.
+                                    //
+                                    // The success path above already had
+                                    // `if (mounted)` on its setState; the error
+                                    // path had nothing. Failure paths run in
+                                    // exactly the conditions that unmount
+                                    // things, so they need the guard MORE.
+                                    if (!dialogContext.mounted) return;
                                     // Reset loading state on error
                                     setDialogState(() {
                                       _isDialogLoading = false;
