@@ -1,0 +1,130 @@
+# Risk #36 — the first CI this project has had.
+#
+# Every gate here already existed and was something a human had to remember to
+# run. That is the whole problem: 351 Jest tests, 157 Dart tests and a clean
+# analyzer are only worth anything if they run without being asked.
+#
+# Three jobs, deliberately independent so one failure does not hide the others.
+#
+# What it does NOT do, on purpose:
+#   * no deploy. The deploy is owner-held and its order is forced
+#     (functions -> app submission -> hosting). Automating it would be the
+#     single most dangerous thing this file could do.
+#   * no secrets. Nothing here needs APPLE_SHARED_SECRET, GOOGLE_CREDENTIALS or
+#     RESEND_API_KEY, and a CI run that cannot reach production cannot damage
+#     it. The emulators use a throwaway project id.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # A new push supersedes an in-flight run on the same ref.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flutter:
+    name: Flutter — analyze & test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          # Pinned to the toolchain this project actually builds with.
+          # in_app_purchase_android is pinned to 0.5.0 because later versions
+          # need Dart ^3.12 / Flutter >= 3.44, so drifting here breaks the
+          # build in a way that looks unrelated.
+          flutter-version: '3.41.7'
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Analyze (errors only)
+        # The repo carries ~3,176 info-level lints (deprecations, const hints)
+        # and ZERO errors. Gating on infos would mean a permanently red build
+        # that everyone learns to ignore; gating on errors is a line that can
+        # actually be held. Tightening this is a separate, deliberate piece of
+        # work.
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Test
+        run: flutter test
+
+  functions:
+    name: Functions — build & test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Matches `engines.node` in functions/package.json, which is what
+          # Cloud Functions actually runs.
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      - name: Java for the Firestore emulator
+        # The rules suites (firestore-rules, counter-rules) run against a real
+        # Firestore emulator, which is a JVM process. Without this they fail
+        # with a connection error that looks like a test bug.
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - run: npm ci
+
+      - name: Compile
+        # The same `tsc` the deploy's predeploy hook runs. If this fails, the
+        # deploy would have shipped months-old JS (risk #16).
+        run: npm run build
+
+      - name: Install firebase-tools (pinned)
+        # `npm test` shells out to `firebase emulators:exec`, and the CLI is
+        # NOT a dependency of this package — it is global on the dev machine.
+        # Pinned to the version that is actually used locally: the CLI and the
+        # emulator jars move together, so an unpinned install is a build that
+        # breaks on someone else's release day.
+        run: npm i -g firebase-tools@15.7.0
+
+      - name: Test (with emulators)
+        # `npm test` wraps `firebase emulators:exec --project demo-driveusa`,
+        # which boots firestore/auth/pubsub, runs jest, and tears them down.
+        # The project id is a throwaway; nothing here can reach production.
+        run: npm test
+
+  lint:
+    name: Functions — lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      - run: npm ci
+
+      - name: Lint
+        # Deliberately a small rule set — see eslint.config.mjs for why. It
+        # reports zero findings today, so a failure here is a real regression
+        # rather than accumulated noise.
+        run: npm run lint
