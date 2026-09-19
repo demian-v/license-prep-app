@@ -28,7 +28,8 @@ calls `sendEmailVerificationCode`, `verifyEmailCode` and
 before the functions and signup breaks for every new user.** So:
 
 ```
-functions deploy  ->  then  ->  app store submission  ->  then  ->  hosting deploy
+functions deploy  ->  app store submission  ->  hosting deploy
+     (+ firestore:rules — a FOURTH deploy, no ordering constraint)
 ```
 
 Never the other way round — and note where **hosting** sits, which is the
@@ -65,8 +66,25 @@ hosting-only deploy.
 | `APPLE_APP_ID` in `functions/.env.licenseprepapp` | ✅ real 10-digit id, **not** the dangerous `0` |
 | `APPLE_SHARED_SECRET`, `GOOGLE_CREDENTIALS`, `RESEND_API_KEY` | ✅ all three present and ENABLED in Secret Manager |
 | `predeploy` compiles TypeScript | ✅ (risk #16 — without it the deploy ships months-old JS) |
-| Tests | ✅ 332 Jest / 137 Dart, all green |
+| Tests | ✅ **351 Jest / 157 Dart**, all green — and enforced by CI since 2026-09-19 |
 | Deploy surface unchanged by the #56 backend work | ✅ zero new `export const` in `index.ts`, so the 6 deletions / 6 creations below still hold |
+
+#### The fourth deploy: security rules
+
+`firebase deploy --only functions` does **not** ship security rules, and
+`firestore.rules` changed on 2026-09-19 (E2): the per-user report counter can
+no longer be rewound by its owner, which is how a user could silently overwrite
+their own past reports. Without this command it never reaches production:
+
+```
+firebase deploy --only firestore:rules
+```
+
+**No ordering constraint, unlike hosting.** Verified against `main`: the live
+1.0.5 client writes the identical `{value, lastUpdated, userId}` with
+`merge: true` and always increments by one, so the tightened rule accepts
+everything the shipped app already does. Before, during or after the rest is
+all fine.
 
 #### What the deploy will do
 
@@ -280,6 +298,28 @@ tested from a desktop browser. Pointing at a registered target is necessary,
 not sufficient — it needs a device with the app installed, on both platforms.
 On the Windows/device checklist as §4d, with `adb`/`simctl` one-liners that
 isolate scheme registration from the page.
+
+### AFTER THE DEVICE RUN — 2026-09-19, the unblocked backlog
+
+Four rows from the either-machine list, done the same day. All are **client or
+infra** changes; none affects the functions deploy's create/delete list.
+
+| Row | Result |
+|---|---|
+| **E1** production advisories | `npm audit --omit=dev`: **25 → 8**, and **0 critical, 0 high**. Plain `npm audit fix`, never `--force`; `package.json` untouched, lockfile only. The 8 left are all behind a **major** `firebase-admin` bump, still deliberately untaken — it is the SDK every function depends on and belongs on its own branch |
+| **E2** counter rewind | A user could replay `counters/user_{uid}_reports` to a lower value; since reports are written with `.set()` not `.create()`, the next one silently overwrote an earlier report. Rule now mirrors the global counter. **Needs `--only firestore:rules`** — see the gate |
+| **E3** sandbox in statistics | Operator counts included sandbox rows. Now excludes only a **known** sandbox row and returns `sandboxExcluded`, so nothing vanishes unreported. Filtered in code, because a `.where()` would change the query shape and need new indexes (#15/#19) |
+| **E7** CI — risk **#36** | `.github/workflows/ci.yml`, green: Flutter (analyze + 157 tests), Functions (tsc + 351 tests against live emulators), Lint |
+
+**CI's first run failed, and that is the argument for it.** Every step passed
+locally; the runner still rejected it with *"firebase-tools no longer supports
+Java version before 21"* because I had pinned 17 and this Mac happens to have
+JDK 22. **Java 21 is now fixed in the workflow and is the only value that
+works project-wide** — `firebase-tools` refuses below 21, Gradle 8.13 (#57)
+aborts on 25. The two constraints pull in opposite directions; do not bump it
+casually.
+
+Risk numbers from the device run are **#60–#65** in the register.
 
 ### THE DEVICE RUN — 2026-09-19, first time this app has run on real hardware
 
