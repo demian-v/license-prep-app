@@ -39,10 +39,15 @@ Future<void> connectToEmulatorsIfEnabled() async {
   }
 
   // The Android emulator reaches the host machine on 10.0.2.2;
-  // the iOS simulator shares the host's loopback.
-  final host = (!kIsWeb && defaultTargetPlatform == TargetPlatform.android)
-      ? '10.0.2.2'
-      : '127.0.0.1';
+  // the iOS simulator shares the host's loopback. A PHYSICAL device shares
+  // neither — 127.0.0.1 there is the phone — so it needs the Mac's LAN
+  // address passed in explicitly.
+  const override = String.fromEnvironment('EMULATOR_HOST');
+  final host = override.isNotEmpty
+      ? override
+      : (!kIsWeb && defaultTargetPlatform == TargetPlatform.android)
+          ? '10.0.2.2'
+          : '127.0.0.1';
 
   FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
   await FirebaseAuth.instance.useAuthEmulator(host, 9099);

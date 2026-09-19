@@ -12,6 +12,10 @@ import '../services/in_app_purchase_service.dart';
 
 class EnhancedSubscriptionCard extends StatefulWidget {
   final SubscriptionType subscriptionType;
+  /// The price EXACTLY as the store formats it — "$9.99", "11,99 US$",
+  /// "£7.99". It already carries its own currency, so nothing here prefixes a
+  /// symbol. Prefixing a dollar sign is what made the paywall misquote every
+  /// storefront but the US one (found on a device, 2026-09-19).
   final String price;
   final String period;
   final UserSubscription? subscription;
@@ -522,7 +526,7 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
               Row(
                 children: [
                   Text(
-                    '\$${widget.price}',
+                    widget.price,
                     style: TextStyle(
                       fontSize: 36,
                       fontWeight: FontWeight.bold,
@@ -1174,7 +1178,7 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
                           ),
                         )
                       : Text(
-                          '${isActiveTrial ? AppLocalizations.of(context).translate('upgrade_now') : AppLocalizations.of(context).translate('subscribe_now')} - \$${widget.price}${widget.period}',
+                          '${isActiveTrial ? AppLocalizations.of(context).translate('upgrade_now') : AppLocalizations.of(context).translate('subscribe_now')} - ${widget.price}${widget.period}',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,

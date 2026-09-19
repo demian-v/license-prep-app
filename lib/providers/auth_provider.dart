@@ -558,8 +558,19 @@ class AuthProvider extends ChangeNotifier {
         debugPrint('ℹ️ AuthProvider: Email already matches verified email, no update needed');
       }
     } catch (e) {
+      // Deliberately NOT rethrown. The old comment here said "re-throw to
+      // handle in UI", but none of the three callers handle it, and the one
+      // that runs on screen load is an async addPostFrameCallback — a
+      // fire-and-forget callback with no error path, where a throw escapes to
+      // the zone. On a real device (2026-09-19) that produced an Unhandled
+      // Exception just from opening Profile; in release it would reach
+      // platformDispatcher.onError and be filed to Crashlytics as a FATAL.
+      //
+      // This is best-effort reconciliation of an already-verified email, and
+      // every other failure inside this method — the Firestore write, the
+      // email sync — is already logged and swallowed. Failing loudly here was
+      // the outlier, not the rule.
       debugPrint('❌ AuthProvider: Error applying verified email: $e');
-      throw e; // Re-throw to handle in UI
     }
   }
   
@@ -684,8 +695,13 @@ class AuthProvider extends ChangeNotifier {
     try {
       debugPrint('🚪 AuthProvider: Logging out user');
       
-      // Sign out using the API
-      await serviceLocator.auth.logout();
+      // Sign out using the API.
+      //
+      // Bounded deliberately. The catch below exists to clear local data "even
+      // if API logout fails", and that promise is only real if this call is
+      // guaranteed to return — a hang would skip the catch entirely, which is
+      // exactly what stranded logout on a real device (2026-09-19).
+      await serviceLocator.auth.logout().timeout(const Duration(seconds: 10));
       
       // Reset language to English when user logs out
       await _resetLanguageToEnglish();

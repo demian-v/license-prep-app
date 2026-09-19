@@ -46,7 +46,8 @@ class InAppPurchaseService {
   // stealing _purchasePending and leaving the UI stuck in a loading state.
   String? _pendingProductId;
   // Safety-net timeout: if no purchase event arrives within 60s of the user
-  // tapping Subscribe, clear the loading state and show an error.
+  // tapping Subscribe, re-enable the UI. It does NOT report an error — see the
+  // note at the timer itself.
   Timer? _purchasePendingTimeoutTimer;
   bool _isRestoringPurchases = false;
   Timer? _restoreSessionTimer;
@@ -57,14 +58,22 @@ class InAppPurchaseService {
   // times on app launch (sandbox behaviour in particular).
   final Set<String> _processedPurchaseIds = {};
 
+  // Receipts that arrived while a validation was in flight. Drained one at a
+  // time by [_onValidationSettled]. Exists because dropping them loses
+  // renewals Apple has already billed — see the guard in
+  // _handleSuccessfulPurchase.
+  final List<PurchaseDetails> _validationQueue = [];
+
   // Concurrency guard: only one validation may be in flight at a time.
   // In sandbox, Apple accelerates subscription renewals to every 5 minutes, so
   // after 1 hour there may be 12+ pending renewal receipts in StoreKit's queue.
   // Each has a DIFFERENT transaction_id → _processedPurchaseIds doesn't catch
   // them. When restorePurchases() delivers all 12 simultaneously, without this
   // flag they all fire concurrent Firebase calls and exhaust the rate limit.
-  // With this flag, only the first validation runs; the other 11 still call
-  // completePurchase() to clear StoreKit's queue but skip Firebase.
+  // With this flag, only the first validation runs at a time; the rest go to
+  // [_validationQueue] and are drained one by one. They used to be DROPPED,
+  // which silently lost renewals Apple had already billed (device run,
+  // 2026-09-19). Serialising was the part worth keeping.
   bool _isValidating = false;
 
   // Callbacks for purchase events
@@ -175,13 +184,28 @@ class InAppPurchaseService {
     _pendingProductId = productId;
 
     // Safety net: if StoreKit never delivers a purchase event (e.g. race
-    // condition where an old renewal steals the flag), clear loading after 60s.
+    // condition where an old renewal steals the flag), re-enable the UI so it
+    // cannot strand in a loading state.
+    //
+    // It does NOT report a failure, and that is the point. Observed on a real
+    // device 2026-09-19: this fired at 60s while Apple's payment sheet was
+    // still open, said "Purchase timed out. Please try again.", and the
+    // purchase then completed and validated. The customer was told a purchase
+    // they had paid for had failed, and invited to buy it twice.
+    //
+    // No fixed deadline can be correct here. The App Store sheet is open-ended
+    // — password, 2FA, Apple's "Terms and Conditions have changed"
+    // interstitial, a slow sandbox — and under Family Sharing **Ask to Buy** a
+    // purchase legitimately stays pending for days awaiting a parent. The
+    // purchase stream is the source of truth; this timer only unsticks the UI.
     _purchasePendingTimeoutTimer?.cancel();
     _purchasePendingTimeoutTimer = Timer(const Duration(seconds: 60), () {
       if (_purchasePending) {
-        debugPrint('⏱️ InAppPurchaseService: Purchase timed out — clearing pending state');
+        debugPrint(
+          '⏱️ InAppPurchaseService: no purchase event after 60s — re-enabling '
+          'the UI. The purchase may still be in progress; the stream decides.',
+        );
         _clearPurchasePending();
-        onPurchaseError?.call('Purchase timed out. Please try again.');
       }
     });
 
@@ -258,6 +282,15 @@ class InAppPurchaseService {
       switch (purchaseDetails.status) {
         case PurchaseStatus.pending:
           debugPrint('⏳ Purchase pending: ${purchaseDetails.productID}');
+          // Apple has confirmed this purchase is genuinely in flight, so the
+          // safety net has nothing left to protect against and must not
+          // outlive it. This is also where Family Sharing's **Ask to Buy**
+          // sits: the answer can be days away, and the UI keeps its pending
+          // state until the stream says otherwise.
+          if (purchaseDetails.productID == _pendingProductId) {
+            _purchasePendingTimeoutTimer?.cancel();
+            _purchasePendingTimeoutTimer = null;
+          }
           break;
         
         case PurchaseStatus.purchased:
@@ -347,9 +380,31 @@ class InAppPurchaseService {
     // Firebase concurrently and exhaust the rate limit.
     // User-initiated purchases bypass this guard so they are always processed.
     if (!isUserInitiated && _isValidating) {
-      debugPrint('⚠️ InAppPurchaseService: Validation already in progress — '
-          'skipping concurrent receipt for ${purchaseDetails.productID}/'
-          '${purchaseDetails.purchaseID} (StoreKit delivered multiple renewals at once)');
+      // QUEUE, do not drop. Dropping here loses renewals Apple has already
+      // billed: on a device 2026-09-19, 11 events arrived at once and five
+      // DISTINCT transaction ids were discarded, leaving nextBillingDate
+      // behind what had actually been charged.
+      //
+      // The guard itself stays — serialising is the point. Its call site in
+      // SubscriptionProvider.checkAndAutoRestoreIfNeeded exists because a
+      // burst of concurrent validations exhausts the backend rate limit.
+      // One at a time, but none thrown away.
+      final queuedId = purchaseDetails.purchaseID ?? '';
+      final alreadyKnown = queuedId.isNotEmpty &&
+          (_processedPurchaseIds.contains(queuedId) ||
+              _validationQueue
+                  .any((p) => (p.purchaseID ?? '') == queuedId));
+      if (alreadyKnown) {
+        // StoreKit redelivers unfinished transactions repeatedly; without this
+        // the queue would grow on every redelivery.
+        debugPrint('⚠️ InAppPurchaseService: Receipt $queuedId already '
+            'processed or queued — not re-queuing');
+        return;
+      }
+      _validationQueue.add(purchaseDetails);
+      debugPrint('⏳ InAppPurchaseService: Validation in progress — queued '
+          '${purchaseDetails.productID}/${purchaseDetails.purchaseID} '
+          '(${_validationQueue.length} waiting)');
       return;
     }
     _isValidating = true;
@@ -365,7 +420,7 @@ class InAppPurchaseService {
       if (_processedPurchaseIds.contains(purchaseId)) {
         debugPrint('⚠️ InAppPurchaseService: Purchase $purchaseId already processed '
             'this session — skipping duplicate Firebase call');
-        _isValidating = false;
+        _onValidationSettled();
         return;
       }
       _processedPurchaseIds.add(purchaseId);
@@ -373,7 +428,6 @@ class InAppPurchaseService {
 
     // Validate receipt with backend
     _validateReceipt(purchaseDetails).then((isValid) {
-      _isValidating = false;
       if (isValid) {
         debugPrint('✅ InAppPurchaseService: Receipt validated successfully');
         onPurchaseSuccess?.call(purchaseDetails.productID);
@@ -381,12 +435,29 @@ class InAppPurchaseService {
         debugPrint('❌ InAppPurchaseService: Receipt validation failed');
         onPurchaseError?.call('Receipt validation failed');
       }
+      _onValidationSettled();
     }).catchError((error) {
-      _isValidating = false;
       // BUG FIX: Call error callback when validation throws an exception
       debugPrint('❌ InAppPurchaseService: Receipt validation error: $error');
       onPurchaseError?.call('Receipt validation error: ${error.toString()}');
+      _onValidationSettled();
     });
+  }
+
+  /// Releases the concurrency guard and starts the next queued receipt.
+  ///
+  /// Strictly one at a time: the guard exists because a burst of concurrent
+  /// validations exhausts the backend rate limit, so draining must never fan
+  /// out. A failed validation still drains — the next receipt is a different
+  /// transaction and deserves its own attempt.
+  void _onValidationSettled() {
+    _isValidating = false;
+    if (_validationQueue.isEmpty) return;
+    final next = _validationQueue.removeAt(0);
+    debugPrint('▶️ InAppPurchaseService: Draining queued receipt '
+        '${next.productID}/${next.purchaseID} '
+        '(${_validationQueue.length} still waiting)');
+    _handleSuccessfulPurchase(next);
   }
 
   /// Handle purchase error

@@ -430,28 +430,39 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
   // This method forces a sync of the email in Firestore when the profile screen loads
   void _syncEmailOnScreenLoad() {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
-      // CRITICAL: First apply any verified email from Firebase Auth
-      // This handles the case where user just completed email verification
-      await authProvider.applyVerifiedEmail();
-      
-      // Force sync the email in Firebase with Firestore (simplified)
-      await emailSyncService.smartSync();
-      
-      // With simplified system, no complex verification handling needed
-      if (mounted) {
-        // Update Firestore with the current auth email
-        await emailSyncService.updateFirestoreEmail();
+      // An async post-frame callback has no error path: anything thrown here
+      // escapes to the zone rather than surfacing in the UI, and in release
+      // that means a FATAL Crashlytics report. There are five awaits below,
+      // every one of them a network call that can fail. Opening this screen
+      // must never be able to crash the app.
+      try {
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-        // Also update the AuthProvider's user object with correct email
-        await emailSyncService.updateAuthProviderEmail(context);
+        // CRITICAL: First apply any verified email from Firebase Auth
+        // This handles the case where user just completed email verification
+        await authProvider.applyVerifiedEmail();
+
+        // Force sync the email in Firebase with Firestore (simplified)
+        await emailSyncService.smartSync();
+
+        // With simplified system, no complex verification handling needed
+        if (mounted) {
+          // Update Firestore with the current auth email
+          await emailSyncService.updateFirestoreEmail();
+
+          // Also update the AuthProvider's user object with correct email
+          await emailSyncService.updateAuthProviderEmail(context);
+        }
+
+        // After syncing, refresh the verification status
+        await _checkEmailVerificationStatus();
+
+        debugPrint('📧 ProfileScreen: Completed email sync on screen load');
+      } catch (e) {
+        // Email sync is background reconciliation. The screen is still usable
+        // without it, so report and carry on.
+        debugPrint('⚠️ ProfileScreen: Email sync on screen load failed: $e');
       }
-      
-      // After syncing, refresh the verification status
-      await _checkEmailVerificationStatus();
-      
-      debugPrint('📧 ProfileScreen: Completed email sync on screen load');
     });
   }
 

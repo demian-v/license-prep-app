@@ -52,6 +52,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     final subscriptionProvider =
         Provider.of<SubscriptionProvider>(context, listen: true);
     final subscription = subscriptionProvider.subscription;
+    // Needed for the store-reported price below. `listen: false` — the price
+    // is read once per build and nothing here should rebuild on it.
+    final iapService =
+        Provider.of<InAppPurchaseService>(context, listen: false);
 
     return Scaffold(
       appBar: AppBar(
@@ -79,7 +83,20 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           padding: EdgeInsets.all(16.0),
           child: EnhancedSubscriptionCard(
             subscriptionType: SubscriptionType.monthly,
-            price: "9.99",
+            // The store is authoritative for money, exactly as the server is
+            // for entitlement (#48) and Apple is for the receipt (#56).
+            // `ProductDetails.price` is already formatted for the customer's
+            // storefront — "$9.99", "11,99 US$", "£7.99" — and was being
+            // ignored in favour of a literal, which misquotes everyone outside
+            // the storefront that literal was written for.
+            //
+            // The fallback is only reachable before `queryProductDetails` has
+            // returned, or with the store unavailable — in which case no
+            // purchase is possible anyway.
+            price: iapService
+                    .getProduct(InAppPurchaseService.monthlyProductId)
+                    ?.price ??
+                r'$9.99',
             period: AppLocalizations.of(context).translate('per_month'),
             subscription: subscription,
             subscriptionProvider: subscriptionProvider,

@@ -652,9 +652,21 @@ class FirebaseAuthApi implements AuthApiInterface {
       if (currentUser != null) {
         debugPrint('🚪 FirebaseAuthApi: Invalidating session for user: ${currentUser.uid}');
         try {
-          await sessionManager.invalidateSession(currentUser.uid);
+          // The deadline is the fix, not the catch. Observed hanging forever
+          // on a real device 2026-09-19: this is a Firestore write, and a
+          // Firestore write Future does not complete until the SERVER
+          // acknowledges it. With no valid auth token there is no ack, so the
+          // await never returned and Log out silently did nothing — six taps,
+          // zero completions. A hang throws nothing, so the catch below (and
+          // the one in AuthProvider) never ran.
+          //
+          // Session invalidation is best-effort housekeeping. Signing out is
+          // not optional, so it must never be gated on a network round trip.
+          await sessionManager
+              .invalidateSession(currentUser.uid)
+              .timeout(const Duration(seconds: 5));
         } catch (sessionError) {
-          debugPrint('⚠️ FirebaseAuthApi: Session invalidation error: $sessionError');
+          debugPrint('⚠️ FirebaseAuthApi: Session invalidation skipped ($sessionError) — signing out anyway');
         }
       }
       
