@@ -398,9 +398,41 @@ onError` (async). `profile_screen.dart` has exactly **three** null-assertions �
 swallow rather than report. **So the `!` is in a frame below the one Crashlytics
 names**, and the issue title is truncated at `_ProfileScre…`.
 
-**BLOCKED on the console.** The full stack trace resolves this in one look, and
-it needs Firebase console access, which this session does not have. Do not
-guess at a fix from the three guarded sites — none of them is it.
+**RESOLVED — `fc4d375`.** The stack trace settled it instantly:
+
+```
+State.setState (framework.dart:1219)
+_ProfileScreenState._showStateSelector.<fn>.<fn>.<fn>.<fn>
+                                   (profile_screen.dart:1291)
+```
+
+`framework.dart:1219` is inside Flutter's **own** `setState`, which ends in
+`_element!.markNeedsBuild()`. On an unmounted State `_element` is null, so the
+`!` throws. **The null assertion is Flutter's, not ours** — which is exactly why
+auditing our own `!` operators found nothing. Line 1291 is
+`setDialogState(() => _isDialogLoading = false)` in the **catch block**.
+
+**Reproduction:** change state with no network, then dismiss the dialog by
+tapping outside while `updateUserState` is in flight. It fails, the catch runs,
+and the StatefulBuilder is gone. **That is what this session did while testing
+W5's offline case** — two taps, two events — and it closes the loose end above:
+the offline change looked like it did nothing because Firestore queued the write
+*and the error path crashed before any feedback could be shown*.
+
+**The asymmetry is the lesson.** The SUCCESS path already had `if (mounted)` on
+its `setState`; the ERROR path had nothing. Failure paths run in precisely the
+conditions that tear widgets down, so they need the guard **more**. The file
+already knew the pattern — line 1046 does `if (navigator.mounted) navigator.pop(...)`.
+
+**Firebase's AI summary was wrong** and would have sent someone the wrong way:
+it blamed an unsafe `!` in our code and recommended
+`firstWhere(..., orElse: () => null)`, which is both the wrong cause and would
+not compile against a non-nullable list. The stack trace disproves it in one
+line. Worth remembering before acting on those summaries.
+
+**Device confirmation still outstanding** — the phone locked mid-verification,
+and a first attempt produced a meaningless "no crash" because the screen was
+off and the taps went nowhere. The fix is verified at test level only.
 
 **Reproduction context, for whoever opens the issue.** It was produced during
 the 2026-09-19 device run on `gefeb69217@blobapps.com`, whose profile was
