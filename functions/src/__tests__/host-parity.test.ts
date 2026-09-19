@@ -138,19 +138,22 @@ describe("the page's deep links point at schemes that are actually registered", 
     expect(androidManifest).toContain(`android:scheme="driveusa" android:host="${host}"`);
   });
 
-  it('offers the PATH form first, because the host form loses the mode', () => {
-    // Measured on the simulator 2026-09-17:
+  it('offers ONLY the path form — the host form silently loses the mode', () => {
+    // Measured on the simulator 2026-09-17 and confirmed on a real iPhone
+    // 2026-09-19:
     //   driveusa://resetPassword?oobCode=X   -> route "/?oobCode=X"
     //   driveusa:///resetPassword?oobCode=X  -> route "/resetPassword?oobCode=X"
-    // Flutter drops the host, so only the three-slash form tells the app what
-    // the link was for. That matters because firebase_auth returned
-    // `ActionCodeInfoOperation.unknown` for a valid reset code, leaving the
-    // URL as the only way to route it.
+    //
+    // This test used to assert the host form came SECOND. The device run
+    // showed second is still too high: `checkActionCode` returns
+    // ActionCodeInfoOperation.unknown even for a VALID reset code, so once the
+    // host is dropped the router has no signal at all and defaults to email
+    // verification. A password-reset link produced "Failed to verify email...
+    // request a new verification email", which is advice for a problem the
+    // user does not have.
     const pathForm = landingPage.indexOf("SCHEME + ':///' + cfg.host");
-    const hostForm = landingPage.indexOf("SCHEME + '://' + cfg.host");
     expect(pathForm).toBeGreaterThan(-1);
-    expect(hostForm).toBeGreaterThan(-1);
-    expect(pathForm).toBeLessThan(hostForm);
+    expect(landingPage).not.toContain("SCHEME + '://' + cfg.host");
   });
 
   it('the Android intent names the real applicationId', () => {
