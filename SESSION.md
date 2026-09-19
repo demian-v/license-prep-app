@@ -281,6 +281,70 @@ not sufficient — it needs a device with the app installed, on both platforms.
 On the Windows/device checklist as §4d, with `adb`/`simctl` one-liners that
 isolate scheme registration from the page.
 
+### THE DEVICE RUN — 2026-09-19, first time this app has run on real hardware
+
+A physical iPhone 12 Pro, pointed at the local emulators, with a real Apple
+sandbox purchase. **Everything below was invisible from the simulator**, which
+is the point: a simulator has a healthy localhost, no App Store sheet, and no
+backend that can genuinely fail to answer.
+
+#### The objective: #56's JWS path, verified against a real Apple signature
+
+```
+🔐 Detected a StoreKit 2 JWS — verifying the signature locally
+🍎 Starting Apple JWS (StoreKit 2) validation
+🌍 Environment: SANDBOX
+🎉 JWS validation successful
+🔗 Receipt binding OK: originalTransactionId=2000001238838670
+```
+
+Real online certificate checks too — `ocsp.apple.com` was contacted. This is
+the one thing the 39 unit tests could not prove, because a genuine JWS needs
+Apple's signing key and the verifier is mocked.
+
+The database afterwards, which is the money-path scorecard:
+
+| Check | Result |
+|---|---|
+| #22 | **one** `subscriptions` document, never two |
+| #27 | `environment: sandbox` — not counted as revenue |
+| #42 | `packageId: 1`, stored as a **number** |
+| #5 | `originalTransactionId` bound to the purchasing account |
+| #25 | `provisionUserDocument` fired on signup, wrote `users/{uid}` in 186ms |
+| #48 | refused entitlement under a real outage rather than trusting a stale cache |
+| Trial | granted at signup with **no** verification gate — the owner's decision, working |
+
+#### Five bugs found, all five fixed (`34a8195`)
+
+| Bug | Why the simulator could never show it |
+|---|---|
+| **Purchase timeout reported a paid purchase as failed**, and said "try again" | needs Apple's payment sheet to be open longer than 60s |
+| **Logout hung forever** — a Firestore write with no server ack; try/catch is useless against a hang | needs a backend that accepts connections but cannot authorise |
+| **Opening Profile could throw an unhandled exception** → FATAL in release | needs an auth call to fail in flight |
+| **The paywall quoted a price the store does not charge** | needs two storefronts to compare |
+| **Concurrent renewal receipts were dropped** | needs ~45 min of accelerated sandbox renewals |
+
+#### Environment findings, not product bugs
+
+- **ATS blocks emulator use from a physical device.** No `NSAppTransportSecurity`
+  key — correct for shipping — but Auth (9099) and Functions (5001) go through
+  NSURLSession and are blocked on a LAN address. **Firestore appears to work**
+  because its gRPC transport bypasses ATS entirely, which disguises the failure
+  as an Auth-specific bug. Invisible on the simulator, where 127.0.0.1 is exempt.
+- **A debug Flutter build cannot be launched from the home screen** (iOS 14+).
+  Only `flutter run` or Xcode can start it, so when the debugger attach fails
+  the app becomes unlaunchable. Cost two wasted rounds here.
+- **Emulator email goes nowhere with a dummy `RESEND_API_KEY`.** The factory
+  picks Resend whenever the key is *non-empty*, so a placeholder selects the
+  real API with a bad key. Blank the key to get `LoggingEmailSender`, which
+  prints the code. Verification codes are stored **hashed**, so they cannot be
+  read back — rewrite the hash to a known code instead.
+- **A stale production session survives the switch to emulators** and makes
+  every callable fail for reasons that look like bugs. Log out, or reinstall.
+
+Full write-up, including two findings I got wrong and corrected:
+`device-findings.md` (session scratchpad), folded into the register below.
+
 #### #56 — the backend half is DONE (2026-09-18), the sandbox half is not
 
 **My earlier framing of this row was too coarse.** "#56 needs a Mac and an
@@ -330,8 +394,20 @@ expiry, failure reporting. The sandbox matrix in the register (fresh purchase,
 restore, auto-renewal, trial→paid) remains the only thing that can verify the
 real path, and it still needs an Apple sandbox tester and a Mac.
 
-**Do not drop `enableStoreKit1()` yet.** The order is: deploy this, verify in
-sandbox, *then* let the client move to StoreKit 2.
+**Sandbox verification: DONE 2026-09-19** — against the **emulator**, not
+production. A real sandbox purchase produced a real Apple-signed JWS and this
+code verified it, including online certificate checks. Matrix status: fresh
+purchase ✅ (it was the trial→paid conversion, so both at once), auto-renewal ✅
+(five accelerated sandbox renewals observed), restore ⚠️ exercised only through
+StoreKit's redelivery of unfinished transactions — the explicit auto-restore
+path never fired.
+
+**Still do not drop `enableStoreKit1()`.** One thing has changed and one has
+not: the JWS path is proven, but it was proven against code running in the
+emulator. Production still runs the old `validateAppleReceipt`, so a client
+emitting JWS today would meet a backend that cannot read it. The order stands:
+**deploy the functions, re-verify against production, then** let the client
+move.
 
 #### Still open, in the order they are worth doing
 
