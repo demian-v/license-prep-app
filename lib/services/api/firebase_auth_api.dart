@@ -159,19 +159,28 @@ class FirebaseAuthApi implements AuthApiInterface {
         password: password,
       );
       
-      // Risk #12 — send the verification email. sendEmailVerification() was
-      // never called anywhere in the app, so `emailVerified` stayed false for
-      // every account forever, and the EmailVerificationScreen deep-link flow
-      // wired up in main.dart was unreachable dead code.
+      // Risk #12 — NO `sendEmailVerification()` here, deliberately.
       //
-      // Deliberately non-fatal: a mail failure must not cost the user the
-      // account they have just created.
-      try {
-        await userCredential.user!.sendEmailVerification();
-        debugPrint('📧 [FirebaseAuthApi] Verification email sent to: $email');
-      } catch (e) {
-        debugPrint('⚠️ [FirebaseAuthApi] Could not send verification email: $e');
-      }
+      // It used to sit at this line, from the first attempt at #12 when the
+      // plan was Firebase's built-in LINK email. The 6-digit code flow
+      // superseded that (`52452b6` server, `fd6ab4e` client) and the call was
+      // left behind, so signup fired BOTH: Firebase's link email and the app's
+      // code email.
+      //
+      // Caught on a real device 2026-09-19 — the signup produced an email
+      // reading "Follow this link to verify your email address", from
+      // `noreply@licenseprepapp.firebaseapp.com`, while the screen in front of
+      // the user was asking for six digits. Two mechanisms, two emails, and
+      // the one that arrived could not satisfy the screen that was open.
+      //
+      // The code flow is self-sufficient: `verifyEmailCode` sets Firebase's
+      // real `emailVerified` through `admin.auth().updateUser`
+      // (`verification-callables.ts:141`), which is the only thing the link
+      // email did. Nothing else in `lib/` calls it.
+      //
+      // Deploy order makes this safe: functions ship BEFORE the app (see THE
+      // DEPLOY GATE), so no released client is ever left with neither
+      // mechanism.
 
       // Update display name
       await userCredential.user!.updateDisplayName(name);
