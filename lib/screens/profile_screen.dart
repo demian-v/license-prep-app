@@ -13,6 +13,7 @@ import '../providers/state_provider.dart';
 // Removed developer example imports for production build
 import '../services/email_sync_service.dart';
 import '../services/analytics_service.dart';
+import '../services/crash_reporter.dart';
 import '../services/session_notification_service.dart';
 import 'package:flutter/foundation.dart';
 import '../models/user.dart';
@@ -1281,7 +1282,30 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                                       'previousState': _stateBeforeChange,
                                     });
                                     
-                                  } catch (e) {
+                                  } catch (e, stackTrace) {
+                                    // The stack was being thrown away here.
+                                    //
+                                    // Only `e.toString()` reached analytics,
+                                    // truncated to 100 chars, which is how a
+                                    // real failure on this path stayed
+                                    // undiagnosable: the device reported
+                                    // `state_change_failed` with
+                                    // "Null check operator used on a null
+                                    // value" and no way to tell WHICH `!` —
+                                    // and #34 means the Dart log says nothing
+                                    // in release. Record it as a non-fatal so
+                                    // the next occurrence arrives with frames.
+                                    crashReporter.recordNonFatal(
+                                      e,
+                                      stackTrace,
+                                      reason: 'state change failed',
+                                      keys: {
+                                        'target_state': state,
+                                        'previous_state': _stateBeforeChange,
+                                        'selection_context': 'profile',
+                                      },
+                                    );
+
                                     // Enhanced error logging
                                     final errorMessage = e.toString();
                                     final truncatedError = errorMessage.length > 100 

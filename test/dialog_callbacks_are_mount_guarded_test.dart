@@ -106,8 +106,16 @@ void main() {
           firstAt(0, (l) => l.contains('void _showStateSelector('));
       expect(selector, isNot(-1),
           reason: '_showStateSelector definition not found');
-      final catchLine = firstAt(selector, (l) => l.contains('} catch (e) {'));
-      expect(catchLine, isNot(-1), reason: 'catch block not found');
+      // `} catch (e` rather than `} catch (e) {` — the block legitimately
+      // became `} catch (e, stackTrace) {` when stack capture was added, and
+      // the stricter form made this test fail with "catch block not found".
+      // Failing loudly there was correct behaviour, not a nuisance: a
+      // structural test that cannot locate its target must never quietly pass.
+      final catchLine = firstAt(selector, (l) => l.contains('} catch (e'));
+      expect(catchLine, isNot(-1),
+          reason: 'the state selector catch block could not be located — if it '
+              'was renamed or restructured, update this matcher rather than '
+              'deleting the test');
       expectGuardedRegion(catchLine, 'the state selector catch block');
     });
 
