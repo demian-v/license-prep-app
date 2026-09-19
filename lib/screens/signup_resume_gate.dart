@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/email_verification_service.dart';
-import 'state_selection_screen.dart';
+import 'language_selection_screen.dart';
 import 'verification_code_screen.dart';
 
 /// Risk #12 — resume-on-relaunch for an interrupted signup.
@@ -50,8 +50,15 @@ class _SignupResumeGateState extends State<SignupResumeGate> {
         final status = snapshot.data;
 
         // Could not ask, or already verified: carry on with signup.
+        //
+        // LanguageSelectionScreen, NOT StateSelectionScreen. The fresh-signup
+        // path goes verification -> language -> state
+        // (signup_screen.dart:274, language_selection_screen.dart:308), and
+        // this resume path used to jump straight to state, silently skipping
+        // the language question and leaving the account on the 'en' default it
+        // was created with. Found on a real Android device 2026-09-19.
         if (status == null || status.emailVerified) {
-          return StateSelectionScreen();
+          return LanguageSelectionScreen();
         }
 
         return VerificationCodeScreen(
@@ -61,7 +68,7 @@ class _SignupResumeGateState extends State<SignupResumeGate> {
           // would invalidate it and spend a send from their hourly budget.
           sendOnOpen: !status.hasPendingCode,
           onVerified: () => Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => StateSelectionScreen()),
+            MaterialPageRoute(builder: (context) => LanguageSelectionScreen()),
           ),
         );
       },
