@@ -324,6 +324,35 @@ The database afterwards, which is the money-path scorecard:
 | **The paywall quoted a price the store does not charge** | needs two storefronts to compare |
 | **Concurrent renewal receipts were dropped** | needs ~45 min of accelerated sandbox renewals |
 
+#### Deep links, verified end to end on the device (M5)
+
+`host-parity.test.ts` could only ever say "pointing at a registered target is
+necessary, not sufficient". It is now sufficient, and proven:
+
+```
+🔗 Route requested: /resetPassword?oobCode=…
+📧 Action code operation: ActionCodeInfoOperation.unknown   ← live, not inferred
+↩️ Firebase said unknown; the URL says passwordReset — using that
+✅ Reset code verified for email: test1@test.com
+✅ Password reset confirmed successfully
+```
+
+The `unknown`-for-a-valid-code behaviour that the whole URL-fallback exists for
+**actually happened**, on real hardware, with a real code minted by the Auth
+emulator. The two-slash control confirmed Flutter drops the host
+(`Route requested: /?oobCode=…`) — and that surfaced **#65**: the page's second
+deep link sent password resets to the email-verification screen, advising a
+verification email for a problem the user does not have. Fixed; only the path
+form is offered now.
+
+**Universal links are a different matter and must not be rushed.** They need
+three things and have one: the entitlement is signed in ✅, the AASA is
+Firebase's empty default ❌, and **the client cannot consume a universal link
+at all** ❌ — no `app_links`/`uni_links`, no `continueUserActivity`, no
+`FlutterDeepLinkingEnabled`. Publishing an AASA before the client half exists
+would make iOS open the app, the app ignore the URL, and the working web page
+be bypassed. Worse than today.
+
 #### Environment findings, not product bugs
 
 - **ATS blocks emulator use from a physical device.** No `NSAppTransportSecurity`
