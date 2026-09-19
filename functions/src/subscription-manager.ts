@@ -394,11 +394,32 @@ export async function testSubscriptionProcessing(): Promise<ProcessingResult> {
  * Get statistics about upcoming expirations
  * Useful for monitoring and alerts
  */
+/**
+ * Whether a subscription document should be counted in operator-facing stats.
+ *
+ * Risk #27 persisted `environment` so a sandbox purchase could never be
+ * mistaken for a real one. These counts never used it, so test purchases
+ * inflated what an operator reads — and with zero real subscriptions today,
+ * sandbox rows are most of what there is.
+ *
+ * **Only a KNOWN sandbox row is excluded.** A missing `environment` means
+ * unknown, not sandbox: every document written before #27 has no field at all,
+ * and dropping those would understate the real numbers. That is the same rule
+ * #27 applied in the other direction — unknown is never silently promoted to
+ * production, and it is never silently discarded either.
+ */
+export function countsTowardRealStats(
+  environment: unknown,
+): boolean {
+  return environment !== 'sandbox';
+}
+
 export async function getSubscriptionStatistics(): Promise<{
   trialsExpiringToday: number;
   trialsExpiringTomorrow: number;
   canceledExpiringToday: number;
   canceledExpiringTomorrow: number;
+  sandboxExcluded: number;
 }> {
   const now = new Date();
   const today = Timestamp.fromDate(now);
@@ -446,11 +467,29 @@ export async function getSubscriptionStatistics(): Promise<{
         .get(),
     ]);
 
+    // Filtered in CODE, not in the query. Adding `.where('environment', ...)`
+    // would change the query shape and therefore need new composite indexes
+    // (risk #15), and a shape change on a money-path query is how #19 nearly
+    // broke every purchase. These are 24-hour windows, so the sets are small.
+    const snaps = [trialsToday, trialsTomorrow, canceledToday, canceledTomorrow];
+    const kept = snaps.map((snap) =>
+      snap.docs.filter((d) => countsTowardRealStats(d.get('environment'))),
+    );
+    const sandboxExcluded = snaps.reduce(
+      (n, snap, i) => n + (snap.docs.length - kept[i].length),
+      0,
+    );
+    if (sandboxExcluded > 0) {
+      // Reported, never silently dropped.
+      console.log(`📊 Excluded ${sandboxExcluded} sandbox subscription(s) from statistics`);
+    }
+
     return {
-      trialsExpiringToday: trialsToday.docs.length,
-      trialsExpiringTomorrow: trialsTomorrow.docs.length,
-      canceledExpiringToday: canceledToday.docs.length,
-      canceledExpiringTomorrow: canceledTomorrow.docs.length,
+      trialsExpiringToday: kept[0].length,
+      trialsExpiringTomorrow: kept[1].length,
+      canceledExpiringToday: kept[2].length,
+      canceledExpiringTomorrow: kept[3].length,
+      sandboxExcluded,
     };
   } catch (error) {
     console.error('❌ Error getting subscription statistics:', error);
@@ -458,7 +497,8 @@ export async function getSubscriptionStatistics(): Promise<{
       trialsExpiringToday: 0,
       trialsExpiringTomorrow: 0,
       canceledExpiringToday: 0,
-      canceledExpiringTomorrow: 0
+      canceledExpiringTomorrow: 0,
+      sandboxExcluded: 0
     };
   }
 }
