@@ -361,6 +361,18 @@ class AuthProvider extends ChangeNotifier {
   
   Future<void> updateUserState(String? state) async {
     if (user != null) {
+      // `user` is a plain mutable field on a ChangeNotifier, NOT a State —
+      // there is no `mounted` here to guard with. The hazard is the same shape
+      // though: the `if (user != null)` above does NOT hold across the awaits
+      // below, because anything that signs the user out (token expiry, a
+      // session conflict, logout) nulls the field while they are in flight.
+      // Every `user!` after an await was therefore a time-of-check/time-of-use
+      // bug throwing "Null check operator used on a null value".
+      //
+      // Captured once, before anything can await, and declared OUTSIDE the try
+      // so the catch — which is the offline fallback path — can use it too.
+      final before = user!;
+
       try {
         debugPrint('🗺️ [AuthProvider] Updating user state to: ${state ?? "null"}');
         
@@ -386,7 +398,7 @@ class AuthProvider extends ChangeNotifier {
         
         if (stateId != null) {
           // Try to use the API only if state is not null
-          await serviceLocator.auth.updateUserState(user!.id, stateId);
+          await serviceLocator.auth.updateUserState(before.id, stateId);
           
           // Get the updated user from the API
           try {
@@ -396,36 +408,47 @@ class AuthProvider extends ChangeNotifier {
               user = updatedUserFromApi;
             } else {
               debugPrint('⚠️ [AuthProvider] API returned null user, using local update');
-              user = user!.copyWith(state: stateId);
+              user = (user ?? before).copyWith(state: stateId);
             }
           } catch (getUserError) {
             debugPrint('⚠️ [AuthProvider] Error getting updated user: $getUserError');
             // Use local update as fallback
-            user = user!.copyWith(state: stateId);
+            user = (user ?? before).copyWith(state: stateId);
           }
         } else {
           // Just update the local user with null state
-          user = user!.copyWith(clearState: true);
+          user = (user ?? before).copyWith(clearState: true);
           debugPrint('✅ [AuthProvider] Updated user state to null locally');
         }
         
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('user', jsonEncode(user!.toJson()));
-        
+        // Same TOCTOU as above: `getInstance()` is an await, so `user` can be
+        // null by the time these run. Persisting nothing is correct if the
+        // user signed out mid-update — writing a stale record would be worse.
+        final current = user;
+        if (current != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('user', jsonEncode(current.toJson()));
+        }
+
         notifyListeners();
-        debugPrint('🗺️ AuthProvider: State set to: ${user!.state ?? "null"}');
+        debugPrint('🗺️ AuthProvider: State set to: ${user?.state ?? "null"}');
       } catch (e) {
         // Fallback to local update if API is not available
         debugPrint('⚠️ AuthProvider: API error, updating locally: $e');
         
-        final updatedUser = user!.copyWith(state: state);
+        // This is the OFFLINE path — "API not available" is what a dropped
+        // connection looks like — and it is the leading suspect for the
+        // `state_change_failed: Null check operator used on a null value`
+        // reproduced on device 2026-09-19. `before` was captured before any
+        // await, so this fallback can no longer be the thing that throws.
+        final updatedUser = (user ?? before).copyWith(state: state);
         user = updatedUser;
         
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('user', jsonEncode(updatedUser.toJson()));
         
         notifyListeners();
-        debugPrint('🗺️ AuthProvider: State set locally to: ${user!.state ?? "null"}');
+        debugPrint('🗺️ AuthProvider: State set locally to: ${user?.state ?? "null"}');
       }
     } else {
       debugPrint('⚠️ AuthProvider: Cannot update state - user is null');
