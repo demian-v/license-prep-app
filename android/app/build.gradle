@@ -12,14 +12,17 @@ plugins {
 // Add the line that's directly from the error message
 android.buildFeatures.buildConfig = true
 
-android {
-    // Load keystore properties
-    def keystoreProperties = new Properties()
-    def keystorePropertiesFile = rootProject.file('key.properties')
-    if (keystorePropertiesFile.exists()) {
-        keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
-    }
+// Release signing inputs (risk #31). Loaded at the top level, not inside
+// `android { }`, so the guard at the bottom of this file can see them too.
+// key.properties is gitignored — it holds keystore passwords — so it is absent
+// on every fresh clone and on CI. That is correct; the missing guard was the bug.
+def keystorePropertiesFile = rootProject.file('key.properties')
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
 
+android {
     namespace = "com.driveusa.app"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
@@ -50,7 +53,14 @@ kotlinOptions {
         applicationId = "com.driveusa.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdkVersion 23
+        // W7 / 2026-09-19. This line used to read `minSdkVersion 23`, and the file
+        // was lying: the Flutter tool REWRITES it to `flutter.minSdkVersion` on
+        // every build (it logs "Upgrading build.gradle"), and that constant is 24
+        // in Flutter 3.41.7 (FlutterExtension.kt:26). Measured, not inferred — the
+        // merged release manifest declares minSdkVersion="24".
+        // Left as the symbol deliberately: a literal here is silently overwritten,
+        // so a literal can only ever go stale again.
+        minSdkVersion flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -81,4 +91,63 @@ dependencies {
 
 flutter {
     source = "../.."
+}
+
+// ---------------------------------------------------------------------------
+// Risk #31 — release signing had no guard.
+//
+// `signingConfigs.release` is built from key.properties, and that file is
+// gitignored. When it is absent every field becomes null, and reproduced on
+// Windows 2026-09-19 the result was NOT a silently unsigned bundle (the
+// register's worst case, which does not happen) but something almost as
+// unhelpful: a full 135-second release build ending in
+//
+//     Execution failed for task ':app:signReleaseBundle'
+//     > java.lang.NullPointerException (no error message)
+//
+// Nothing in that names the keystore. The fix is not to make the build fail —
+// it already fails — but to make it fail in about a second, saying why.
+//
+// Deferred to the task graph on purpose. This file is configured on EVERY
+// Gradle invocation, so throwing at configuration time would break debug
+// builds, `flutter run` and `gradlew tasks` on any machine without the
+// keystore — which is most of them, and all of CI.
+// ---------------------------------------------------------------------------
+def requiredKeystoreKeys = ['storeFile', 'storePassword', 'keyAlias', 'keyPassword']
+
+gradle.taskGraph.whenReady { graph ->
+    def buildingRelease = graph.allTasks.any { t ->
+        t.project == project && t.name ==~ /(?i)(assemble|bundle)Release.*/
+    }
+    if (!buildingRelease) {
+        return
+    }
+
+    if (!keystorePropertiesFile.exists()) {
+        throw new GradleException(
+            "Release signing is not configured.\n\n" +
+            "  android/key.properties is missing, so this release build cannot be signed\n" +
+            "  with the upload key and must not be shipped.\n\n" +
+            "  Create android/key.properties (see android/key.properties.example) with:\n" +
+            "      " + requiredKeystoreKeys.join(', ') + "\n\n" +
+            "  Debug builds and `flutter run` do not need it."
+        )
+    }
+
+    def missing = requiredKeystoreKeys.findAll { !keystoreProperties[it] }
+    if (!missing.isEmpty()) {
+        throw new GradleException(
+            "Release signing is incomplete: android/key.properties is missing " +
+            missing.join(', ') + "."
+        )
+    }
+
+    def resolvedStore = file(keystoreProperties['storeFile'])
+    if (!resolvedStore.exists()) {
+        throw new GradleException(
+            "Release signing is misconfigured: keystore not found at\n" +
+            "      " + resolvedStore.absolutePath + "\n" +
+            "  (storeFile in android/key.properties)."
+        )
+    }
 }

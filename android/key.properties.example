@@ -1,0 +1,7 @@
+# Copy to android/key.properties and fill in. NEVER commit the real file or the
+# keystore — both are gitignored (risk #31). Release builds fail without this;
+# debug builds and `flutter run` do not need it.
+storeFile=C:\path\to\upload-keystore.jks
+storePassword=
+keyAlias=upload
+keyPassword=
