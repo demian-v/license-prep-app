@@ -299,6 +299,112 @@ not sufficient — it needs a device with the app installed, on both platforms.
 On the Windows/device checklist as §4d, with `adb`/`simctl` one-liners that
 isolate scheme registration from the page.
 
+### THE WINDOWS RUN — 2026-09-19, first Android build this branch has had
+
+A Windows 11 machine with the Android SDK. **Phase 1, W1–W7.** Four closed by
+running them, one was a real bug, two are blocked on hardware this machine does
+not have. Nothing deployed.
+
+**Toolchain, verified before touching the app:** Flutter 3.41.7 ✅ · Java 21.0.6
+Temurin ✅ · Gradle 8.13 ✅. **The JDK trap (#57) did not fire** — Flutter was
+already configured with `--jdk-dir` pointing at JDK 21, and `flutter doctor -v`
+confirms it reads that rather than Android Studio's bundled JDK. One deviation
+from the checklist's expectation: the Android toolchain row is `[!]`, not a
+green tick, because *"Android license status unknown"*. It did not block any
+build performed here.
+
+| # | Result |
+|---|---|
+| **W1** | ✅ **`004d043` stands — do not revert.** Release build succeeds with the block removed, and the bundle stamps `androidGradlePluginVersion=8.13.0`. Also proved the block is inert *without* removing it: a build with the 8.4.0 `buildscript` classpath still present stamps 8.13.0, so `settings.gradle:21` is the real authority exactly as the commit argued |
+| **W2** | ✅ **Reproduced and fixed** — see below, the reproduction contradicts the register |
+| **W3** | ⛔ **Not done — needs a device and a decision.** The R8/ProGuard crash hunt is a *runtime* question and this machine has no physical Android device |
+| **W4** | ⚠️ **Static half only.** Verified `lib/` has **zero** `developer.log`, `stdout.write` or `stderr.write` calls, so the Zone + `debugPrint` reassignment covers every Dart logging path there. The runtime half (app starts, logcat is clean) needs a device |
+| **W5** | ⛔ **Not done — needs a device.** The `content_prefetch` event with `outcome` success/failure is wired at `content_loading_manager.dart:103-111` |
+| **W6** | ❌ **Real bug, found and fixed.** The Android Crashlytics half did not compile |
+| **W7** | ✅ **Answered: it ships 24, not 23.** Measured, not inferred |
+
+**W6 — Crashlytics did not build, and the checklist guessed the wrong line.**
+The first release build ever attempted on this branch failed in 27 seconds:
+
+```
+Could not create task ':app:uploadCrashlyticsMappingFileRelease'.
+> The Crashlytics Gradle plugin 3 requires Google-Services 4.4.1 and above.
+```
+
+The checklist expected the `com.google.firebase.crashlytics` `3.0.2` pin to be
+wrong for AGP 8.13.0. It is not; that pin is fine. The stale line is
+`com.google.gms.google-services`, still at **4.4.0**. Bumped to 4.4.1 in
+`settings.gradle` only. The release task graph now carries
+`minifyReleaseWithR8`, `injectCrashlyticsMappingFileIdRelease` and
+`uploadCrashlyticsMappingFileRelease`. **Still unverified: that a real crash
+report arrives in the console** — that needs a device.
+
+**W2 / #31 — the reproduction contradicts the register, in a useful direction.**
+`key.properties` is gitignored, so its normal state on a fresh clone is absent,
+and no rename was needed to reproduce. The register's worst case — a release
+build carrying on and producing an unsigned bundle — **does not happen**.
+`build/app/outputs/bundle/release/` stays empty; only an unsigned
+*intermediary* under `intermediates/` exists, which is not a deliverable. What
+happens instead is a full **135-second** build ending in:
+
+```
+Execution failed for task ':app:signReleaseBundle'.
+> java.lang.NullPointerException (no error message)
+```
+
+Nothing in that names the keystore. So the fix was not to make release builds
+fail — they already fail — but to make them fail in **~6 seconds saying why**.
+The guard hangs off `gradle.taskGraph.whenReady`, deliberately not
+configuration time: this file is configured on *every* Gradle invocation, so
+throwing eagerly would break debug builds, `flutter run` and CI on every machine
+without the keystore. Verified both directions: release without `key.properties`
+fails in 6s with an actionable message; `flutter build apk --debug` still
+succeeds and produces an APK. `android/key.properties.example` added.
+
+**W7 — the file was lying, and here is the mechanism.** `build.gradle:49` said
+`minSdkVersion 23`. The **Flutter tool rewrites that literal** to
+`flutter.minSdkVersion` on every build — it logs `Upgrading build.gradle` while
+doing it — and that constant is **24** in Flutter 3.41.7
+(`FlutterExtension.kt:26`). Confirmed in the merged release manifest:
+`minSdkVersion="24"`. Left as the symbol and documented, because a literal there
+can only ever be overwritten and go stale again. **API 23 devices cannot install
+this app and never could.**
+
+**Two checklist errors that cost time — corrected in the vault.**
+
+1. The checklist says `004d043` "is an ancestor of this branch, so the branch
+   build covers it." **It is not.** It is the *single* commit on `main` that
+   this branch lacks, and the dead `buildscript` block is still here. Building
+   the branch verifies the un-removed state — the opposite of W1's intent. W1
+   was done by applying the patch locally, building, then reverting it; the
+   commit itself is left to arrive by merge rather than be duplicated.
+2. The prefetch service is `lib/services/content_loading_manager.dart`. There is
+   no `lib/services/content_prefetch_service.dart` on this branch either.
+
+**What blocks W3, W4-runtime and W5 — and it is not just the missing device.**
+A release build **cannot be pointed at the local emulators**:
+`connectToEmulatorsIfEnabled` throws `StateError` in release mode by design
+(`emulator_config.dart:33-38`). So driving a release build means driving it
+against **production**, with a real account — and W5's expired-trial case needs
+a production account in that state. That is an owner decision, not a mechanical
+next step. This machine has no physical Android device attached; four AVDs
+exist, but an emulator cannot answer the Play Billing half at all.
+
+**Cross-platform watch items from the iPhone run (#60-#65):**
+
+- **#61 logout hang — the live path is correctly fixed**, double-guarded (5s on
+  the session write at `firebase_auth_api.dart:666`, 10s on the API call at
+  `auth_provider.dart:704`). But `direct_auth_service.dart:532` carries the
+  **same unguarded `invalidateSession` call**. It is **dead code** —
+  `DirectAuthService` has zero references anywhere in `lib/` — so this is a
+  latent trap, not a live bug. Wire that class up and the hang returns.
+- **#62** confirmed fixed at `auth_provider.dart:561`; no longer rethrows.
+- **#63** confirmed fixed; renders `ProductDetails.price`. **Note the trap:**
+  `subscription_screen.dart:99` still falls back to the literal `$9.99` before
+  `queryProductDetails` resolves. On a US storefront a *failed* Play query is
+  therefore indistinguishable from a working one. Test this on a non-US
+  storefront, or the check proves nothing.
+
 ### AFTER THE DEVICE RUN — 2026-09-19, the unblocked backlog
 
 Four rows from the either-machine list, done the same day. All are **client or
@@ -1262,6 +1368,17 @@ None of this is a register row and none of it is urgent: the vulnerable code is
 unreachable. But it is cheap, and it is the whole of the repo's alert list.
 
 ### 4. Gradle build to verify the dead-buildscript removal
+
+> **✅ DONE 2026-09-19 on the Windows machine. See THE WINDOWS RUN above.**
+> `004d043` **stands — do not revert.** The release build succeeds with the
+> block removed and the bundle stamps `androidGradlePluginVersion=8.13.0`.
+> Stronger than asked for: a build with the block *still present* also stamps
+> 8.13.0, so the classpath was provably inert rather than merely argued to be.
+> Correction to the note below and to the checklist: `004d043` is **not** an
+> ancestor of `local/security-money-hardening` — it is the one commit on `main`
+> the branch lacks, so a plain branch build does not cover it. It was verified
+> by applying the patch locally, building, and reverting.
+
 
 `chore/remove-dead-buildscript` was merged into `main` on 2026-09-17 at the
 owner's request (`004d043`). Its own commit message asks for a Gradle build
