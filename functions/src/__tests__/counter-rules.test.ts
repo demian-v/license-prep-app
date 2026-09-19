@@ -150,3 +150,113 @@ describe('Risk #11 — the increment invariant still holds', () => {
     await assertFails(user().firestore().doc(COUNTER).delete());
   });
 });
+
+/**
+ * The PER-USER counter was never tightened alongside the global one.
+ *
+ * `firestore.rules` still carries a bare `allow read, write` for
+ * `counters/user_{uid}_reports`. The global counter got a create-at-1 rule and
+ * an exactly-+1 update rule (risk #11); its sibling, written in the *same
+ * transaction* by `CounterService.getNextGlobalReportId`, got neither.
+ *
+ * The consequence is self-inflicted but real: a user can replay their own
+ * counter to a lower value, and the next report then reuses an id that is
+ * already taken. `reports/{id}` is written with `.set()`, not `.create()`, so
+ * the earlier report is **silently overwritten** — a user can delete their own
+ * report history and nothing records that it happened.
+ *
+ * Recorded as still-open in `global-counter.md` on 2026-09-18 and closed here.
+ * The writer sends exactly three fields:
+ *     { value, lastUpdated, userId }   (merge: true)
+ */
+const USER_COUNTER = 'counters/user_user-1_reports';
+
+const userIncrement = (value: number) => ({
+  value,
+  lastUpdated: new Date(),
+  userId: 'user-1',
+});
+
+const seedUserCounter = async (value: number) => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc(USER_COUNTER).set(userIncrement(value));
+  });
+};
+
+describe('the per-user report counter bootstraps like the global one', () => {
+  it("a user's first report creates their counter at 1", async () => {
+    await assertSucceeds(
+      user().firestore().doc(USER_COUNTER).set(userIncrement(1), { merge: true }),
+    );
+  });
+
+  it('a create that does not start at 1 is refused', async () => {
+    await assertFails(
+      user().firestore().doc(USER_COUNTER).set(userIncrement(7), { merge: true }),
+    );
+  });
+
+  it('a create carrying extra fields is refused', async () => {
+    await assertFails(
+      user()
+        .firestore()
+        .doc(USER_COUNTER)
+        .set({ ...userIncrement(1), injected: true }, { merge: true }),
+    );
+  });
+});
+
+describe('the per-user counter can only ever go up by one', () => {
+  beforeEach(async () => { await seedUserCounter(5); });
+
+  it('accepts the increment the writer actually performs', async () => {
+    await assertSucceeds(
+      user().firestore().doc(USER_COUNTER).set(userIncrement(6), { merge: true }),
+    );
+  });
+
+  it('REFUSES a replay to a lower value — the whole point', async () => {
+    // This is how a user silently overwrote their own past reports: rewind the
+    // counter, file a new report, and it lands on an id already in use.
+    await assertFails(
+      user().firestore().doc(USER_COUNTER).set(userIncrement(2), { merge: true }),
+    );
+  });
+
+  it('refuses a jump of more than one', async () => {
+    await assertFails(
+      user().firestore().doc(USER_COUNTER).set(userIncrement(9), { merge: true }),
+    );
+  });
+
+  it('refuses an update that changes a field the counter does not own', async () => {
+    await assertFails(
+      user()
+        .firestore()
+        .doc(USER_COUNTER)
+        .set({ ...userIncrement(6), somethingElse: 1 }, { merge: true }),
+    );
+  });
+
+  it('refuses a delete', async () => {
+    await assertFails(user().firestore().doc(USER_COUNTER).delete());
+  });
+});
+
+describe("a user still cannot touch anyone else's counter", () => {
+  it('refuses a write to another uid', async () => {
+    await assertFails(
+      user()
+        .firestore()
+        .doc('counters/user_somebody-else_reports')
+        .set({ value: 1, lastUpdated: new Date(), userId: 'somebody-else' }, { merge: true }),
+    );
+  });
+
+  it('refuses an unauthenticated write', async () => {
+    await assertFails(
+      env.unauthenticatedContext().firestore().doc(USER_COUNTER)
+        .set(userIncrement(1), { merge: true }),
+    );
+  });
+});

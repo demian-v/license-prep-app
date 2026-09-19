@@ -83,10 +83,33 @@ service cloud.firestore {
     }
     
     // User-specific report counters - each user can manage their own counter
+    // The per-user report counter, written in the SAME transaction as the
+    // global one by CounterService.getNextGlobalReportId. It used to carry a
+    // bare `allow read, write`, so its owner could rewind it — and because
+    // reports are written with .set() rather than .create(), the next report
+    // then landed on an id already in use and silently overwrote the earlier
+    // one. A user could erase their own report history with nothing recording
+    // it. The global counter was tightened for risk #11; this is its sibling,
+    // closed 2026-09-19.
+    //
+    // The writer sends exactly { value, lastUpdated, userId } with merge:true,
+    // so a first report is a CREATE at 1 and every later one is +1.
     match /counters/{counterId} {
-      allow read, write: if request.auth != null 
-        && counterId.matches('user_[^_]+_reports')
-        && counterId == ('user_' + request.auth.uid + '_reports');
+      function isOwnCounter() {
+        return request.auth != null
+          && counterId.matches('user_[^_]+_reports')
+          && counterId == ('user_' + request.auth.uid + '_reports');
+      }
+
+      allow read: if isOwnCounter();
+      allow create: if isOwnCounter()
+        && request.resource.data.value == 1
+        && request.resource.data.keys().hasOnly(['value', 'lastUpdated', 'userId']);
+      allow update: if isOwnCounter()
+        && request.resource.data.value == resource.data.value + 1
+        && request.resource.data.diff(resource.data)
+             .affectedKeys().hasOnly(['value', 'lastUpdated', 'userId']);
+      allow delete: if false;
     }
     
     // Global report counter - updates must be exactly +1 increment.
