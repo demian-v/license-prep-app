@@ -316,7 +316,7 @@ Fixed in `71102d2`, with a structural test proven to fail beforehand.
 | W3 | ✅ **COMPLETE — no R8 damage anywhere.** Theory and quiz driven in a second pass (below). Across both passes: zero R8 signatures, zero fatals, zero unhandled exceptions, zero obfuscated stack frames |
 | W4 | ⚠️ **Dart half verified clean, native half is NOT.** See below |
 | W5 | ✅ **Success case confirmed with hard evidence.** ⚠️ offline case inconclusive, ⛔ expired-trial case impossible |
-| W6 | ✅ **Crashlytics initialises on device.** Delivery of a real report still unverified |
+| W6 | ✅ **COMPLETE — end to end.** A real issue arrived in the Firebase console ("We've detected your first issue in com.driveusa.app"). Gradle plugin → init → capture → delivery, all verified |
 
 **W3 finished — theory and quiz driven, 2026-09-19.** A second capture of
 53,809 lines covering the theory list, a theory lesson, a 40-question exam with
@@ -367,6 +367,46 @@ explanation — meaning the offline behaviour may be **silently accepted with no
 feedback** (dialog stays open, nothing changes on screen) rather than ignored.
 **Not asserted** — a second action in between could also explain it. It needs a
 clean repeat, and it is the one loose end left in W5.
+
+**W6 CLOSED, and its first report immediately found a bug my method could not.**
+The Crashlytics console received:
+
+```
+package:license_prep_app/screens/profile_screen.dart - _ProfileScre…
+io.flutter.plugins.firebase.crashlytics.FlutterError
+  - Null check operator used on a null value
+```
+
+**This corrects the W3 result above.** I reported "zero unhandled exceptions",
+and that claim was **logcat-based and therefore blind to this class of error**:
+a *non-fatal* Flutter error in a release build is not an `E/AndroidRuntime`
+FATAL, and #34 suppresses the Dart print that would otherwise show it. So the
+W3 sweep was sound for what it measured — R8 damage, native crashes — and
+**unsound as evidence that nothing went wrong**. Crashlytics is not a nice-to-
+have on this app; it is the only instrument that can see a whole category of
+defect in release. That is the strongest argument yet for #34 + W6 as a pair.
+
+**What is known about the defect.** `io.flutter.plugins.firebase.crashlytics.
+FlutterError` is how the plugin labels errors captured from `FlutterError.
+onError`, i.e. the **widget build/layout** path, not `platformDispatcher.
+onError` (async). `profile_screen.dart` has exactly **three** null-assertions —
+`:811` `authProvider.user!.state!`, `:1087` `_languageDialogStartTime!`,
+`:1220` `_stateDialogStartTime!` — and **all three are guarded**
+(`?.isNotEmpty == true`, `!= null`). `_getFullStateName` is null-safe
+(`stateInfo?.name ?? stateCode`) and the file has no `late` fields. The
+`addPostFrameCallback` at `:432` is inside the try/catch #62 added, so it would
+swallow rather than report. **So the `!` is in a frame below the one Crashlytics
+names**, and the issue title is truncated at `_ProfileScre…`.
+
+**BLOCKED on the console.** The full stack trace resolves this in one look, and
+it needs Firebase console access, which this session does not have. Do not
+guess at a fix from the three guarded sites — none of them is it.
+
+**Reproduction context, for whoever opens the issue.** It was produced during
+the 2026-09-19 device run on `gefeb69217@blobapps.com`, whose profile was
+opened repeatedly, including while `state == null` immediately after signup, and
+whose state dialog was opened and dismissed several times — once by tapping
+outside the barrier, and twice while offline with no visible effect.
 
 **W5 — the prefetch event, captured.** `adb shell setprop debug.firebase.analytics.app com.driveusa.app` plus `setprop log.tag.FA VERBOSE` puts Analytics events into logcat, which is how to do this **without Firebase console access** — the checklist assumed DebugView was the only route. Changing state in Profile produced:
 
