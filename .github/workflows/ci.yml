@@ -79,10 +79,18 @@ jobs:
         # The rules suites (firestore-rules, counter-rules) run against a real
         # Firestore emulator, which is a JVM process. Without this they fail
         # with a connection error that looks like a test bug.
+        #
+        # 21, and it is the only number that works project-wide:
+        #   firebase-tools 15.x REFUSES Java < 21
+        #     ("no longer supports Java version before 21")
+        #   Gradle 8.13 (risk #57) ABORTS on Java 25
+        # First CI run used 17 and failed on exactly that message. It passed
+        # locally only because this machine happens to have JDK 22 — the
+        # difference a real run catches and a local check never will.
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       - run: npm ci
 
