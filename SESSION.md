@@ -430,9 +430,48 @@ it blamed an unsafe `!` in our code and recommended
 not compile against a non-nullable list. The stack trace disproves it in one
 line. Worth remembering before acting on those summaries.
 
-**Device confirmation still outstanding** — the phone locked mid-verification,
-and a first attempt produced a meaningless "no crash" because the screen was
-off and the taps went nowhere. The fix is verified at test level only.
+**DEVICE CONFIRMED, and it exposed a second bug.**
+
+The exact sequence — change state offline, dismiss the dialog mid-flight — ran
+**five times** with the fix installed: no crash, no Crashlytics report, process
+alive throughout. **#70 is closed.**
+
+**But the underlying failure is still there.** With analytics routed to logcat,
+the offline change reports:
+
+```
+name=state_change_failed
+error_message=Null check operator used on a null value
+```
+
+So there are **two** defects, and the guard fixed the second one only:
+
+1. something inside the `try` throws a null-check → the catch runs — **OPEN**
+2. the catch's `setDialogState` on a dead dialog then crashed — **FIXED**
+
+The diagnosis of #70 was right; it was the crash. It was not the cause.
+
+**Why it stayed undiagnosable, and what changed.** The catch discarded the
+stack — only `e.toString()` reached analytics, truncated to 100 chars, and #34
+means the Dart log says nothing in release. It now records a non-fatal through
+`crashReporter.recordNonFatal` with the target and previous state as keys, so
+the next occurrence arrives with frames. **Three candidates were identified and
+none is being changed on suspicion:** `user!` after an await in
+`AuthProvider.updateUserState` (a mutable field, so a real TOCTOU), the
+null-asserting lazy getters in `ServiceLocatorExtensions`, or something below
+them. Guessing is how the wrong guarded line gets "fixed".
+
+**Two measurement traps worth recording, because both produced false results
+during this verification:**
+
+- **A sleeping screen silently swallows `adb input tap`.** Two runs reported
+  "no crash" that proved nothing, because the always-on display was up and the
+  taps went nowhere. `adb shell svc power stayon true` while charging, and
+  screenshot before trusting any tap.
+- **Offline, `FA-SVC` does not process the analytics queue**, so nothing appears
+  in logcat until connectivity returns — events then arrive in a burst. An
+  earlier reading attributed that burst to live online failures. Restore the
+  network and read the flush; do not read silence as success.
 
 **Reproduction context, for whoever opens the issue.** It was produced during
 the 2026-09-19 device run on `gefeb69217@blobapps.com`, whose profile was
