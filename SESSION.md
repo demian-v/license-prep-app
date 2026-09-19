@@ -313,10 +313,60 @@ Fixed in `71102d2`, with a structural test proven to fail beforehand.
 
 | # | Result |
 |---|---|
-| W3 | ✅ **No R8 damage found.** Zero `ClassNotFoundException` / `NoSuchMethodError` / `NoSuchFieldException` / fatals / unhandled exceptions from our process across signup, home, profile, subscription screen and two state changes. The 5 matches in 496k captured lines are Samsung's own `scloud.galleryproxy`, a different pid. **Not exhaustive** — theory and quiz were not driven |
+| W3 | ✅ **COMPLETE — no R8 damage anywhere.** Theory and quiz driven in a second pass (below). Across both passes: zero R8 signatures, zero fatals, zero unhandled exceptions, zero obfuscated stack frames |
 | W4 | ⚠️ **Dart half verified clean, native half is NOT.** See below |
 | W5 | ✅ **Success case confirmed with hard evidence.** ⚠️ offline case inconclusive, ⛔ expired-trial case impossible |
 | W6 | ✅ **Crashlytics initialises on device.** Delivery of a real report still unverified |
+
+**W3 finished — theory and quiz driven, 2026-09-19.** A second capture of
+53,809 lines covering the theory list, a theory lesson, a 40-question exam with
+grading, Practice Training, and Learn by Topics:
+
+| Check | Result |
+|---|---|
+| R8 damage signatures, **any** process | **0** |
+| Fatal / AndroidRuntime | **0** |
+| Dart unhandled exceptions | **0** |
+| Obfuscated stack frames (`a.b.c`) | **0** |
+| App Dart log lines (W4 again) | **0** |
+| PII in logs | **0** |
+
+**So `minifyEnabled true` with no `proguard-rules.pro` is not currently breaking
+anything.** That file has never existed in this repo's history, and R8 has been
+running with only `proguard-android-optimize.txt` on an app using Firebase,
+`in_app_purchase` and reflection-heavy libraries. Driven hard, nothing broke.
+**The recommendation is therefore to leave `minifyEnabled` ON and NOT add
+keep-rules speculatively** — with the mapping upload now working (W6), an
+obfuscated crash is readable, and the register's interim "turn minification
+off" is not needed. Note the limit: this exercised the content and auth paths,
+**not** a real purchase, which is where IAP reflection would bite.
+
+**#39 confirmed on Android, by content rather than by argument.** The account is
+New York, and every question served was New York specific — *"Driver
+Responsibility Assessment … in New York"*, *"What can a driver under 16 do in
+New York"*, *"Open Container Law in New York"* — and the theory lesson rendered
+*"1.1 Driver's License in New York"* with a New York State licence image. The
+state parameter reaches the query. **I briefly misread this as a #39 relapse**
+because I believed the account was still on Illinois; it was not.
+
+**W9 changes shape: `getPracticeTests` has ZERO callers in `lib/`.**
+`PracticeProvider` uses `getQuizQuestions`; the only references to
+`getPracticeTests` are its own interface, two implementations and the functions
+client's name map. So the `practiceTests` index deployed 2026-09-17 protects a
+function **the client never calls**, and W9's instruction — *"open the
+practice-test list and confirm it populates"* — has no client surface to test.
+This is #45's shape again (`getCurrentUserReports`, zero callers). Whoever picks
+up Phase 2 should decide whether the function is dead or the screen is missing,
+rather than hunting a list that does not exist.
+
+**A correction to what this file said about the offline prefetch.** The state
+was recorded as Illinois at 17:18 and reads New York now, and the only thing
+that requested New York was the *offline* tap that appeared to do nothing.
+Firestore's offline persistence makes a queued-then-synced write the likely
+explanation — meaning the offline behaviour may be **silently accepted with no
+feedback** (dialog stays open, nothing changes on screen) rather than ignored.
+**Not asserted** — a second action in between could also explain it. It needs a
+clean repeat, and it is the one loose end left in W5.
 
 **W5 — the prefetch event, captured.** `adb shell setprop debug.firebase.analytics.app com.driveusa.app` plus `setprop log.tag.FA VERBOSE` puts Analytics events into logcat, which is how to do this **without Firebase console access** — the checklist assumed DebugView was the only route. Changing state in Profile produced:
 
