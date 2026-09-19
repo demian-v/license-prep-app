@@ -299,6 +299,98 @@ not sufficient — it needs a device with the app installed, on both platforms.
 On the Windows/device checklist as §4d, with `adb`/`simctl` one-liners that
 isolate scheme registration from the page.
 
+### THE ANDROID DEVICE RUN — 2026-09-19, Galaxy S10 Lite
+
+A real Samsung SM-G770F, Android 12 / API 31, running the **release** build off
+this branch against **production** (a release build cannot reach the emulators —
+`connectToEmulatorsIfEnabled` throws in release by design). Test account
+`gefeb69217@blobapps.com`, fresh signup, trial active.
+
+**The owner found a bug no automated check could see.** The app skipped a
+screen, and that was the only signal. Tests green, analyzer clean, CI green,
+no crash, nothing logged — it did the wrong thing silently and successfully.
+Fixed in `71102d2`, with a structural test proven to fail beforehand.
+
+| # | Result |
+|---|---|
+| W3 | ✅ **No R8 damage found.** Zero `ClassNotFoundException` / `NoSuchMethodError` / `NoSuchFieldException` / fatals / unhandled exceptions from our process across signup, home, profile, subscription screen and two state changes. The 5 matches in 496k captured lines are Samsung's own `scloud.galleryproxy`, a different pid. **Not exhaustive** — theory and quiz were not driven |
+| W4 | ⚠️ **Dart half verified clean, native half is NOT.** See below |
+| W5 | ✅ **Success case confirmed with hard evidence.** ⚠️ offline case inconclusive, ⛔ expired-trial case impossible |
+| W6 | ✅ **Crashlytics initialises on device.** Delivery of a real report still unverified |
+
+**W5 — the prefetch event, captured.** `adb shell setprop debug.firebase.analytics.app com.driveusa.app` plus `setprop log.tag.FA VERBOSE` puts Analytics events into logcat, which is how to do this **without Firebase console access** — the checklist assumed DebugView was the only route. Changing state in Profile produced:
+
+```
+name=state_changed, params=[previous_state=NY, new_state=IL,
+                            selection_context=profile, platform=android]
+name=content_prefetch, params=[outcome=success,
+                               reason=state changed in settings]
+```
+
+The other two bullets did not close. **Offline:** with wifi and data off, tapping a state in the dialog did nothing at all — dialog stayed open, no error, no dismissal, no `content_prefetch` event of either outcome. Taps were confirmed to land (a tap outside dismissed the dialog). **Not reported as a defect**, because the same tap was never demonstrated to work online either; it needs a clean repeat. **Expired trial:** not reachable — the account has 3 days left, and there is no way to age it from the client.
+
+**W4 — #34's goal is not met on Android, and cannot be met by #34.** The Dart
+half is verified: **zero** of the app's `debugPrint` lines reached logcat across
+496,469 captured lines, and `lib/` has no `developer.log`, `stdout.write` or
+`stderr.write` to escape the Zone. But the Firebase Auth SDK logs the address
+itself, in Java, at INFO, in a release build:
+
+```
+I/FirebaseAuth(12875): Creating user with gefeb69217@blobapps.com
+                       with empty reCAPTCHA token
+```
+
+Reassigning `debugPrint` and wrapping Dart in a `Zone` cannot reach a native
+Google library. This is exactly #34's stated threat model — *"anyone with the
+phone plugged into a laptop"*. The fix is sound and the row should **not** be
+reopened against it; this is a separate, newly evidenced leak. No in-app
+suppression is obvious, since it is the SDK's own logging.
+
+**#63 cannot be verified on a sideloaded build — at all.** The paywall showed
+`$9.99`, which is also the hardcoded fallback at `subscription_screen.dart:99`,
+so the screen is uninformative in the US either way. The billing layer settles
+it:
+
+```
+I Finsky : Billing preferred account via installer for com.driveusa.app
+E AuthPII: [RequestTokenManager] getToken() -> BAD_AUTHENTICATION.
+           App: com.android.vending, Service: oauth2:.../auth/googleplay   x4
+```
+
+And structurally it must fail: this APK is signed with a **throwaway** key while
+the product ids belong to the real Play listing, and Play validates the package
+signature against that listing. So `queryProductDetails` cannot succeed here.
+**The Android price check, and W8's purchase items, need a build signed with the
+real upload key on a Play internal-testing track** — not a sideload. That is a
+firmer conclusion than the checklist's "use a non-US storefront".
+
+**THE DEPLOY GATE, confirmed empirically for the first time.** It has only ever
+been reasoned about. A real signup on the device: the Auth user is created
+(that is plain Firebase and works), the app moves to the code screen, and
+`sendEmailVerificationCode` — absent from production — fails. On screen:
+
+> **"We sent a 6-digit code to gefeb69217@blobapps.com"**
+> **"Something went wrong. Please try again."**
+
+**Both at once.** The headline is asserted as fact before the send is confirmed,
+so a user goes hunting for a code that was never sent, and *"Send a new code"*
+invites them to do it again. That contradiction is independent of the deploy
+ordering — **any** send failure produces it, so it will outlive the gate.
+
+**The blast radius is narrower than the gate document implies, though.**
+`SignupResumeGate` **fails open** by design: when the status call cannot be
+made, the user continues rather than being held. Verified on the device — kill
+and relaunch, and the app proceeds. New users are therefore **not** locked out;
+they get their trial and reach the app. The only broken thing is verification
+itself, which is not a gate on entitlement. A correction to what this file said
+earlier: a failed signup does **not** leave a permanently wedged account.
+
+**Diagnosis in release is blind, and that is the cost of #34.** Not one Dart
+error reached logcat for any of the above. The screenshot was the only evidence
+of the signup failure. Android release-build diagnosis now depends entirely on
+Crashlytics and Analytics — exactly what the checklist predicted for the
+prefetch, now true of everything.
+
 ### THE WINDOWS RUN — 2026-09-19, first Android build this branch has had
 
 A Windows 11 machine with the Android SDK. **Phase 1, W1–W7.** Four closed by
