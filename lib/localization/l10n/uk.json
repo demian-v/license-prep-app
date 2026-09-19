@@ -238,6 +238,8 @@
   "auth_check_email_instructions": "Перевірте пошту {0} — там інструкції для скидання пароля.",
   "verify_title": "Перевірте пошту",
   "verify_subtitle": "Ми надіслали 6-значний код на {email}",
+  "verify_title_unsent": "Підтвердіть пошту",
+  "verify_subtitle_unsent": "Ми надішлемо 6-значний код на {email}",
   "verify_cta": "Підтвердити",
   "verify_resend": "Надіслати новий код",
   "verify_resend_in": "Надіслати новий код через {seconds} с",

@@ -238,6 +238,8 @@
   "auth_check_email_instructions": "Please check the email address {0} for instructions to reset your password.",
   "verify_title": "Check your email",
   "verify_subtitle": "We sent a 6-digit code to {email}",
+  "verify_title_unsent": "Verify your email",
+  "verify_subtitle_unsent": "We'll send a 6-digit code to {email}",
   "verify_cta": "Verify",
   "verify_resend": "Send a new code",
   "verify_resend_in": "Send a new code in {seconds}s",

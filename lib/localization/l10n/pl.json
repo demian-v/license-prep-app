@@ -238,6 +238,8 @@
   "auth_check_email_instructions": "Sprawdź skrzynkę {0}, aby znaleźć instrukcje resetowania hasła.",
   "verify_title": "Sprawdź pocztę",
   "verify_subtitle": "Wysłaliśmy 6-cyfrowy kod na {email}",
+  "verify_title_unsent": "Zweryfikuj e-mail",
+  "verify_subtitle_unsent": "Wyślemy 6-cyfrowy kod na {email}",
   "verify_cta": "Zweryfikuj",
   "verify_resend": "Wyślij nowy kod",
   "verify_resend_in": "Wyślij nowy kod za {seconds} s",

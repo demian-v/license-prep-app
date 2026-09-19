@@ -60,6 +60,20 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
   bool _sending = false;
   String? _error;
   String? _notice;
+
+  /// Risk #67 — whether a code is actually in the user's inbox.
+  ///
+  /// The heading and subtitle used to assert "Check your email" / "We sent a
+  /// 6-digit code to X" unconditionally, so a FAILED send rendered that claim
+  /// directly above "Something went wrong. Please try again." Observed on a
+  /// device 2026-09-19: both at once. The user then hunts an inbox that has
+  /// nothing in it, and "Send a new code" invites them to repeat it.
+  ///
+  /// True when the screen was opened because a code is already outstanding
+  /// (`sendOnOpen == false`), when a send succeeds, and when a send is
+  /// throttled — throttling means one was sent recently enough to still be
+  /// there, which is exactly why a second was refused.
+  late bool _codeSent;
   int _resendIn = 0;
   Timer? _resendTimer;
 
@@ -69,6 +83,8 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
   void initState() {
     super.initState();
     _service = widget.service ?? EmailVerificationService();
+    // Not sending on open means one is already outstanding — see sendOnOpen.
+    _codeSent = !widget.sendOnOpen;
     if (widget.sendOnOpen) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _send(initial: true));
     } else {
@@ -120,7 +136,10 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
 
     switch (result.outcome) {
       case SendCodeOutcome.sent:
-        setState(() => _notice = _t('verify_sent'));
+        setState(() {
+          _codeSent = true;
+          _notice = _t('verify_sent');
+        });
         _startCooldown();
         break;
       case SendCodeOutcome.alreadyVerified:
@@ -130,6 +149,8 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
         break;
       case SendCodeOutcome.throttled:
         setState(() {
+          // Refused BECAUSE one was sent recently — so there is one to find.
+          _codeSent = true;
           _resendIn = result.retryAfter?.inSeconds ?? _resendCooldownSeconds;
           if (!initial) _error = _t('verify_err_throttled');
         });
@@ -290,7 +311,7 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_t('verify_title')),
+        title: Text(_t(_codeSent ? 'verify_title' : 'verify_title_unsent')),
         leading: widget.onBack == null
             ? null
             : IconButton(icon: const Icon(Icons.arrow_back), onPressed: widget.onBack),
@@ -303,7 +324,9 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
             children: [
               const SizedBox(height: 16),
               Text(
-                _t('verify_subtitle').replaceAll('{email}', widget.email),
+                // #67 — only claim a code was sent when one was.
+                _t(_codeSent ? 'verify_subtitle' : 'verify_subtitle_unsent')
+                    .replaceAll('{email}', widget.email),
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 16),
               ),

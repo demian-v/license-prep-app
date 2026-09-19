@@ -238,6 +238,8 @@
   "auth_check_email_instructions": "Revisa el correo electrónico {0} para ver las instrucciones de restablecimiento de contraseña.",
   "verify_title": "Revisa tu correo",
   "verify_subtitle": "Enviamos un código de 6 dígitos a {email}",
+  "verify_title_unsent": "Verifica tu correo",
+  "verify_subtitle_unsent": "Enviaremos un código de 6 dígitos a {email}",
   "verify_cta": "Verificar",
   "verify_resend": "Enviar un código nuevo",
   "verify_resend_in": "Enviar un código nuevo en {seconds} s",
