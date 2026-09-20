@@ -24,7 +24,12 @@ void main() {
     'lib/screens/theory_screen.dart',
     'lib/screens/quiz_question_screen.dart',
     'lib/screens/topic_quiz_screen.dart',
-    'lib/screens/practice_test_screen.dart',
+    // `practice_test_screen.dart` was here until 2026-09-19. It was legacy
+    // from the app's Ukrainian previous life, unreachable, and deleted with
+    // W9 — see no_orphaned_ukrainian_practice_screen_test. Removed from this
+    // list so the guard stops reporting a permanent skip; the screen users
+    // actually reach for practice is `practice_question_screen.dart`, which
+    // goes through PracticeProvider and is covered by test_screen above.
   ];
 
   group('risk #39 — no hardcoded state on a content request', () {

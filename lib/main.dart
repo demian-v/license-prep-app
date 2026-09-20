@@ -28,7 +28,6 @@ import 'services/in_app_purchase_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/theory_module_screen.dart';
-import 'screens/practice_test_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/subscription_screen.dart';
 import 'screens/home_screen.dart';
@@ -809,11 +808,6 @@ class MyApp extends StatelessWidget {
                   builder: (context) => TrafficRulesTopicsScreen(),
                 );
               }
-            } else if (settings.name!.startsWith('/practice/')) {
-              final licenseId = settings.name!.split('/')[2];
-              return MaterialPageRoute(
-                builder: (context) => PracticeTestScreen(licenseId: licenseId),
-              );
             }
             // Handle email verification deep links - simplified to just redirect to profile
             else if (settings.name!.startsWith('/email-verified') || 

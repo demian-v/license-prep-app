@@ -1,6 +1,5 @@
 import '../models/license_type.dart';
 import '../models/theory_module.dart';
-import '../models/practice_test.dart';
 
 final List<LicenseType> licenseTypes = [
   LicenseType(
@@ -37,32 +36,5 @@ final List<TheoryModule> theoryModules = [
     description: 'Вивчення сигналів світлофора',
     estimatedTime: 15,
     topics: ['Типи світлофорів', 'Значення сигналів'],
-  ),
-];
-
-final List<PracticeTest> practiceTests = [
-  PracticeTest(
-    id: 'exam-simulation',
-    licenseId: 'driver',
-    title: 'Складай іспит',
-    description: 'як в СЦ МВС: 20 запитань, 20 хвилин',
-    questions: 20,
-    timeLimit: 20,
-  ),
-  PracticeTest(
-    id: 'random-questions',
-    licenseId: 'driver',
-    title: 'Тренуйся по білетах',
-    description: '20 випадкових запитань, без обмежень',
-    questions: 20,
-    timeLimit: 0,
-  ),
-  PracticeTest(
-    id: 'my-mistakes',
-    licenseId: 'driver',
-    title: 'Мої помилки',
-    description: 'Запитання, де були допущені помилки',
-    questions: 0,
-    timeLimit: 0,
   ),
 ];
