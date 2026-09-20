@@ -83,7 +83,10 @@ jobs:
         # 21, and it is the only number that works project-wide:
         #   firebase-tools 15.x REFUSES Java < 21
         #     ("no longer supports Java version before 21")
-        #   Gradle 8.13 (risk #57) ABORTS on Java 25
+        #   Gradle USED to abort on Java 25 (risk #57) — resolved on this
+        #     branch by moving the wrapper to 9.1.0, and the android job below
+        #     now proves 25 works rather than assuming it. This job stays on
+        #     21 regardless: it runs the Firestore emulator, not Gradle.
         # First CI run used 17 and failed on exactly that message. It passed
         # locally only because this machine happens to have JDK 22 — the
         # difference a real run catches and a local check never will.
@@ -136,3 +139,59 @@ jobs:
         # reports zero findings today, so a failure here is a real regression
         # rather than accumulated noise.
         run: npm run lint
+
+  android:
+    name: Android — build (Java ${{ matrix.java }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      # Do not cancel Java 25 just because 21 failed, or vice versa — which of
+      # the two broke is the entire signal this job exists to give.
+      fail-fast: false
+      matrix:
+        # 21 is what the project builds with today.
+        #
+        # 25 is the point of this job. Android Studio's bundled JDK
+        # self-updates and is already 25.0.2 on the Windows machine, so a
+        # developer who has never run `flutter config --jdk-dir` gets 25
+        # whether they chose it or not. That is risk #57, and it used to be a
+        # one-line failure nobody could read:
+        #
+        #     Error resolving plugin [id: 'dev.flutter.flutter-plugin-loader']
+        #     > 25.0.2
+        #
+        # REQUIRES GRADLE 9. This entry passes on this branch because the
+        # wrapper is 9.1.0; on a branch still pinned to Gradle 8.13 it will
+        # fail exactly as above. If you copy this file to such a branch, drop
+        # 25 from the matrix until the Gradle bump lands there too.
+        java: ['21', '25']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          # Same pin and same reason as the flutter job above.
+          flutter-version: '3.41.7'
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Build debug APK
+        # DEBUG on purpose: a release build needs android/key.properties and
+        # the upload keystore, and putting signing material in CI to prove the
+        # toolchain compiles would be a bad trade. Everything this job is meant
+        # to catch — an unresolvable Gradle plugin, an AGP/Gradle/JDK
+        # mismatch, a broken build script — fails identically in debug.
+        #
+        # This job is the gap that let W6 through: the Crashlytics Gradle
+        # plugin was added on 2026-09-17 and did NOT compile, and nothing
+        # noticed until someone ran an Android build by hand two days later.
+        # Every other gate was green the whole time, because none of them
+        # builds Android.
+        run: flutter build apk --debug
