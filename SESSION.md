@@ -299,6 +299,42 @@ not sufficient — it needs a device with the app installed, on both platforms.
 On the Windows/device checklist as §4d, with `adb`/`simctl` one-liners that
 isolate scheme registration from the page.
 
+### DEVICE VERIFICATION OF THE DAY'S FIXES — 2026-09-19, second signup
+
+A second throwaway account, `oanqp8c5xm@ozsaip.com` (uid
+`KwzZdTCoSbcetfDQgYiuNSwXNxB3`), on the branch build. **Every client fix made
+today is now confirmed on real hardware, not just in tests.**
+
+| # | What was checked | Result |
+|---|---|---|
+| **#66** | Force-close after signup, relaunch | ✅ **Language Selection**, not State. The owner's original catch, on device |
+| **#67** | The verification screen's wording | ✅ *"Verify your email"* / *"We'll send a 6-digit code to …"* — future tense, no contradiction with the error below it |
+| **#72** | The inbox, and the logs | ✅ **Zero** `sendEmailVerification` activity. The Firebase link email is gone |
+| **#61** | Log out | ✅ **Completed inside 6 seconds** onto the Log In screen. First time #61 has been exercised on **Android** — it was iPhone-only before |
+| **#70 / #71** | Offline state change | ✅ Confirmed earlier the same session |
+
+**Clean signup otherwise.** 65,628 lines captured: zero crashes, zero R8
+damage, zero unhandled exceptions **from our process**. The four
+`ClassNotFoundException`s are Samsung's `scloud.galleryproxy` (a different pid)
+and the one Crashlytics line is another app's init provider — the same noise as
+the first pass, and worth knowing so it is not mistaken for ours. Analytics
+fired correctly: `signup_form_started` → `signup_form_completed` → `sign_up` →
+`user_account_created` → `signup_trial_started`.
+
+**#68 reproduced again, unchanged:**
+
+```
+I/FirebaseAuth(17099): Creating user with oanqp8c5xm@ozsaip.com
+                       with empty reCAPTCHA token
+```
+
+Still the SDK's own Java logging, still untouchable by #34, and still the app's
+**zero** Dart log lines beside it. The row stands as written.
+
+**Two throwaway production accounts now exist** — `gefeb69217@blobapps.com` and
+`oanqp8c5xm@ozsaip.com`. Neither is wedged (the gate fails open), but both are
+real records someone may want to remove.
+
 ### THE ANDROID DEVICE RUN — 2026-09-19, Galaxy S10 Lite
 
 A real Samsung SM-G770F, Android 12 / API 31, running the **release** build off
