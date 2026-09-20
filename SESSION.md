@@ -299,6 +299,41 @@ not sufficient — it needs a device with the app installed, on both platforms.
 On the Windows/device checklist as §4d, with `adb`/`simctl` one-liners that
 isolate scheme registration from the page.
 
+### THE DEPLOY GATE, MEASURED - 2026-09-19
+
+The gate has been reasoned about since 2026-09-18 and confirmed behaviourally
+on the device today. It can also be **measured directly**, which is quicker and
+leaves no room for argument. An unauthenticated GET against a callable returns
+404 when it is not deployed, and 400 when it is (a deployed callable rejects a
+bare GET as malformed):
+
+```
+curl -s -o /dev/null -w "%{http_code}"   https://us-central1-licenseprepapp.cloudfunctions.net/<name>
+
+400  updateUserState                 <- deployed
+404  sendEmailVerificationCode       <- NOT deployed
+404  verifyEmailCode                 <- NOT deployed
+404  getEmailVerificationStatus      <- NOT deployed
+```
+
+**The `400` is the important one.** Without a known-deployed control the 404s
+prove nothing about the probe, only about the host. With it, the three are
+genuinely absent.
+
+**So no 6-digit code email is sent, by anything.** The app calls
+`sendEmailVerificationCode`, production answers 404, and the screen shows
+*"Something went wrong. Please try again."* That is the whole mechanism.
+
+**Do not read the missing email as a #72 regression.** Before #72 a Firebase
+**link** email arrived - real, but useless to a screen wanting six digits.
+After #72 nothing arrives, which is honest: there is no code to send until the
+functions deploy. The server half is built and tested (51 tests) and
+`RESEND_API_KEY` is confirmed present in Secret Manager, so the code email
+starts flowing the moment the deploy happens.
+
+This probe is worth re-running after the deploy as a one-line confirmation that
+all three landed.
+
 ### DEVICE VERIFICATION OF THE DAY'S FIXES — 2026-09-19, second signup
 
 A second throwaway account, `oanqp8c5xm@ozsaip.com` (uid
