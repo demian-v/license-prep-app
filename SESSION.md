@@ -299,6 +299,71 @@ not sufficient — it needs a device with the app installed, on both platforms.
 On the Windows/device checklist as §4d, with `adb`/`simctl` one-liners that
 isolate scheme registration from the page.
 
+### THE WINDOWS SESSION - 2026-09-19, closing summary
+
+Started to run Phase 1 (W1-W7) of [[android-verification-checklist]]. Ended
+with Phase 1 complete, **seven defects found and fixed**, two of W8's four
+checks closed, and the deploy gate measured rather than argued.
+
+**Phase 1**
+
+| # | Outcome |
+|---|---|
+| W1 | `004d043` **stands**. Bundle stamps AGP 8.13.0 - and does so with the dead buildscript block still present, so it was provably inert |
+| W2 | Reproduced and fixed. **Step B closed later the same day** when a bundle signed with the REAL upload key verified as `CN=Demian Vyrozub, OU=Drive USA, O=DEMROS WEST LLC` |
+| W3 | **No R8 damage anywhere.** Theory, a lesson, a 40-question exam with grading, Practice Training and Learn by Topics, all driven. **Leave `minifyEnabled` ON** |
+| W4 | Dart half **verified clean** on device; the native half is #68, parked by the owner |
+| W5 | Success case confirmed. The offline case turned out to be **#71**, now fixed |
+| W6 | **Complete end to end** - it did not compile at all to begin with; now builds, initialises, and a real report reached the console |
+| W7 | Ships **24**, not the declared 23. Confirmed against the production app too |
+
+**Defects found and fixed, none of which existed on the checklist**
+
+| # | What | How it was found |
+|---|---|---|
+| #66 | Signup resume skipped language selection entirely | **The owner noticed a missing screen** |
+| #67 | The screen claimed a code was sent when it was not | Looking at the screen |
+| #70 | `setState` on a dismissed dialog crashed the state selector | **The first Crashlytics report this app ever delivered** |
+| #71 | `user!` after an await in `updateUserState` | Analytics routed into logcat |
+| #72 | Signup sent TWO verification emails; the wrong one arrived | **The owner noticed the email did not match the screen** |
+| W9 | A duplicate practice screen from the app's Ukrainian previous life, still shipping | **The owner remembered it** |
+| #63 | The paywall price | A Play-signed build on a non-US storefront |
+
+**Four of those seven were found by a person looking at the product.** Not one
+was visible to the test suite, the analyzer, CI or logcat. The suite went 157 ->
+176 and was green the whole way, before and after each defect.
+
+**W8 - two of four closed without a purchase**
+
+- ✅ **#63 proven.** The paywall rendered **519,99 UAH/month**, matching
+  Google's own purchase sheet. The hardcoded fallback is `$9.99`, so hryvnia
+  could only have come from `ProductDetails.price`. The US-storefront ambiguity
+  that made this unanswerable all day simply does not arise on a UA account
+- ✅ **#6 proven.** `productIds` contains only `monthly`, the screen builds one
+  monthly card, and Play offered only *Monthly Premium Access*
+- ⛔ #27, #22, #5 are the branch's **server** half. A purchase today is validated
+  by the OLD production backend and would prove nothing about them
+
+**Corrections made to this file's own earlier claims**
+
+1. A failed signup does **not** wedge an account - the resume gate fails open
+2. `BAD_AUTHENTICATION` was **not** evidence of a billing failure. It comes from
+   Play Store and Play Services for a stale device account, zero from our
+   process, and is present while billing works perfectly
+3. #70's fix was the crash, never the cause - #71 was the cause
+
+**Measurement traps that produced FALSE results here, worth knowing**
+
+- A **sleeping screen silently swallows `adb input tap`**. Two runs reported
+  "no crash" that proved nothing
+- **Offline, `FA-SVC` does not process the analytics queue**, so logcat silence
+  is not success - events arrive in a burst when connectivity returns
+- A structural test can **pass on broken code four different ways**; the #70
+  guard needed four attempts, and one version was satisfied by the comment that
+  documented the bug
+- A **versionCode is burned by the upload**, not by the rollout. 34 was lost to
+  an abandoned draft
+
 ### THE DEPLOY GATE, MEASURED - 2026-09-19
 
 The gate has been reasoned about since 2026-09-18 and confirmed behaviourally
