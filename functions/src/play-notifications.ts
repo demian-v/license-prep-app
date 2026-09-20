@@ -141,3 +141,26 @@ export function mapPlayNotification(
       };
   }
 }
+
+/**
+ * The `processedWebhooks` document id used to deduplicate a Play notification,
+ * or `null` when the delivery carries no usable id (risk #76).
+ *
+ * Pub/Sub is at-least-once, so redeliveries have to be recognised. The caller
+ * used to key on `(message as any).messageId`, but the Functions **v1**
+ * `Message` class has no such property — only `data`, `attributes`, `json` and
+ * `toJSON()`. The delivery id is on the handler's second argument,
+ * `context.eventId`. The cast made it compile and the value was always
+ * `undefined`, so every notification addressed `gp_undefined`: the first one
+ * created that document and every one afterwards was skipped as a duplicate.
+ *
+ * `null` rather than a fallback constant is the point. Deduplication that
+ * cannot identify the delivery must be SKIPPED, not performed against a shared
+ * id — processing one redelivery twice is recoverable, and the handlers write
+ * derived state rather than increments. Deduplicating everything together is
+ * what silently dropped five months of Android renewals, cancellations and
+ * expiries.
+ */
+export function playDedupKey(eventId: string | null | undefined): string | null {
+  return eventId ? `gp_${eventId}` : null;
+}

@@ -10,7 +10,7 @@ import * as admin from 'firebase-admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { requireEntitledUser, requireAdmin } from './entitlement';
 import { applyToAllMatches } from './webhook-fanout';
-import { mapPlayNotification, PLAY_NOTIFICATION } from './play-notifications';
+import { mapPlayNotification, PLAY_NOTIFICATION, playDedupKey } from './play-notifications';
 import { recordWebhookFailure } from './webhook-dead-letter';
 import { anonymizeTrialDevicesForUser } from './trial-devices';
 import { collectUserDataForDeletion, applyDeletionPlan, assertRecentLogin } from './account-deletion';
@@ -2352,7 +2352,7 @@ export const appStoreWebhook = functions.https.onRequest(async (req, res) => {
 export const handleGooglePlayNotifications = functions
   .runWith({ secrets: [googleCredentials] })
   .pubsub.topic('play-rtdn')
-  .onPublish(async (message) => {
+  .onPublish(async (message, context) => {
     // Captured for the dead letter (risk #9): parsed inside the try, so out of
     // scope in the catch.
     let dlKey: string | undefined;
@@ -2376,18 +2376,31 @@ export const handleGooglePlayNotifications = functions
 
       const { notificationType, purchaseToken } = notification.subscriptionNotification;
 
-      // BUG B3 FIX: Pub/Sub guarantees at-least-once delivery — deduplicate using message.messageId.
-      // Without this, duplicate deliveries can double-write subscriptionLogs or clobber status
-      // if a stale EXPIRED message arrives after a RENEWED message.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const messageId = (message as any).messageId as string;
-      dlKey = messageId;
+      // Pub/Sub is at-least-once, so redeliveries must be recognised. Risk #76:
+      // this used to read `(message as any).messageId`, which does not exist on
+      // the v1 Message class — the delivery id is `context.eventId`. The cast
+      // made it compile, the value was always undefined, and every notification
+      // deduped against the single document `gp_undefined`. Five months of
+      // Android renewals, cancellations and expiries were dropped in silence.
+      const deliveryId = context?.eventId;
+      const dedupId = playDedupKey(deliveryId);
+      dlKey = deliveryId;
       dlType = String(notificationType ?? 'unknown');
-      const alreadyProcessed = await db.collection('processedWebhooks').doc(`gp_${messageId}`).get();
-      if (alreadyProcessed.exists) {
-        console.log(`⏭️ handleGooglePlayNotifications: Already processed ${messageId}`);
-        return;
+      if (dedupId) {
+        const alreadyProcessed = await db.collection('processedWebhooks').doc(dedupId).get();
+        if (alreadyProcessed.exists) {
+          console.log(`⏭️ handleGooglePlayNotifications: Already processed ${deliveryId}`);
+          return;
+        }
+      } else {
+        // No usable id: process it rather than dedup against a shared key.
+        console.warn('⚠️ handleGooglePlayNotifications: no delivery id; processing without dedup');
       }
+      // A notification with no delivery id still gets recorded, under an auto id
+      // so it cannot collide with anything.
+      const webhookDoc = () => (dedupId
+        ? db.collection('processedWebhooks').doc(dedupId)
+        : db.collection('processedWebhooks').doc());
 
       // See the appStoreWebhook note above: surfacing duplicates, not fanning out.
       const subSnap = await db.collection('subscriptions')
@@ -2407,7 +2420,7 @@ export const handleGooglePlayNotifications = functions
         // Will self-heal on their next purchase through validatePurchaseReceipt.
         console.warn('⚠️ handleGooglePlayNotifications: No subscription found for purchaseToken. ' +
           'Existing subscriber without androidPurchaseToken — will self-heal on next purchase.');
-        await db.collection('processedWebhooks').doc(`gp_${messageId}`).set({
+        await webhookDoc().set({
           processedAt: FieldValue.serverTimestamp(),
           notificationType,
           result: 'subscription_not_found',
@@ -2478,7 +2491,7 @@ export const handleGooglePlayNotifications = functions
           `${notificationType}. Entitlement left unchanged — check whether this ` +
           'type should be modelled in play-notifications.ts.',
         );
-        await db.collection('processedWebhooks').doc(`gp_${messageId}`).set({
+        await webhookDoc().set({
           processedAt: now, notificationType, result: 'unhandled_type',
         });
         return;
@@ -2489,7 +2502,7 @@ export const handleGooglePlayNotifications = functions
       const batch = db.batch();
       // Risk #22 — see the appStoreWebhook note above.
       applyToAllMatches(db, batch, subSnap.docs, subUpdates, userUpdates);
-      batch.set(db.collection('processedWebhooks').doc(`gp_${messageId}`), {
+      batch.set(webhookDoc(), {
         processedAt: now,
         notificationType,
         purchaseToken: purchaseToken ?? null,
