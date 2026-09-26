@@ -499,7 +499,39 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(_translate('delete_confirmation_title', languageProvider)),
+        // Bento (2026-09-26): a red disc says "irreversible" before the text
+        // does; the actions are two full-width pills — the destructive one a
+        // field pill with a red label, the safe way out the dark ink pill.
+        icon: Container(
+          width: 56,
+          height: 56,
+          decoration: const BoxDecoration(
+            color: AppColors.stopSurface,
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: const Icon(SolarIcons.dangerTriangleLinear, color: AppColors.stop, size: 28),
+        ),
+        // One line; a long translation shrinks rather than wraps.
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+          _translate('delete_confirmation_title', languageProvider),
+          maxLines: 1,
+          style: AppTypography.title.copyWith(
+            fontSize: 22,
+            height: 28 / 22,
+            color: AppColors.ink,
+            fontVariations: const [FontVariation('wght', 600)],
+          ),
+        ),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(
+          AppSpacing.x6,
+          0,
+          AppSpacing.x6,
+          AppSpacing.x6,
+        ),
         // Risk #14 — deleting the account does NOT cancel an App Store or
         // Google Play subscription; only the store can do that. Saying nothing
         // meant people kept being charged for an account that no longer
@@ -540,13 +572,20 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           ],
         ),
         actions: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(context); // Close dialog
-            },
-            child: Text(_translate('cancel', languageProvider)),
-          ),
-          TextButton(
+            style: TextButton.styleFrom(
+              backgroundColor: AppColors.field,
+              foregroundColor: AppColors.stop,
+              minimumSize: const Size.fromHeight(52),
+              shape: const StadiumBorder(),
+              textStyle: AppTypography.label.copyWith(
+                fontSize: 16,
+                fontVariations: const [FontVariation('wght', 500)],
+              ),
+            ),
             onPressed: () async {
               Navigator.pop(context); // Close dialog
               
@@ -595,8 +634,26 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             },
             child: Text(
               _translate('confirm', languageProvider),
-              style: TextStyle(color: AppColors.stop),
             ),
+          ),
+          const SizedBox(height: AppSpacing.x2),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.ink,
+              foregroundColor: AppColors.onSignal,
+              minimumSize: const Size.fromHeight(52),
+              shape: const StadiumBorder(),
+              textStyle: AppTypography.label.copyWith(
+                fontSize: 16,
+                fontVariations: const [FontVariation('wght', 500)],
+              ),
+            ),
+            onPressed: () {
+              Navigator.pop(context); // Close dialog
+            },
+            child: Text(_translate('cancel', languageProvider)),
+          ),
+            ],
           ),
         ],
       ),
