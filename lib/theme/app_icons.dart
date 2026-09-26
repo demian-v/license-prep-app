@@ -24,6 +24,9 @@ class AppIcons {
   static const String testsFilled = '$_base/clipboard-check-bold.svg';
   static const String theory = '$_base/book-2-linear.svg';
   static const String theoryFilled = '$_base/book-2-bold.svg';
+  static const String instructors = '$_base/users-group-rounded-linear.svg';
+  static const String instructorsFilled =
+      '$_base/users-group-rounded-bold.svg';
   static const String profile = '$_base/user-rounded-linear.svg';
   static const String profileFilled = '$_base/user-rounded-bold.svg';
 

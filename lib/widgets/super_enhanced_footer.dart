@@ -34,6 +34,7 @@ class SuperEnhancedFooter extends StatelessWidget {
   static const List<_Tab> _tabs = [
     _Tab('tests', AppIcons.tests, AppIcons.testsFilled),
     _Tab('theory', AppIcons.theory, AppIcons.theoryFilled),
+    _Tab('instructors', AppIcons.instructors, AppIcons.instructorsFilled),
     _Tab('profile', AppIcons.profile, AppIcons.profileFilled),
   ];
 
@@ -73,6 +74,7 @@ class SuperEnhancedFooter extends StatelessWidget {
           return {
                 'tests': 'Pruebas',
                 'theory': 'Teoría',
+                'instructors': 'Instructores',
                 'profile': 'Perfil',
               }[key] ??
               key;
@@ -80,6 +82,7 @@ class SuperEnhancedFooter extends StatelessWidget {
           return {
                 'tests': 'Тести',
                 'theory': 'Теорія',
+                'instructors': 'Інструктори',
                 'profile': 'Профіль',
               }[key] ??
               key;
@@ -87,6 +90,7 @@ class SuperEnhancedFooter extends StatelessWidget {
           return {
                 'tests': 'Тесты',
                 'theory': 'Теория',
+                'instructors': 'Инструкторы',
                 'profile': 'Профиль',
               }[key] ??
               key;
@@ -94,6 +98,7 @@ class SuperEnhancedFooter extends StatelessWidget {
           return {
                 'tests': 'Testy',
                 'theory': 'Teoria',
+                'instructors': 'Instruktorzy',
                 'profile': 'Profil',
               }[key] ??
               key;
@@ -102,6 +107,7 @@ class SuperEnhancedFooter extends StatelessWidget {
           return {
                 'tests': 'Tests',
                 'theory': 'Theory',
+                'instructors': 'Instructors',
                 'profile': 'Profile',
               }[key] ??
               key;

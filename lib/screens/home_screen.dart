@@ -30,9 +30,14 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   @override
   bool get wantKeepAlive => true;
   
+  /// «Инструкторы» — a marketplace of instructors and driving schools, not
+  /// built yet. The tab is shown, but tapping it goes nowhere.
+  static const int _instructorsTab = 2;
+
   final List<Widget> _screens = [
     TestScreen(),
     TheoryScreen(),
+    const SizedBox.shrink(), // Instructors — never shown, see _onTabTapped
     ProfileScreen(),
   ];
 
@@ -143,6 +148,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   }
 
   void _onTabTapped(int index) {
+    if (index == _instructorsTab) return;
+
     // Validate session before allowing navigation
     if (!SessionValidationService.validateBeforeActionSafely(context)) {
       print('🚨 HomeScreen: Session invalid, blocking tab navigation');
@@ -157,7 +164,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     
     // Breadcrumb: the bottom nav is the app's primary navigation and uses no
     // route at all, so CrashBreadcrumbObserver cannot see it.
-    const tabs = ['tests', 'theory', 'profile'];
+    const tabs = ['tests', 'theory', 'instructors', 'profile'];
     crashReporter.log('nav: tab ${index < tabs.length ? tabs[index] : index}');
 
     print('🏠 HomeScreen: Tab changed to index $index, persisted for future rebuilds');
