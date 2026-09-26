@@ -125,11 +125,18 @@ class TrialStatusWidget extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  title,
-                  style: AppTypography.label.copyWith(
-                    color: AppColors.ink,
-                    fontVariations: const [FontVariation('wght', 700)],
+                // One line (owner, 2026-09-26): a long title — «Пробный
+                // период активен» — shrinks slightly rather than wrapping.
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    style: AppTypography.label.copyWith(
+                      color: AppColors.ink,
+                      fontVariations: const [FontVariation('wght', 700)],
+                    ),
                   ),
                 ),
                 if (hasSubtitle) ...[

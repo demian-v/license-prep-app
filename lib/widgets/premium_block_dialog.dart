@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../providers/subscription_provider.dart';
 import '../localization/app_localizations.dart';
 import '../utils/subscription_checker.dart';
+import '../theme/app_theme.dart';
+import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
 
 class PremiumBlockDialog extends StatelessWidget {
@@ -24,180 +26,170 @@ class PremiumBlockDialog extends StatelessWidget {
         final isExpiredTrial = subscriptionProvider.hasExpiredTrial;
         final titleKey = SubscriptionChecker.getBlockTitleKey(subscriptionProvider);
         final messageKey = SubscriptionChecker.getBlockMessageKey(subscriptionProvider);
-        
+        final l = AppLocalizations.of(context);
+        final close = onClosePressed ?? () => Navigator.of(context).pop();
+
+        // Bento (2026-09-26): a white dialog card; the state as a tinted disc
+        // — red when the trial has ended, amber otherwise (access running
+        // out); the way forward as the dark `ink` pill, as the paywall's buy
+        // button, and «Закрыть» as a field pill.
         return Dialog(
-          backgroundColor: Colors.transparent,
-          child: Container(
-            margin: EdgeInsets.all(16),
-            padding: EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  spreadRadius: 2,
-                  blurRadius: 10,
-                  offset: Offset(0, 4),
-                ),
-              ],
+          backgroundColor: AppColors.paper,
+          surfaceTintColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.x6),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(BentoTokens.card),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.x6,
+              AppSpacing.x3,
+              AppSpacing.x3,
+              AppSpacing.x6,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Close button (top right)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    IconButton(
-                      onPressed: onClosePressed ?? () => Navigator.of(context).pop(),
-                      icon: Icon(SolarIcons.closeLinear, color: Colors.grey[600]),
-                      padding: EdgeInsets.zero,
-                      constraints: BoxConstraints(),
+                // Close button (top right), a full 44pt target
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: IconButton(
+                    onPressed: close,
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.field,
+                      fixedSize: const Size(44, 44),
+                      shape: const CircleBorder(),
                     ),
-                  ],
-                ),
-                
-                // Warning Icon
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: isExpiredTrial ? Colors.red.shade100 : Colors.orange.shade100,
-                    shape: BoxShape.circle,
+                    icon: const Icon(SolarIcons.closeLinear, color: AppColors.inkSecondary, size: 22),
                   ),
-                  child: isExpiredTrial 
-                    ? Image.asset(
-                        'assets/images/trial/locker.png',
-                        width: 40,
-                        height: 40,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) {
-                          // Fallback to material icon if asset fails to load
-                          return Icon(
-                            SolarIcons.lockKeyholeMinimalisticLinear,
-                            size: 40,
-                            color: Colors.red.shade600,
-                          );
-                        },
-                      )
-                    : Icon(
-                        SolarIcons.crownStarLinear,
-                        size: 40,
-                        color: Colors.orange.shade600,
-                      ),
                 ),
-                
-                SizedBox(height: 24),
-                
-                // Title
-                Text(
-                  AppLocalizations.of(context).translate(titleKey),
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[800],
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                
-                SizedBox(height: 16),
-                
-                // Feature-specific message
-                Text.rich(
-                  TextSpan(
+                Padding(
+                  padding: const EdgeInsets.only(right: AppSpacing.x3),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      TextSpan(
-                        text: featureName,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue[600],
+                      Center(
+                        child: Container(
+                          width: 88,
+                          height: 88,
+                          decoration: BoxDecoration(
+                            color: isExpiredTrial ? AppColors.stopSurface : AppColors.warnSurface,
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: isExpiredTrial
+                              ? Image.asset(
+                                  'assets/images/trial/locker.png',
+                                  width: 48,
+                                  height: 48,
+                                  fit: BoxFit.contain,
+                                  excludeFromSemantics: true,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    // Fallback to the Solar glyph if the asset fails to load
+                                    return const Icon(
+                                      SolarIcons.lockKeyholeMinimalisticLinear,
+                                      size: 40,
+                                      color: AppColors.stop,
+                                    );
+                                  },
+                                )
+                              : const Icon(
+                                  SolarIcons.crownStarLinear,
+                                  size: 40,
+                                  color: AppColors.warn,
+                                ),
                         ),
                       ),
-                      TextSpan(
-                        text: ' ${AppLocalizations.of(context).translate('subscription_required').toLowerCase()}',
-                        style: TextStyle(
-                          color: Colors.grey[700],
+                      const SizedBox(height: AppSpacing.x4),
+
+                      // Title — one line, shrinking rather than wrapping
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          l.translate(titleKey),
+                          maxLines: 1,
+                          textAlign: TextAlign.center,
+                          style: AppTypography.title.copyWith(
+                            fontSize: 22,
+                            height: 28 / 22,
+                            color: AppColors.ink,
+                            fontVariations: const [FontVariation('wght', 600)],
+                          ),
                         ),
                       ),
-                    ],
-                  ),
-                  style: TextStyle(fontSize: 16),
-                  textAlign: TextAlign.center,
-                ),
-                
-                SizedBox(height: 12),
-                
-                // Detailed message
-                Text(
-                  AppLocalizations.of(context).translate(messageKey),
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                    height: 1.4,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                
-                SizedBox(height: 32),
-                
-                // Action Buttons
-                Column(
-                  children: [
-                    // Upgrade Now Button (Primary)
-                    Container(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
+                      const SizedBox(height: AppSpacing.x3),
+
+                      // Feature-specific message
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: featureName,
+                              style: const TextStyle(
+                                color: AppColors.ink,
+                                fontVariations: [FontVariation('wght', 600)],
+                              ),
+                            ),
+                            TextSpan(
+                              text: ' ${l.translate('subscription_required').toLowerCase()}',
+                            ),
+                          ],
+                        ),
+                        style: AppTypography.body.copyWith(color: AppColors.ink),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: AppSpacing.x2),
+
+                      // Detailed message
+                      Text(
+                        l.translate(messageKey),
+                        style: AppTypography.body.copyWith(
+                          fontSize: 15,
+                          height: 22 / 15,
+                          color: AppColors.inkSecondary,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: AppSpacing.x6),
+
+                      // Upgrade (primary)
+                      FilledButton(
                         onPressed: onUpgradePressed ?? () {
                           Navigator.of(context).pop();
                           Navigator.pushNamed(context, '/subscription');
                         },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: isExpiredTrial 
-                              ? Colors.red.shade600 
-                              : Colors.blue.shade600,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 2,
-                        ),
-                        child: Text(
-                          AppLocalizations.of(context).translate('upgrade_now'),
-                          style: TextStyle(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.ink,
+                          foregroundColor: AppColors.onSignal,
+                          minimumSize: const Size.fromHeight(56),
+                          shape: const StadiumBorder(),
+                          textStyle: AppTypography.label.copyWith(
                             fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                            fontVariations: const [FontVariation('wght', 500)],
                           ),
                         ),
+                        child: Text(l.translate('upgrade_now')),
                       ),
-                    ),
-                    
-                    SizedBox(height: 12),
-                    
-                    // Close Button (Secondary)
-                    Container(
-                      width: double.infinity,
-                      height: 45,
-                      child: TextButton(
-                        onPressed: onClosePressed ?? () => Navigator.of(context).pop(),
+                      const SizedBox(height: AppSpacing.x2),
+
+                      // Close (secondary)
+                      TextButton(
+                        onPressed: close,
                         style: TextButton.styleFrom(
-                          foregroundColor: Colors.grey[600],
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(color: Colors.grey[300]!),
+                          backgroundColor: AppColors.field,
+                          foregroundColor: AppColors.ink,
+                          minimumSize: const Size.fromHeight(52),
+                          shape: const StadiumBorder(),
+                          textStyle: AppTypography.label.copyWith(
+                            fontSize: 16,
+                            fontVariations: const [FontVariation('wght', 500)],
                           ),
                         ),
-                        child: Text(
-                          AppLocalizations.of(context).translate('close'),
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                        child: Text(l.translate('close')),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
