@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/theory_module.dart';
 import '../providers/language_provider.dart';
+import '../theme/solar_icons.dart';
 
 class ModuleCard extends StatefulWidget {
   final TheoryModule module;
@@ -176,7 +177,7 @@ class _ModuleCardState extends State<ModuleCard> with SingleTickerProviderStateM
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
-                                Icons.check,
+                                SolarIcons.checkLinear,
                                 color: Colors.white,
                                 size: 16,
                               ),
@@ -196,7 +197,7 @@ class _ModuleCardState extends State<ModuleCard> with SingleTickerProviderStateM
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
                           _buildInfoChip(
-                            Icons.list_alt,
+                            SolarIcons.listCheckLinear,
                             '$modulePhrase: ${widget.module.theoryModulesCount}',
                           ),
                         ],

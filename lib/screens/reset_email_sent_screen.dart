@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/analytics_service.dart';
 import '../localization/app_localizations.dart';
+import '../theme/solar_icons.dart';
 
 class ResetEmailSentScreen extends StatefulWidget {
   @override
@@ -113,7 +114,7 @@ class _ResetEmailSentScreenState extends State<ResetEmailSentScreen> with Ticker
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: Icon(Icons.arrow_back),
+          icon: Icon(SolarIcons.arrowLeftLinear),
           onPressed: () => Navigator.of(context).pushReplacementNamed('/login'),
         ),
         title: Text(
@@ -185,7 +186,7 @@ class _ResetEmailSentScreenState extends State<ResetEmailSentScreen> with Ticker
                                   radius: 50,
                                   backgroundColor: Colors.indigo.shade50,
                                   child: Icon(
-                                    Icons.email,
+                                    SolarIcons.letterBold,
                                     size: 60,
                                     color: Colors.indigo.shade400,
                                   ),

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/subscription_provider.dart';
 import '../localization/app_localizations.dart';
 import '../utils/subscription_checker.dart';
+import '../theme/solar_icons.dart';
 
 class PremiumBlockDialog extends StatelessWidget {
   final String featureName;
@@ -50,7 +51,7 @@ class PremiumBlockDialog extends StatelessWidget {
                   children: [
                     IconButton(
                       onPressed: onClosePressed ?? () => Navigator.of(context).pop(),
-                      icon: Icon(Icons.close, color: Colors.grey[600]),
+                      icon: Icon(SolarIcons.closeLinear, color: Colors.grey[600]),
                       padding: EdgeInsets.zero,
                       constraints: BoxConstraints(),
                     ),
@@ -74,14 +75,14 @@ class PremiumBlockDialog extends StatelessWidget {
                         errorBuilder: (context, error, stackTrace) {
                           // Fallback to material icon if asset fails to load
                           return Icon(
-                            Icons.lock_outlined,
+                            SolarIcons.lockKeyholeMinimalisticLinear,
                             size: 40,
                             color: Colors.red.shade600,
                           );
                         },
                       )
                     : Icon(
-                        Icons.diamond_outlined,
+                        SolarIcons.crownStarLinear,
                         size: 40,
                         color: Colors.orange.shade600,
                       ),

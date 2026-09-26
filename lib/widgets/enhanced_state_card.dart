@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/state_data.dart';
+import '../theme/solar_icons.dart';
 
 class EnhancedStateCard extends StatefulWidget {
   final String stateName;
@@ -395,14 +396,14 @@ class _EnhancedStateCardState extends State<EnhancedStateCard> with SingleTicker
                       // Checkmark for selected state
                       if (widget.isSelected)
                         Icon(
-                          Icons.check_circle,
+                          SolarIcons.checkCircleBold,
                           color: Colors.green,
                           size: 24,
                         ),
                       // Arrow icon if not selected
                       if (!widget.isSelected)
                         Icon(
-                          Icons.arrow_forward_ios,
+                          SolarIcons.altArrowRightLinear,
                           color: Colors.grey[400],
                           size: 16,
                         ),

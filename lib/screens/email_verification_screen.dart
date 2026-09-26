@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../services/email_verification_handler.dart';
 import '../providers/auth_provider.dart';
 import '../localization/app_localizations.dart';
+import '../theme/solar_icons.dart';
 
 class EmailVerificationScreen extends StatefulWidget {
   final String oobCode;
@@ -129,7 +130,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
               Row(
                 children: [
                   IconButton(
-                    icon: Icon(Icons.arrow_back, color: Colors.grey[600]),
+                    icon: Icon(SolarIcons.arrowLeftLinear, color: Colors.grey[600]),
                     onPressed: _goToProfile,
                   ),
                   Expanded(
@@ -249,7 +250,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
           shape: BoxShape.circle,
         ),
         child: Icon(
-          Icons.check,
+          SolarIcons.checkLinear,
           color: Colors.white,
           size: 40,
         ),
@@ -263,7 +264,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
           shape: BoxShape.circle,
         ),
         child: Icon(
-          Icons.close,
+          SolarIcons.closeLinear,
           color: Colors.white,
           size: 40,
         ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/solar_icons.dart';
 
 class EnhancedLanguageCard extends StatefulWidget {
   final String language;
@@ -58,14 +59,14 @@ class _EnhancedLanguageCardState extends State<EnhancedLanguageCard> with Single
   IconData _getLanguageIcon(String code) {
     // Language-specific icons that better represent each language
     final Map<String, IconData> languageIcons = {
-      'en': Icons.language_outlined, // English - world language
-      'es': Icons.text_format,       // Spanish - text format for Latin alphabet
-      'uk': Icons.translate,         // Ukrainian - translation icon
-      'pl': Icons.font_download,     // Polish - font icon
-      'ru': Icons.translate_outlined, // Russian - alternate translation icon
+      'en': SolarIcons.globalLinear, // English - world language
+      'es': SolarIcons.textSquareLinear,       // Spanish - text format for Latin alphabet
+      'uk': SolarIcons.chatRoundLineBold,         // Ukrainian - translation icon
+      'pl': SolarIcons.textSquareBold,     // Polish - font icon
+      'ru': SolarIcons.chatRoundLineLinear, // Russian - alternate translation icon
     };
     
-    return languageIcons[code] ?? Icons.language;
+    return languageIcons[code] ?? SolarIcons.globalLinear;
   }
   
   // Helper method to get vibrant colors for language labels
@@ -255,7 +256,7 @@ class _EnhancedLanguageCardState extends State<EnhancedLanguageCard> with Single
                       ),
                       // Arrow icon
                       Icon(
-                        Icons.arrow_forward_ios,
+                        SolarIcons.altArrowRightLinear,
                         color: Colors.grey[400],
                         size: 16,
                       ),

@@ -5,6 +5,7 @@ import '../localization/app_localizations.dart';
 import '../services/analytics_service.dart';
 import '../services/service_locator.dart';
 import '../providers/state_provider.dart';
+import '../theme/solar_icons.dart';
 
 class QuizResultScreen extends StatefulWidget {
   final QuizTopic topic;
@@ -202,7 +203,7 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
         foregroundColor: Colors.black,
         centerTitle: true,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back),
+          icon: Icon(SolarIcons.arrowLeftLinear),
           onPressed: () async {
             await _trackTopicFinished('back_to_topics');
             // Navigate back to topic selection screen (skip the question screen)
@@ -371,14 +372,14 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
                         // Fallback to trophy icon if custom asset fails to load
                         debugPrint('❌ QuizResultScreen: Failed to load learn_by_topics icon: ${_getLearnByTopicsIconAsset()}');
                         return Icon(
-                          Icons.emoji_events,
+                          SolarIcons.cupStarBold,
                           color: Colors.amber.shade700,
                           size: 80,
                         );
                       },
                     )
                   : Icon(
-                      Icons.emoji_events,
+                      SolarIcons.cupStarBold,
                       color: Colors.amber.shade700,
                       size: 80,
                     ),
@@ -422,19 +423,19 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     _buildStatChip(
-                      icon: Icons.check_circle,
+                      icon: SolarIcons.checkCircleBold,
                       value: correctAnswers.toString(),
                       label: AppLocalizations.of(context).translate('correct'),
                       color: Colors.green,
                     ),
                     _buildStatChip(
-                      icon: Icons.cancel,
+                      icon: SolarIcons.closeCircleBold,
                       value: incorrectAnswers.toString(),
                       label: AppLocalizations.of(context).translate('incorrect'),
                       color: Colors.red,
                     ),
                     _buildStatChip(
-                      icon: Icons.quiz,
+                      icon: SolarIcons.questionSquareBold,
                       value: totalAnswered.toString(),
                       label: AppLocalizations.of(context).translate('questions'),
                       color: Colors.blue,

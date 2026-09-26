@@ -161,6 +161,26 @@ class ExamProvider extends ChangeNotifier {
   void skipQuestion() {
     goToNextQuestion();
   }
+
+  /// Jump straight to [index].
+  ///
+  /// The question strip at the top of the exam screen has always shown which
+  /// questions are answered, right and wrong, but the numbers were not
+  /// tappable — a 40-question exam could only be walked forwards one at a
+  /// time, so a user who wanted to revisit question 3 from question 30 could
+  /// not. This makes the strip the navigation it already looked like.
+  ///
+  /// Out-of-range indices and a finished exam are ignored rather than
+  /// clamped: a jump that cannot mean what it says should do nothing, not
+  /// land somewhere the user did not choose.
+  void goToQuestion(int index) {
+    if (_currentExam == null || _currentExam!.isCompleted) return;
+    if (index < 0 || index >= _currentExam!.questionIds.length) return;
+    if (index == _currentExam!.currentQuestionIndex) return;
+
+    _currentExam = _currentExam!.copyWith(currentQuestionIndex: index);
+    notifyListeners();
+  }
   
   // Complete the exam
   void completeExam() {

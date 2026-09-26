@@ -5,6 +5,7 @@ import '../providers/language_provider.dart';
 import '../providers/state_provider.dart';
 import '../services/report_service.dart';
 import '../services/service_locator.dart';
+import '../theme/app_theme.dart';
 
 enum ReportReason { image, translation, other }
 
@@ -266,7 +267,7 @@ class _ReportSheetState extends State<ReportSheet> with TickerProviderStateMixin
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                   color: Colors.grey.shade800,
-                  fontFamily: 'Roboto',
+                  fontFamily: AppTypography.family,
                 ),
               ),
               const SizedBox(height: 24),
@@ -339,7 +340,7 @@ class _ReportSheetState extends State<ReportSheet> with TickerProviderStateMixin
                       maxLines: 4,
                       style: TextStyle(
                         fontSize: 16,
-                        fontFamily: 'Roboto',
+                        fontFamily: AppTypography.family,
                       ),
                       decoration: InputDecoration(
                         hintText: AppLocalizations.of(context).translate('describe_issue'),
@@ -428,7 +429,7 @@ class _ReportSheetState extends State<ReportSheet> with TickerProviderStateMixin
                                   fontSize: 18,
                                   fontWeight: FontWeight.w600,
                                   color: Colors.black,
-                                  fontFamily: 'Roboto',
+                                  fontFamily: AppTypography.family,
                                   letterSpacing: 0.5,
                                 ),
                               ),

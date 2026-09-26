@@ -25,6 +25,7 @@ import 'services/crash_reporter.dart';
 import 'services/session_manager.dart';
 import 'services/in_app_purchase_service.dart';
 
+import 'theme/app_theme.dart';
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/theory_module_screen.dart';
@@ -614,18 +615,12 @@ class MyApp extends StatelessWidget {
         return MaterialApp(
           navigatorKey: navigatorKey,
           title: 'USA License Prep',
-          theme: ThemeData(
-            primarySwatch: Colors.blue,
-            colorScheme: ColorScheme.light(secondary: Colors.green),
-            fontFamily: 'Roboto',
-            scaffoldBackgroundColor: Color(0xFFF5F7FA),
-            cardTheme: CardThemeData(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-          ),
+          // The design system. Replaces the ten-line ThemeData that set only
+          // primarySwatch + a green secondary and left every remaining role to
+          // Material 3's default purple seed -- which is why focus rings, the
+          // paywall CTA and scrolled app bars were lavender.
+          // See wiki/driveusa/Development/design system/design-tokens.md
+          theme: AppTheme.light,
           // Set locale and use stable key based only on language
           locale: Locale(currentLang),
           key: ValueKey('app_$currentLang'),

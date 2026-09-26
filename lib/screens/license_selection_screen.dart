@@ -7,6 +7,7 @@ import '../providers/language_provider.dart';
 import '../services/service_locator.dart';
 import '../widgets/license_card.dart';
 import '../data/license_data.dart' as license_data;
+import '../theme/solar_icons.dart';
 
 class LicenseSelectionScreen extends StatefulWidget {
   @override
@@ -73,7 +74,7 @@ class _LicenseSelectionScreenState extends State<LicenseSelectionScreen> {
         title: Text('USA License Prep'),
         actions: [
           IconButton(
-            icon: Icon(Icons.person),
+            icon: Icon(SolarIcons.userRoundedBold),
             onPressed: () {
               Navigator.pushNamed(context, '/profile');
             },
@@ -104,7 +105,7 @@ class _LicenseSelectionScreenState extends State<LicenseSelectionScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.access_time, color: Colors.amber.shade900),
+                  Icon(SolarIcons.clockCircleLinear, color: Colors.amber.shade900),
                   SizedBox(width: 12),
                   Expanded(
                     child: Text(

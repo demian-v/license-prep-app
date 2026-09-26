@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../localization/app_localizations.dart';
+import '../theme/solar_icons.dart';
 
 class PasswordResetSuccessScreen extends StatefulWidget {
   @override
@@ -89,7 +90,7 @@ class _PasswordResetSuccessScreenState extends State<PasswordResetSuccessScreen>
                               radius: 50,
                               backgroundColor: Colors.indigo.shade50,
                               child: Icon(
-                                Icons.check,
+                                SolarIcons.checkLinear,
                                 size: 60,
                                 color: Colors.indigo.shade400,
                               ),

@@ -6,6 +6,7 @@ import '../providers/content_provider.dart';
 import '../providers/language_provider.dart';
 import '../localization/app_localizations.dart';
 import 'traffic_rule_content_screen.dart';
+import '../theme/solar_icons.dart';
 
 class TrafficRulesTopicsScreen extends StatefulWidget {
   @override
@@ -74,7 +75,7 @@ class _TrafficRulesTopicsScreenState extends State<TrafficRulesTopicsScreen> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         foregroundColor: Colors.black,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back),
+          icon: Icon(SolarIcons.arrowLeftLinear),
           onPressed: () {
             // Instead of popping, navigate to the home screen
             // This ensures we have a proper screen to go back to
@@ -83,7 +84,7 @@ class _TrafficRulesTopicsScreenState extends State<TrafficRulesTopicsScreen> {
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.search),
+            icon: Icon(SolarIcons.magniferLinear),
             onPressed: () {
               // Search functionality
             },
@@ -118,7 +119,7 @@ class _TrafficRulesTopicsScreenState extends State<TrafficRulesTopicsScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      Icons.hourglass_empty,
+                      SolarIcons.hourglassLinear,
                       size: 64,
                       color: Colors.grey[400],
                     ),

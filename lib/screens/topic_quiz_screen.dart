@@ -11,6 +11,7 @@ import '../services/service_locator.dart';
 import '../services/analytics_service.dart';
 import '../services/session_validation_service.dart';
 import '../screens/quiz_question_screen.dart';
+import '../theme/solar_icons.dart';
 
 class TopicQuizScreen extends StatefulWidget {
   final String? sessionId;
@@ -165,19 +166,19 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> with TickerProviderSt
     // Dynamic theming based on topic content
     if (topicTitle.toLowerCase().contains('загальн') || topicTitle.toLowerCase().contains('general')) {
       endColor = Colors.purple.shade50.withOpacity(0.6);
-      topicIcon = Icons.info_outline;
+      topicIcon = SolarIcons.infoCircleLinear;
     } else if (topicTitle.toLowerCase().contains('правила') || topicTitle.toLowerCase().contains('rule')) {
       endColor = Colors.blue.shade50.withOpacity(0.6);
-      topicIcon = Icons.rule;
+      topicIcon = SolarIcons.checklistMinimalisticLinear;
     } else if (topicTitle.toLowerCase().contains('безпек') || topicTitle.toLowerCase().contains('safety')) {
       endColor = Colors.green.shade50.withOpacity(0.6);
-      topicIcon = Icons.security;
+      topicIcon = SolarIcons.shieldCheckBold;
     } else if (topicTitle.toLowerCase().contains('велосипед') || topicTitle.toLowerCase().contains('bike')) {
       endColor = Colors.orange.shade50.withOpacity(0.6);
-      topicIcon = Icons.directions_bike;
+      topicIcon = SolarIcons.bicyclingLinear;
     } else {
       endColor = Colors.indigo.shade50.withOpacity(0.6);
-      topicIcon = Icons.school;
+      topicIcon = SolarIcons.squareAcademicCapBold;
     }
     
     return AnimatedBuilder(
@@ -281,21 +282,21 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> with TickerProviderSt
   // Helper method to get thematic icon for topics
   IconData _getTopicIcon(String topicTitle) {
     if (topicTitle.toLowerCase().contains('загальн') || topicTitle.toLowerCase().contains('general')) {
-      return Icons.info_outline;
+      return SolarIcons.infoCircleLinear;
     } else if (topicTitle.toLowerCase().contains('правила') || topicTitle.toLowerCase().contains('rule')) {
-      return Icons.rule;
+      return SolarIcons.checklistMinimalisticLinear;
     } else if (topicTitle.toLowerCase().contains('безпек') || topicTitle.toLowerCase().contains('safety')) {
-      return Icons.security;
+      return SolarIcons.shieldCheckBold;
     } else if (topicTitle.toLowerCase().contains('велосипед') || topicTitle.toLowerCase().contains('bike')) {
-      return Icons.directions_bike;
+      return SolarIcons.bicyclingLinear;
     } else if (topicTitle.toLowerCase().contains('пішоход') || topicTitle.toLowerCase().contains('pedestrian')) {
-      return Icons.directions_walk;
+      return SolarIcons.walkingLinear;
     } else if (topicTitle.toLowerCase().contains('транспорт') || topicTitle.toLowerCase().contains('transport')) {
-      return Icons.directions_bus;
+      return SolarIcons.busLinear;
     } else if (topicTitle.toLowerCase().contains('водінн') || topicTitle.toLowerCase().contains('driving')) {
-      return Icons.drive_eta;
+      return SolarIcons.carLinear;
     } else {
-      return Icons.quiz;
+      return SolarIcons.questionSquareBold;
     }
   }
 
@@ -553,7 +554,7 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> with TickerProviderSt
       foregroundColor: Colors.black,
       elevation: 0,
       leading: IconButton(
-        icon: Icon(Icons.arrow_back),
+        icon: Icon(SolarIcons.arrowLeftLinear),
         onPressed: () => Navigator.pop(context),
       ),
     );
@@ -632,7 +633,7 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> with TickerProviderSt
                         ],
                       ),
                       child: Icon(
-                        Icons.format_list_bulleted,
+                        SolarIcons.listLinear,
                         size: 48,
                         color: Colors.grey[400],
                       ),

@@ -1,8 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/language_provider.dart';
 
-class EnhancedBottomNavigation extends StatefulWidget {
+import '../providers/language_provider.dart';
+import '../theme/app_icons.dart';
+import '../theme/app_theme.dart';
+
+/// The tab bar.
+///
+/// Rebuilt to the pattern Instagram and Telegram both use: a hairline rule, a
+/// flat surface, and **selection carried by the icon itself** — filled when
+/// active, outline when not.
+///
+/// What it replaces: each tab was an animated `LinearGradient` that painted a
+/// lavender wash behind the active item, running three `AnimationController`s.
+/// The colour came from Material 3's default seed, not from the brand, so the
+/// most persistent chrome in the app was tinted a purple nobody chose.
+///
+/// Labels are kept, unlike Instagram's icon-only bar: the app ships in five
+/// languages to people learning a new country's road rules, and an unlabelled
+/// glyph is a guess. Telegram keeps its labels for the same reason.
+class EnhancedBottomNavigation extends StatelessWidget {
   final int currentIndex;
   final Function(int) onTap;
 
@@ -12,43 +29,78 @@ class EnhancedBottomNavigation extends StatefulWidget {
     required this.onTap,
   }) : super(key: key);
 
-  @override
-  _EnhancedBottomNavigationState createState() => _EnhancedBottomNavigationState();
-}
+  static const List<_Tab> _tabs = [
+    _Tab('tests', AppIcons.tests, AppIcons.testsFilled),
+    _Tab('theory', AppIcons.theory, AppIcons.theoryFilled),
+    _Tab('profile', AppIcons.profile, AppIcons.profileFilled),
+  ];
 
-class _EnhancedBottomNavigationState extends State<EnhancedBottomNavigation> with TickerProviderStateMixin {
-  late List<AnimationController> _controllers;
-  late List<Animation<double>> _animations;
-  
   @override
-  void initState() {
-    super.initState();
-    // Initialize controllers for each tab
-    _controllers = List.generate(3, (index) => 
-      AnimationController(
-        vsync: this,
-        duration: Duration(milliseconds: 300),
-      )
+  Widget build(BuildContext context) {
+    return Consumer<LanguageProvider>(
+      builder: (context, languageProvider, _) {
+        return DecoratedBox(
+          decoration: const BoxDecoration(
+            color: AppColors.paper,
+            border: Border(top: BorderSide(color: AppColors.border)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: SizedBox(
+              height: 56,
+              child: Row(
+                children: List.generate(_tabs.length, (index) {
+                  final tab = _tabs[index];
+                  final selected = index == currentIndex;
+                  final label = _translate(tab.key, languageProvider);
+                  final color =
+                      selected ? AppColors.signal : AppColors.inkTertiary;
+
+                  return Expanded(
+                    child: Semantics(
+                      selected: selected,
+                      button: true,
+                      child: InkWell(
+                        onTap: () => onTap(index),
+                        // No ink splash box: the bar is flat, and a rectangular
+                        // highlight would reintroduce the shape just removed.
+                        splashColor: Colors.transparent,
+                        highlightColor: Colors.transparent,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            AppIcons.icon(
+                              selected ? tab.filled : tab.outline,
+                              size: 25,
+                              color: color,
+                            ),
+                            const SizedBox(height: AppSpacing.x1),
+                            Text(
+                              label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.caption.copyWith(
+                                color: color,
+                                fontSize: 11,
+                                fontVariations: [
+                                  FontVariation('wght', selected ? 700 : 500),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+          ),
+        );
+      },
     );
-    
-    // Create animations for each tab
-    _animations = _controllers.map((controller) => 
-      Tween<double>(begin: 0.0, end: 1.0).animate(
-        CurvedAnimation(parent: controller, curve: Curves.easeInOut)
-      )
-    ).toList();
   }
-  
-  @override
-  void dispose() {
-    // Dispose all controllers when widget is removed
-    for (var controller in _controllers) {
-      controller.dispose();
-    }
-    super.dispose();
-  }
-  
-  // Helper method to get correct translations
+
   String _translate(String key, LanguageProvider languageProvider) {
     // Create a direct translation based on the selected language
     try {
@@ -92,121 +144,12 @@ class _EnhancedBottomNavigationState extends State<EnhancedBottomNavigation> wit
       return key;
     }
   }
+}
 
-  Widget _buildTabItem(int index, String label, IconData icon, bool isSelected) {
-    // Get theme colors
-    final primaryColor = Theme.of(context).primaryColor;
-    final unselectedColor = Colors.grey;
-    
-    // Start or reverse animation based on tab selection
-    if (isSelected) {
-      _controllers[index].forward();
-    } else {
-      _controllers[index].reverse();
-    }
-    
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => widget.onTap(index),
-        child: AnimatedBuilder(
-          animation: _animations[index],
-          builder: (context, child) {
-            // Calculate the gradient stops based on animation value
-            final animValue = _animations[index].value;
-            return Container(
-              height: 56, // Standard bottom navigation height
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [
-                    Colors.transparent,
-                    isSelected ? primaryColor.withOpacity(0.05) : Colors.transparent,
-                    isSelected ? primaryColor.withOpacity(0.05) : Colors.transparent,
-                    Colors.transparent,
-                  ],
-                  // Animate gradient stops to create the "disappearing from sides" effect
-                  stops: [
-                    0.0,
-                    0.3 + (animValue * 0.2), // Left edge moves inward
-                    0.7 - (animValue * 0.2), // Right edge moves inward
-                    1.0,
-                  ],
-                ),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    icon,
-                    color: isSelected ? primaryColor : unselectedColor,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: isSelected ? primaryColor : unselectedColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.normal,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
+class _Tab {
+  const _Tab(this.key, this.outline, this.filled);
 
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<LanguageProvider>(
-      builder: (context, languageProvider, _) {
-        // Define tab data
-        final tabs = [
-          {'key': 'tests', 'icon': Icons.quiz},
-          {'key': 'theory', 'icon': Icons.menu_book},
-          {'key': 'profile', 'icon': Icons.person},
-        ];
-        
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Colors.white, Colors.white.withOpacity(0.95)],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 4,
-                offset: Offset(0, -1),
-              ),
-            ],
-          ),
-          child: SafeArea(
-            top: false,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: tabs.asMap().entries.map((entry) {
-                final index = entry.key;
-                final tab = entry.value;
-                final isSelected = index == widget.currentIndex;
-                final label = _translate(tab['key'] as String, languageProvider);
-                
-                return _buildTabItem(
-                  index, 
-                  label,
-                  tab['icon'] as IconData,
-                  isSelected,
-                );
-              }).toList(),
-            ),
-          ),
-        );
-      },
-    );
-  }
+  final String key;
+  final String outline;
+  final String filled;
 }

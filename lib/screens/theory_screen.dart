@@ -19,6 +19,8 @@ import '../widgets/trial_status_widget.dart';
 import '../widgets/premium_block_dialog.dart';
 import '../utils/subscription_checker.dart';
 import '../providers/subscription_provider.dart';
+import '../theme/solar_icons.dart';
+import '../theme/app_theme.dart';
 
 class TheoryScreen extends StatefulWidget {
   @override
@@ -176,38 +178,13 @@ class _TheoryScreenState extends State<TheoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Builder(
-          builder: (context) {
-            // Get the current language from the LanguageProvider
-            final language = Provider.of<LanguageProvider>(context, listen: false).language;
-            
-            // Translation map for "Theory" title in different languages
-            final Map<String, String> theoryTitleTranslations = {
-              'en': 'Theory',
-              'uk': 'Теорія',
-              'es': 'Teoría',
-              'ru': 'Теория',
-              'pl': 'Teoria',
-            };
-            
-            // Get the correct translation based on the current language
-            final titleText = theoryTitleTranslations[language] ?? 'Theory';
-            
-            return Text(
-              titleText,
-              style: TextStyle(fontWeight: FontWeight.bold),
-            );
-          }
-        ),
-        elevation: 0,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: Colors.black,
-        centerTitle: true,
-      ),
-      body: Column(
+      // No title bar: the tab bar already says where you are, and the bar
+      // took a full row above the content.
+      body: SafeArea(
+        bottom: false,
+        child: Column(
         children: [
-          // Add TrialStatusWidget here - under "Theory" title, above content
+          const SizedBox(height: AppSpacing.x2),
           TrialStatusWidget(),
           
           Expanded(
@@ -311,7 +288,7 @@ class _TheoryScreenState extends State<TheoryScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        Icons.menu_book_outlined,
+                        SolarIcons.book2Linear,
                         size: 64,
                         color: Colors.grey.shade400,
                       ),
@@ -334,7 +311,7 @@ class _TheoryScreenState extends State<TheoryScreen> {
                       ),
                       SizedBox(height: 24),
                       ElevatedButton.icon(
-                        icon: Icon(Icons.refresh),
+                        icon: Icon(SolarIcons.refreshLinear),
                         label: Text('Refresh'),
                         onPressed: () {
                           contentProvider.fetchContentAfterSelection(forceRefresh: true);
@@ -477,6 +454,7 @@ class _TheoryScreenState extends State<TheoryScreen> {
           ),
         ],
       ),
+      )
     );
   }
 }

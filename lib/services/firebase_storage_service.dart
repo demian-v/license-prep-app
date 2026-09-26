@@ -4,6 +4,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/storage_result.dart';
+import '../theme/solar_icons.dart';
 
 class FirebaseStorageService {
   final FirebaseStorage _storage = FirebaseStorage.instance;
@@ -183,7 +184,7 @@ class FirebaseStorageService {
     double? height,
     BoxFit fit = BoxFit.contain, // Changed default from BoxFit.cover to prevent cropping
     Color? placeholderColor,
-    IconData placeholderIcon = Icons.image,
+    IconData placeholderIcon = SolarIcons.galleryLinear,
   }) {
     return FutureBuilder<StorageResult>(
       future: getDownloadURL(storagePath),
@@ -292,31 +293,31 @@ class FirebaseStorageService {
     
     switch (errorType) {
       case StorageErrorType.billingRequired:
-        icon = Icons.cloud_off;
+        icon = SolarIcons.cloudCrossLinear;
         backgroundColor = Colors.orange.shade50;
         iconColor = Colors.orange.shade600;
         message = "Service upgrade required";
         break;
       case StorageErrorType.permissionDenied:
-        icon = Icons.lock;
+        icon = SolarIcons.lockKeyholeMinimalisticBold;
         backgroundColor = Colors.red.shade50;
         iconColor = Colors.red.shade600;
         message = "Access restricted";
         break;
       case StorageErrorType.networkError:
-        icon = Icons.wifi_off;
+        icon = SolarIcons.wiFiOffLinear;
         backgroundColor = Colors.blue.shade50;
         iconColor = Colors.blue.shade600;
         message = "Connection error";
         break;
       case StorageErrorType.fileNotFound:
-        icon = Icons.image_not_supported;
+        icon = SolarIcons.galleryRemoveLinear;
         backgroundColor = Colors.grey.shade100;
         iconColor = Colors.grey.shade600;
         message = "Image not available";
         break;
       case StorageErrorType.unknown:
-        icon = Icons.broken_image;
+        icon = SolarIcons.galleryRemoveLinear;
         backgroundColor = Colors.grey.shade100;
         iconColor = Colors.grey.shade600;
         message = "Image unavailable";

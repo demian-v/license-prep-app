@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import '../services/analytics_service.dart';
 import '../services/password_reset_handler.dart';
 import '../localization/app_localizations.dart';
+import '../theme/solar_icons.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   final String code;
@@ -289,7 +290,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        Icons.error_outline,
+                        SolarIcons.dangerCircleLinear,
                         color: Colors.red,
                         size: 60,
                       ),
@@ -429,7 +430,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                                Icon(SolarIcons.dangerCircleLinear, color: Colors.red.shade700, size: 20),
                                 SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
@@ -469,14 +470,14 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
                                     borderSide: BorderSide(color: Colors.indigo.shade400),
                                   ),
                             prefixIcon: Icon(
-                              Icons.lock_outline,
+                              SolarIcons.lockKeyholeMinimalisticLinear,
                               color: _showValidationErrors && !_validatePassword(_passwordController.text) 
                                   ? Colors.red 
                                   : Colors.grey.shade600,
                             ),
                             suffixIcon: IconButton(
                               icon: Icon(
-                                _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                                _obscurePassword ? SolarIcons.eyeLinear : SolarIcons.eyeClosedLinear,
                                 color: Colors.grey.shade600,
                               ),
                               onPressed: () {
@@ -533,14 +534,14 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
                                     borderSide: BorderSide(color: Colors.indigo.shade400),
                                   ),
                             prefixIcon: Icon(
-                              Icons.lock_outline,
+                              SolarIcons.lockKeyholeMinimalisticLinear,
                               color: _showValidationErrors && (_passwordController.text != _confirmPasswordController.text)
                                   ? Colors.red
                                   : Colors.grey.shade600,
                             ),
                             suffixIcon: IconButton(
                               icon: Icon(
-                                _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
+                                _obscureConfirmPassword ? SolarIcons.eyeLinear : SolarIcons.eyeClosedLinear,
                                 color: Colors.grey.shade600,
                               ),
                               onPressed: () {
@@ -718,7 +719,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
           // icon sits slightly high against the first line.
           padding: const EdgeInsets.only(top: 2),
           child: Icon(
-            isValid ? Icons.check_circle : (highlightError ? Icons.cancel : Icons.circle_outlined),
+            isValid ? SolarIcons.checkCircleBold : (highlightError ? SolarIcons.closeCircleBold : SolarIcons.recordLinear),
             color: isValid ? Colors.green.shade600 : (highlightError ? Colors.red.shade600 : Colors.grey),
             size: 16,
           ),
@@ -749,7 +750,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
         Padding(
           padding: const EdgeInsets.only(top: 2),
           child: Icon(
-            isValid ? Icons.check_circle : (highlightError ? Icons.cancel : Icons.circle_outlined),
+            isValid ? SolarIcons.checkCircleBold : (highlightError ? SolarIcons.closeCircleBold : SolarIcons.recordLinear),
             color: isValid ? Colors.green.shade600 : (highlightError ? Colors.red.shade600 : Colors.grey),
             size: 16,
           ),

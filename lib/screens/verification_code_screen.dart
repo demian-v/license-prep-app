@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../localization/app_localizations.dart';
 import '../providers/language_provider.dart';
 import '../services/email_verification_service.dart';
+import '../theme/solar_icons.dart';
 
 /// Risk #12 — the code-entry step of signup.
 ///
@@ -314,7 +315,7 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
         title: Text(_t(_codeSent ? 'verify_title' : 'verify_title_unsent')),
         leading: widget.onBack == null
             ? null
-            : IconButton(icon: const Icon(Icons.arrow_back), onPressed: widget.onBack),
+            : IconButton(icon: const Icon(SolarIcons.arrowLeftLinear), onPressed: widget.onBack),
       ),
       body: SafeArea(
         child: SingleChildScrollView(

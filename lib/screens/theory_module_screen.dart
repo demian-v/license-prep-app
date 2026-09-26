@@ -5,6 +5,7 @@ import '../models/traffic_rule_topic.dart';
 import '../providers/content_provider.dart';
 import '../providers/progress_provider.dart';
 import 'traffic_rule_content_screen.dart';
+import '../theme/solar_icons.dart';
 
 class TheoryModuleScreen extends StatefulWidget {
   final TheoryModule module;
@@ -253,7 +254,7 @@ class _TheoryModuleScreenState extends State<TheoryModuleScreen> {
                               if (progress >= 1.0)
                                 Center(
                                   child: Icon(
-                                    Icons.check,
+                                    SolarIcons.checkLinear,
                                     color: Colors.green,
                                     size: 16,
                                   ),
@@ -263,7 +264,7 @@ class _TheoryModuleScreenState extends State<TheoryModuleScreen> {
                         );
                       } else {
                         return Icon(
-                          Icons.arrow_forward_ios,
+                          SolarIcons.altArrowRightLinear,
                           size: 16,
                           color: Colors.grey,
                         );

@@ -8,6 +8,7 @@ import '../services/service_locator.dart';
 import '../services/direct_firestore_service.dart';
 import '../localization/app_localizations.dart';
 import '../widgets/adaptive_question_image.dart';
+import '../theme/solar_icons.dart';
 
 class SavedItemsScreen extends StatefulWidget {
   const SavedItemsScreen({Key? key}) : super(key: key);
@@ -267,7 +268,7 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> with TickerProvider
         foregroundColor: Colors.black,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back),
+          icon: Icon(SolarIcons.arrowLeftLinear),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -314,7 +315,7 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> with TickerProvider
                             ],
                           ),
                           child: Icon(
-                            Icons.error_outline,
+                            SolarIcons.dangerCircleLinear,
                             size: 64,
                             color: Colors.red.shade400,
                           ),
@@ -354,7 +355,7 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> with TickerProvider
                                 ],
                               ),
                               child: Icon(
-                                Icons.favorite_border,
+                                SolarIcons.heartLinear,
                                 size: 64,
                                 color: Colors.red.shade300,
                               ),
@@ -476,7 +477,7 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> with TickerProvider
                                             duration: Duration(milliseconds: 150),
                                             child: IconButton(
                                               icon: Icon(
-                                                Icons.favorite,
+                                                SolarIcons.heartBold,
                                                 color: Colors.red.shade400,
                                                 size: 24,
                                               ),
@@ -506,7 +507,7 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> with TickerProvider
                                           turns: isExpanded ? 0.5 : 0.0,
                                           duration: Duration(milliseconds: 300),
                                           child: Icon(
-                                            Icons.keyboard_arrow_down,
+                                            SolarIcons.altArrowDownLinear,
                                             color: Colors.grey,
                                             size: 28,
                                           ),
@@ -614,7 +615,7 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> with TickerProvider
                                               ),
                                               child: isSelected
                                                 ? Icon(
-                                                    Icons.check,
+                                                    SolarIcons.checkLinear,
                                                     color: Colors.white,
                                                     size: 14,
                                                   )
@@ -682,7 +683,7 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> with TickerProvider
                                               Row(
                                                 children: [
                                                   Icon(
-                                                    Icons.lightbulb_outline,
+                                                    SolarIcons.lightbulbLinear,
                                                     color: Colors.blue.shade600,
                                                     size: 18,
                                                   ),

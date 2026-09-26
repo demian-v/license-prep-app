@@ -8,6 +8,7 @@ import '../providers/auth_provider.dart';
 import '../widgets/enhanced_test_card.dart';
 import 'exam_question_screen.dart';
 import '../localization/app_localizations.dart';
+import '../theme/solar_icons.dart';
 
 class ExamScreen extends StatelessWidget {
   // Method to start exam flow
@@ -144,7 +145,7 @@ class ExamScreen extends StatelessWidget {
     return EnhancedTestCard(
       title: title,
       description: subtitle,
-      icon: Icons.description, // Using the same icon for consistency
+      icon: SolarIcons.documentTextBold, // Using the same icon for consistency
       leftInfoText: leftInfoText,
       rightInfoText: rightInfoText,
       cardType: cardType,

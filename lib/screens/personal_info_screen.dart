@@ -6,6 +6,7 @@ import '../providers/language_provider.dart';
 import '../services/email_sync_service.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'dart:async';
+import '../theme/solar_icons.dart';
 
 class PersonalInfoScreen extends StatefulWidget {
   @override
@@ -68,7 +69,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
             'delete_confirmation_message': '¿Estás seguro de que quieres eliminar tu cuenta? Esta acción es permanente y no se puede deshacer.',
             'cancel': 'Cancelar',
             'confirm': 'Confirmar',
-          }[key] ?? key;
+          }[key] ?? _translateFromL10n(key);
         case 'uk':
           return {
             'personal_info': 'Персональна інформація',
@@ -91,7 +92,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
             'delete_confirmation_message': 'Ви впевнені, що хочете видалити свій аккаунт? Ця дія незворотна і не може бути скасована.',
             'cancel': 'Скасувати',
             'confirm': 'Підтвердити',
-          }[key] ?? key;
+          }[key] ?? _translateFromL10n(key);
         case 'ru':
           return {
             'personal_info': 'Персональная информация',
@@ -114,7 +115,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
             'delete_confirmation_message': 'Вы уверены, что хотите удалить свою учетную запись? Это действие нельзя отменить.',
             'cancel': 'Отмена',
             'confirm': 'Подтвердить',
-          }[key] ?? key;
+          }[key] ?? _translateFromL10n(key);
         case 'pl':
           return {
             'personal_info': 'Informacje osobiste',
@@ -137,7 +138,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
             'delete_confirmation_message': 'Czy na pewno chcesz usunąć swoje konto? Ta akcja jest trwała i nie może zostać cofnięta.',
             'cancel': 'Anuluj',
             'confirm': 'Potwierdź',
-          }[key] ?? key;
+          }[key] ?? _translateFromL10n(key);
         case 'en':
         default:
           return {
@@ -161,11 +162,28 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
             'delete_confirmation_message': 'Are you sure you want to delete your account? This action is permanent and cannot be undone.',
             'cancel': 'Cancel',
             'confirm': 'Confirm',
-          }[key] ?? key;
+          }[key] ?? _translateFromL10n(key);
       }
     } catch (e) {
       print('🚨 [PERSONAL INFO SCREEN] Error getting translation: $e');
       // Default fallback
+      return _translateFromL10n(key);
+    }
+  }
+
+  // Last resort for keys the inline maps above do not carry.
+  //
+  // The maps cannot simply be replaced by the l10n files: they hold 16 keys
+  // that lib/localization/l10n/*.json does not define. But the reverse gap
+  // exists too — `delete_subscription_warning` lives only in the JSON — and
+  // the old `?? key` returned the raw key instead of looking there, so the
+  // account-deletion dialog showed `delete_subscription_warning` verbatim.
+  // Consulting the JSON here closes that gap for every key, not just this one.
+  String _translateFromL10n(String key) {
+    try {
+      // translate() already falls back to returning the key itself.
+      return AppLocalizations.of(context).translate(key);
+    } catch (e) {
       return key;
     }
   }
@@ -591,7 +609,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.info_outline, size: 18, color: Colors.orange.shade800),
+                  Icon(SolarIcons.infoCircleLinear, size: 18, color: Colors.orange.shade800),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -795,7 +813,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  Icons.person_outline,
+                  SolarIcons.userRoundedLinear,
                   size: 16,
                   color: Colors.black,
                 ),
@@ -918,7 +936,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
             foregroundColor: Colors.black,
             centerTitle: true,
             leading: IconButton(
-              icon: Icon(Icons.arrow_back),
+              icon: Icon(SolarIcons.arrowLeftLinear),
               onPressed: () => Navigator.pop(context),
             ),
             actions: [
@@ -966,7 +984,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
                                   _buildFormField(
                                     context,
                                     _translate('name', languageProvider),
-                                    Icons.person_outline,
+                                    SolarIcons.userRoundedLinear,
                                     Colors.green,
                                     _nameController,
                                     (value) {
@@ -985,7 +1003,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
                                   _buildFormField(
                                     context,
                                     _translate('email', languageProvider),
-                                    Icons.email_outlined,
+                                    SolarIcons.letterLinear,
                                     Colors.blue,
                                     _emailController,
                                     (value) {
@@ -1022,7 +1040,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
                                       child: Row(
                                         children: [
                                           Icon(
-                                            Icons.info_outline,
+                                            SolarIcons.infoCircleLinear,
                                             size: 16,
                                             color: Colors.purple.shade700,
                                           ),
@@ -1044,7 +1062,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
                                     _buildFormField(
                                       context,
                                       _translate('password', languageProvider),
-                                      Icons.lock_outline,
+                                      SolarIcons.lockKeyholeMinimalisticLinear,
                                       Colors.purple,
                                       _passwordController,
                                       (value) {
@@ -1096,7 +1114,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
                                     child: Row(
                                       children: [
                                         Icon(
-                                          Icons.warning_outlined,
+                                          SolarIcons.dangerTriangleLinear,
                                           size: 16,
                                           color: Colors.red.shade700,
                                         ),
@@ -1248,7 +1266,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
                 ),
                 if (showEditIcon)
                   Icon(
-                    Icons.edit_outlined,
+                    SolarIcons.penLinear,
                     size: 16,
                     color: Colors.grey.shade600,
                   ),
@@ -1280,7 +1298,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
             child: Row(
               children: [
                 Icon(
-                  Icons.error_outline,
+                  SolarIcons.dangerCircleLinear,
                   size: 16,
                   color: Colors.red.shade700,
                 ),

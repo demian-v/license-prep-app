@@ -12,6 +12,7 @@ import '../localization/app_localizations.dart';
 import '../widgets/report_sheet.dart';
 import '../widgets/adaptive_question_image.dart';
 import 'practice_result_screen.dart';
+import '../theme/solar_icons.dart';
 
 class PracticeQuestionScreen extends StatefulWidget {
   @override
@@ -190,7 +191,7 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  Icons.fitness_center,
+                  SolarIcons.dumbbellLargeLinear,
                   size: 16,
                   color: Colors.black,
                 ),
@@ -332,7 +333,7 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
                 child: Row(
                   children: [
                     Icon(
-                      Icons.info_outline,
+                      SolarIcons.infoCircleLinear,
                       size: 16,
                       color: Colors.blue.shade700,
                     ),
@@ -481,14 +482,14 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
           foregroundColor: Colors.black,
           elevation: 0,
           leading: IconButton(
-            icon: Icon(Icons.arrow_back),
+            icon: Icon(SolarIcons.arrowLeftLinear),
             onPressed: () {
               _showExitConfirmation(context);
             },
           ),
           actions: [
             IconButton(
-              icon: Icon(Icons.warning_amber_rounded),
+              icon: Icon(SolarIcons.dangerTriangleLinear),
               onPressed: _showReportSheet,
             ),
             Consumer<ProgressProvider>(
@@ -501,7 +502,7 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
                 
                 return IconButton(
                   icon: Icon(
-                    isSaved ? Icons.favorite : Icons.favorite_border,
+                    isSaved ? SolarIcons.heartBold : SolarIcons.heartLinear,
                     color: isSaved ? Colors.red : null,
                   ),
                   onPressed: () {
@@ -694,7 +695,7 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> with Ti
                                 child: Row(
                                   children: [
                                     Icon(
-                                      Icons.info_outline,
+                                      SolarIcons.infoCircleLinear,
                                       size: 16,
                                       color: Colors.blue.shade700,
                                     ),

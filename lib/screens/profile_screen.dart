@@ -23,6 +23,8 @@ import '../main.dart';
 import 'personal_info_screen.dart';
 import 'support_screen.dart';
 import '../widgets/trial_status_widget.dart';
+import '../theme/solar_icons.dart';
+import '../theme/app_theme.dart';
 
 class ProfileScreen extends StatefulWidget {
   @override
@@ -650,20 +652,14 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
         }
 
         return Scaffold(
-          appBar: AppBar(
-            title: Text(
-              _translate('my_profile', languageProvider),
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            elevation: 0,
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            foregroundColor: Colors.black,
-            centerTitle: true,
-          ),
-          body: SingleChildScrollView(
+          // No title bar: the tab bar already says where you are, and the bar
+          // took a full row above the content.
+          body: SafeArea(
+            bottom: false,
+            child: SingleChildScrollView(
             child: Column(
               children: [
-                // Add TrialStatusWidget here - under "My Profile" title, above profile card
+                SizedBox(height: AppSpacing.x2),
                 TrialStatusWidget(),
                 
                 Padding(
@@ -732,7 +728,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                               Row(
                                 children: [
                                   Icon(
-                                    Icons.email,
+                                    SolarIcons.letterBold,
                                     size: 14,
                                     color: Colors.grey[600],
                                   ),
@@ -778,7 +774,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                   _buildEnhancedMenuCard(
                     _translate('support', languageProvider),
                     _translate('support_desc', languageProvider),
-                    Icons.help_outline,
+                    SolarIcons.questionCircleLinear,
                     0, // Support - Green
                     false,
                     () {
@@ -795,7 +791,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                   _buildEnhancedMenuCard(
                     _translate('select_language', languageProvider),
                     languageProvider.languageName,
-                    Icons.language,
+                    SolarIcons.globalLinear,
                     1, // Language - Blue
                     true, // Highlight language name
                     () {
@@ -813,7 +809,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                               word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}' : ''
                             ).join(' ') // Convert to title case
                           : _translate('Not selected', languageProvider)),
-                    Icons.location_on,
+                    SolarIcons.mapPointBold,
                     2, // State - Purple
                     false,
                     () {
@@ -831,7 +827,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                     subscriptionProvider.isSubscriptionActive 
                         ? _translate('active', languageProvider) 
                         : _translate('try_premium', languageProvider),
-                    Icons.workspace_premium,
+                    SolarIcons.medalRibbonsStarBold,
                     3, // Subscription - Amber
                     subscriptionProvider.isSubscriptionActive, // Highlight if active
                     () {
@@ -918,6 +914,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                 ),
               ],
             ),
+          ),
           ),
         );
       }
@@ -1021,7 +1018,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
       LanguageProvider provider, AuthProvider authProvider) {
     return ListTile(
       title: Text(language),
-      trailing: provider.language == code ? Icon(Icons.check, color: Colors.green) : null,
+      trailing: provider.language == code ? Icon(SolarIcons.checkLinear, color: Colors.green) : null,
       onTap: () async {
         // Captured here, outside the try, for two reasons: the context is
         // certainly mounted at this point, and the catch block needs it too.
@@ -1207,7 +1204,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                               
                               return ListTile(
                                 title: Text(titleCaseState),
-                                trailing: isSelected ? Icon(Icons.check, color: Colors.green) : null,
+                                trailing: isSelected ? Icon(SolarIcons.checkLinear, color: Colors.green) : null,
                                 enabled: !_isDialogLoading, // Disable during loading
                                 onTap: () async {
                                   // Set loading state. Safe today — this runs
@@ -1452,7 +1449,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                 children: [
                   // Removed developer example navigation options for production build
                   ListTile(
-                    leading: Icon(Icons.settings_applications),
+                    leading: Icon(SolarIcons.settingsBold),
                     title: Text(_translate('app_settings_reset', languageProvider)),
                     subtitle: Text(_translate('app_settings_reset_desc', languageProvider)),
                     onTap: () {
@@ -1463,7 +1460,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                   // Debug option for testing session conflict notifications
                   if (kDebugMode)
                     ListTile(
-                      leading: Icon(Icons.logout, color: Colors.orange),
+                      leading: Icon(SolarIcons.logout2Linear, color: Colors.orange),
                       title: Text('Test Session Conflict Notification'),
                       subtitle: Text('Show session conflict notification for testing'),
                       onTap: () {
@@ -1474,7 +1471,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                   // Debug option for testing full session conflict flow
                   if (kDebugMode)
                     ListTile(
-                      leading: Icon(Icons.security, color: Colors.red),
+                      leading: Icon(SolarIcons.shieldCheckBold, color: Colors.red),
                       title: Text('Test Full Session Conflict Flow'),
                       subtitle: Text('Simulate session conflict with immediate logout'),
                       onTap: () {

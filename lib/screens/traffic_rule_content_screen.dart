@@ -8,6 +8,7 @@ import '../services/analytics_service.dart';
 import '../widgets/report_sheet.dart';
 import '../widgets/adaptive_question_image.dart';
 import 'package:provider/provider.dart';
+import '../theme/solar_icons.dart';
 
 class TrafficRuleContentScreen extends StatefulWidget {
   final TrafficRuleTopic topic;
@@ -297,17 +298,17 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
   // Topic icon selection
   IconData _getTopicIcon(String topicTitle) {
     if (topicTitle.toLowerCase().contains('загальн')) {
-      return Icons.info_outline;
+      return SolarIcons.infoCircleLinear;
     } else if (topicTitle.toLowerCase().contains('правила')) {
-      return Icons.rule;
+      return SolarIcons.checklistMinimalisticLinear;
     } else if (topicTitle.toLowerCase().contains('безпек')) {
-      return Icons.security;
+      return SolarIcons.shieldCheckBold;
     } else if (topicTitle.toLowerCase().contains('велосипед')) {
-      return Icons.directions_bike;
+      return SolarIcons.bicyclingLinear;
     } else if (topicTitle.toLowerCase().contains('піш')) {
-      return Icons.directions_walk;
+      return SolarIcons.walkingLinear;
     } else {
-      return Icons.school;
+      return SolarIcons.squareAcademicCapBold;
     }
   }
 
@@ -384,7 +385,7 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
               borderRadius: BorderRadius.circular(6),
             ),
             child: Icon(
-              Icons.article,
+              SolarIcons.documentTextLinear,
               size: 16,
               color: Colors.black87,
             ),
@@ -428,7 +429,7 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
             ],
           ),
           child: IconButton(
-            icon: Icon(Icons.warning_amber_rounded, size: 16),
+            icon: Icon(SolarIcons.dangerTriangleLinear, size: 16),
             onPressed: () => _showSectionReportSheet(index, title),
             tooltip: 'Report Section Issue',
             padding: EdgeInsets.all(4),
@@ -497,6 +498,10 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
               imagePath: section.imagePath,
               storageFolder: 'theory_images',
               assetFallback: section.imagePath,
+              // Theory is long-form reading: no timer, no action bar competing
+              // for the viewport. The widget's default is deliberately short
+              // for question screens; diagrams here keep their original height.
+              maxHeight: 265,
             ),
           
           if (section.imagePath != null && section.imagePath.isNotEmpty)
@@ -545,7 +550,7 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
               ],
             ),
             child: Icon(
-              Icons.more_horiz,
+              SolarIcons.menuDotsBold,
               size: 16,
               color: Colors.grey.shade600,
             ),
@@ -668,7 +673,7 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
               borderRadius: BorderRadius.circular(50),
             ),
             child: Icon(
-              Icons.error_outline, 
+              SolarIcons.dangerCircleLinear, 
               size: 48, 
               color: Colors.red.shade600,
             ),
@@ -780,7 +785,7 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back),
+          icon: Icon(SolarIcons.arrowLeftLinear),
           onPressed: () {
             // Track content completion (same as "Back to Theory" button)
             _trackContentCompleted();
@@ -789,7 +794,7 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.warning_amber_rounded),
+            icon: Icon(SolarIcons.dangerTriangleLinear),
             onPressed: _showTopicReportSheet,
             tooltip: 'Report Issue',
           ),

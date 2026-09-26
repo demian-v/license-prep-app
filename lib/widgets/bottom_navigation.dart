@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/language_provider.dart';
+import '../theme/solar_icons.dart';
 
 class BottomNavigation extends StatelessWidget {
   final int currentIndex;
@@ -71,15 +72,15 @@ class BottomNavigation extends StatelessWidget {
           unselectedItemColor: Colors.grey,
           items: [
             BottomNavigationBarItem(
-              icon: Icon(Icons.quiz),
+              icon: Icon(SolarIcons.questionSquareBold),
               label: _translate('tests', languageProvider),
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.menu_book),
+              icon: Icon(SolarIcons.book2Bold),
               label: _translate('theory', languageProvider),
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.person),
+              icon: Icon(SolarIcons.userRoundedBold),
               label: _translate('profile', languageProvider),
             ),
           ],

@@ -7,6 +7,7 @@ import '../services/analytics_service.dart';
 import 'language_selection_screen.dart';
 import 'verification_code_screen.dart';
 import '../localization/app_localizations.dart';
+import '../theme/solar_icons.dart';
 
 class SignupScreen extends StatefulWidget {
   @override
@@ -432,7 +433,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
                                     ),
                                     child: Row(
                                       children: [
-                                        Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                                        Icon(SolarIcons.dangerCircleLinear, color: Colors.red.shade700, size: 20),
                                         SizedBox(width: 8),
                                         Expanded(
                                           child: Text(
@@ -463,7 +464,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide(color: Colors.indigo.shade400),
                                     ),
-                                    prefixIcon: Icon(Icons.person, color: Colors.grey.shade600),
+                                    prefixIcon: Icon(SolarIcons.userRoundedBold, color: Colors.grey.shade600),
                                     filled: true,
                                     fillColor: Colors.white,
                                     contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -494,7 +495,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide(color: Colors.indigo.shade400),
                                     ),
-                                    prefixIcon: Icon(Icons.email, color: Colors.grey.shade600),
+                                    prefixIcon: Icon(SolarIcons.letterBold, color: Colors.grey.shade600),
                                     filled: true,
                                     fillColor: Colors.white,
                                     contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -531,7 +532,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide(color: Colors.indigo.shade400),
                                     ),
-                                    prefixIcon: Icon(Icons.lock, color: Colors.grey.shade600),
+                                    prefixIcon: Icon(SolarIcons.lockKeyholeMinimalisticBold, color: Colors.grey.shade600),
                                     filled: true,
                                     fillColor: Colors.white,
                                     contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),

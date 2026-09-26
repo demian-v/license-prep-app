@@ -9,6 +9,7 @@ import '../providers/subscription_provider.dart';
 import '../providers/auth_provider.dart';
 import '../localization/app_localizations.dart';
 import '../services/in_app_purchase_service.dart';
+import '../theme/solar_icons.dart';
 
 class EnhancedSubscriptionCard extends StatefulWidget {
   final SubscriptionType subscriptionType;
@@ -587,7 +588,7 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          Icons.access_time, 
+                          SolarIcons.clockCircleLinear, 
                           size: 14, 
                           color: Colors.orange.shade700
                         ),
@@ -683,7 +684,7 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
               border: Border.all(color: Colors.green.shade200, width: 1),
             ),
             child: Icon(
-              Icons.check,
+              SolarIcons.checkLinear,
               color: Colors.green.shade700,
               size: 16,
             ),
@@ -717,7 +718,7 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+          Icon(SolarIcons.dangerCircleLinear, color: Colors.red.shade700, size: 20),
           SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -866,7 +867,7 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.orange.shade300, width: 2),
                 ),
-                child: Icon(Icons.schedule, color: Colors.orange.shade700, size: 24),
+                child: Icon(SolarIcons.clockCircleLinear, color: Colors.orange.shade700, size: 24),
               ),
               SizedBox(width: 12),
               Expanded(
@@ -943,7 +944,7 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.red.shade300, width: 2),
                 ),
-                child: Icon(Icons.cancel, color: Colors.red.shade700, size: 24),
+                child: Icon(SolarIcons.closeCircleBold, color: Colors.red.shade700, size: 24),
               ),
               SizedBox(width: 12),
               Expanded(
@@ -1013,7 +1014,7 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.green.shade300, width: 2),
                 ),
-                child: Icon(Icons.check_circle, color: Colors.green.shade700, size: 24),
+                child: Icon(SolarIcons.checkCircleBold, color: Colors.green.shade700, size: 24),
               ),
               SizedBox(width: 12),
               Expanded(
@@ -1070,7 +1071,7 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.green.shade300, width: 2),
                 ),
-                child: Icon(Icons.check_circle, color: Colors.green.shade700, size: 24),
+                child: Icon(SolarIcons.checkCircleBold, color: Colors.green.shade700, size: 24),
               ),
               SizedBox(width: 12),
               Expanded(

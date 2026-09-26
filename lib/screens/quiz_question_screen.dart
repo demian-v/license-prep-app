@@ -12,6 +12,7 @@ import '../localization/app_localizations.dart';
 import '../widgets/report_sheet.dart';
 import '../widgets/adaptive_question_image.dart';
 import 'quiz_result_screen.dart';
+import '../theme/solar_icons.dart';
 
 class QuizQuestionScreen extends StatefulWidget {
   final QuizTopic topic;
@@ -154,19 +155,19 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
     // Dynamic theming based on topic content
     if (topicTitle.toLowerCase().contains('загальн')) {
       endColor = Colors.purple.shade50.withOpacity(0.6);
-      topicIcon = Icons.info_outline;
+      topicIcon = SolarIcons.infoCircleLinear;
     } else if (topicTitle.toLowerCase().contains('правила')) {
       endColor = Colors.blue.shade50.withOpacity(0.6);
-      topicIcon = Icons.rule;
+      topicIcon = SolarIcons.checklistMinimalisticLinear;
     } else if (topicTitle.toLowerCase().contains('безпек')) {
       endColor = Colors.green.shade50.withOpacity(0.6);
-      topicIcon = Icons.security;
+      topicIcon = SolarIcons.shieldCheckBold;
     } else if (topicTitle.toLowerCase().contains('велосипед')) {
       endColor = Colors.orange.shade50.withOpacity(0.6);
-      topicIcon = Icons.directions_bike;
+      topicIcon = SolarIcons.bicyclingLinear;
     } else {
       endColor = Colors.indigo.shade50.withOpacity(0.6);
-      topicIcon = Icons.school;
+      topicIcon = SolarIcons.squareAcademicCapBold;
     }
     
     return AnimatedBuilder(
@@ -339,7 +340,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
                 child: Row(
                   children: [
                     Icon(
-                      Icons.info_outline,
+                      SolarIcons.infoCircleLinear,
                       size: 16,
                       color: Colors.blue.shade700,
                     ),
@@ -471,7 +472,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
           Row(
             children: [
               Icon(
-                Icons.lightbulb_outline,
+                SolarIcons.lightbulbLinear,
                 size: 20,
                 color: Colors.indigo.shade700,
               ),
@@ -708,7 +709,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
       foregroundColor: Colors.black,
       elevation: 0,
       leading: IconButton(
-        icon: Icon(Icons.arrow_back),
+        icon: Icon(SolarIcons.arrowLeftLinear),
         onPressed: () => Navigator.pop(context),
       ),
     );
@@ -775,7 +776,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
       foregroundColor: Colors.black,
       elevation: 0,
       leading: IconButton(
-        icon: Icon(Icons.arrow_back),
+        icon: Icon(SolarIcons.arrowLeftLinear),
         onPressed: () async {
           await _trackTopicTerminated('back_arrow');
           Navigator.pop(context);
@@ -783,7 +784,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
       ),
       actions: [
         IconButton(
-          icon: Icon(Icons.warning_amber_rounded),
+          icon: Icon(SolarIcons.dangerTriangleLinear),
           onPressed: () => _showReportSheet(context),
         ),
         Consumer<ProgressProvider>(
@@ -793,7 +794,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
             
             return IconButton(
               icon: Icon(
-                isSaved ? Icons.favorite : Icons.favorite_border,
+                isSaved ? SolarIcons.heartBold : SolarIcons.heartLinear,
                 color: isSaved ? Colors.red : null,
               ),
               onPressed: () {
@@ -984,7 +985,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
                               child: Row(
                                 children: [
                                   Icon(
-                                    Icons.info_outline,
+                                    SolarIcons.infoCircleLinear,
                                     size: 16,
                                     color: Colors.blue.shade700,
                                   ),
@@ -1131,7 +1132,7 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
                           Row(
                             children: [
                               Icon(
-                                Icons.lightbulb_outline,
+                                SolarIcons.lightbulbLinear,
                                 size: 20,
                                 color: Colors.indigo.shade700,
                               ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
 import '../localization/app_localizations.dart';
+import '../theme/solar_icons.dart';
 
 /// Service for handling session-related user notifications
 class SessionNotificationService {
@@ -38,7 +39,7 @@ class SessionNotificationService {
           content: Row(
             children: [
               Icon(
-                Icons.info_outline,
+                SolarIcons.infoCircleLinear,
                 color: Colors.white,
                 size: 20,
               ),

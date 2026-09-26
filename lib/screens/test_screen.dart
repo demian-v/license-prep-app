@@ -3,6 +3,8 @@ import '../services/crash_reporter.dart';
 import 'package:provider/provider.dart';
 import '../data/license_data.dart';
 import '../widgets/enhanced_test_card.dart';
+import '../theme/app_theme.dart';
+import '../theme/design_variant.dart';
 import '../providers/exam_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/progress_provider.dart';
@@ -21,6 +23,7 @@ import '../widgets/trial_status_widget.dart';
 import '../widgets/premium_block_dialog.dart';
 import '../utils/subscription_checker.dart';
 import '../providers/subscription_provider.dart';
+import '../theme/solar_icons.dart';
 
 class TestScreen extends StatefulWidget {
   @override
@@ -217,6 +220,7 @@ class _TestScreenState extends State<TestScreen> {
             'questions_40': '40 preguntas',
             'time_unlimited': 'Tiempo ilimitado',
             'questions_100_sorted': '100+ preguntas por tema',
+            'questions_100': '100+ preguntas',
           }[key] ?? key;
         case 'uk':
           return {
@@ -235,6 +239,7 @@ class _TestScreenState extends State<TestScreen> {
             'questions_40': '40 запитань',
             'time_unlimited': 'Необмежений час',
             'questions_100_sorted': '100+ питань по темах',
+            'questions_100': '100+ запитань',
           }[key] ?? key;
         case 'ru':
           return {
@@ -253,6 +258,7 @@ class _TestScreenState extends State<TestScreen> {
             'questions_40': '40 вопросов',
             'time_unlimited': 'Неограниченное время',
             'questions_100_sorted': '100+ вопросов по темах',
+            'questions_100': '100+ вопросов',
           }[key] ?? key;
         case 'pl':
           return {
@@ -271,6 +277,7 @@ class _TestScreenState extends State<TestScreen> {
             'questions_40': '40 pytań',
             'time_unlimited': 'Nieograniczony czas',
             'questions_100_sorted': '100+ pytań na tematy',
+            'questions_100': '100+ pytań',
           }[key] ?? key;
         case 'en':
         default:
@@ -290,6 +297,7 @@ class _TestScreenState extends State<TestScreen> {
             'questions_40': '40 questions',
             'time_unlimited': 'Unlimited time',
             'questions_100_sorted': '100+ topic questions',
+            'questions_100': '100+ questions',
           }[key] ?? key;
       }
     } catch (e) {
@@ -299,251 +307,462 @@ class _TestScreenState extends State<TestScreen> {
     }
   }
 
+  // Entry handlers. Moved here unchanged from the inline closures that used to
+  // sit inside `build`, so all three design variants run exactly the same
+  // session check, subscription gate, analytics and navigation.
+
+  void _onTakeExam(BuildContext context, LanguageProvider languageProvider) {
+    // Session validation - validate before starting exam
+    if (!SessionValidationService.validateBeforeActionSafely(context)) {
+      print('🚨 TestScreen: Session invalid, blocking Take Exam action');
+      return; // User will be logged out by the validation service
+    }
+    
+    // NEW: Subscription validation - check if user has valid subscription
+    final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+    if (SubscriptionChecker.shouldBlockPremiumFeature(subscriptionProvider)) {
+      print('🚫 TestScreen: Subscription invalid, blocking Take Exam action');
+      print('   - Block reason: ${SubscriptionChecker.getBlockReason(subscriptionProvider)}');
+      _showPremiumBlockDialog(context, _translate('take_exam', languageProvider));
+      return;
+    }
+    
+    // Track exam start FIRST
+    _logExamStartedAnalytics(languageProvider);
+    
+    // Start a new exam
+    final examProvider = Provider.of<ExamProvider>(context, listen: false);
+    
+    // Get language from provider
+    final language = languageProvider.language;
+    
+    // Get license type from provider, default to 'driver'
+    final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
+    final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
+    
+    // Start new exam with required parameters
+    examProvider.startNewExam(
+      language: language,
+      state: _questionState(), // Risk #39 — was hardcoded 'IL'
+      licenseType: licenseType,
+    );
+    
+    // Navigate to the exam question screen
+    crashReporter.log('nav: exam started');
+    // Shared-axis forward transition: entering a timed,
+    // 40-question test should not feel like swapping between
+    // peer screens.
+    Navigator.push(
+      context,
+      ForwardPageRoute(child: ExamQuestionScreen()),
+    );
+  }
+
+  void _onLearnByTopics(BuildContext context, LanguageProvider languageProvider) {
+    // Session validation - validate before starting Learn by Topics
+    if (!SessionValidationService.validateBeforeActionSafely(context)) {
+      print('🚨 TestScreen: Session invalid, blocking Learn by Topics action');
+      return; // User will be logged out by the validation service
+    }
+    
+    // NEW: Subscription validation - check if user has valid subscription
+    final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+    if (SubscriptionChecker.shouldBlockPremiumFeature(subscriptionProvider)) {
+      print('🚫 TestScreen: Subscription invalid, blocking Learn by Topics action');
+      print('   - Block reason: ${SubscriptionChecker.getBlockReason(subscriptionProvider)}');
+      _showPremiumBlockDialog(context, _translate('learn_by_topics', languageProvider));
+      return;
+    }
+    
+    // Track Learn by Topics start FIRST
+    _logLearnByTopicsStartedAnalytics(languageProvider);
+    
+    // Generate session ID for this Learn by Topics session
+    final sessionId = DateTime.now().millisecondsSinceEpoch.toString();
+    
+    // Navigate to themed questions
+    crashReporter.log('nav: topic quiz started');
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TopicQuizScreen(sessionId: sessionId),
+      ),
+    );
+  }
+
+  void _onPracticeTickets(BuildContext context, LanguageProvider languageProvider) {
+    // Session validation - validate before starting Practice Tickets
+    if (!SessionValidationService.validateBeforeActionSafely(context)) {
+      print('🚨 TestScreen: Session invalid, blocking Practice Tickets action');
+      return; // User will be logged out by the validation service
+    }
+    
+    // NEW: Subscription validation - check if user has valid subscription
+    final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+    if (SubscriptionChecker.shouldBlockPremiumFeature(subscriptionProvider)) {
+      print('🚫 TestScreen: Subscription invalid, blocking Practice Tickets action');
+      print('   - Block reason: ${SubscriptionChecker.getBlockReason(subscriptionProvider)}');
+      _showPremiumBlockDialog(context, _translate('practice_tickets', languageProvider));
+      return;
+    }
+    
+    // Track practice start FIRST
+    _logPracticeStartedAnalytics(languageProvider);
+    
+    // Start a new practice test
+    final practiceProvider = Provider.of<PracticeProvider>(context, listen: false);
+    final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
+    
+    final language = languageProvider.language;
+    final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
+    
+    // Start new practice with required parameters
+    practiceProvider.startNewPractice(
+      language: language,
+      state: _questionState(), // Risk #39 — was hardcoded 'IL'
+      licenseType: licenseType,
+    ).then((_) {
+      // Navigate to the practice question screen after loading
+      crashReporter.log('nav: practice test started');
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PracticeQuestionScreen(),
+        ),
+      );
+    });
+  }
+
+  void _onSaved(BuildContext context, LanguageProvider languageProvider) {
+    // Session validation - validate before navigating to Saved questions
+    if (!SessionValidationService.validateBeforeActionSafely(context)) {
+      print('🚨 TestScreen: Session invalid, blocking Saved action');
+      return; // User will be logged out by the validation service
+    }
+    
+    // NEW: Subscription validation - check if user has valid subscription
+    final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+    if (SubscriptionChecker.shouldBlockPremiumFeature(subscriptionProvider)) {
+      print('🚫 TestScreen: Subscription invalid, blocking Saved action');
+      print('   - Block reason: ${SubscriptionChecker.getBlockReason(subscriptionProvider)}');
+      _showPremiumBlockDialog(context, _translate('saved', languageProvider));
+      return;
+    }
+    
+    // Navigate to saved questions
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SavedItemsScreen(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<LanguageProvider>(
       builder: (context, languageProvider, _) {
         print('🧪 [TEST SCREEN] Building with language: ${languageProvider.language}');
-        
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(
-              _translate('tests', languageProvider),
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            elevation: 0,
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            foregroundColor: Colors.black,
-            centerTitle: true,
-          ),
-          body: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Add TrialStatusWidget here - under "Tests" title, above "Testing" section
-                TrialStatusWidget(),
-                
-                Padding(
-                  padding: EdgeInsets.only(left: 16, right: 16, bottom: 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildSectionHeader(_translate('testing', languageProvider)),
-                  // Take Exam card with left and right info
-                  _buildTestItem(
-                    context,
-                    'assets/images/exam.png',
-                    _translate('take_exam', languageProvider),
-                    _translate('dmv_exam_desc', languageProvider),
-                    () {
-                      // Session validation - validate before starting exam
-                      if (!SessionValidationService.validateBeforeActionSafely(context)) {
-                        print('🚨 TestScreen: Session invalid, blocking Take Exam action');
-                        return; // User will be logged out by the validation service
-                      }
-                      
-                      // NEW: Subscription validation - check if user has valid subscription
-                      final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
-                      if (SubscriptionChecker.shouldBlockPremiumFeature(subscriptionProvider)) {
-                        print('🚫 TestScreen: Subscription invalid, blocking Take Exam action');
-                        print('   - Block reason: ${SubscriptionChecker.getBlockReason(subscriptionProvider)}');
-                        _showPremiumBlockDialog(context, _translate('take_exam', languageProvider));
-                        return;
-                      }
-                      
-                      // Track exam start FIRST
-                      _logExamStartedAnalytics(languageProvider);
-                      
-                      // Start a new exam
-                      final examProvider = Provider.of<ExamProvider>(context, listen: false);
-                      
-                      // Get language from provider
-                      final language = languageProvider.language;
-                      
-                      // Get license type from provider, default to 'driver'
-                      final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
-                      final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
-                      
-                      // Start new exam with required parameters
-                      examProvider.startNewExam(
-                        language: language,
-                        state: _questionState(), // Risk #39 — was hardcoded 'IL'
-                        licenseType: licenseType,
-                      );
-                      
-                      // Navigate to the exam question screen
-                      crashReporter.log('nav: exam started');
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ExamQuestionScreen(),
-                        ),
-                      );
-                    },
-                    leftInfoText: _translate('time_60_minutes', languageProvider),
-                    rightInfoText: _translate('questions_40', languageProvider),
-                    cardType: 0,
-                  ),
-                  // Learn by Topics card with left and right info
-                  _buildTestItem(
-                    context,
-                    'assets/images/themes.png',
-                    _translate('learn_by_topics', languageProvider),
-                    _translate('questions_by_topics', languageProvider),
-                    () {
-                      // Session validation - validate before starting Learn by Topics
-                      if (!SessionValidationService.validateBeforeActionSafely(context)) {
-                        print('🚨 TestScreen: Session invalid, blocking Learn by Topics action');
-                        return; // User will be logged out by the validation service
-                      }
-                      
-                      // NEW: Subscription validation - check if user has valid subscription
-                      final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
-                      if (SubscriptionChecker.shouldBlockPremiumFeature(subscriptionProvider)) {
-                        print('🚫 TestScreen: Subscription invalid, blocking Learn by Topics action');
-                        print('   - Block reason: ${SubscriptionChecker.getBlockReason(subscriptionProvider)}');
-                        _showPremiumBlockDialog(context, _translate('learn_by_topics', languageProvider));
-                        return;
-                      }
-                      
-                      // Track Learn by Topics start FIRST
-                      _logLearnByTopicsStartedAnalytics(languageProvider);
-                      
-                      // Generate session ID for this Learn by Topics session
-                      final sessionId = DateTime.now().millisecondsSinceEpoch.toString();
-                      
-                      // Navigate to themed questions
-                      crashReporter.log('nav: topic quiz started');
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => TopicQuizScreen(sessionId: sessionId),
-                        ),
-                      );
-                    },
-                    leftInfoText: _translate('time_unlimited', languageProvider),
-                    rightInfoText: _translate('questions_100_sorted', languageProvider),
-                    cardType: 1,
-                  ),
-                  // Practice Tickets card with left and right info
-                  _buildTestItem(
-                    context,
-                    'assets/images/random.png',
-                    _translate('practice_tickets', languageProvider),
-                    _translate('random_questions_no_limit', languageProvider),
-                    () {
-                      // Session validation - validate before starting Practice Tickets
-                      if (!SessionValidationService.validateBeforeActionSafely(context)) {
-                        print('🚨 TestScreen: Session invalid, blocking Practice Tickets action');
-                        return; // User will be logged out by the validation service
-                      }
-                      
-                      // NEW: Subscription validation - check if user has valid subscription
-                      final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
-                      if (SubscriptionChecker.shouldBlockPremiumFeature(subscriptionProvider)) {
-                        print('🚫 TestScreen: Subscription invalid, blocking Practice Tickets action');
-                        print('   - Block reason: ${SubscriptionChecker.getBlockReason(subscriptionProvider)}');
-                        _showPremiumBlockDialog(context, _translate('practice_tickets', languageProvider));
-                        return;
-                      }
-                      
-                      // Track practice start FIRST
-                      _logPracticeStartedAnalytics(languageProvider);
-                      
-                      // Start a new practice test
-                      final practiceProvider = Provider.of<PracticeProvider>(context, listen: false);
-                      final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
-                      
-                      final language = languageProvider.language;
-                      final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
-                      
-                      // Start new practice with required parameters
-                      practiceProvider.startNewPractice(
-                        language: language,
-                        state: _questionState(), // Risk #39 — was hardcoded 'IL'
-                        licenseType: licenseType,
-                      ).then((_) {
-                        // Navigate to the practice question screen after loading
-                        crashReporter.log('nav: practice test started');
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => PracticeQuestionScreen(),
-                          ),
-                        );
-                      });
-                    },
-                    leftInfoText: _translate('time_unlimited', languageProvider),
-                    rightInfoText: _translate('questions_40', languageProvider),
-                    cardType: 2,
-                  ),
-                  SizedBox(height: 16),
-                  _buildSectionHeader(_translate('working_on_mistakes', languageProvider)),
-                  // Saved card with no info text
-                  _buildTestItem(
-                    context,
-                    'assets/images/saved.png',
-                    _translate('saved', languageProvider),
-                    _translate('saved_questions_desc', languageProvider),
-                    () {
-                      // Session validation - validate before navigating to Saved questions
-                      if (!SessionValidationService.validateBeforeActionSafely(context)) {
-                        print('🚨 TestScreen: Session invalid, blocking Saved action');
-                        return; // User will be logged out by the validation service
-                      }
-                      
-                      // NEW: Subscription validation - check if user has valid subscription
-                      final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
-                      if (SubscriptionChecker.shouldBlockPremiumFeature(subscriptionProvider)) {
-                        print('🚫 TestScreen: Subscription invalid, blocking Saved action');
-                        print('   - Block reason: ${SubscriptionChecker.getBlockReason(subscriptionProvider)}');
-                        _showPremiumBlockDialog(context, _translate('saved', languageProvider));
-                        return;
-                      }
-                      
-                      // Navigate to saved questions
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => SavedItemsScreen(),
-                        ),
-                      );
-                    },
-                    cardType: 3,
-                  ),
-                    ],
+
+        return ValueListenableBuilder<DesignVariant>(
+          valueListenable: designVariant,
+          builder: (context, variant, _) {
+            final List<Widget> blocks;
+            switch (variant) {
+              case DesignVariant.refined:
+                blocks = _refinedBlocks(context, languageProvider);
+                break;
+              case DesignVariant.boldA:
+                blocks = _signalBlocks(context, languageProvider);
+                break;
+              case DesignVariant.boldB:
+                blocks = _ledgerBlocks(context, languageProvider);
+                break;
+              case DesignVariant.bento:
+                // Same structure as Refined; the cards themselves change.
+                blocks = _refinedBlocks(context, languageProvider);
+                break;
+            }
+
+            // One-shot entrance, keyed by variant so switching replays it.
+            // Refined: 240ms cascade. Signal: a longer, springier rise.
+            // Ledger: a single 180ms fade, no cascade.
+            final Duration total = variant == DesignVariant.boldA
+                ? AppMotion.slow
+                : variant == DesignVariant.boldB
+                    ? AppMotion.fast
+                    : AppMotion.base;
+            final Duration step = variant == DesignVariant.boldB
+                ? Duration.zero
+                : variant == DesignVariant.boldA
+                    ? AppMotion.stagger * 1.5
+                    : AppMotion.stagger;
+
+            return DesignVariantSwitcher(
+              child: Scaffold(
+                // No AppBar: the title is content, set large and left. A
+                // centred system title bar would put the chrome back.
+                backgroundColor: variant == DesignVariant.boldB
+                    ? AppColors.paper
+                    : AppColors.field,
+                body: SafeArea(
+                  bottom: false,
+                  child: SingleChildScrollView(
+                    key: ValueKey(variant),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: variant == DesignVariant.boldB
+                            ? AppSpacing.gutter
+                            : AppSpacing.x4 + AppSpacing.x1,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (var i = 0; i < blocks.length; i++)
+                            StaggerIn(
+                              index: i,
+                              count: blocks.length,
+                              total: total,
+                              step: step,
+                              rise: variant == DesignVariant.boldA
+                                  ? 16
+                                  : variant == DesignVariant.boldB
+                                      ? 0
+                                      : 8,
+                              curve: VariantTokens.of(variant).curve,
+                              child: blocks[i],
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Container(
-      margin: EdgeInsets.symmetric(vertical: 16),
+  Widget _examItem(BuildContext context, LanguageProvider languageProvider) =>
+      _buildTestItem(
+        context,
+        'assets/images/exam.png',
+        _translate('take_exam', languageProvider),
+        _translate('dmv_exam_desc', languageProvider),
+        () => _onTakeExam(context, languageProvider),
+        leftInfoText: _translate('time_60_minutes', languageProvider),
+        rightInfoText: _translate('questions_40', languageProvider),
+        cardType: 0,
+      );
+
+  Widget _topicsItem(BuildContext context, LanguageProvider languageProvider) =>
+      _buildTestItem(
+        context,
+        'assets/images/themes.png',
+        _translate('learn_by_topics', languageProvider),
+        _translate('questions_by_topics', languageProvider),
+        () => _onLearnByTopics(context, languageProvider),
+        leftInfoText: _translate('time_unlimited', languageProvider),
+        // Short form: the tile's title already says "by topics".
+        rightInfoText: _translate('questions_100', languageProvider),
+        cardType: 1,
+      );
+
+  Widget _practiceItem(BuildContext context, LanguageProvider languageProvider) =>
+      _buildTestItem(
+        context,
+        'assets/images/random.png',
+        _translate('practice_tickets', languageProvider),
+        _translate('random_questions_no_limit', languageProvider),
+        () => _onPracticeTickets(context, languageProvider),
+        leftInfoText: _translate('time_unlimited', languageProvider),
+        rightInfoText: _translate('questions_40', languageProvider),
+        cardType: 2,
+      );
+
+  Widget _savedItem(BuildContext context, LanguageProvider languageProvider) =>
+      _buildTestItem(
+        context,
+        'assets/images/saved.png',
+        _translate('saved', languageProvider),
+        _translate('saved_questions_desc', languageProvider),
+        () => _onSaved(context, languageProvider),
+        cardType: 3,
+      );
+
+  /// The two practice modes side by side: they are peers, and pairing them
+  /// keeps the exam above visually dominant.
+  Widget _practicePair(BuildContext context, LanguageProvider languageProvider,
+      {required double gap}) {
+    return IntrinsicHeight(
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: Divider(color: Colors.grey[300]),
+          Expanded(child: _topicsItem(context, languageProvider)),
+          SizedBox(width: gap),
+          Expanded(child: _practiceItem(context, languageProvider)),
+        ],
+      ),
+    );
+  }
+
+  /// Refined: direction A with a strict 4/8 rhythm.
+  List<Widget> _refinedBlocks(BuildContext context, LanguageProvider lp) => [
+        // No screen title: the tab bar already names the tab.
+        const SizedBox(height: AppSpacing.x2),
+        // Status sits above the modes: it tells the user whether any of them
+        // are even available to them.
+        TrialStatusWidget(),
+        Padding(
+          padding: const EdgeInsets.only(top: AppSpacing.x8),
+          child: _buildSectionHeader(_translate('testing', lp)),
+        ),
+        _examItem(context, lp),
+        // Bento stacks the two practice modes full width: side by side they
+        // left a large empty band above the tab bar whenever the trial card
+        // is hidden (a paid subscriber sees none).
+        if (designVariant.value == DesignVariant.bento) ...[
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.x3),
+            child: _topicsItem(context, lp),
           ),
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              title,
-              style: TextStyle(
-                color: Colors.grey[500],
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+            padding: const EdgeInsets.only(top: AppSpacing.x3),
+            child: _practiceItem(context, lp),
           ),
-          Expanded(
-            child: Divider(color: Colors.grey[300]),
+        ] else
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.x3),
+            child: _practicePair(context, lp, gap: AppSpacing.x3),
           ),
-        ],
+        Padding(
+          padding: const EdgeInsets.only(top: AppSpacing.x8),
+          child: _buildSectionHeader(_translate('working_on_mistakes', lp)),
+        ),
+        _savedItem(context, lp),
+        const SizedBox(height: AppSpacing.x8),
+      ];
+
+  /// Signal: the exam is the hero; everything else steps back to support it.
+  List<Widget> _signalBlocks(BuildContext context, LanguageProvider lp) => [
+        // No screen title: the tab bar already names the tab.
+        const SizedBox(height: AppSpacing.x2),
+        TrialStatusWidget(),
+        Padding(
+          padding: const EdgeInsets.only(top: AppSpacing.x8),
+          child: _buildSectionHeader(_translate('testing', lp)),
+        ),
+        _examItem(context, lp),
+        Padding(
+          padding: const EdgeInsets.only(top: AppSpacing.x4),
+          child: _practicePair(context, lp, gap: AppSpacing.x4),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: AppSpacing.x8),
+          child: _buildSectionHeader(_translate('working_on_mistakes', lp)),
+        ),
+        _savedItem(context, lp),
+        const SizedBox(height: AppSpacing.x8),
+      ];
+
+  /// Ledger: list-first. The exam leads; the rest are rows in one block.
+  List<Widget> _ledgerBlocks(BuildContext context, LanguageProvider lp) {
+    final tokens = VariantTokens.of(DesignVariant.boldB);
+    Widget block(List<Widget> rows) => Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(tokens.card),
+            border: Border.all(color: AppColors.borderStrong),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < rows.length; i++) ...[
+                if (i > 0)
+                  const Divider(
+                    height: 1,
+                    thickness: 1,
+                    indent: AppSpacing.x4 + 20 + AppSpacing.x3,
+                  ),
+                rows[i],
+              ],
+            ],
+          ),
+        );
+
+    return [
+      // No screen title: the tab bar already names the tab.
+      const SizedBox(height: AppSpacing.x2),
+      TrialStatusWidget(),
+      Padding(
+        padding: const EdgeInsets.only(top: AppSpacing.x6),
+        child: _buildSectionHeader(_translate('testing', lp)),
+      ),
+      _examItem(context, lp),
+      Padding(
+        padding: const EdgeInsets.only(top: AppSpacing.x2),
+        child: block([_topicsItem(context, lp), _practiceItem(context, lp)]),
+      ),
+      Padding(
+        padding: const EdgeInsets.only(top: AppSpacing.x6),
+        child: _buildSectionHeader(_translate('working_on_mistakes', lp)),
+      ),
+      block([_savedItem(context, lp)]),
+      const SizedBox(height: AppSpacing.x8),
+    ];
+  }
+
+  /// A section label.
+  ///
+  /// Was a centred label flanked by two hairline rules — a dated device that
+  /// spent a full row of vertical space to say one word. Now a plain
+  /// left-aligned label, in sentence case: all-caps is harder to read in
+  /// Cyrillic, and an eyebrow label above every heading is decoration, not
+  /// information.
+  ///
+  /// Secondary ink, not tertiary: tertiary is 3.1:1 on the field grey and
+  /// fails body-text contrast.
+  Widget _buildSectionHeader(String title) {
+    final variant = designVariant.value;
+    if (variant == DesignVariant.bento) {
+      // Bento: section titles are small bold labels, like a dashboard's
+      // panel headings.
+      return Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.x3),
+        child: Text(
+          title,
+          style: AppTypography.label.copyWith(
+            fontSize: 15,
+            color: AppColors.ink,
+            fontVariations: const [FontVariation('wght', 700)],
+          ),
+        ),
+      );
+    }
+    if (variant == DesignVariant.boldA) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.x3),
+        child: Text(
+          title,
+          style: AppTypography.heading.copyWith(
+            fontVariations: const [FontVariation('wght', 700)],
+          ),
+        ),
+      );
+    }
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: variant == DesignVariant.boldB ? AppSpacing.x2 : AppSpacing.x3,
+      ),
+      child: Text(
+        title,
+        style: AppTypography.caption.copyWith(
+          fontSize: 13,
+          color: AppColors.inkSecondary,
+          fontVariations: const [FontVariation('wght', 600)],
+        ),
       ),
     );
   }
@@ -561,7 +780,7 @@ class _TestScreenState extends State<TestScreen> {
     return EnhancedTestCard(
       title: title,
       description: subtitle,
-      icon: Icons.description, // Using the same icon for all cards for consistency
+      icon: SolarIcons.documentTextBold, // Using the same icon for all cards for consistency
       leftInfoText: leftInfoText,
       rightInfoText: rightInfoText,
       cardType: cardType,

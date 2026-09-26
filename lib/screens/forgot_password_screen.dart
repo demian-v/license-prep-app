@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/analytics_service.dart';
 import '../localization/app_localizations.dart';
+import '../theme/solar_icons.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   @override
@@ -142,7 +143,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: Icon(Icons.arrow_back),
+          icon: Icon(SolarIcons.arrowLeftLinear),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
@@ -226,7 +227,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
                                     ),
                                     child: Row(
                                       children: [
-                                        Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                                        Icon(SolarIcons.dangerCircleLinear, color: Colors.red.shade700, size: 20),
                                         SizedBox(width: 8),
                                         Expanded(
                                           child: Text(
@@ -258,7 +259,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide(color: Colors.indigo.shade400),
                                     ),
-                                    prefixIcon: Icon(Icons.email, color: Colors.grey.shade600),
+                                    prefixIcon: Icon(SolarIcons.letterBold, color: Colors.grey.shade600),
                                     filled: true,
                                     fillColor: Colors.white,
                                     contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),

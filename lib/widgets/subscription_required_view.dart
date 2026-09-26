@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../localization/app_localizations.dart';
+import '../theme/solar_icons.dart';
 
 /// Shown when content was REFUSED for lack of a subscription, rather than
 /// being genuinely absent (risk #3's entitlement gate).
@@ -21,7 +22,7 @@ class SubscriptionRequiredView extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.lock_outline, size: 64, color: Colors.blue.shade300),
+            Icon(SolarIcons.lockKeyholeMinimalisticLinear, size: 64, color: Colors.blue.shade300),
             const SizedBox(height: 24),
             Text(
               localizations.translate('subscription_required_title'),

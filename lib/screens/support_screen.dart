@@ -5,6 +5,8 @@ import '../providers/language_provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/report_service.dart';
 import '../services/service_locator.dart';
+import '../theme/solar_icons.dart';
+import '../theme/app_theme.dart';
 
 class SupportScreen extends StatefulWidget {
   @override
@@ -198,7 +200,7 @@ class _SupportScreenState extends State<SupportScreen> with TickerProviderStateM
                       color: Colors.white,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.check, color: Colors.green, size: 16),
+                    child: Icon(SolarIcons.checkLinear, color: Colors.green, size: 16),
                   ),
                   SizedBox(width: 12),
                   Expanded(
@@ -265,7 +267,20 @@ class _SupportScreenState extends State<SupportScreen> with TickerProviderStateM
               
               // Enhanced support card
               _buildEnhancedSupportCard(),
-              
+
+              SizedBox(height: 16),
+
+              // Attribution the Solar icon licence (CC BY 4.0) requires.
+              // Proper names and a licence id, so it is not translated.
+              Text(
+                'Icons: Solar by 480 Design · CC BY 4.0',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade700,
+                ),
+                textAlign: TextAlign.center,
+              ),
+
               SizedBox(height: 16),
             ],
           ),
@@ -386,7 +401,7 @@ class _SupportScreenState extends State<SupportScreen> with TickerProviderStateM
               shape: BoxShape.circle,
               border: Border.all(color: Colors.blue.shade300, width: 2),
             ),
-            child: Icon(Icons.support_agent, color: Colors.blue.shade700, size: 24),
+            child: Icon(SolarIcons.headphonesRoundSoundLinear, color: Colors.blue.shade700, size: 24),
           ),
           SizedBox(width: 12),
           Expanded(
@@ -447,7 +462,7 @@ class _SupportScreenState extends State<SupportScreen> with TickerProviderStateM
         textAlignVertical: TextAlignVertical.top,
         style: TextStyle(
           fontSize: 16,
-          fontFamily: 'Roboto',
+          fontFamily: AppTypography.family,
         ),
         decoration: InputDecoration(
           hintText: AppLocalizations.of(context).translate('support_message_placeholder'),
@@ -505,7 +520,7 @@ class _SupportScreenState extends State<SupportScreen> with TickerProviderStateM
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+          Icon(SolarIcons.dangerCircleLinear, color: Colors.red.shade700, size: 20),
           SizedBox(width: 8),
           Expanded(
             child: Text(

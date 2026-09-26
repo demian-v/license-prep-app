@@ -13,6 +13,7 @@ import '../services/service_locator_extensions.dart';
 import '../providers/subscription_provider.dart';
 import '../services/analytics_service.dart';
 import '../widgets/enhanced_state_card.dart';
+import '../theme/solar_icons.dart';
 
 class StateSelectionScreen extends StatefulWidget {
   // Add constructor with key parameter
@@ -206,7 +207,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> with Ticker
             foregroundColor: Colors.black,
             centerTitle: true,
             leading: IconButton(
-              icon: Icon(Icons.arrow_back),
+              icon: Icon(SolarIcons.arrowLeftLinear),
               onPressed: () {
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
@@ -269,7 +270,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> with Ticker
                   height: 42,
                   padding: EdgeInsets.all(10),
                   child: Icon(
-                    Icons.search_rounded,
+                    SolarIcons.magniferLinear,
                     color: Color(0xFF2196F3),
                     size: 26,
                   ),
@@ -283,7 +284,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> with Ticker
                         ),
                         child: IconButton(
                           icon: Icon(
-                            Icons.clear,
+                            SolarIcons.closeLinear,
                             color: Colors.grey[600],
                             size: 18,
                           ),
@@ -312,7 +313,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> with Ticker
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          Icons.search_off,
+                          SolarIcons.magniferBugLinear,
                           size: 70,
                           color: Colors.grey[300],
                         ),

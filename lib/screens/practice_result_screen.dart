@@ -8,6 +8,7 @@ import '../providers/progress_provider.dart';
 import '../services/analytics_service.dart';
 import '../localization/app_localizations.dart';
 import 'practice_question_screen.dart';
+import '../theme/solar_icons.dart';
 
 class PracticeResultScreen extends StatefulWidget {
   @override
@@ -217,7 +218,7 @@ class _PracticeResultScreenState extends State<PracticeResultScreen> with Ticker
         foregroundColor: Colors.black,
         centerTitle: true,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back),
+          icon: Icon(SolarIcons.arrowLeftLinear),
           onPressed: () async {
             // Log analytics before navigation
             await _logPracticeFinished('back_arrow');
@@ -364,14 +365,14 @@ class _PracticeResultScreenState extends State<PracticeResultScreen> with Ticker
                         // Fallback to Material icon if asset fails to load
                         debugPrint('❌ PracticeResultScreen: Failed to load result icon: ${_getResultIconAsset(isPassed)}');
                         return Icon(
-                          isPassed ? Icons.emoji_events : Icons.block,
+                          isPassed ? SolarIcons.cupStarBold : SolarIcons.forbiddenCircleLinear,
                           color: isPassed ? Colors.amber.shade700 : Colors.red.shade600,
                           size: 80,
                         );
                       },
                     )
                   : Icon(
-                      isPassed ? Icons.emoji_events : Icons.block,
+                      isPassed ? SolarIcons.cupStarBold : SolarIcons.forbiddenCircleLinear,
                       color: isPassed ? Colors.amber.shade700 : Colors.red.shade600,
                       size: 80,
                     ),
@@ -418,13 +419,13 @@ class _PracticeResultScreenState extends State<PracticeResultScreen> with Ticker
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
                         _buildStatChip(
-                          icon: Icons.check_circle,
+                          icon: SolarIcons.checkCircleBold,
                           value: correctAnswers.toString(),
                           label: AppLocalizations.of(context).translate('correct'),
                           color: Colors.green,
                         ),
                         _buildStatChip(
-                          icon: Icons.cancel,
+                          icon: SolarIcons.closeCircleBold,
                           value: incorrectAnswers.toString(),
                           label: AppLocalizations.of(context).translate('incorrect'),
                           color: Colors.red,
