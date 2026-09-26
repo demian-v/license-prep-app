@@ -174,8 +174,16 @@ class _MeniscusBarState extends State<_MeniscusBar>
   /// Space above the bar that the bead rises into.
   static const double _top = _beadRadius + _beadRise;
 
-  late final AnimationController _controller = AnimationController(vsync: this)
-    ..addListener(_tick);
+  // Created in initState, not lazily: a lazy controller first touched in
+  // dispose() (bead never moved) looks up TickerMode on a deactivated
+  // element and throws.
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this)..addListener(_tick);
+  }
 
   /// Bead position in tab units: 0 is the first tab's centre.
   late double _pos = widget.currentIndex.toDouble();
@@ -231,18 +239,77 @@ class _MeniscusBarState extends State<_MeniscusBar>
     super.dispose();
   }
 
-  int _indexAt(double dx, double slot) =>
-      (dx / slot).floor().clamp(0, _count - 1);
+  static const double _labelSize = 11;
+
+  TextStyle _labelStyle(bool active) => AppTypography.caption.copyWith(
+        fontSize: _labelSize,
+        color: active ? AppColors.signal : AppColors.inkSecondary,
+        fontVariations: [FontVariation('wght', active ? 700 : 500)],
+      );
+
+  /// Each tab's centre along the bar. The gaps between tabs (and at the two
+  /// ends) are equal, measured from each tab's widest content — so a short
+  /// label like «Тесты» does not sit in more air than «Инструкторы». Labels
+  /// are measured at the resting weight; the active one grows evenly on both
+  /// sides, so nothing shifts on selection. If the labels leave too little
+  /// room (very large text), fall back to equal slots.
+  List<double> _centers(double width) {
+    final scaler = MediaQuery.textScalerOf(context);
+    final widths = [
+      for (final label in widget.labels)
+        math.max(
+          24.0,
+          (TextPainter(
+            text: TextSpan(text: label, style: _labelStyle(false)),
+            textDirection: TextDirection.ltr,
+            textScaler: scaler,
+            maxLines: 1,
+          )..layout())
+              .width,
+        ),
+    ];
+    final gap = (width - widths.fold(0.0, (a, w) => a + w)) / (_count + 1);
+    if (gap < AppSpacing.x4) {
+      final slot = width / _count;
+      return [for (var i = 0; i < _count; i++) (i + 0.5) * slot];
+    }
+    final centers = <double>[];
+    var x = gap;
+    for (final w in widths) {
+      centers.add(x + w / 2);
+      x += w + gap;
+    }
+    return centers;
+  }
+
+  /// The bead's x for a fractional tab position.
+  static double _xAt(List<double> centers, double pos) {
+    final i = pos.floor().clamp(0, centers.length - 1);
+    final j = math.min(i + 1, centers.length - 1);
+    return centers[i] + (centers[j] - centers[i]) * (pos - i);
+  }
+
+  int _indexAt(double dx, List<double> centers) {
+    var nearest = 0;
+    for (var i = 1; i < centers.length; i++) {
+      if ((centers[i] - dx).abs() < (centers[nearest] - dx).abs()) nearest = i;
+    }
+    return nearest;
+  }
 
   void _onDragStart(DragStartDetails _) {
     _controller.stop();
     _dragging = true;
   }
 
-  void _onDragUpdate(DragUpdateDetails details, double slot) {
+  void _onDragUpdate(DragUpdateDetails details, List<double> centers) {
     final reduced = AppMotion.reduced(context);
+    // Tabs are unevenly spaced, so a point of drag is worth the local
+    // spacing between the two tabs the bead is between.
+    final i = _pos.floor().clamp(0, _count - 2);
+    final step = centers[i + 1] - centers[i];
     setState(() {
-      _pos = (_pos + details.delta.dx / slot).clamp(0.0, _count - 1.0);
+      _pos = (_pos + details.delta.dx / step).clamp(0.0, _count - 1.0);
       final push = (details.delta.dx / 8).clamp(-1.0, 1.0);
       _lean = reduced ? 0 : _lean * 0.6 + push * 0.4;
     });
@@ -277,16 +344,17 @@ class _MeniscusBarState extends State<_MeniscusBar>
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final slot = width / _count;
-        final cx = (_pos + 0.5) * slot;
+        final centers = _centers(width);
+        final cx = _xAt(centers, _pos);
         final shown = _pos.round().clamp(0, _count - 1);
         final state = AppMotion.duration(context, AppMotion.fast);
 
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTapUp: (d) => widget.onTap(_indexAt(d.localPosition.dx, slot)),
+          onTapUp: (d) =>
+              widget.onTap(_indexAt(d.localPosition.dx, centers)),
           onHorizontalDragStart: _onDragStart,
-          onHorizontalDragUpdate: (d) => _onDragUpdate(d, slot),
+          onHorizontalDragUpdate: (d) => _onDragUpdate(d, centers),
           // Count the drag from touch-down, not from where it cleared the
           // slop, so the bead stays under the finger.
           dragStartBehavior: DragStartBehavior.down,
@@ -309,62 +377,59 @@ class _MeniscusBarState extends State<_MeniscusBar>
                     ),
                   ),
                 ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  top: _top,
-                  height: _barHeight,
-                  child: Row(
-                    children: List.generate(_count, (i) {
-                      final tab = widget.tabs[i];
-                      final selected = i == widget.currentIndex;
-                      final active = i == shown;
-                      // The icon gives way as the bead passes over its slot.
-                      final visible = ((_pos - i).abs() / 0.5).clamp(0.0, 1.0);
-                      return Expanded(
-                        child: Semantics(
-                          button: true,
-                          selected: selected,
-                          label: widget.labels[i],
-                          onTap: () => widget.onTap(i),
-                          child: ExcludeSemantics(
-                            child: Column(
-                              children: [
-                                const SizedBox(height: AppSpacing.x3),
-                                Opacity(
-                                  opacity: visible,
-                                  child: AppIcons.icon(
-                                    tab.outline,
-                                    size: 24,
-                                    color: AppColors.inkSecondary,
-                                  ),
+                for (var i = 0; i < _count; i++)
+                  // Each tab's box is centred on its own centre, as wide as
+                  // the space it owns on its narrower side.
+                  Builder(builder: (context) {
+                    final left = i == 0 ? 0.0 : (centers[i - 1] + centers[i]) / 2;
+                    final right = i == _count - 1
+                        ? width
+                        : (centers[i] + centers[i + 1]) / 2;
+                    final half =
+                        math.min(centers[i] - left, right - centers[i]);
+                    final tab = widget.tabs[i];
+                    final selected = i == widget.currentIndex;
+                    final active = i == shown;
+                    // The icon gives way as the bead passes over its slot.
+                    final visible = ((_pos - i).abs() / 0.5).clamp(0.0, 1.0);
+                    return Positioned(
+                      left: centers[i] - half,
+                      width: half * 2,
+                      top: _top,
+                      height: _barHeight,
+                      child: Semantics(
+                        button: true,
+                        selected: selected,
+                        label: widget.labels[i],
+                        onTap: () => widget.onTap(i),
+                        child: ExcludeSemantics(
+                          child: Column(
+                            children: [
+                              const SizedBox(height: AppSpacing.x3),
+                              Opacity(
+                                opacity: visible,
+                                child: AppIcons.icon(
+                                  tab.outline,
+                                  size: 24,
+                                  color: AppColors.inkSecondary,
                                 ),
-                                const SizedBox(height: AppSpacing.x1),
-                                AnimatedDefaultTextStyle(
-                                  duration: state,
-                                  style: AppTypography.caption.copyWith(
-                                    fontSize: 11,
-                                    color: active
-                                        ? AppColors.signal
-                                        : AppColors.inkSecondary,
-                                    fontVariations: [
-                                      FontVariation('wght', active ? 700 : 500),
-                                    ],
-                                  ),
-                                  child: Text(
-                                    widget.labels[i],
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                              ),
+                              const SizedBox(height: AppSpacing.x1),
+                              AnimatedDefaultTextStyle(
+                                duration: state,
+                                style: _labelStyle(active),
+                                child: Text(
+                                  widget.labels[i],
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
-                      );
-                    }),
-                  ),
-                ),
+                      ),
+                    );
+                  }),
                 // The bead: brand blue, because it marks "you are here".
                 Positioned(
                   left: cx - _beadRadius,
