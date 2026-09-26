@@ -6,6 +6,7 @@ import '../providers/state_provider.dart';
 import '../services/report_service.dart';
 import '../services/service_locator.dart';
 import '../theme/app_theme.dart';
+import '../theme/bento_tokens.dart';
 
 enum ReportReason { image, translation, other }
 
@@ -25,52 +26,13 @@ class ReportSheet extends StatefulWidget {
   State<ReportSheet> createState() => _ReportSheetState();
 }
 
-class _ReportSheetState extends State<ReportSheet> with TickerProviderStateMixin {
-  // Design constants matching app theme
-  static const Color primaryBlue = Colors.blue;
+class _ReportSheetState extends State<ReportSheet> {
+  // Snackbar colour for the thank-you message (used by _submit, unchanged).
   static const Color primaryGreen = Colors.green;
-  static const Color backgroundColor = Color(0xFFF5F7FA);
-  static const Color cardBackground = Colors.white;
-  static const double cardBorderRadius = 12.0;
-  static const double buttonBorderRadius = 12.0;
-  
-  // Gradients for different states
-  static const LinearGradient submitButtonGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Colors.white, Color(0x66E3F2FD)], // Colors.blue.shade50.withOpacity(0.4) equivalent
-  );
-  
-  static const LinearGradient disabledButtonGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Color(0xFFBDBDBD), Color(0xFF9E9E9E)],
-  );
-  
-  static const LinearGradient dragHandleGradient = LinearGradient(
-    begin: Alignment.centerLeft,
-    end: Alignment.centerRight,
-    colors: [Color(0xFFE0E0E0), Color(0xFFBDBDBD)],
-  );
 
   ReportReason? _reason;
   final _ctrl = TextEditingController();
   bool _submitting = false;
-  
-  late AnimationController _scaleController;
-  late Animation<double> _scaleAnimation;
-  
-  @override
-  void initState() {
-    super.initState();
-    _scaleController = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: 150),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.98).animate(
-      CurvedAnimation(parent: _scaleController, curve: Curves.easeInOut),
-    );
-  }
 
   bool get _canSubmit {
     if (_reason == null) return false;
@@ -83,7 +45,6 @@ class _ReportSheetState extends State<ReportSheet> with TickerProviderStateMixin
   @override
   void dispose() {
     _ctrl.dispose();
-    _scaleController.dispose();
     super.dispose();
   }
 
@@ -162,59 +123,54 @@ class _ReportSheetState extends State<ReportSheet> with TickerProviderStateMixin
     }
   }
 
+  /// A reason as a picker row, as in the language and state dialogs: a white
+  /// rounded row on the field sheet; the chosen one the dark `ink` row, no
+  /// radio (2026-09-26). Tapping sets the reason exactly as the radio did.
   Widget _buildRadioOption({
     required ReportReason value,
     required String title,
     required bool isLast,
   }) {
     final isSelected = _reason == value;
-    
-    return AnimatedContainer(
-      duration: Duration(milliseconds: 200),
-      decoration: BoxDecoration(
-        gradient: isSelected 
-          ? LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Colors.white, Colors.purple.shade50.withOpacity(0.4)], // Like "Збережені" card
-            )
-          : null,
-        borderRadius: isLast 
-          ? BorderRadius.only(
-              bottomLeft: Radius.circular(cardBorderRadius),
-              bottomRight: Radius.circular(cardBorderRadius),
-            )
-          : null,
-      ),
-      child: Theme(
-        data: Theme.of(context).copyWith(
-          radioTheme: RadioThemeData(
-            fillColor: MaterialStateProperty.resolveWith((states) {
-              if (states.contains(MaterialState.selected)) {
-                return Colors.purple.shade600;
-              }
-              return Colors.grey.shade400;
-            }),
+    final radius = BorderRadius.circular(AppRadius.lg);
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : AppSpacing.x2),
+      child: Semantics(
+        selected: isSelected,
+        inMutuallyExclusiveGroup: true,
+        child: AnimatedContainer(
+          duration: AppMotion.duration(context, BentoTokens.state),
+          curve: AppMotion.enter,
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.ink : AppColors.paper,
+            borderRadius: radius,
           ),
-        ),
-        child: RadioListTile<ReportReason>(
-          title: Text(
-            title,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              color: isSelected ? Colors.purple.shade700 : Colors.grey.shade800,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: radius,
+              onTap: () {
+                setState(() => _reason = value);
+              },
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 52),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.x4,
+                  vertical: AppSpacing.x3,
+                ),
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  title,
+                  style: AppTypography.body.copyWith(
+                    fontSize: 17,
+                    color: isSelected ? AppColors.onSignal : AppColors.ink,
+                    fontVariations: [FontVariation('wght', isSelected ? 600 : 400)],
+                  ),
+                ),
+              ),
             ),
           ),
-          value: value,
-          groupValue: _reason,
-          onChanged: (v) {
-            setState(() => _reason = v);
-            // Add subtle haptic feedback
-            // HapticFeedback.selectionClick(); // Uncomment if you want haptic feedback
-          },
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-          dense: false,
         ),
       ),
     );
@@ -222,215 +178,182 @@ class _ReportSheetState extends State<ReportSheet> with TickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final count = _ctrl.text.trim().length;
+    final enough = count >= 10;
+    final enabled = !_submitting && _canSubmit;
+    final buttonRadius = BorderRadius.circular(BentoTokens.button);
+
     return Container(
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: const BoxDecoration(
+        color: AppColors.field,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(BentoTokens.card)),
       ),
       child: SafeArea(
         child: Padding(
           padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-            left: 20,
-            right: 20,
-            top: 16,
+            bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.x4,
+            left: AppSpacing.x4 + AppSpacing.x1,
+            right: AppSpacing.x4 + AppSpacing.x1,
+            top: AppSpacing.x3,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Enhanced drag handle
+              // Drag handle
               Center(
                 child: Container(
-                  width: 50,
+                  width: 40,
                   height: 5,
                   decoration: BoxDecoration(
-                    gradient: dragHandleGradient,
-                    borderRadius: BorderRadius.circular(3),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        spreadRadius: 0,
-                        blurRadius: 2,
-                        offset: Offset(0, 1),
-                      ),
-                    ],
+                    color: AppColors.borderStrong,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
-              
-              // Enhanced title
+              const SizedBox(height: AppSpacing.x4 + AppSpacing.x1),
+
               Text(
-                AppLocalizations.of(context).translate('report_issue'),
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey.shade800,
-                  fontFamily: AppTypography.family,
+                l.translate('report_issue'),
+                style: AppTypography.title.copyWith(
+                  fontSize: 22,
+                  height: 28 / 22,
+                  color: AppColors.ink,
+                  fontVariations: const [FontVariation('wght', 600)],
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: AppSpacing.x4),
 
-              // Enhanced radio buttons section
-              Card(
-                elevation: 3,
-                shadowColor: Colors.black.withOpacity(0.2),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(cardBorderRadius),
-                ),
-                child: Container(
+              _buildRadioOption(
+                value: ReportReason.image,
+                title: l.translate('issue_with_image'),
+                isLast: false,
+              ),
+              _buildRadioOption(
+                value: ReportReason.translation,
+                title: l.translate('issue_with_text_translation'),
+                isLast: false,
+              ),
+              _buildRadioOption(
+                value: ReportReason.other,
+                title: l.translate('other_issue'),
+                isLast: true,
+              ),
+
+              // Text field for "Other": a white card with the character count
+              // as a pill in its corner, as on Поддержка.
+              if (_reason == ReportReason.other) ...[
+                const SizedBox(height: AppSpacing.x3),
+                Container(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.x4,
+                    AppSpacing.x1,
+                    AppSpacing.x4,
+                    AppSpacing.x3,
+                  ),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(cardBorderRadius),
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        cardBackground,
-                        cardBackground.withOpacity(0.95),
-                      ],
-                    ),
+                    color: AppColors.paper,
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
                   ),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _buildRadioOption(
-                        value: ReportReason.image,
-                        title: AppLocalizations.of(context).translate('issue_with_image'),
-                        isLast: false,
+                      TextField(
+                        controller: _ctrl,
+                        maxLines: 4,
+                        minLines: 3,
+                        style: AppTypography.body.copyWith(color: AppColors.ink),
+                        decoration: InputDecoration(
+                          hintText: l.translate('describe_issue'),
+                          hintStyle: AppTypography.body.copyWith(
+                            color: AppColors.inkSecondary,
+                          ),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          filled: false,
+                          contentPadding: const EdgeInsets.symmetric(vertical: AppSpacing.x3),
+                        ),
+                        onChanged: (value) => setState(() {}),
                       ),
-                      Divider(
-                        height: 1,
-                        color: Colors.grey.shade200,
-                        indent: 20,
-                        endIndent: 20,
-                      ),
-                      _buildRadioOption(
-                        value: ReportReason.translation,
-                        title: AppLocalizations.of(context).translate('issue_with_text_translation'),
-                        isLast: false,
-                      ),
-                      Divider(
-                        height: 1,
-                        color: Colors.grey.shade200,
-                        indent: 20,
-                        endIndent: 20,
-                      ),
-                      _buildRadioOption(
-                        value: ReportReason.other,
-                        title: AppLocalizations.of(context).translate('other_issue'),
-                        isLast: true,
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: AnimatedContainer(
+                          duration: AppMotion.duration(context, BentoTokens.state),
+                          curve: AppMotion.enter,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.x2 + 2,
+                            vertical: AppSpacing.x1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: enough ? AppColors.guideSurface : AppColors.field,
+                            borderRadius: BorderRadius.circular(BentoTokens.chip),
+                          ),
+                          child: Text(
+                            // Was a hard-coded English «N/10 minimum»; the
+                            // same counter key as Поддержка.
+                            l.translate('character_counter').replaceAll('{0}', '$count'),
+                            style: AppTypography.caption.copyWith(
+                              fontSize: 13,
+                              color: enough ? AppColors.guide : AppColors.inkSecondary,
+                              fontVariations: const [FontVariation('wght', 500)],
+                              fontFeatures: const [FontFeature.tabularFigures()],
+                            ),
+                          ),
+                        ),
                       ),
                     ],
-                  ),
-                ),
-              ),
-
-              // Enhanced text field for "Other" option
-              if (_reason == ReportReason.other) ...[
-                const SizedBox(height: 20),
-                Card(
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(cardBorderRadius),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: TextField(
-                      controller: _ctrl,
-                      maxLines: 4,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontFamily: AppTypography.family,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: AppLocalizations.of(context).translate('describe_issue'),
-                        hintStyle: TextStyle(color: Colors.grey.shade500),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Colors.grey.shade300),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: primaryBlue, width: 2),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Colors.grey.shade300),
-                        ),
-                        filled: true,
-                        fillColor: Colors.grey.shade50,
-                        contentPadding: EdgeInsets.all(16),
-                        helperText: '${_ctrl.text.trim().length}/10 minimum',
-                        helperStyle: TextStyle(
-                          color: _ctrl.text.trim().length >= 10 
-                            ? primaryGreen 
-                            : Colors.grey.shade600,
-                          fontWeight: _ctrl.text.trim().length >= 10 
-                            ? FontWeight.w500 
-                            : FontWeight.normal,
-                        ),
-                      ),
-                      onChanged: (value) => setState(() {}),
-                    ),
                   ),
                 ),
               ],
 
-              const SizedBox(height: 24),
+              const SizedBox(height: AppSpacing.x4 + AppSpacing.x1),
 
-              // Enhanced submit button
-              ScaleTransition(
-                scale: _scaleAnimation,
-                child: Container(
-                  width: double.infinity,
-                  height: 52,
+              // Submit: the dark `ink` pill, grey until a reason (and, for
+              // «Другое», enough text) is given; a spinner while sending.
+              PressScale(
+                scale: 0.97,
+                duration: BentoTokens.state,
+                enabled: enabled,
+                child: AnimatedContainer(
+                  duration: AppMotion.duration(context, BentoTokens.state),
+                  curve: AppMotion.enter,
+                  height: 56,
                   decoration: BoxDecoration(
-                    gradient: _submitting || !_canSubmit 
-                      ? disabledButtonGradient 
-                      : submitButtonGradient,
-                    borderRadius: BorderRadius.circular(30),
-                    boxShadow: _submitting || !_canSubmit 
-                      ? []
-                      : [
-                          BoxShadow(
-                            color: primaryBlue.withOpacity(0.3),
-                            spreadRadius: 0,
-                            blurRadius: 8,
-                            offset: Offset(0, 4),
-                          ),
-                        ],
+                    color: _canSubmit ? AppColors.ink : AppColors.border,
+                    borderRadius: buttonRadius,
+                    boxShadow: _canSubmit
+                        ? const [
+                            BoxShadow(
+                              color: Color(0x290E1422),
+                              blurRadius: 24,
+                              offset: Offset(0, 10),
+                            ),
+                          ]
+                        : null,
                   ),
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: _submitting || !_canSubmit ? null : () {
-                        _scaleController.forward().then((_) {
-                          _scaleController.reverse();
-                          _submit();
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(30),
-                      splashColor: Colors.white.withOpacity(0.2),
-                      highlightColor: Colors.white.withOpacity(0.1),
-                      child: Container(
-                        alignment: Alignment.center,
+                      onTap: enabled ? _submit : null,
+                      borderRadius: buttonRadius,
+                      child: Center(
                         child: _submitting
-                            ? SizedBox(
+                            ? const SizedBox(
                                 width: 24,
                                 height: 24,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2.5,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.onSignal),
                                 ),
                               )
                             : Text(
-                                AppLocalizations.of(context).translate('submit'),
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.black,
-                                  fontFamily: AppTypography.family,
-                                  letterSpacing: 0.5,
+                                l.translate('submit'),
+                                style: AppTypography.label.copyWith(
+                                  fontSize: 16,
+                                  color: _canSubmit ? AppColors.onSignal : AppColors.inkTertiary,
+                                  fontVariations: const [FontVariation('wght', 500)],
                                 ),
                               ),
                       ),
@@ -438,7 +361,6 @@ class _ReportSheetState extends State<ReportSheet> with TickerProviderStateMixin
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
             ],
           ),
         ),
