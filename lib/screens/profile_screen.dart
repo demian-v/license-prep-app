@@ -1154,11 +1154,46 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     });
   }
 
+  // Picker dialogs (language, state) in the Тесты look (2026-09-26): each
+  // option a rounded field row, the current one the dark `ink` row — no
+  // tick, the fill says it (owner: "select black, not blue… no check"). The
+  // ListTiles and their onTap are unchanged.
+  static final ShapeBorder _pickerShape = RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(AppRadius.lg),
+  );
+
+  /// Each language in its own name, as on the Профиль card
+  /// (`LanguageProvider.languageName`) — display only; the English name still
+  /// goes to analytics and the result (owner, 2026-09-26).
+  static const Map<String, String> _nativeLanguageNames = {
+    'en': 'English',
+    'es': 'Español',
+    'uk': 'Українська',
+    'pl': 'Polski',
+    'ru': 'Русский',
+  };
+
+  Widget _pickerOption(Widget tile) => Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.x2),
+        child: tile,
+      );
+
+  TextStyle _pickerOptionStyle(bool selected) => AppTypography.body.copyWith(
+        fontSize: 17,
+        color: selected ? AppColors.onSignal : AppColors.ink,
+        fontVariations: [FontVariation('wght', selected ? 600 : 400)],
+      );
+
   Widget _buildLanguageOption(BuildContext context, String language, String code, 
       LanguageProvider provider, AuthProvider authProvider) {
-    return ListTile(
-      title: Text(language),
-      trailing: provider.language == code ? Icon(SolarIcons.checkLinear, color: AppColors.signal) : null,
+    final isSelected = provider.language == code;
+    return _pickerOption(ListTile(
+      title: Text(_nativeLanguageNames[code] ?? language, style: _pickerOptionStyle(isSelected)),
+      selected: isSelected,
+      shape: _pickerShape,
+      tileColor: AppColors.field,
+      selectedTileColor: AppColors.ink,
+      minTileHeight: 52,
       onTap: () async {
         // Captured here, outside the try, for two reasons: the context is
         // certainly mounted at this point, and the catch block needs it too.
@@ -1270,7 +1305,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
           });
         }
       },
-    );
+    ));
   }
 
   void _showStateSelector(BuildContext context, LanguageProvider languageProvider) {
@@ -1355,9 +1390,13 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                                 word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}' : ''
                               ).join(' ');
                               
-                              return ListTile(
-                                title: Text(titleCaseState),
-                                trailing: isSelected ? Icon(SolarIcons.checkLinear, color: AppColors.signal) : null,
+                              return _pickerOption(ListTile(
+                                title: Text(titleCaseState, style: _pickerOptionStyle(isSelected)),
+                                selected: isSelected,
+                                shape: _pickerShape,
+                                tileColor: AppColors.field,
+                                selectedTileColor: AppColors.ink,
+                                minTileHeight: 52,
                                 enabled: !_isDialogLoading, // Disable during loading
                                 onTap: () async {
                                   // Set loading state. Safe today — this runs
@@ -1506,7 +1545,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                                     });
                                   }
                                 },
-                              );
+                              ));
                             },
                           ),
                         ),
