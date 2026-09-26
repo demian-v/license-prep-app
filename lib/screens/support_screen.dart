@@ -7,163 +7,28 @@ import '../services/report_service.dart';
 import '../services/service_locator.dart';
 import '../theme/solar_icons.dart';
 import '../theme/app_theme.dart';
+import '../theme/bento_tokens.dart';
+import '../widgets/bento_result_parts.dart';
 
 class SupportScreen extends StatefulWidget {
   @override
   _SupportScreenState createState() => _SupportScreenState();
 }
 
-class _SupportScreenState extends State<SupportScreen> with TickerProviderStateMixin {
+class _SupportScreenState extends State<SupportScreen> {
   final _messageController = TextEditingController();
   bool _isSubmitting = false;
   String? _errorMessage;
 
-  late AnimationController _cardAnimationController;
-  late AnimationController _featuresAnimationController;
-  late AnimationController _buttonAnimationController;
-  late AnimationController _scaleController;
-
-  late Animation<double> _cardSlideAnimation;
-  late Animation<double> _cardFadeAnimation;
-  late Animation<double> _buttonSlideAnimation;
-  late Animation<double> _buttonFadeAnimation;
-  late Animation<double> _buttonScaleAnimation;
+  // The four delayed entrance/press controllers were replaced by a one-shot
+  // StaggerIn and PressScale (2026-09-26, Bento).
 
   bool get _canSubmit => _messageController.text.trim().length >= 10;
 
   @override
-  void initState() {
-    super.initState();
-    
-    // Initialize animation controllers
-    _cardAnimationController = AnimationController(
-      duration: Duration(milliseconds: 500),
-      vsync: this,
-    );
-    _featuresAnimationController = AnimationController(
-      duration: Duration(milliseconds: 400),
-      vsync: this,
-    );
-    _buttonAnimationController = AnimationController(
-      duration: Duration(milliseconds: 300),
-      vsync: this,
-    );
-    _scaleController = AnimationController(
-      duration: Duration(milliseconds: 100),
-      vsync: this,
-    );
-
-    // Setup animations
-    _cardSlideAnimation = Tween<double>(
-      begin: 50.0,
-      end: 0.0,
-    ).animate(CurvedAnimation(
-      parent: _cardAnimationController,
-      curve: Curves.easeOut,
-    ));
-
-    _cardFadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _cardAnimationController,
-      curve: Curves.easeIn,
-    ));
-
-    _buttonSlideAnimation = Tween<double>(
-      begin: 30.0,
-      end: 0.0,
-    ).animate(CurvedAnimation(
-      parent: _buttonAnimationController,
-      curve: Curves.easeOut,
-    ));
-
-    _buttonFadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _buttonAnimationController,
-      curve: Curves.easeIn,
-    ));
-
-    _buttonScaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.98,
-    ).animate(CurvedAnimation(
-      parent: _scaleController,
-      curve: Curves.easeInOut,
-    ));
-
-    // Start animations with delays
-    _startAnimations();
-  }
-
-  void _startAnimations() {
-    Future.delayed(Duration(milliseconds: 200), () {
-      if (mounted) _cardAnimationController.forward();
-    });
-    Future.delayed(Duration(milliseconds: 400), () {
-      if (mounted) _featuresAnimationController.forward();
-    });
-    Future.delayed(Duration(milliseconds: 600), () {
-      if (mounted) _buttonAnimationController.forward();
-    });
-  }
-
-  @override
   void dispose() {
     _messageController.dispose();
-    _cardAnimationController.dispose();
-    _featuresAnimationController.dispose();
-    _buttonAnimationController.dispose();
-    _scaleController.dispose();
     super.dispose();
-  }
-
-  // Helper method to get gradient for main card
-  LinearGradient _getCardGradient() {
-    return LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [Colors.white, Colors.blue.shade50.withOpacity(0.3)],
-      stops: [0.0, 1.0],
-    );
-  }
-
-  // Helper method to get gradient for info section
-  LinearGradient _getInfoGradient() {
-    return LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [Colors.white, Colors.blue.shade50.withOpacity(0.4)],
-      stops: [0.0, 1.0],
-    );
-  }
-
-  // Helper method to get gradient for buttons
-  LinearGradient _getButtonGradient(bool isActive, bool isBack) {
-    if (isBack) {
-      return LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Colors.white, Colors.grey.shade50.withOpacity(0.4)],
-        stops: [0.0, 1.0],
-      );
-    } else if (isActive) {
-      return LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Colors.white, Colors.blue.shade50.withOpacity(0.4)],
-        stops: [0.0, 1.0],
-      );
-    } else {
-      return LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Colors.white, Colors.grey.shade50.withOpacity(0.4)],
-        stops: [0.0, 1.0],
-      );
-    }
   }
 
   Future<void> _sendMessage() async {
@@ -236,192 +101,168 @@ class _SupportScreenState extends State<SupportScreen> with TickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    // In the Тесты look (2026-09-26): a blue hero saying what this page is,
+    // the message as a white card, then the actions — the dark pill sends.
+    final blocks = <Widget>[
+      _buildEnhancedInfoSection(),
+      const SizedBox(height: AppSpacing.x8),
+      _buildSectionHeader(
+        l.translate('message_details').replaceFirst(RegExp(r'\s*:\s*$'), ''),
+      ),
+      _buildEnhancedMessageSection(),
+      const SizedBox(height: AppSpacing.x4),
+      // Error message
+      if (_errorMessage != null) ...[
+        _buildEnhancedErrorMessage(),
+        const SizedBox(height: AppSpacing.x3),
+      ],
+      _buildEnhancedActionButtons(),
+      const SizedBox(height: AppSpacing.x4),
+      // Fine print
+      Text(
+        l.translate('support_response_info'),
+        style: AppTypography.caption.copyWith(
+          fontSize: 13,
+          height: 18 / 13,
+          color: AppColors.inkSecondary,
+          fontVariations: const [FontVariation('wght', 400)],
+        ),
+        textAlign: TextAlign.center,
+      ),
+      const SizedBox(height: AppSpacing.x6),
+      // Attribution the Solar icon licence (CC BY 4.0) requires.
+      // Proper names and a licence id, so it is not translated.
+      Text(
+        'Icons: Solar by 480 Design · CC BY 4.0',
+        style: AppTypography.caption.copyWith(
+          color: AppColors.inkSecondary,
+          fontVariations: const [FontVariation('wght', 400)],
+        ),
+        textAlign: TextAlign.center,
+      ),
+    ];
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          AppLocalizations.of(context).translate('support_title'),
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        elevation: 0,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: Colors.black,
-        centerTitle: true,
+      backgroundColor: AppColors.field,
+      appBar: bentoHeadingAppBar(
+        title: l.translate('support_title'),
+        onBack: () => Navigator.maybePop(context),
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.white,
-              Colors.grey.shade50.withOpacity(0.2),
-            ],
-          ),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.x4 + AppSpacing.x1,
+          AppSpacing.x2,
+          AppSpacing.x4 + AppSpacing.x1,
+          AppSpacing.x6 + MediaQuery.of(context).padding.bottom,
         ),
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(height: 8),
-              
-              // Enhanced support card
-              _buildEnhancedSupportCard(),
-
-              SizedBox(height: 16),
-
-              // Attribution the Solar icon licence (CC BY 4.0) requires.
-              // Proper names and a licence id, so it is not translated.
-              Text(
-                'Icons: Solar by 480 Design · CC BY 4.0',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade700,
-                ),
-                textAlign: TextAlign.center,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < blocks.length; i++)
+              StaggerIn(
+                index: i,
+                count: blocks.length,
+                curve: BentoTokens.curve,
+                child: blocks[i],
               ),
-
-              SizedBox(height: 16),
-            ],
-          ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildEnhancedSupportCard() {
-    return AnimatedBuilder(
-      animation: _cardAnimationController,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(0, _cardSlideAnimation.value),
-          child: Opacity(
-            opacity: _cardFadeAnimation.value,
-            child: Container(
-              margin: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                gradient: _getCardGradient(),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.2),
-                    spreadRadius: 0,
-                    blurRadius: 8,
-                    offset: Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: EdgeInsets.all(24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Enhanced info section
-                    _buildEnhancedInfoSection(),
-                    
-                    SizedBox(height: 24),
-                    
-                    // Message section
-                    Text(
-                      AppLocalizations.of(context).translate('message_details'),
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 12),
-                    
-                    // Enhanced message input
-                    _buildEnhancedMessageSection(),
-                    
-                    SizedBox(height: 12),
-                    
-                    // Enhanced character counter
-                    _buildEnhancedCharacterCounter(),
-                    
-                    SizedBox(height: 24),
-                    
-                    // Error message
-                    if (_errorMessage != null) ...[
-                      _buildEnhancedErrorMessage(),
-                      SizedBox(height: 16),
-                    ],
-                    
-                    // Enhanced action buttons
-                    _buildEnhancedActionButtons(),
-                    
-                    SizedBox(height: 12),
-                    
-                    // Fine print
-                    Text(
-                      AppLocalizations.of(context).translate('support_response_info'),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade700,
-                        fontStyle: FontStyle.italic,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
+  /// A section label, as on Тесты: 15/600 ink, 12 below.
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.x3),
+      child: Text(
+        title,
+        style: AppTypography.label.copyWith(
+          fontSize: 15,
+          color: AppColors.ink,
+          fontVariations: const [FontVariation('wght', 600)],
+        ),
+      ),
     );
   }
 
+  /// The page's hero, in the Тесты exam card's blue: the headphones on a
+  /// white disc, «Связаться с поддержкой», one line under it, and the faint
+  /// bar strip behind.
   Widget _buildEnhancedInfoSection() {
     return Container(
-      padding: EdgeInsets.all(20),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        gradient: _getInfoGradient(),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
+        borderRadius: BorderRadius.circular(BentoTokens.card),
+        gradient: const LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [AppColors.signal600, AppColors.signal, AppColors.signal400],
+          stops: [0, 0.55, 1],
+        ),
+        boxShadow: const [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 0,
-            blurRadius: 4,
-            offset: Offset(0, 2),
+            color: Color(0x290048C3),
+            blurRadius: 24,
+            offset: Offset(0, 10),
           ),
         ],
       ),
-      child: Row(
+      child: Stack(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Colors.white, Colors.blue.shade100],
-              ),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.blue.shade300, width: 2),
-            ),
-            child: Icon(SolarIcons.headphonesRoundSoundLinear, color: Colors.blue.shade700, size: 24),
+          Positioned(
+            right: AppSpacing.x4 + AppSpacing.x1,
+            bottom: 0,
+            child: ExcludeSemantics(child: _heroBars()),
           ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.x4 + AppSpacing.x1),
+            child: Row(
               children: [
-                Text(
-                  AppLocalizations.of(context).translate('contact_support'),
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: const BoxDecoration(
+                    color: AppColors.paper,
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    SolarIcons.headphonesRoundSoundLinear,
+                    color: AppColors.signal,
+                    size: 28,
                   ),
                 ),
-                SizedBox(height: 4),
-                Text(
-                  AppLocalizations.of(context).translate('support_desc'),
-                  style: TextStyle(
-                    color: Colors.grey.shade700,
-                    fontSize: 14,
+                const SizedBox(width: AppSpacing.x4),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // One line; a long translation shrinks rather than wraps.
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          AppLocalizations.of(context).translate('contact_support'),
+                          maxLines: 1,
+                          style: AppTypography.title.copyWith(
+                            fontSize: 22,
+                            height: 28 / 22,
+                            color: AppColors.onSignal,
+                            fontVariations: const [FontVariation('wght', 700)],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        AppLocalizations.of(context).translate('support_desc'),
+                        style: AppTypography.label.copyWith(
+                          color: AppColors.signal100,
+                          fontVariations: const [FontVariation('wght', 400)],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -432,75 +273,102 @@ class _SupportScreenState extends State<SupportScreen> with TickerProviderStateM
     );
   }
 
+  /// The exam card's bar strip (`EnhancedTestCard._questionBars`, frozen —
+  /// copied), larger and fainter, as on the Профиль hero.
+  Widget _heroBars() {
+    const heights = [
+      10, 16, 12, 22, 14, 26, 18, 30, 20, 34, 24, 28, 38, 26, 42, 30, 36, 46,
+      32, 40, 50, 36, 44, 54, 40, 48, 58, 44, 52, 60, 48, 56, 62, 52, 58, 64,
+      56, 60, 66, 62,
+    ];
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        for (final h in heights)
+          Container(
+            width: 3,
+            height: h * 1.5,
+            margin: const EdgeInsets.only(left: 3),
+            decoration: BoxDecoration(
+              color: AppColors.onSignal.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// The message as a white card: the text field, and the character count
+  /// as a pill in its bottom-right corner — green once there is enough to
+  /// send (enough = done), grey before.
   Widget _buildEnhancedMessageSection() {
     return Container(
-      height: 200,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Colors.white, Colors.grey.shade50.withOpacity(0.3)],
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: _canSubmit ? Colors.green.shade300 : Colors.grey.shade300,
-          width: _canSubmit ? 2 : 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 0,
-            blurRadius: 4,
-            offset: Offset(0, 2),
+        color: AppColors.paper,
+        borderRadius: BorderRadius.circular(BentoTokens.card),
+        boxShadow: AppColors.shadowCard,
+      ),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.x4,
+        AppSpacing.x2,
+        AppSpacing.x4,
+        AppSpacing.x3,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            height: 180,
+            child: TextField(
+              controller: _messageController,
+              maxLines: null,
+              expands: true,
+              textAlignVertical: TextAlignVertical.top,
+              style: AppTypography.body.copyWith(
+                color: AppColors.ink,
+              ),
+              decoration: InputDecoration(
+                hintText: AppLocalizations.of(context).translate('support_message_placeholder'),
+                hintStyle: AppTypography.body.copyWith(
+                  color: AppColors.inkSecondary,
+                ),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                filled: false,
+                contentPadding: const EdgeInsets.symmetric(vertical: AppSpacing.x2),
+              ),
+              onChanged: (value) => setState(() {}),
+            ),
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: _buildEnhancedCharacterCounter(),
           ),
         ],
-      ),
-      child: TextField(
-        controller: _messageController,
-        maxLines: null,
-        expands: true,
-        textAlignVertical: TextAlignVertical.top,
-        style: TextStyle(
-          fontSize: 16,
-          fontFamily: AppTypography.family,
-        ),
-        decoration: InputDecoration(
-          hintText: AppLocalizations.of(context).translate('support_message_placeholder'),
-          hintStyle: TextStyle(color: Colors.grey.shade500),
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.all(16),
-        ),
-        onChanged: (value) => setState(() {}),
       ),
     );
   }
 
   Widget _buildEnhancedCharacterCounter() {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: _canSubmit 
-              ? [Colors.white, Colors.green.shade50.withOpacity(0.4)]
-              : [Colors.white, Colors.grey.shade50.withOpacity(0.4)],
-          ),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: _canSubmit ? Colors.green.shade200 : Colors.grey.shade200,
-            width: 1,
-          ),
-        ),
-        child: Text(
-          AppLocalizations.of(context).translate('character_counter').replaceAll('{0}', _messageController.text.trim().length.toString()),
-          style: TextStyle(
-            color: _canSubmit ? Colors.green.shade700 : Colors.grey.shade600,
-            fontWeight: FontWeight.w500,
-            fontSize: 14,
-          ),
+    return AnimatedContainer(
+      duration: AppMotion.duration(context, BentoTokens.state),
+      curve: AppMotion.enter,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.x2 + 2,
+        vertical: AppSpacing.x1,
+      ),
+      decoration: BoxDecoration(
+        color: _canSubmit ? AppColors.guideSurface : AppColors.field,
+        borderRadius: BorderRadius.circular(BentoTokens.chip),
+      ),
+      child: Text(
+        AppLocalizations.of(context).translate('character_counter').replaceAll('{0}', _messageController.text.trim().length.toString()),
+        style: AppTypography.caption.copyWith(
+          fontSize: 13,
+          color: _canSubmit ? AppColors.guide : AppColors.inkSecondary,
+          fontVariations: const [FontVariation('wght', 500)],
+          fontFeatures: const [FontFeature.tabularFigures()],
         ),
       ),
     );
@@ -508,24 +376,22 @@ class _SupportScreenState extends State<SupportScreen> with TickerProviderStateM
 
   Widget _buildEnhancedErrorMessage() {
     return Container(
-      padding: EdgeInsets.all(12),
+      padding: const EdgeInsets.all(AppSpacing.x3),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Colors.white, Colors.red.shade50.withOpacity(0.6)],
-        ),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.red.shade200),
+        color: AppColors.stopSurface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       child: Row(
         children: [
-          Icon(SolarIcons.dangerCircleLinear, color: Colors.red.shade700, size: 20),
-          SizedBox(width: 8),
+          const Icon(SolarIcons.dangerCircleLinear, color: AppColors.stop, size: 20),
+          const SizedBox(width: AppSpacing.x2),
           Expanded(
             child: Text(
               _errorMessage!,
-              style: TextStyle(color: Colors.red.shade900, fontWeight: FontWeight.w500),
+              style: AppTypography.label.copyWith(
+                color: AppColors.stop,
+                fontVariations: const [FontVariation('wght', 500)],
+              ),
             ),
           ),
         ],
@@ -534,60 +400,44 @@ class _SupportScreenState extends State<SupportScreen> with TickerProviderStateM
   }
 
   Widget _buildEnhancedActionButtons() {
-    return AnimatedBuilder(
-      animation: _buttonAnimationController,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(0, _buttonSlideAnimation.value),
-          child: Opacity(
-            opacity: _buttonFadeAnimation.value,
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildEnhancedBackButton(),
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: _buildEnhancedSendButton(),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+    return Row(
+      children: [
+        Expanded(
+          child: _buildEnhancedBackButton(),
+        ),
+        const SizedBox(width: AppSpacing.x3),
+        Expanded(
+          child: _buildEnhancedSendButton(),
+        ),
+      ],
     );
   }
 
+  /// «Назад»: the white secondary pill.
   Widget _buildEnhancedBackButton() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: _getButtonGradient(false, true),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 0,
-            blurRadius: 6,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => Navigator.pop(context),
-          borderRadius: BorderRadius.circular(12),
-          splashColor: Colors.white.withOpacity(0.3),
-          highlightColor: Colors.white.withOpacity(0.2),
-          child: Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
+    final radius = BorderRadius.circular(BentoTokens.button);
+    return PressScale(
+      scale: 0.97,
+      duration: BentoTokens.state,
+      child: Container(
+        height: 56,
+        decoration: BoxDecoration(
+          color: AppColors.paper,
+          borderRadius: radius,
+          boxShadow: AppColors.shadowCard,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => Navigator.pop(context),
+            borderRadius: radius,
             child: Center(
               child: Text(
                 AppLocalizations.of(context).translate('back'),
-                style: TextStyle(
+                style: AppTypography.label.copyWith(
                   fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade700,
+                  color: AppColors.ink,
+                  fontVariations: const [FontVariation('wght', 500)],
                 ),
               ),
             ),
@@ -597,55 +447,55 @@ class _SupportScreenState extends State<SupportScreen> with TickerProviderStateM
     );
   }
 
+  /// «Отправить»: the dark `ink` pill, as the paywall's buy button — grey
+  /// until the message is long enough, a spinner while it sends.
   Widget _buildEnhancedSendButton() {
-    return GestureDetector(
-      onTapDown: (_) => _scaleController.forward(),
-      onTapUp: (_) => _scaleController.reverse(),
-      onTapCancel: () => _scaleController.reverse(),
-      child: ScaleTransition(
-        scale: _buttonScaleAnimation,
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: _getButtonGradient(_canSubmit, false),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.2),
-                spreadRadius: 0,
-                blurRadius: 6,
-                offset: Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: _isSubmitting || !_canSubmit ? null : _sendMessage,
-              borderRadius: BorderRadius.circular(12),
-              splashColor: Colors.white.withOpacity(0.3),
-              highlightColor: Colors.white.withOpacity(0.2),
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Center(
-                  child: _isSubmitting
-                      ? SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            color: Colors.blue.shade700,
-                            strokeWidth: 3,
-                          ),
-                        )
-                      : Text(
-                          AppLocalizations.of(context).translate('support_send'),
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: _canSubmit ? Colors.black : Colors.grey.shade500,
-                          ),
-                        ),
-                ),
-              ),
+    final radius = BorderRadius.circular(BentoTokens.button);
+    final enabled = !_isSubmitting && _canSubmit;
+    return PressScale(
+      scale: 0.97,
+      duration: BentoTokens.state,
+      enabled: enabled,
+      child: AnimatedContainer(
+        duration: AppMotion.duration(context, BentoTokens.state),
+        curve: AppMotion.enter,
+        height: 56,
+        decoration: BoxDecoration(
+          color: _canSubmit ? AppColors.ink : AppColors.border,
+          borderRadius: radius,
+          boxShadow: _canSubmit
+              ? const [
+                  BoxShadow(
+                    color: Color(0x290E1422),
+                    blurRadius: 24,
+                    offset: Offset(0, 10),
+                  ),
+                ]
+              : null,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: _isSubmitting || !_canSubmit ? null : _sendMessage,
+            borderRadius: radius,
+            child: Center(
+              child: _isSubmitting
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        color: AppColors.onSignal,
+                        strokeWidth: 3,
+                      ),
+                    )
+                  : Text(
+                      AppLocalizations.of(context).translate('support_send'),
+                      style: AppTypography.label.copyWith(
+                        fontSize: 16,
+                        color: _canSubmit ? AppColors.onSignal : AppColors.inkTertiary,
+                        fontVariations: const [FontVariation('wght', 500)],
+                      ),
+                    ),
             ),
           ),
         ),
