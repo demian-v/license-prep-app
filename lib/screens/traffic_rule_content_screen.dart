@@ -4,73 +4,58 @@ import '../localization/app_localizations.dart';
 import '../providers/language_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/state_provider.dart';
+import '../providers/progress_provider.dart';
 import '../services/analytics_service.dart';
 import '../widgets/report_sheet.dart';
 import '../widgets/adaptive_question_image.dart';
 import 'package:provider/provider.dart';
+import '../theme/app_icons.dart';
+import '../theme/app_theme.dart';
+import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
+import '../widgets/bento_question_parts.dart';
+import '../widgets/bento_result_parts.dart';
 
 class TrafficRuleContentScreen extends StatefulWidget {
   final TrafficRuleTopic topic;
 
+  /// The Теория module this topic belongs to, when opened from one. Reaching
+  /// the end of the page marks that module done (its tick on Теория).
+  final String? moduleId;
+
   const TrafficRuleContentScreen({
     Key? key,
     required this.topic,
+    this.moduleId,
   }) : super(key: key);
 
   @override
   _TrafficRuleContentScreenState createState() => _TrafficRuleContentScreenState();
 }
 
-class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> with TickerProviderStateMixin {
-  late AnimationController _titleAnimationController;
-  late Animation<double> _titlePulseAnimation;
-  late AnimationController _contentAnimationController;
-  late Animation<double> _contentFadeAnimation;
-  
+class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> {
   // Analytics tracking variables
   DateTime? _contentViewStartTime;
   bool _hasTrackedContentViewed = false;
   bool _hasTrackedViewFailed = false;
+
+  // Reading progress (owner, 2026-09-26): how far down the page the reader
+  // has been, saved locally when they leave. Reaching the end counts as done.
+  late final ProgressProvider _progressProvider;
+  double _readFraction = 0;
+  bool _reachedEnd = false;
+
+  // «Назад к теории» steps out of the way while reading down and returns on
+  // the way back up or at the end of the page (owner, 2026-09-26).
+  bool _showBackButton = true;
   
   @override
   void initState() {
     super.initState();
     _contentViewStartTime = DateTime.now();
+    _progressProvider = Provider.of<ProgressProvider>(context, listen: false);
     
-    // Title pulse animation (3-second cycle)
-    _titleAnimationController = AnimationController(
-      duration: Duration(seconds: 3),
-      vsync: this,
-    );
-    
-    _titlePulseAnimation = Tween<double>(
-      begin: 1.0,
-      end: 1.03,
-    ).animate(CurvedAnimation(
-      parent: _titleAnimationController,
-      curve: Curves.easeInOut,
-    ));
-    
-    // Content fade-in animation
-    _contentAnimationController = AnimationController(
-      duration: Duration(milliseconds: 800),
-      vsync: this,
-    );
-    
-    _contentFadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _contentAnimationController,
-      curve: Curves.easeOut,
-    ));
-    
-    // Start animations
-    _titleAnimationController.repeat(reverse: true);
-    _contentAnimationController.forward();
-    
-    // Track content viewed after animations start
+    // Track content viewed once the first frame is up
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _trackContentViewed();
     });
@@ -78,9 +63,71 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
   
   @override
   void dispose() {
-    _titleAnimationController.dispose();
-    _contentAnimationController.dispose();
+    _saveReadingProgress();
     super.dispose();
+  }
+
+  /// Follows the page's scroll position. The furthest point reached is the
+  /// topic's reading progress (the ring on the module page); the end of the
+  /// page — or a page short enough to need no scrolling — is done.
+  void _onReadingPosition(ScrollMetrics metrics) {
+    if (metrics.axis != Axis.vertical || _reachedEnd) return;
+    final fraction = metrics.maxScrollExtent <= 0
+        ? 1.0
+        : (metrics.pixels / metrics.maxScrollExtent).clamp(0.0, 1.0);
+    if (fraction > _readFraction) _readFraction = fraction;
+    if (metrics.extentAfter <= _endSlack) {
+      _reachedEnd = true;
+      _readFraction = 1.0;
+      _saveReadingProgress();
+    }
+  }
+
+  /// How close to the bottom counts as the end, so the last few pixels of
+  /// padding need not be scrolled.
+  static const double _endSlack = 24;
+
+  /// Saves the reading progress locally — never lowering what was saved
+  /// before — and, at the end of the page, marks the module done.
+  void _saveReadingProgress() {
+    final topicId = widget.topic.id;
+    final saved = _progressProvider.progress.topicProgress[topicId] ?? 0.0;
+    if (_readFraction > saved) {
+      _progressProvider.updateTopicProgress(topicId, _readFraction);
+    }
+    final moduleId = widget.moduleId;
+    if (_reachedEnd && moduleId != null) {
+      _progressProvider.completeModule(moduleId);
+    }
+  }
+
+  void _onScrollDirection(ScrollUpdateNotification n) {
+    if (n.depth != 0 || n.metrics.axis != Axis.vertical) return;
+    final delta = n.scrollDelta ?? 0;
+    bool show = _showBackButton;
+    if (n.metrics.extentAfter <= _endSlack || n.metrics.pixels <= 0) {
+      show = true;
+    } else if (delta > 2) {
+      show = false;
+    } else if (delta < -2) {
+      show = true;
+    }
+    if (show != _showBackButton) setState(() => _showBackButton = show);
+  }
+
+  Widget _trackReading(Widget content) {
+    bool onMetrics(ScrollMetrics metrics, int depth) {
+      if (depth == 0) _onReadingPosition(metrics);
+      return false;
+    }
+
+    return NotificationListener<ScrollMetricsNotification>(
+      onNotification: (n) => onMetrics(n.metrics, n.depth),
+      child: NotificationListener<ScrollUpdateNotification>(
+        onNotification: (n) => onMetrics(n.metrics, n.depth),
+        child: content,
+      ),
+    );
   }
 
   // Analytics tracking methods
@@ -224,224 +271,57 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
     );
   }
 
-  // Topic-based gradient selection
-  LinearGradient _getTopicGradient(String topicTitle, {double opacity = 0.6}) {
-    Color endColor;
-    
-    if (topicTitle.toLowerCase().contains('загальн')) {
-      endColor = Colors.purple.shade50.withOpacity(opacity);
-    } else if (topicTitle.toLowerCase().contains('правила')) {
-      endColor = Colors.blue.shade50.withOpacity(opacity);
-    } else if (topicTitle.toLowerCase().contains('безпек')) {
-      endColor = Colors.green.shade50.withOpacity(opacity);
-    } else if (topicTitle.toLowerCase().contains('велосипед')) {
-      endColor = Colors.orange.shade50.withOpacity(opacity);
-    } else if (topicTitle.toLowerCase().contains('піш')) {
-      endColor = Colors.teal.shade50.withOpacity(opacity);
-    } else {
-      endColor = Colors.indigo.shade50.withOpacity(opacity);
-    }
-    
-    return LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [Colors.white, endColor],
-      stops: [0.0, 1.0],
-    );
+  /// Leaves the page. Moved unchanged from the back arrow's and «Назад к
+  /// теории»'s inline handlers (they were identical).
+  void _onBack() {
+    // Track content completion
+    _trackContentCompleted();
+    Navigator.pop(context);
   }
 
-  // Section-specific gradients (cycling through colors) - EXACT match with module cards
-  LinearGradient _getSectionGradient(int sectionIndex) {
-    Color endColor;
-    
-    // Use the exact same color rotation as module cards
-    switch (sectionIndex % 5) {
-      case 0:
-        endColor = Colors.blue.shade50.withOpacity(0.4); // General Provisions color
-        break;
-      case 1:
-        endColor = Colors.green.shade50.withOpacity(0.4); // Traffic Rules color
-        break;
-      case 2:
-        endColor = Colors.orange.shade50.withOpacity(0.4); // Passenger Safety color
-        break;
-      case 3:
-        endColor = Colors.purple.shade50.withOpacity(0.4); // Pedestrian Rights color
-        break;
-      case 4:
-        endColor = Colors.teal.shade50.withOpacity(0.4); // Bicycles and Motorcycles color
-        break;
-      default:
-        endColor = Colors.indigo.shade50.withOpacity(0.4); // Fallback color
-    }
-    
-    return LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [Colors.white, endColor],
-      stops: [0.0, 1.0],
-    );
-  }
-
-  // Standard shadow configuration
-  List<BoxShadow> _getCardShadow() {
-    return [
-      BoxShadow(
-        color: Colors.grey.withOpacity(0.2),
-        spreadRadius: 0,
-        blurRadius: 6,
-        offset: Offset(0, 3),
-      ),
-    ];
-  }
-
-  // Topic icon selection
-  IconData _getTopicIcon(String topicTitle) {
-    if (topicTitle.toLowerCase().contains('загальн')) {
-      return SolarIcons.infoCircleLinear;
-    } else if (topicTitle.toLowerCase().contains('правила')) {
-      return SolarIcons.checklistMinimalisticLinear;
-    } else if (topicTitle.toLowerCase().contains('безпек')) {
-      return SolarIcons.shieldCheckBold;
-    } else if (topicTitle.toLowerCase().contains('велосипед')) {
-      return SolarIcons.bicyclingLinear;
-    } else if (topicTitle.toLowerCase().contains('піш')) {
-      return SolarIcons.walkingLinear;
-    } else {
-      return SolarIcons.squareAcademicCapBold;
-    }
-  }
-
-  // Enhanced animated title widget
-  Widget _buildEnhancedTopicTitle() {
-    final topicIcon = _getTopicIcon(widget.topic.title);
-    final gradient = _getTopicGradient(widget.topic.title);
-    
-    return AnimatedBuilder(
-      animation: _titlePulseAnimation,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _titlePulseAnimation.value,
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              gradient: gradient,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: _getCardShadow(),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  topicIcon,
-                  size: 16,
-                  color: Colors.black,
-                ),
-                SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    widget.topic.title,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // Enhanced section title - EXACT match with module card styling
-  Widget _buildSectionTitle(String title, int index) {
-    // Use the exact same gradient as the section cards for consistency
-    LinearGradient titleGradient = _getSectionGradient(index);
-    
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        gradient: titleGradient,
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.15),
-            spreadRadius: 0,
-            blurRadius: 4,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.8),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Icon(
-              SolarIcons.documentTextLinear,
-              size: 16,
-              color: Colors.black87,
-            ),
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87, // Match module card text color
-                height: 1.3,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Section header with report button
+  /// A section title and its ⚠ report button (44pt target), title first.
   Widget _buildSectionHeader(String title, int index) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: _buildSectionTitle(title, index),
-        ),
-        SizedBox(width: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.8),
-            borderRadius: BorderRadius.circular(6),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.1),
-                spreadRadius: 0,
-                blurRadius: 2,
-                offset: Offset(0, 1),
+          child: Padding(
+            // Centres a one-line title on the 44pt button.
+            padding: const EdgeInsets.only(top: 9),
+            child: Text(
+              title,
+              style: AppTypography.heading.copyWith(
+                fontSize: 19,
+                height: 26 / 19,
+                letterSpacing: -0.2,
+                color: AppColors.ink,
+                fontVariations: const [FontVariation('wght', 600)],
               ),
-            ],
+            ),
           ),
-          child: IconButton(
-            icon: Icon(SolarIcons.dangerTriangleLinear, size: 16),
-            onPressed: () => _showSectionReportSheet(index, title),
-            tooltip: 'Report Section Issue',
-            padding: EdgeInsets.all(4),
-            constraints: BoxConstraints(minWidth: 24, minHeight: 24),
-            color: Colors.grey.shade700,
+        ),
+        const SizedBox(width: AppSpacing.x1),
+        // The card's right padding is narrow on this row only, so the full
+        // 44pt target fits while the glyph lines up with the text edge.
+        IconButton(
+          tooltip: 'Report Section Issue',
+          style: IconButton.styleFrom(
+            fixedSize: const Size(44, 44),
+            shape: const CircleBorder(),
           ),
+          icon: AppIcons.icon(
+            AppIcons.report,
+            size: 20,
+            color: AppColors.inkSecondary,
+          ),
+          onPressed: () => _showSectionReportSheet(index, title),
         ),
       ],
     );
   }
 
-  // Enhanced content text
+  /// Reading text: 16/24 at 400 in ink, straight on the card — no inner
+  /// bordered box.
   Widget _buildSectionContent(String content) {
     // Process content for better formatting
     final processedContent = content
@@ -449,39 +329,35 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
         .replaceAll('\\n\\n', '\n\n') // Handle double newlines
         .replaceAll('\\n', '\n'); // Handle regular newlines
     
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Colors.grey.withOpacity(0.2),
-          width: 1,
-        ),
-      ),
-      child: Text(
-        processedContent,
-        style: TextStyle(
-          fontSize: 16,
-          height: 1.5, // Enhanced line spacing
-          color: Colors.black87,
-          letterSpacing: 0.2, // Slight letter spacing for readability
-        ),
-      ),
-    );
+    return Text(processedContent, style: _bodyStyle);
   }
 
-  // Enhanced section card
+  static final TextStyle _bodyStyle = AppTypography.body.copyWith(
+    fontSize: 16,
+    height: 24 / 16,
+    color: AppColors.ink,
+    fontVariations: const [FontVariation('wght', 400)],
+  );
+
+  BoxDecoration get _cardDecoration => BoxDecoration(
+        color: AppColors.paper,
+        borderRadius: BorderRadius.circular(BentoTokens.card),
+        boxShadow: AppColors.shadowCard,
+      );
+
+  /// One section as one white card: title and ⚠, the picture, then the text.
+  /// The right padding is 8 so the ⚠ row can hold a full 44pt target; the
+  /// picture and text add 12 back, for the same 20 on both sides.
   Widget _buildSectionCard(section, int index) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: _getSectionGradient(index),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: _getCardShadow(),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.x4 + AppSpacing.x1,
+        AppSpacing.x3,
+        AppSpacing.x2,
+        AppSpacing.x4 + AppSpacing.x1,
       ),
+      decoration: _cardDecoration,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -490,284 +366,236 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
             _buildSectionHeader(section.title, index),
           
           if (section.title != null && section.title.isNotEmpty)
-            SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.x3),
           
           // NEW: Add image display if imagePath exists
           if (section.imagePath != null && section.imagePath.isNotEmpty)
-            AdaptiveQuestionImage(
-              imagePath: section.imagePath,
-              storageFolder: 'theory_images',
-              assetFallback: section.imagePath,
-              // Theory is long-form reading: no timer, no action bar competing
-              // for the viewport. The widget's default is deliberately short
-              // for question screens; diagrams here keep their original height.
-              maxHeight: 265,
+            Padding(
+              padding: const EdgeInsets.only(right: AppSpacing.x3),
+              child: AdaptiveQuestionImage(
+                imagePath: section.imagePath,
+                storageFolder: 'theory_images',
+                assetFallback: section.imagePath,
+                // Theory is long-form reading: no timer, no action bar competing
+                // for the viewport. The widget's default is deliberately short
+                // for question screens; diagrams here keep their original height.
+                maxHeight: 265,
+              ),
             ),
           
           if (section.imagePath != null && section.imagePath.isNotEmpty)
-            SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.x4),
           
           // Enhanced content text
-          _buildSectionContent(section.content ?? "No content available"),
-        ],
-      ),
-    );
-  }
-
-  // Section divider
-  Widget _buildSectionDivider() {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              height: 1,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.transparent,
-                    Colors.grey.withOpacity(0.3),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Container(
-            margin: EdgeInsets.symmetric(horizontal: 16),
-            padding: EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              gradient: _getTopicGradient(widget.topic.title, opacity: 0.4),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 0,
-                  blurRadius: 4,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Icon(
-              SolarIcons.menuDotsBold,
-              size: 16,
-              color: Colors.grey.shade600,
-            ),
-          ),
-          Expanded(
-            child: Container(
-              height: 1,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.transparent,
-                    Colors.grey.withOpacity(0.3),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
+          Padding(
+            padding: const EdgeInsets.only(right: AppSpacing.x3),
+            child: _buildSectionContent(section.content ?? "No content available"),
           ),
         ],
       ),
     );
   }
 
-  // Enhanced fallback content
+  /// The heading over a topic's full text. It was «Зміст теми» in Ukrainian
+  /// for every language (fixed 2026-09-26, owner).
+  String _topicContentLabel() {
+    switch (Provider.of<LanguageProvider>(context, listen: false).language) {
+      case 'ru':
+        return 'Содержание темы';
+      case 'uk':
+        return 'Зміст теми';
+      case 'es':
+        return 'Contenido del tema';
+      case 'pl':
+        return 'Treść tematu';
+      default:
+        return 'Topic content';
+    }
+  }
+
+  /// A topic without sections: its full text in one card.
   Widget _buildFallbackContent() {
     return Container(
-      margin: EdgeInsets.all(16),
-      padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: _getTopicGradient(widget.topic.title),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: _getCardShadow(),
-      ),
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.x4 + AppSpacing.x1),
+      decoration: _cardDecoration,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Topic overview header
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white,
-                  _getTopicGradient(widget.topic.title, opacity: 0.3).colors[1],
-                ],
-              ),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  _getTopicIcon(widget.topic.title),
-                  size: 18,
-                  color: Colors.indigo.shade700,
-                ),
-                SizedBox(width: 8),
-                Text(
-                  "Зміст теми",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.indigo.shade700,
-                    fontSize: 16,
-                  ),
-                ),
-              ],
+          Text(
+            _topicContentLabel(),
+            style: AppTypography.heading.copyWith(
+              fontSize: 19,
+              height: 26 / 19,
+              color: AppColors.ink,
+              fontVariations: const [FontVariation('wght', 600)],
             ),
           ),
-          SizedBox(height: 16),
-          
-          // Content container
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.8),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              widget.topic.fullContent
-                  ?.replaceAll('\\n•', '\n• ')
-                  ?.replaceAll('\\n\\n', '\n\n')
-                  ?.replaceAll('\\n', '\n') ?? 
-                  "No content available for this topic.",
-              style: TextStyle(
-                fontSize: 16,
-                height: 1.5,
-                color: Colors.black87,
-                letterSpacing: 0.2,
-              ),
-            ),
+          const SizedBox(height: AppSpacing.x3),
+          Text(
+            widget.topic.fullContent
+                ?.replaceAll('\\n•', '\n• ')
+                ?.replaceAll('\\n\\n', '\n\n')
+                ?.replaceAll('\\n', '\n') ?? 
+                "No content available for this topic.",
+            style: _bodyStyle,
           ),
         ],
       ),
     );
   }
 
-  // Enhanced error state
+  /// Rendering failed: a soft red disc, a title, one quiet line.
   Widget _buildErrorState(Object error) {
-    return Container(
-      margin: EdgeInsets.all(16),
-      padding: EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Colors.white, Colors.red.shade50.withOpacity(0.3)],
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.x8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 88,
+              height: 88,
+              decoration: const BoxDecoration(
+                color: AppColors.stopSurface,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: const Icon(
+                SolarIcons.dangerCircleLinear,
+                size: 40,
+                color: AppColors.stop,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.x6),
+            Text(
+              'Error displaying content',
+              textAlign: TextAlign.center,
+              style: AppTypography.heading.copyWith(
+                fontSize: 20,
+                height: 26 / 20,
+                fontVariations: const [FontVariation('wght', 600)],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.x2),
+            Text(
+              'Please try again later or contact support if the issue persists.',
+              textAlign: TextAlign.center,
+              style: AppTypography.body.copyWith(
+                fontSize: 15,
+                height: 22 / 15,
+                color: AppColors.inkSecondary,
+              ),
+            ),
+          ],
         ),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: _getCardShadow(),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.red.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(50),
-            ),
-            child: Icon(
-              SolarIcons.dangerCircleLinear, 
-              size: 48, 
-              color: Colors.red.shade600,
-            ),
-          ),
-          SizedBox(height: 16),
-          Text(
-            'Error displaying content',
-            style: TextStyle(
-              fontSize: 18, 
-              fontWeight: FontWeight.bold,
-              color: Colors.red.shade700,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Please try again later or contact support if the issue persists.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.grey.shade700,
-              height: 1.4,
-            ),
-          ),
-        ],
       ),
     );
   }
 
-  // Enhanced content rendering
+  /// The sections as a stack of cards on the field page, entering once.
   Widget _buildEnhancedContent() {
+    final sections = widget.topic.sections;
+    final hasSections = sections != null && sections.isNotEmpty;
+    final count = hasSections ? sections.length : 1;
     return SingleChildScrollView(
-      padding: EdgeInsets.only(bottom: 8),
+      // The end of the text stays clear of the floating «Назад к теории».
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.x4,
+        AppSpacing.x2,
+        AppSpacing.x4,
+        AppSpacing.x2 + 56 + AppSpacing.x4 + MediaQuery.of(context).padding.bottom,
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (widget.topic.sections != null && widget.topic.sections.isNotEmpty) 
-            ...widget.topic.sections.asMap().entries.map((entry) {
+          if (hasSections)
+            ...sections.asMap().entries.map((entry) {
               final int index = entry.key;
               final section = entry.value;
-              
-              return Column(
-                children: [
-                  // Enhanced section divider (not for first section)
-                  if (index > 0) _buildSectionDivider(),
-                  
-                  // Enhanced section card
-                  _buildSectionCard(section, index),
-                ],
+              return Padding(
+                padding: EdgeInsets.only(top: index > 0 ? AppSpacing.x3 : 0),
+                child: StaggerIn(
+                  index: index,
+                  count: count,
+                  curve: BentoTokens.curve,
+                  child: _buildSectionCard(section, index),
+                ),
               );
-            }).toList()
-          else 
-            _buildFallbackContent(),
+            })
+          else
+            StaggerIn(
+              index: 0,
+              count: 1,
+              curve: BentoTokens.curve,
+              child: _buildFallbackContent(),
+            ),
         ],
       ),
     );
   }
 
-  // Back to Theory button
-  Widget _buildBackToTheoryButton() {
-    return Container(
-      height: 56,
-      margin: EdgeInsets.only(left: 16, right: 16, bottom: 24, top: 4),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Colors.white, Colors.blue.shade50.withOpacity(0.4)],
+  /// A neutral dark pill: it floats over both the white cards and the field
+  /// page, so it needs contrast with both — a white pill vanished into the
+  /// cards. `ink` is neutral, not semantic (as on the «Сохраненные» card).
+  Widget _buildInkPill(String text, VoidCallback onTap) {
+    final radius = BorderRadius.circular(BentoTokens.button);
+    return PressScale(
+      scale: 0.97,
+      duration: BentoTokens.state,
+      child: Container(
+        height: 56,
+        decoration: BoxDecoration(
+          color: AppColors.ink,
+          borderRadius: radius,
+          boxShadow: AppColors.shadowRaised,
         ),
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 0,
-            blurRadius: 6,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            // Track content completion
-            _trackContentCompleted();
-            Navigator.pop(context);
-          },
-          borderRadius: BorderRadius.circular(30),
-          child: Center(
-            child: Text(
-              AppLocalizations.of(context).translate('back_to_theory'),
-              style: TextStyle(
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: radius,
+            child: Center(
+              child: Text(
+                text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.label.copyWith(
+                  fontSize: 16,
+                  color: AppColors.onSignal,
+                  fontVariations: const [FontVariation('wght', 500)],
+                ),
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// «Назад к теории» as a dark pill floating over the text (owner: the
+  /// blue one was loud). It slides away while reading down and comes back on
+  /// the way up; hidden, it takes no taps.
+  Widget _buildBackToTheoryButton() {
+    return IgnorePointer(
+      ignoring: !_showBackButton,
+      child: AnimatedSlide(
+        offset: _showBackButton ? Offset.zero : const Offset(0, 1),
+        duration: AppMotion.duration(context, AppMotion.base),
+        curve: _showBackButton ? AppMotion.enter : AppMotion.exit,
+        child: SafeArea(
+          top: false,
+          minimum: const EdgeInsets.only(bottom: AppSpacing.x4),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.x4,
+              AppSpacing.x2,
+              AppSpacing.x4,
+              0,
+            ),
+            child: _buildInkPill(
+              AppLocalizations.of(context).translate('back_to_theory'),
+              _onBack,
             ),
           ),
         ),
@@ -778,83 +606,59 @@ class _TrafficRuleContentScreenState extends State<TrafficRuleContentScreen> wit
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: _buildEnhancedTopicTitle(),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        leading: IconButton(
-          icon: Icon(SolarIcons.arrowLeftLinear),
-          onPressed: () {
-            // Track content completion (same as "Back to Theory" button)
-            _trackContentCompleted();
-            Navigator.pop(context);
-          },
-        ),
+      backgroundColor: AppColors.field,
+      // The round back button with the topic's name beside it (one line,
+      // shrinking rather than wrapping), and the ⚠ for the whole topic.
+      appBar: bentoHeadingAppBar(
+        title: widget.topic.title,
+        onBack: _onBack,
         actions: [
           IconButton(
-            icon: Icon(SolarIcons.dangerTriangleLinear),
-            onPressed: _showTopicReportSheet,
             tooltip: 'Report Issue',
+            style: bentoRoundIconStyle,
+            icon: AppIcons.icon(
+              AppIcons.report,
+              size: 22,
+              color: AppColors.inkSecondary,
+            ),
+            onPressed: _showTopicReportSheet,
           ),
+          const SizedBox(width: AppSpacing.x3),
         ],
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.white,
-              _getTopicGradient(widget.topic.title, opacity: 0.1).colors[1],
-            ],
-            stops: [0.0, 1.0],
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: NotificationListener<ScrollUpdateNotification>(
+              onNotification: (n) {
+                _onScrollDirection(n);
+                return false;
+              },
+              child: Builder(
+              builder: (context) {
+                try {
+                  return _trackReading(_buildEnhancedContent());
+                } catch (e) {
+                  print('Error rendering topic content: $e');
+                  // Track content view failure
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _trackContentViewFailed(e);
+                  });
+                  return _buildErrorState(e);
+                }
+              },
+              ),
+            ),
           ),
-        ),
-        child: Column(
-          children: [
-            // Decorative top border
-            Container(
-              width: double.infinity,
-              height: 8,
-              decoration: BoxDecoration(
-                gradient: _getTopicGradient(widget.topic.title, opacity: 0.4),
-                border: Border(
-                  bottom: BorderSide(
-                    color: _getTopicGradient(widget.topic.title, opacity: 0.6).colors[1],
-                    width: 1,
-                  ),
-                ),
-              ),
-            ),
-            SizedBox(height: 8),
-            
-            // Animated content
-            Expanded(
-              child: FadeTransition(
-                opacity: _contentFadeAnimation,
-                child: Builder(
-                  builder: (context) {
-                    try {
-                      return _buildEnhancedContent();
-                    } catch (e) {
-                      print('Error rendering topic content: $e');
-                      // Track content view failure
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        _trackContentViewFailed(e);
-                      });
-                      return _buildErrorState(e);
-                    }
-                  },
-                ),
-              ),
-            ),
-            
-            // Bottom button area
-            _buildBackToTheoryButton(),
-          ],
-        ),
+          
+          // Bottom button area
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _buildBackToTheoryButton(),
+          ),
+        ],
       ),
     );
   }

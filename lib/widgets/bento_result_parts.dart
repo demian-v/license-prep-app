@@ -11,10 +11,12 @@ import 'bento_question_parts.dart';
 /// screen keeps its own analytics and navigation.
 
 /// A pushed page's app bar: the round back button and, beside it, the page's
-/// name — left-aligned, one line, shrinking rather than wrapping.
+/// name — left-aligned, one line, shrinking rather than wrapping. [actions]
+/// (round buttons, e.g. ⚠) sit on the right.
 AppBar bentoHeadingAppBar({
   required String title,
   required VoidCallback onBack,
+  List<Widget>? actions,
 }) {
   return AppBar(
     toolbarHeight: 64,
@@ -36,6 +38,7 @@ AppBar bentoHeadingAppBar({
         ),
       ),
     ),
+    actions: actions,
     title: FittedBox(
       fit: BoxFit.scaleDown,
       alignment: Alignment.centerLeft,

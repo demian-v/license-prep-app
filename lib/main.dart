@@ -34,7 +34,6 @@ import 'screens/subscription_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/state_selection_screen.dart';
 import 'screens/signup_resume_gate.dart';
-import 'screens/traffic_rules_topics_screen.dart';
 import 'screens/test_screen.dart';
 import 'screens/reset_app_settings_screen.dart';
 import 'screens/forgot_password_screen.dart';
@@ -690,7 +689,6 @@ class MyApp extends StatelessWidget {
             '/login': (context) => LoginScreen(),
             '/signup': (context) => SignupScreen(),
             '/home': (context) => HomeScreen(),
-            '/theory': (context) => TrafficRulesTopicsScreen(),
             '/tests': (context) => TestScreen(),
             '/profile': (context) => ProfileScreen(),
             '/subscription': (context) => SubscriptionScreen(),
@@ -798,9 +796,11 @@ class MyApp extends StatelessWidget {
                   builder: (context) => TheoryModuleScreen(module: nonNullModule),
                 );
               } else {
-                // If module not found, redirect to theory screen
+                // If module not found, go home. The old target, a separate
+                // topics list at '/theory', was unreachable and was removed
+                // on 2026-09-26 (owner).
                 return MaterialPageRoute(
-                  builder: (context) => TrafficRulesTopicsScreen(),
+                  builder: (context) => HomeScreen(),
                 );
               }
             }

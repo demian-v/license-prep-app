@@ -5,7 +5,10 @@ import '../models/traffic_rule_topic.dart';
 import '../providers/content_provider.dart';
 import '../providers/progress_provider.dart';
 import 'traffic_rule_content_screen.dart';
+import '../theme/app_theme.dart';
+import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
+import '../widgets/bento_result_parts.dart';
 
 class TheoryModuleScreen extends StatefulWidget {
   final TheoryModule module;
@@ -146,7 +149,7 @@ class _TheoryModuleScreenState extends State<TheoryModuleScreen> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => TrafficRuleContentScreen(topic: _moduleTopics[0]),
+              builder: (context) => TrafficRuleContentScreen(topic: _moduleTopics[0], moduleId: widget.module.id),
             ),
           );
         }
@@ -154,17 +157,25 @@ class _TheoryModuleScreenState extends State<TheoryModuleScreen> {
     }
   }
 
+  /// Opens a topic. Moved unchanged from the row's inline `onTap`.
+  void _openTopic(TrafficRuleTopic topic) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TrafficRuleContentScreen(topic: topic, moduleId: widget.module.id),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // A pushed screen: the round back button with the module's name beside
+    // it, one line, shrinking rather than wrapping.
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.module.title,
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        elevation: 0,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: Colors.black,
+      backgroundColor: AppColors.field,
+      appBar: bentoHeadingAppBar(
+        title: widget.module.title,
+        onBack: () => Navigator.pop(context),
       ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
@@ -174,109 +185,218 @@ class _TheoryModuleScreenState extends State<TheoryModuleScreen> {
 
   Widget _buildTopicsList() {
     if (_moduleTopics.isEmpty) {
+      // As on the topic list: a soft blue disc, the message, then the action
+      // as a blue pill.
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('No topics available for this module'),
-            SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadTopics,
-              child: Text('Refresh'),
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.x8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 88,
+                height: 88,
+                decoration: const BoxDecoration(
+                  color: AppColors.signal50,
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: const Icon(
+                  SolarIcons.listLinear,
+                  size: 40,
+                  color: AppColors.signal,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.x6),
+              Text(
+                'No topics available for this module',
+                textAlign: TextAlign.center,
+                style: AppTypography.heading.copyWith(
+                  fontSize: 20,
+                  height: 26 / 20,
+                  fontVariations: const [FontVariation('wght', 600)],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.x6),
+              FilledButton(
+                onPressed: _loadTopics,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 48),
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x6),
+                  shape: const StadiumBorder(),
+                ),
+                child: Text('Refresh'),
+              ),
+            ],
+          ),
         ),
       );
     }
 
     return ListView.builder(
-      padding: EdgeInsets.all(16),
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.x4,
+        AppSpacing.x2,
+        AppSpacing.x4,
+        AppSpacing.x6 + MediaQuery.of(context).padding.bottom,
+      ),
       itemCount: _moduleTopics.length,
       itemBuilder: (context, index) {
         final topic = _moduleTopics[index];
-        return Card(
-          margin: EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => TrafficRuleContentScreen(topic: topic),
-                ),
-              );
-            },
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: Colors.blue.shade100,
-                    child: Text(
-                      (index + 1).toString(),
-                      style: TextStyle(
-                        color: Colors.blue,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      topic.title,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  Consumer<ProgressProvider>(
-                    builder: (context, progressProvider, _) {
-                      // Show progress indicator for this topic
-                      final progress = progressProvider.progress.topicProgress[topic.id] ?? 0.0;
-                      
-                      if (progress > 0) {
-                        return Container(
-                          width: 40,
-                          height: 40,
-                          child: Stack(
-                            children: [
-                              CircularProgressIndicator(
-                                value: progress,
-                                backgroundColor: Colors.grey.shade200,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  progress >= 1.0 ? Colors.green : Colors.blue,
-                                ),
-                              ),
-                              if (progress >= 1.0)
-                                Center(
-                                  child: Icon(
-                                    SolarIcons.checkLinear,
-                                    color: Colors.green,
-                                    size: 16,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        );
-                      } else {
-                        return Icon(
-                          SolarIcons.altArrowRightLinear,
-                          size: 16,
-                          color: Colors.grey,
-                        );
-                      }
-                    },
-                  ),
-                ],
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.x3),
+          // One-shot entrance, capped so the whole list lands inside
+          // AppMotion.base.
+          child: StaggerIn(
+            index: index,
+            count: _moduleTopics.length,
+            curve: BentoTokens.curve,
+            child: _TopicRow(
+              number: index + 1,
+              title: topic.title,
+              onTap: () => _openTopic(topic),
+              trailing: Consumer<ProgressProvider>(
+                builder: (context, progressProvider, _) {
+                  // Show progress indicator for this topic
+                  final progress = progressProvider.progress.topicProgress[topic.id] ?? 0.0;
+                  return _buildProgress(progress);
+                },
               ),
             ),
           ),
         );
       },
+    );
+  }
+
+  /// The topic's progress: nothing before it is started, a blue ring while
+  /// under way (blue = current), a green disc with a tick once done
+  /// (green = done).
+  Widget _buildProgress(double progress) {
+    if (progress <= 0) return const SizedBox.shrink();
+    if (progress >= 1.0) {
+      return Container(
+        width: 28,
+        height: 28,
+        decoration: const BoxDecoration(
+          color: AppColors.guide,
+          shape: BoxShape.circle,
+        ),
+        alignment: Alignment.center,
+        child: const Icon(
+          SolarIcons.checkLinear,
+          color: AppColors.onSignal,
+          size: 18,
+        ),
+      );
+    }
+    return SizedBox(
+      width: 28,
+      height: 28,
+      child: CircularProgressIndicator(
+        value: progress,
+        strokeWidth: 3,
+        strokeCap: StrokeCap.round,
+        backgroundColor: AppColors.border,
+        valueColor: const AlwaysStoppedAnimation<Color>(AppColors.signal),
+      ),
+    );
+  }
+}
+
+/// One topic of the module as a Bento card: a neutral number key, the title,
+/// and the progress at the end. The whole card is the button — no chevron.
+/// Presses lift the card rather than shrinking it, as on Тесты.
+class _TopicRow extends StatefulWidget {
+  const _TopicRow({
+    required this.number,
+    required this.title,
+    required this.trailing,
+    required this.onTap,
+  });
+
+  final int number;
+  final String title;
+  final Widget trailing;
+  final VoidCallback onTap;
+
+  @override
+  State<_TopicRow> createState() => _TopicRowState();
+}
+
+class _TopicRowState extends State<_TopicRow> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => _setPressed(true),
+        onTapUp: (_) => _setPressed(false),
+        onTapCancel: () => _setPressed(false),
+        onTap: widget.onTap,
+        child: AnimatedSlide(
+          offset: Offset(0, _pressed ? -0.04 : 0),
+          duration: AppMotion.duration(context, BentoTokens.state),
+          curve: AppMotion.enter,
+          child: Container(
+            width: double.infinity,
+            constraints: const BoxConstraints(minHeight: 72),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.x4,
+              vertical: AppSpacing.x3,
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.paper,
+              borderRadius: BorderRadius.circular(BentoTokens.card),
+              boxShadow: AppColors.shadowCard,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    color: AppColors.field,
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    '${widget.number}',
+                    style: AppTypography.label.copyWith(
+                      color: AppColors.inkSecondary,
+                      fontVariations: const [FontVariation('wght', 600)],
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.x3),
+                Expanded(
+                  child: Text(
+                    widget.title,
+                    style: AppTypography.body.copyWith(
+                      fontSize: 17,
+                      height: 22 / 17,
+                      letterSpacing: -0.2,
+                      color: AppColors.ink,
+                      fontVariations: const [FontVariation('wght', 600)],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.x3),
+                widget.trailing,
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
