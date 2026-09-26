@@ -6,6 +6,8 @@ import '../services/in_app_purchase_service.dart';
 import '../localization/app_localizations.dart';
 import '../widgets/enhanced_subscription_card.dart';
 import '../models/subscription.dart';
+import '../theme/app_theme.dart';
+import '../widgets/bento_result_parts.dart';
 
 class SubscriptionScreen extends StatefulWidget {
   @override
@@ -58,29 +60,19 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         Provider.of<InAppPurchaseService>(context, listen: false);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          AppLocalizations.of(context).translate('subscription'),
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        elevation: 0,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: Colors.black,
-        centerTitle: true,
+      backgroundColor: AppColors.field,
+      // A pushed page: the round back button with the page name beside it.
+      appBar: bentoHeadingAppBar(
+        title: AppLocalizations.of(context).translate('subscription'),
+        onBack: () => Navigator.maybePop(context),
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.white,
-              Colors.grey.shade50.withOpacity(0.2),
-            ],
+      body: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.x4 + AppSpacing.x1,
+            AppSpacing.x2,
+            AppSpacing.x4 + AppSpacing.x1,
+            AppSpacing.x6 + MediaQuery.of(context).padding.bottom,
           ),
-        ),
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(16.0),
           child: EnhancedSubscriptionCard(
             subscriptionType: SubscriptionType.monthly,
             // The store is authoritative for money, exactly as the server is
@@ -108,7 +100,6 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             // only when the user actually has a valid active subscription.
             isActive: subscriptionProvider.hasValidSubscription,
           ),
-        ),
       ),
     );
   }

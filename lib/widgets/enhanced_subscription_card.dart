@@ -9,6 +9,8 @@ import '../providers/subscription_provider.dart';
 import '../providers/auth_provider.dart';
 import '../localization/app_localizations.dart';
 import '../services/in_app_purchase_service.dart';
+import '../theme/app_theme.dart';
+import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
 
 class EnhancedSubscriptionCard extends StatefulWidget {
@@ -43,21 +45,13 @@ class EnhancedSubscriptionCard extends StatefulWidget {
   _EnhancedSubscriptionCardState createState() => _EnhancedSubscriptionCardState();
 }
 
-class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> with TickerProviderStateMixin {
+class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> {
   bool _isProcessing = false;
   String? _errorMessage;
   InAppPurchaseService? _iapService;
 
-  late AnimationController _cardAnimationController;
-  late AnimationController _featuresAnimationController;
-  late AnimationController _buttonAnimationController;
-  late AnimationController _scaleController;
-
-  late Animation<double> _cardSlideAnimation;
-  late Animation<double> _cardFadeAnimation;
-  late Animation<double> _buttonSlideAnimation;
-  late Animation<double> _buttonFadeAnimation;
-  late Animation<double> _buttonScaleAnimation;
+  // The four delayed entrance/press controllers were replaced by a one-shot
+  // StaggerIn and PressScale (2026-09-26, Bento).
 
   List<String> _getLocalizedFeatures(BuildContext context) {
     return [
@@ -71,68 +65,6 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
   @override
   void initState() {
     super.initState();
-    
-    // Initialize animation controllers
-    _cardAnimationController = AnimationController(
-      duration: Duration(milliseconds: 500),
-      vsync: this,
-    );
-    _featuresAnimationController = AnimationController(
-      duration: Duration(milliseconds: 400),
-      vsync: this,
-    );
-    _buttonAnimationController = AnimationController(
-      duration: Duration(milliseconds: 300),
-      vsync: this,
-    );
-    _scaleController = AnimationController(
-      duration: Duration(milliseconds: 100),
-      vsync: this,
-    );
-
-    // Setup animations
-    _cardSlideAnimation = Tween<double>(
-      begin: 50.0,
-      end: 0.0,
-    ).animate(CurvedAnimation(
-      parent: _cardAnimationController,
-      curve: Curves.easeOut,
-    ));
-
-    _cardFadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _cardAnimationController,
-      curve: Curves.easeIn,
-    ));
-
-    _buttonSlideAnimation = Tween<double>(
-      begin: 30.0,
-      end: 0.0,
-    ).animate(CurvedAnimation(
-      parent: _buttonAnimationController,
-      curve: Curves.easeOut,
-    ));
-
-    _buttonFadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _buttonAnimationController,
-      curve: Curves.easeIn,
-    ));
-
-    _buttonScaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.98,
-    ).animate(CurvedAnimation(
-      parent: _scaleController,
-      curve: Curves.easeInOut,
-    ));
-
-    // Start animations with delays
-    _startAnimations();
     
     // Setup In-App Purchase callbacks.
     // Only the ACTIVE (visible) card registers callbacks — this prevents the
@@ -242,84 +174,6 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
     );
   }
 
-  void _startAnimations() {
-    Future.delayed(Duration(milliseconds: 200), () {
-      if (mounted) _cardAnimationController.forward();
-    });
-    Future.delayed(Duration(milliseconds: 400), () {
-      if (mounted) _featuresAnimationController.forward();
-    });
-    Future.delayed(Duration(milliseconds: 600), () {
-      if (mounted) _buttonAnimationController.forward();
-    });
-  }
-
-  @override
-  void dispose() {
-    _cardAnimationController.dispose();
-    _featuresAnimationController.dispose();
-    _buttonAnimationController.dispose();
-    _scaleController.dispose();
-    super.dispose();
-  }
-
-  // Helper method to get gradient for subscription card
-  LinearGradient _getCardGradient() {
-    if (widget.subscriptionType == SubscriptionType.yearly) {
-      return LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Colors.white, Colors.orange.shade50.withOpacity(0.3)],
-        stops: [0.0, 1.0],
-      );
-    }
-    return LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [Colors.white, Colors.blue.shade50.withOpacity(0.3)],
-      stops: [0.0, 1.0],
-    );
-  }
-
-  // Helper method to get gradient for pricing section
-  LinearGradient _getPricingGradient() {
-    return LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [Colors.white, Colors.green.shade50.withOpacity(0.4)],
-      stops: [0.0, 1.0],
-    );
-  }
-
-  // Helper method to get gradient for subscribe button
-  LinearGradient _getButtonGradient(bool isActive) {
-    if (isActive) {
-      return LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Colors.white, Colors.green.shade50.withOpacity(0.4)],
-        stops: [0.0, 1.0],
-      );
-    } else {
-      return LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Colors.white, Colors.orange.shade50.withOpacity(0.4)],
-        stops: [0.0, 1.0],
-      );
-    }
-  }
-
-  // Helper method to get gradient for trial countdown widget
-  LinearGradient _getTrialCountdownGradient() {
-    return LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [Colors.white, Colors.orange.shade50.withOpacity(0.4)],
-      stops: [0.0, 1.0],
-    );
-  }
-
   // Helper method to get localized plan type
   String _getLocalizedPlanType(BuildContext context, String? planType) {
     if (planType == null) return AppLocalizations.of(context).translate('trial');
@@ -342,360 +196,407 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
     final isActiveTrial = widget.subscription?.isTrial == true && 
                          widget.subscription?.isTrialActive == true;
 
-    return AnimatedBuilder(
-      animation: _cardAnimationController,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(0, _cardSlideAnimation.value),
-          child: Opacity(
-            opacity: _cardFadeAnimation.value,
-            child: Container(
-              margin: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                gradient: _getCardGradient(),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.2),
-                    spreadRadius: 0,
-                    blurRadius: 8,
-                    offset: Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: EdgeInsets.all(24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    
-                    // Title
-                    Text(
-                      widget.subscriptionType == SubscriptionType.yearly
-                          ? AppLocalizations.of(context).translate('yearly_subscription')
-                          : AppLocalizations.of(context).translate('monthly_subscription'),
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: 24),
-                    
-                    // Enhanced pricing section
-                    _buildEnhancedPricingSection(),
-                    
-                    SizedBox(height: 24),
-                    
-                    // Features section
-                    Text(
-                      AppLocalizations.of(context).translate('features_include'),
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 12),
-                    
-                    // Enhanced features list
-                    _buildEnhancedFeaturesList(),
-                    
-                    SizedBox(height: 24),
-                    
-                    // Error message
-                    if (_errorMessage != null) ...[
-                      _buildEnhancedErrorMessage(),
-                      SizedBox(height: 16),
-                    ],
-                    
-                    // Enhanced button/active indicator
-                    _buildEnhancedActionArea(isPaidSubscription, isActiveTrial),
-                    
-                    SizedBox(height: 12),
-                    
-                    // Fine print
-                    Text(
-                      widget.subscriptionType == SubscriptionType.yearly
-                          ? AppLocalizations.of(context).translate('yearly_auto_renew_text')
-                          : AppLocalizations.of(context).translate('auto_renew_text'),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade700,
-                        fontStyle: FontStyle.italic,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: 8),
-                    RichText(
-                      textAlign: TextAlign.center,
-                      text: TextSpan(
-                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                        children: [
-                          TextSpan(text: 'By subscribing you agree to our '),
-                          TextSpan(
-                            text: 'Terms of Use',
-                            style: TextStyle(decoration: TextDecoration.underline),
-                            recognizer: TapGestureRecognizer()
-                              ..onTap = () => launchUrl(
-                                    Uri.parse('https://sites.google.com/view/driveusa/home'),
-                                    mode: LaunchMode.externalApplication,
-                                  ),
-                          ),
-                          TextSpan(text: ' and '),
-                          TextSpan(
-                            text: 'Privacy Policy',
-                            style: TextStyle(decoration: TextDecoration.underline),
-                            recognizer: TapGestureRecognizer()
-                              ..onTap = () => launchUrl(
-                                    Uri.parse('https://sites.google.com/view/driveusa/privacy-policy'),
-                                    mode: LaunchMode.externalApplication,
-                                  ),
-                          ),
-                          TextSpan(text: '.'),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+    // The paywall in the Тесты look (2026-09-26): the plan as the blue hero,
+    // the user's plan status as a white card, what is included as a list,
+    // then the action and the fine print.
+    final blocks = <Widget>[
+      _buildEnhancedPricingSection(),
+      const SizedBox(height: AppSpacing.x3),
+      _buildPlanStatusCard(),
+      const SizedBox(height: AppSpacing.x8),
+      _buildSectionHeader(
+        AppLocalizations.of(context)
+            .translate('features_include')
+            .replaceFirst(RegExp(r'\s*:\s*$'), ''),
+      ),
+      _buildEnhancedFeaturesList(),
+      const SizedBox(height: AppSpacing.x6),
+      // Error message
+      if (_errorMessage != null) ...[
+        _buildEnhancedErrorMessage(),
+        const SizedBox(height: AppSpacing.x3),
+      ],
+      // Button or plan status
+      _buildEnhancedActionArea(isPaidSubscription, isActiveTrial),
+      const SizedBox(height: AppSpacing.x4),
+      _buildFinePrint(),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < blocks.length; i++)
+          StaggerIn(
+            index: i,
+            count: blocks.length,
+            curve: BentoTokens.curve,
+            child: blocks[i],
           ),
-        );
-      },
+      ],
     );
   }
 
-  Widget _buildBestValueBadgeForPriceContainer() {
-    return Positioned(
-      top: -8,
-      right: -8,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.orange.shade400, Colors.orange.shade600],
-          ),
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.orange.withOpacity(0.3),
-              spreadRadius: 1,
-              blurRadius: 4,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Text(
-          AppLocalizations.of(context).translate('best_value'),
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-          ),
+  /// A section label, as on Тесты: 15/600 ink, 12 below.
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.x3),
+      child: Text(
+        title,
+        style: AppTypography.label.copyWith(
+          fontSize: 15,
+          color: AppColors.ink,
+          fontVariations: const [FontVariation('wght', 600)],
         ),
       ),
     );
   }
 
+  /// Auto-renewal terms and the legal links, quiet but legible.
+  Widget _buildFinePrint() {
+    return Column(
+      children: [
+        // Fine print
+        Text(
+          widget.subscriptionType == SubscriptionType.yearly
+              ? AppLocalizations.of(context).translate('yearly_auto_renew_text')
+              : AppLocalizations.of(context).translate('auto_renew_text'),
+          style: AppTypography.caption.copyWith(
+            fontSize: 13,
+            height: 18 / 13,
+            color: AppColors.inkSecondary,
+            fontVariations: const [FontVariation('wght', 400)],
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: AppSpacing.x2),
+        RichText(
+          textAlign: TextAlign.center,
+          text: TextSpan(
+            style: AppTypography.caption.copyWith(
+              color: AppColors.inkSecondary,
+              fontVariations: const [FontVariation('wght', 400)],
+            ),
+            children: [
+              TextSpan(text: AppLocalizations.of(context).translate('legal_agree_prefix')),
+              TextSpan(
+                text: AppLocalizations.of(context).translate('terms_of_use'),
+                style: const TextStyle(
+                  color: AppColors.signal,
+                  decoration: TextDecoration.underline,
+                  decorationColor: AppColors.signal,
+                ),
+                recognizer: TapGestureRecognizer()
+                  ..onTap = () => launchUrl(
+                        Uri.parse('https://sites.google.com/view/driveusa/home'),
+                        mode: LaunchMode.externalApplication,
+                      ),
+              ),
+              TextSpan(text: AppLocalizations.of(context).translate('legal_and')),
+              TextSpan(
+                text: AppLocalizations.of(context).translate('privacy_policy'),
+                style: const TextStyle(
+                  color: AppColors.signal,
+                  decoration: TextDecoration.underline,
+                  decorationColor: AppColors.signal,
+                ),
+                recognizer: TapGestureRecognizer()
+                  ..onTap = () => launchUrl(
+                        Uri.parse('https://sites.google.com/view/driveusa/privacy-policy'),
+                        mode: LaunchMode.externalApplication,
+                      ),
+              ),
+              TextSpan(text: '.'),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBestValueBadgeForPriceContainer() {
+    // The hero's solid white pill, as «60 минут» on the exam card.
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x3, vertical: AppSpacing.x1 + 2),
+      decoration: BoxDecoration(
+        color: AppColors.paper,
+        borderRadius: BorderRadius.circular(BentoTokens.chip),
+      ),
+      child: Text(
+        AppLocalizations.of(context).translate('best_value'),
+        style: AppTypography.caption.copyWith(
+          fontSize: 13,
+          color: AppColors.signal,
+          fontVariations: const [FontVariation('wght', 600)],
+        ),
+      ),
+    );
+  }
+
+  /// The plan as the page's hero, in the Тесты exam card's blue: the plan's
+  /// name, the store price large, and the exam card's rising bar strip behind.
   Widget _buildEnhancedPricingSection() {
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(BentoTokens.card),
+        gradient: const LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [AppColors.signal600, AppColors.signal, AppColors.signal400],
+          stops: [0, 0.55, 1],
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x290048C3),
+            blurRadius: 24,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: AppSpacing.x4 + AppSpacing.x1,
+            bottom: 0,
+            child: ExcludeSemantics(child: _heroBars()),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.x4 + AppSpacing.x1),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.subscriptionType == SubscriptionType.yearly
+                      ? AppLocalizations.of(context).translate('yearly_subscription')
+                      : AppLocalizations.of(context).translate('monthly_subscription'),
+                  style: AppTypography.title.copyWith(
+                    fontSize: 22,
+                    height: 28 / 22,
+                    color: AppColors.onSignal,
+                    fontVariations: const [FontVariation('wght', 700)],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.x4),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      widget.price,
+                      style: AppTypography.display.copyWith(
+                        fontSize: 44,
+                        height: 50 / 44,
+                        letterSpacing: -1,
+                        color: AppColors.onSignal,
+                        fontVariations: const [FontVariation('wght', 700)],
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      widget.period,
+                      style: AppTypography.body.copyWith(
+                        fontSize: 17,
+                        color: AppColors.signal100,
+                      ),
+                    ),
+                  ],
+                ),
+                if (widget.subscriptionType == SubscriptionType.yearly) ...[
+                  const SizedBox(height: AppSpacing.x1),
+                  Text(
+                    AppLocalizations.of(context).translate('save_per_year'),
+                    style: AppTypography.label.copyWith(
+                      color: AppColors.signal100,
+                      fontVariations: const [FontVariation('wght', 500)],
+                    ),
+                  ),
+                ],
+                // Best Value Badge
+                if (widget.showBestValue) ...[
+                  const SizedBox(height: AppSpacing.x3),
+                  _buildBestValueBadgeForPriceContainer(),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// The exam card's bar strip (`EnhancedTestCard._questionBars`, frozen —
+  /// copied), larger and fainter, as on the Профиль hero.
+  Widget _heroBars() {
+    const heights = [
+      10, 16, 12, 22, 14, 26, 18, 30, 20, 34, 24, 28, 38, 26, 42, 30, 36, 46,
+      32, 40, 50, 36, 44, 54, 40, 48, 58, 44, 52, 60, 48, 56, 62, 52, 58, 64,
+      56, 60, 66, 62,
+    ];
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        for (final h in heights)
+          Container(
+            width: 3,
+            height: h * 1.5,
+            margin: const EdgeInsets.only(left: 3),
+            decoration: BoxDecoration(
+              color: AppColors.onSignal.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// The user's plan as a white card of label/value rows: trial days left
+  /// (amber — access running low), when the plan ends or next bills, and the
+  /// plan type. Same conditions as before, one fact per row.
+  Widget _buildPlanStatusCard() {
     String formatDate(DateTime? date) {
       if (date == null) return 'N/A';
       return '${date.month}/${date.day}/${date.year}';
     }
 
+    final l = AppLocalizations.of(context);
+    final rows = <Widget>[
+      // Trial countdown — only if the user has a trial AND no paid subscription
+      if (widget.subscription?.isTrial == true && 
+          widget.subscription?.isPaidSubscription == false)
+        _statusRow(
+          l.translate('trial_days_left'),
+          '${widget.subscriptionProvider.trialDaysRemaining}',
+          icon: SolarIcons.clockCircleLinear,
+          iconColor: AppColors.warn,
+          iconSurface: AppColors.warnSurface,
+        ),
+      // For trial subscriptions - show when trial ends
+      if (widget.subscription?.isTrial == true && widget.subscription?.trialEndsAt != null)
+        _statusRow(l.translate('plan_ends'), formatDate(widget.subscription!.trialEndsAt)),
+      // For paid subscriptions - show next billing date  
+      if (widget.subscription?.isPaidSubscription == true && widget.subscription?.nextBillingDate != null)
+        _statusRow(l.translate('next_billing'), formatDate(widget.subscription!.nextBillingDate)),
+      // For canceled but still active subscriptions - show when access ends
+      if (widget.subscription?.status == 'canceled' && widget.subscription?.isActive == true && widget.subscription?.nextBillingDate != null)
+        _statusRow(l.translate('plan_ends'), formatDate(widget.subscription!.nextBillingDate)),
+      _statusRow(l.translate('plan_type'), _getLocalizedPlanType(context, widget.subscription?.planType)),
+    ];
+
     return Container(
-      padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: _getPricingGradient(),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 0,
-            blurRadius: 4,
-            offset: Offset(0, 2),
-          ),
-        ],
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.x4,
+        vertical: AppSpacing.x2,
       ),
-      child: Stack(
-        clipBehavior: Clip.none,
+      decoration: BoxDecoration(
+        color: AppColors.paper,
+        borderRadius: BorderRadius.circular(BentoTokens.card),
+        boxShadow: AppColors.shadowCard,
+      ),
+      child: Column(
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    widget.price,
-                    style: TextStyle(
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                  Text(
-                    widget.period,
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.grey.shade700,
-                    ),
-                  ),
-                ],
-              ),
-              if (widget.subscriptionType == SubscriptionType.yearly) ...[
-                SizedBox(height: 4),
-                Text(
-                  AppLocalizations.of(context).translate('save_per_year'),
-                  style: TextStyle(
-                    color: Colors.green.shade700,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-              SizedBox(height: 8),
-              // NEW: Enhanced trial countdown display
-              // FIXED: Only show if user has trial AND not paid subscription
-              if (widget.subscription?.isTrial == true && 
-                  widget.subscription?.isPaidSubscription == false) ...[
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    gradient: _getTrialCountdownGradient(),
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.orange.withOpacity(0.15),
-                        spreadRadius: 0,
-                        blurRadius: 4,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 20,
-                        height: 20,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Colors.white, Colors.orange.shade100],
-                          ),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          SolarIcons.clockCircleLinear, 
-                          size: 14, 
-                          color: Colors.orange.shade700
-                        ),
-                      ),
-                      SizedBox(width: 6),
-                      Text(
-                        '${AppLocalizations.of(context).translate('trial_days_left')}: ${widget.subscriptionProvider.trialDaysRemaining}',
-                        style: TextStyle(
-                          color: Colors.orange.shade800,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 4),
-              ],
-              // For trial subscriptions - show when trial ends
-              if (widget.subscription?.isTrial == true && widget.subscription?.trialEndsAt != null)
-                Text(
-                  '${AppLocalizations.of(context).translate('plan_ends')}: ${formatDate(widget.subscription!.trialEndsAt)}',
-                  style: TextStyle(color: Colors.grey.shade700),
-                ),
-              // For paid subscriptions - show next billing date  
-              if (widget.subscription?.isPaidSubscription == true && widget.subscription?.nextBillingDate != null)
-                Text(
-                  '${AppLocalizations.of(context).translate('next_billing')}: ${formatDate(widget.subscription!.nextBillingDate)}',
-                  style: TextStyle(color: Colors.grey.shade700),
-                ),
-              // For canceled but still active subscriptions - show when access ends
-              if (widget.subscription?.status == 'canceled' && widget.subscription?.isActive == true && widget.subscription?.nextBillingDate != null)
-                Text(
-                  '${AppLocalizations.of(context).translate('plan_ends')}: ${formatDate(widget.subscription!.nextBillingDate)}',
-                  style: TextStyle(color: Colors.grey.shade700),
-                ),
-              Text(
-                '${AppLocalizations.of(context).translate('plan_type')}: ${_getLocalizedPlanType(context, widget.subscription?.planType)}',
-                style: TextStyle(color: Colors.grey.shade700),
-              ),
-            ],
-          ),
-          // Best Value Badge positioned in price container
-          if (widget.showBestValue) _buildBestValueBadgeForPriceContainer(),
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0) const Divider(height: 1, thickness: 1, color: AppColors.field),
+            rows[i],
+          ],
         ],
       ),
     );
   }
 
+  Widget _statusRow(
+    String label,
+    String value, {
+    IconData? icon,
+    Color iconColor = AppColors.signal,
+    Color iconSurface = AppColors.signal50,
+  }) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 48),
+      child: Row(
+        children: [
+          if (icon != null) ...[
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(color: iconSurface, shape: BoxShape.circle),
+              alignment: Alignment.center,
+              child: Icon(icon, size: 16, color: iconColor),
+            ),
+            const SizedBox(width: AppSpacing.x2 + 2),
+          ],
+          Expanded(
+            child: Text(
+              label,
+              style: AppTypography.body.copyWith(
+                fontSize: 15,
+                color: AppColors.inkSecondary,
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.x3),
+          Text(
+            value,
+            style: AppTypography.body.copyWith(
+              fontSize: 15,
+              color: AppColors.ink,
+              fontVariations: const [FontVariation('wght', 600)],
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// What the plan includes, one white card: a blue tick per line.
   Widget _buildEnhancedFeaturesList() {
     final features = _getLocalizedFeatures(context);
     
-    return Column(
-      children: features.asMap().entries.map((entry) {
-        int index = entry.key;
-        String feature = entry.value;
-        
-        return AnimatedBuilder(
-          animation: _featuresAnimationController,
-          builder: (context, child) {
-            final delay = index * 0.1;
-            final progress = (_featuresAnimationController.value - delay).clamp(0.0, 1.0) / (1.0 - delay);
-            
-            return Transform.translate(
-              offset: Offset(-30 * (1 - progress), 0),
-              child: Opacity(
-                opacity: progress,
-                child: _buildEnhancedFeatureItem(feature),
-              ),
-            );
-          },
-        );
-      }).toList(),
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.x4,
+        vertical: AppSpacing.x3,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.paper,
+        borderRadius: BorderRadius.circular(BentoTokens.card),
+        boxShadow: AppColors.shadowCard,
+      ),
+      child: Column(
+        children: [for (final feature in features) _buildEnhancedFeatureItem(feature)],
+      ),
     );
   }
 
   Widget _buildEnhancedFeatureItem(String text) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.x2),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 24,
             height: 24,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Colors.white, Colors.green.shade50.withOpacity(0.6)],
-              ),
+            decoration: const BoxDecoration(
+              color: AppColors.signal50,
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.green.shade200, width: 1),
             ),
-            child: Icon(
+            alignment: Alignment.center,
+            child: const Icon(
               SolarIcons.checkLinear,
-              color: Colors.green.shade700,
+              color: AppColors.signal,
               size: 16,
             ),
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.x3),
           Expanded(
             child: Text(
               text,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
+              style: AppTypography.body.copyWith(
+                fontSize: 15,
+                height: 22 / 15,
+                color: AppColors.ink,
               ),
             ),
           ),
@@ -706,24 +607,22 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
 
   Widget _buildEnhancedErrorMessage() {
     return Container(
-      padding: EdgeInsets.all(12),
+      padding: const EdgeInsets.all(AppSpacing.x3),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Colors.white, Colors.red.shade50.withOpacity(0.6)],
-        ),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.red.shade200),
+        color: AppColors.stopSurface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       child: Row(
         children: [
-          Icon(SolarIcons.dangerCircleLinear, color: Colors.red.shade700, size: 20),
-          SizedBox(width: 8),
+          const Icon(SolarIcons.dangerCircleLinear, color: AppColors.stop, size: 20),
+          const SizedBox(width: AppSpacing.x2),
           Expanded(
             child: Text(
               _errorMessage!,
-              style: TextStyle(color: Colors.red.shade900, fontWeight: FontWeight.w500),
+              style: AppTypography.label.copyWith(
+                color: AppColors.stop,
+                fontVariations: const [FontVariation('wght', 500)],
+              ),
             ),
           ),
         ],
@@ -754,18 +653,7 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
       actionWidget = _buildEnhancedSubscribeButton(isActiveTrial);
     }
     
-    return AnimatedBuilder(
-      animation: _buttonAnimationController,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(0, _buttonSlideAnimation.value),
-          child: Opacity(
-            opacity: _buttonFadeAnimation.value,
-            child: actionWidget,
-          ),
-        );
-      },
-    );
+    return actionWidget;
   }
 
   /// Returns true when this card is a LOWER-tier plan than the user's current
@@ -836,144 +724,115 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
     }
   }
 
-  Widget _buildCanceledButActiveIndicator() {
-    final expiryDate = widget.subscriptionProvider.canceledExpiryDateFormatted;
-    final daysRemaining = widget.subscriptionProvider.daysUntilCanceledExpiry;
-    
+  /// A status panel: a tinted surface, a tone disc with its glyph, the title
+  /// and one line under it. Colour carries the state — green subscribed,
+  /// amber access running out, red expired.
+  Widget _statusPanel({
+    required IconData icon,
+    required Color tone,
+    required Color surface,
+    required String title,
+    String? subtitle,
+    String? note,
+  }) {
     return Container(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.x4),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Colors.white, Colors.orange.shade50.withOpacity(0.6)],
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.orange.shade200),
+        color: surface,
+        borderRadius: BorderRadius.circular(BentoTokens.card),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
               Container(
                 width: 40,
                 height: 40,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Colors.white, Colors.orange.shade100],
-                  ),
+                decoration: const BoxDecoration(
+                  color: AppColors.paper,
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.orange.shade300, width: 2),
                 ),
-                child: Icon(SolarIcons.clockCircleLinear, color: Colors.orange.shade700, size: 24),
+                alignment: Alignment.center,
+                child: Icon(icon, color: tone, size: 22),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.x3),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Subscription Canceled',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                      title,
+                      style: AppTypography.body.copyWith(
+                        fontSize: 17,
+                        height: 22 / 17,
+                        color: AppColors.ink,
+                        fontVariations: const [FontVariation('wght', 600)],
                       ),
                     ),
-                    Text(
-                      'Access until $expiryDate ($daysRemaining days)',
-                      style: TextStyle(
-                        color: Colors.orange.shade700,
-                        fontSize: 14,
+                    if (subtitle != null)
+                      Text(
+                        subtitle,
+                        // Ink, not the tone: amber is too light for small text.
+                        style: AppTypography.label.copyWith(
+                          color: AppColors.ink,
+                          fontVariations: const [FontVariation('wght', 400)],
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
             ],
           ),
-          SizedBox(height: 12),
-          Container(
-            padding: EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.orange.shade50,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              'Your subscription has been canceled. You\'ll continue to have access to premium features until your current billing period ends.',
-              style: TextStyle(
-                color: Colors.orange.shade800,
-                fontSize: 12,
+          if (note != null) ...[
+            const SizedBox(height: AppSpacing.x3),
+            Text(
+              note,
+              style: AppTypography.caption.copyWith(
+                fontSize: 13,
+                height: 18 / 13,
+                color: AppColors.ink,
+                fontVariations: const [FontVariation('wght', 400)],
               ),
-              textAlign: TextAlign.center,
             ),
-          ),
+          ],
         ],
       ),
     );
   }
 
+  Widget _buildCanceledButActiveIndicator() {
+    final expiryDate = widget.subscriptionProvider.canceledExpiryDateFormatted;
+    final daysRemaining = widget.subscriptionProvider.daysUntilCanceledExpiry;
+    
+    final l = AppLocalizations.of(context);
+    return _statusPanel(
+      icon: SolarIcons.clockCircleLinear,
+      tone: AppColors.warn,
+      surface: AppColors.warnSurface,
+      title: l.translate('subscription_canceled_title'),
+      subtitle: l
+          .translate('access_until')
+          .replaceAll('{date}', '$expiryDate')
+          .replaceAll('{days}', '$daysRemaining'),
+      note: l.translate('subscription_canceled_note'),
+    );
+  }
+
   Widget _buildCanceledExpiredIndicator() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // ── Expired banner ──────────────────────────────────────────────────
-        Container(
-          padding: EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Colors.white, Colors.red.shade50.withOpacity(0.6)],
-            ),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.red.shade200),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Colors.white, Colors.red.shade100],
-                  ),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.red.shade300, width: 2),
-                ),
-                child: Icon(SolarIcons.closeCircleBold, color: Colors.red.shade700, size: 24),
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Subscription Expired',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    Text(
-                      'Renew to continue access',
-                      style: TextStyle(
-                        color: Colors.red.shade700,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+        _statusPanel(
+          icon: SolarIcons.closeCircleBold,
+          tone: AppColors.stop,
+          surface: AppColors.stopSurface,
+          title: AppLocalizations.of(context).translate('subscription_expired'),
+          subtitle: AppLocalizations.of(context).translate('renew_to_continue'),
         ),
         // ── Renew button (same IAP flow as Subscribe Now) ───────────────────
-        SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.x3),
         _buildEnhancedSubscribeButton(false),
       ],
     );
@@ -981,118 +840,19 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
 
   Widget _buildActiveSubscriptionIndicator() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          padding: EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Colors.white, Colors.green.shade50.withOpacity(0.6)],
-            ),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.2),
-                spreadRadius: 0,
-                blurRadius: 6,
-                offset: Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Colors.white, Colors.green.shade100],
-                  ),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.green.shade300, width: 2),
-                ),
-                child: Icon(SolarIcons.checkCircleBold, color: Colors.green.shade700, size: 24),
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  AppLocalizations.of(context).translate('subscribed_success'),
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ],
-          ),
+        _statusPanel(
+          icon: SolarIcons.checkCircleBold,
+          tone: AppColors.guide,
+          surface: AppColors.guideSurface,
+          title: AppLocalizations.of(context).translate('subscribed_success'),
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.x3),
         _buildCancelSubscriptionButton(),
       ],
     );
   }
-
-  Widget _buildEnhancedActiveIndicator() {
-    return Column(
-      children: [
-        Container(
-          padding: EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Colors.white, Colors.green.shade50.withOpacity(0.6)],
-            ),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.2),
-                spreadRadius: 0,
-                blurRadius: 6,
-                offset: Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Colors.white, Colors.green.shade100],
-                  ),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.green.shade300, width: 2),
-                ),
-                child: Icon(SolarIcons.checkCircleBold, color: Colors.green.shade700, size: 24),
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  AppLocalizations.of(context).translate('subscribed_success'),
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: 12),
-        _buildCancelSubscriptionButton(),
-      ],
-    );
-  }
-
 
   Widget _buildEnhancedSubscribeButton(bool isActiveTrial) {
     Future<void> handleSubscribe() async {
@@ -1140,52 +900,90 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
       }
     }
 
-    return GestureDetector(
-      onTapDown: (_) => _scaleController.forward(),
-      onTapUp: (_) => _scaleController.reverse(),
-      onTapCancel: () => _scaleController.reverse(),
-      child: ScaleTransition(
-        scale: _buttonScaleAnimation,
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: _getButtonGradient(false),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.2),
-                spreadRadius: 0,
-                blurRadius: 6,
-                offset: Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: _isProcessing ? null : handleSubscribe,
-              borderRadius: BorderRadius.circular(12),
-              splashColor: Colors.white.withOpacity(0.3),
-              highlightColor: Colors.white.withOpacity(0.2),
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Center(
-                  child: _isProcessing
-                      ? SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 3,
-                          ),
-                        )
-                      : Text(
+    // The dark `ink` pill — the page's black element, as «Сохраненные» on
+    // Тесты (owner, 2026-09-26); a spinner in place of the label while the
+    // store sheet is being opened.
+    final radius = BorderRadius.circular(BentoTokens.button);
+    return PressScale(
+      scale: 0.97,
+      duration: BentoTokens.state,
+      enabled: !_isProcessing,
+      child: Container(
+        height: 60,
+        decoration: BoxDecoration(
+          color: AppColors.ink,
+          borderRadius: radius,
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x290E1422),
+              blurRadius: 24,
+              offset: Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: _isProcessing ? null : handleSubscribe,
+            borderRadius: radius,
+            child: Center(
+              child: _isProcessing
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        color: AppColors.onSignal,
+                        strokeWidth: 3,
+                      ),
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x4),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
                           '${isActiveTrial ? AppLocalizations.of(context).translate('upgrade_now') : AppLocalizations.of(context).translate('subscribe_now')} - ${widget.price}${widget.period}',
-                          style: TextStyle(
+                          maxLines: 1,
+                          style: AppTypography.label.copyWith(
                             fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
+                            color: AppColors.onSignal,
+                            fontVariations: const [FontVariation('wght', 600)],
                           ),
                         ),
+                      ),
+                    ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// «Отменить подписку»: a white pill with a red label — destructive, and a
+  /// confirmation dialog comes first.
+  Widget _buildCancelSubscriptionButton() {
+    final radius = BorderRadius.circular(BentoTokens.button);
+    return PressScale(
+      scale: 0.97,
+      duration: BentoTokens.state,
+      child: Container(
+        height: 52,
+        decoration: BoxDecoration(
+          color: AppColors.paper,
+          borderRadius: radius,
+          boxShadow: AppColors.shadowCard,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => _showCancelConfirmation(context),
+            borderRadius: radius,
+            child: Center(
+              child: Text(
+                AppLocalizations.of(context).translate('cancel_subscription'),
+                style: AppTypography.label.copyWith(
+                  fontSize: 16,
+                  color: AppColors.stop,
+                  fontVariations: const [FontVariation('wght', 500)],
                 ),
               ),
             ),
@@ -1195,58 +993,8 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
     );
   }
 
-  Widget _buildCancelSubscriptionButton() {
-    return GestureDetector(
-      onTapDown: (_) => _scaleController.forward(),
-      onTapUp: (_) => _scaleController.reverse(),
-      onTapCancel: () => _scaleController.reverse(),
-      child: ScaleTransition(
-        scale: _buttonScaleAnimation,
-        child: Container(
-          height: 40,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Colors.white, Colors.red.shade50.withOpacity(0.4)],
-            ),
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.2),
-                spreadRadius: 0,
-                blurRadius: 4,
-                offset: Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => _showCancelConfirmation(context),
-              borderRadius: BorderRadius.circular(20),
-              splashColor: Colors.white.withOpacity(0.3),
-              highlightColor: Colors.white.withOpacity(0.2),
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Center(
-                    child: Text(
-                      AppLocalizations.of(context).translate('cancel_subscription'),
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.normal,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
+  /// As the exam's exit dialog: the destructive choice as red text, keeping
+  /// the subscription as the blue pill.
   Future<void> _showCancelConfirmation(BuildContext context) async {
     return showDialog<void>(
       context: context,
@@ -1256,79 +1004,29 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
           AppLocalizations.of(context).translate('cancel_subscription_message'),
         ),
         actions: [
-          // Cancel subscription button (red gradient)
-          Container(
-            height: 40,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Colors.white, Colors.red.shade50.withOpacity(0.4)],
-              ),
-              borderRadius: BorderRadius.circular(20),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(context).pop(); // Close dialog
+              await _handleCancelSubscription();
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.stop,
+              minimumSize: const Size(0, 44),
             ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () async {
-                  Navigator.of(context).pop(); // Close dialog
-                  await _handleCancelSubscription();
-                },
-                borderRadius: BorderRadius.circular(20),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Center(
-                    child: Text(
-                      AppLocalizations.of(context).translate('cancel_subscription_confirm'),
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+            child: Text(
+              AppLocalizations.of(context).translate('cancel_subscription_confirm'),
             ),
           ),
-          // Keep subscription button (green gradient)
-          Container(
-            height: 40,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Colors.white, Colors.green.shade50.withOpacity(0.4)],
-              ),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
-                  spreadRadius: 0,
-                  blurRadius: 4,
-                  offset: Offset(0, 2),
-                ),
-              ],
+          FilledButton(
+            onPressed: () {
+              Navigator.of(context).pop(); // Close dialog
+            },
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 44),
+              shape: const StadiumBorder(),
             ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () {
-                  Navigator.of(context).pop(); // Close dialog
-                },
-                borderRadius: BorderRadius.circular(20),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Center(
-                    child: Text(
-                      AppLocalizations.of(context).translate('keep_subscription'),
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+            child: Text(
+              AppLocalizations.of(context).translate('keep_subscription'),
             ),
           ),
         ],
@@ -1370,7 +1068,4 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> wit
       }
     }
   }
-
-
-
 }
