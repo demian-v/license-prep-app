@@ -6,14 +6,18 @@ import '../providers/language_provider.dart';
 import '../services/email_sync_service.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'dart:async';
+import '../theme/app_theme.dart';
+import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
+import '../widgets/bento_question_parts.dart';
+import '../widgets/bento_result_parts.dart';
 
 class PersonalInfoScreen extends StatefulWidget {
   @override
   _PersonalInfoScreenState createState() => _PersonalInfoScreenState();
 }
 
-class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProviderStateMixin {
+class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _emailController;
@@ -23,19 +27,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
   String? _initialName;
   String? _initialEmail;
   String? _passwordError; // Added variable to track password error
-  late AnimationController _titleAnimationController;
-  late Animation<double> _titlePulseAnimation;
-  
-  // Animation controllers for entrance animations
-  late AnimationController _cardAnimationController;
-  late AnimationController _featuresAnimationController;
-  late AnimationController _buttonAnimationController;
-
-  // Entrance animations
-  late Animation<double> _cardSlideAnimation;
-  late Animation<double> _cardFadeAnimation;
-  late Animation<double> _buttonSlideAnimation;
-  late Animation<double> _buttonFadeAnimation;
   
   // Auth state listener and timeout timer
   StreamSubscription<firebase_auth.User?>? _authStateSubscription;
@@ -199,88 +190,12 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
     });
   }
 
-  void _startAnimations() {
-    Future.delayed(Duration(milliseconds: 200), () {
-      if (mounted) _cardAnimationController.forward();
-    });
-    Future.delayed(Duration(milliseconds: 400), () {
-      if (mounted) _featuresAnimationController.forward();
-    });
-    Future.delayed(Duration(milliseconds: 600), () {
-      if (mounted) _buttonAnimationController.forward();
-    });
-  }
-
   @override
   void initState() {
     super.initState();
     
-    // Initialize animation controller for title pulse
-    _titleAnimationController = AnimationController(
-      duration: Duration(seconds: 3),
-      vsync: this,
-    );
-    
-    _titlePulseAnimation = Tween<double>(
-      begin: 1.0,
-      end: 1.03,
-    ).animate(CurvedAnimation(
-      parent: _titleAnimationController,
-      curve: Curves.easeInOut,
-    ));
-    
-    // Start the title animation
-    _titleAnimationController.repeat(reverse: true);
-
-    // Initialize entrance animation controllers
-    _cardAnimationController = AnimationController(
-      duration: Duration(milliseconds: 500),
-      vsync: this,
-    );
-    _featuresAnimationController = AnimationController(
-      duration: Duration(milliseconds: 400),
-      vsync: this,
-    );
-    _buttonAnimationController = AnimationController(
-      duration: Duration(milliseconds: 300),
-      vsync: this,
-    );
-
-    // Setup entrance animations
-    _cardSlideAnimation = Tween<double>(
-      begin: 50.0,
-      end: 0.0,
-    ).animate(CurvedAnimation(
-      parent: _cardAnimationController,
-      curve: Curves.easeOut,
-    ));
-
-    _cardFadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _cardAnimationController,
-      curve: Curves.easeIn,
-    ));
-
-    _buttonSlideAnimation = Tween<double>(
-      begin: 30.0,
-      end: 0.0,
-    ).animate(CurvedAnimation(
-      parent: _buttonAnimationController,
-      curve: Curves.easeOut,
-    ));
-
-    _buttonFadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _buttonAnimationController,
-      curve: Curves.easeIn,
-    ));
-
-    // Start entrance animations with delays
-    _startAnimations();
+    // The looping title pulse and the delayed entrance controllers were
+    // replaced by a one-shot StaggerIn (2026-09-26).
     
     // Initialize with current user data
     final user = Provider.of<AuthProvider>(context, listen: false).user;
@@ -433,10 +348,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
   void dispose() {
     _authStateSubscription?.cancel();
     _loadingTimeoutTimer?.cancel();
-    _titleAnimationController.dispose();
-    _cardAnimationController.dispose();
-    _featuresAnimationController.dispose();
-    _buttonAnimationController.dispose();
     _nameController.removeListener(() { setState(() {}); });
     _emailController.removeListener(() { setState(() {}); });
     _nameController.dispose();
@@ -602,19 +513,25 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
             Container(
               padding: EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.orange.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange.shade200),
+                color: AppColors.warnSurface,
+                borderRadius: BorderRadius.circular(AppRadius.md),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(SolarIcons.infoCircleLinear, size: 18, color: Colors.orange.shade800),
+                  Icon(SolarIcons.infoCircleLinear, size: 18, color: AppColors.warn),
                   SizedBox(width: 8),
                   Expanded(
+                    // Ink, not amber: amber measures 3.9:1 on its surface,
+                    // too low for small text.
                     child: Text(
                       _translate('delete_subscription_warning', languageProvider),
-                      style: TextStyle(fontSize: 12, color: Colors.orange.shade900),
+                      style: AppTypography.caption.copyWith(
+                        fontSize: 13,
+                        height: 18 / 13,
+                        color: AppColors.ink,
+                        fontVariations: const [FontVariation('wght', 400)],
+                      ),
                     ),
                   ),
                 ],
@@ -678,7 +595,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
             },
             child: Text(
               _translate('confirm', languageProvider),
-              style: TextStyle(color: Colors.red),
+              style: TextStyle(color: AppColors.stop),
             ),
           ),
         ],
@@ -701,215 +618,75 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
     }
   }
 
-  // Helper methods for gradients and shadows
-  LinearGradient _getSectionCardGradient(int sectionIndex) {
-    Color startColor = Colors.white;
-    Color endColor;
-    
-    switch (sectionIndex % 4) {
-      case 0:
-        endColor = Colors.blue.shade50.withOpacity(0.4);
-        break;
-      case 1:
-        endColor = Colors.green.shade50.withOpacity(0.4);
-        break;
-      case 2:
-        endColor = Colors.orange.shade50.withOpacity(0.4);
-        break;
-      case 3:
-        endColor = Colors.purple.shade50.withOpacity(0.4);
-        break;
-      default:
-        endColor = Colors.blue.shade50.withOpacity(0.4);
-    }
-    
-    return LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [startColor, endColor],
-      stops: [0.0, 1.0],
-    );
-  }
-
-  LinearGradient _getFormFieldGradient(int fieldIndex) {
-    Color startColor = Colors.white;
-    Color endColor;
-    
-    switch (fieldIndex % 3) {
-      case 0:
-        endColor = Colors.green.shade50.withOpacity(0.3);
-        break;
-      case 1:
-        endColor = Colors.blue.shade50.withOpacity(0.3);
-        break;
-      case 2:
-        endColor = Colors.purple.shade50.withOpacity(0.3);
-        break;
-      default:
-        endColor = Colors.blue.shade50.withOpacity(0.3);
-    }
-    
-    return LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [startColor, endColor],
-      stops: [0.0, 1.0],
-    );
-  }
-
-  LinearGradient _getButtonGradient(String buttonType) {
-    Color startColor = Colors.white;
-    Color endColor;
-    
-    switch (buttonType) {
-      case 'save':
-        endColor = Colors.blue.shade50.withOpacity(0.4);
-        break;
-      case 'delete':
-        endColor = Colors.red.shade50.withOpacity(0.4);
-        break;
-      default:
-        endColor = Colors.grey.shade50.withOpacity(0.4);
-    }
-    
-    return LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [startColor, endColor],
-      stops: [0.0, 1.0],
-    );
-  }
-
-  List<BoxShadow> _getStandardShadow() {
-    return [
-      BoxShadow(
-        color: Colors.grey.withOpacity(0.2),
-        spreadRadius: 0,
-        blurRadius: 6,
-        offset: Offset(0, 3),
-      ),
-    ];
-  }
-
-  Widget _buildEnhancedTitle(String title, LanguageProvider languageProvider) {
-    return AnimatedBuilder(
-      animation: _titlePulseAnimation,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _titlePulseAnimation.value,
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Colors.white, Colors.blue.shade50.withOpacity(0.6)],
-                stops: [0.0, 1.0],
-              ),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: _getStandardShadow(),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  SolarIcons.userRoundedLinear,
-                  size: 16,
-                  color: Colors.black,
-                ),
-                SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
+  /// A section as on Тесты: a 15/600 label on the page, then its content —
+  /// either stacked tiles ([asCard] false) or one white card.
   Widget _buildEnhancedSectionCard({
     required String title,
     required List<Widget> children,
     required int sectionIndex,
+    bool asCard = false,
   }) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: _getSectionCardGradient(sectionIndex),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: _getStandardShadow(),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-          ),
-          SizedBox(height: 16),
-          ...children,
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEnhancedButton({
-    required String text,
-    required VoidCallback? onPressed,
-    required String buttonType,
-    bool isFullWidth = true,
-    double height = 48,
-  }) {
-    return Container(
-      width: isFullWidth ? double.infinity : null,
-      height: height,
-      decoration: BoxDecoration(
-        gradient: onPressed != null 
-          ? _getButtonGradient(buttonType)
-          : LinearGradient(
-              colors: [Colors.grey.shade300, Colors.grey.shade200],
-            ),
-        borderRadius: BorderRadius.circular(height / 2),
-        boxShadow: onPressed != null ? _getStandardShadow() : [],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onPressed,
-          borderRadius: BorderRadius.circular(height / 2),
-          child: Center(
-            child: Text(
-              text,
-              style: TextStyle(
-                color: onPressed != null ? Colors.black : Colors.grey.shade600,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.x3),
+          child: Text(
+            title,
+            style: AppTypography.label.copyWith(
+              fontSize: 15,
+              color: AppColors.ink,
+              fontVariations: const [FontVariation('wght', 600)],
             ),
           ),
         ),
+        if (asCard)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.x4),
+            decoration: BoxDecoration(
+              color: AppColors.paper,
+              borderRadius: BorderRadius.circular(BentoTokens.card),
+              boxShadow: AppColors.shadowCard,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: children,
+            ),
+          )
+        else
+          ...children,
+      ],
+    );
+  }
+
+  /// A note inside a section: a tinted panel with its icon — blue for
+  /// information, red for the irreversible delete. Text stays ink-dark enough
+  /// to read at 13.
+  Widget _buildNote(IconData icon, String text, {required bool danger}) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.x3),
+      decoration: BoxDecoration(
+        color: danger ? AppColors.stopSurface : AppColors.signal50,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: danger ? AppColors.stop : AppColors.signal),
+          const SizedBox(width: AppSpacing.x2),
+          Expanded(
+            child: Text(
+              text,
+              style: AppTypography.caption.copyWith(
+                fontSize: 13,
+                height: 18 / 13,
+                color: danger ? AppColors.stop : AppColors.ink,
+                fontVariations: const [FontVariation('wght', 400)],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -918,27 +695,106 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
   Widget build(BuildContext context) {
     return Consumer<LanguageProvider>(
       builder: (context, languageProvider, _) {
-        // Define common title style
-        final titleStyle = TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-          color: Colors.black87,
-        );
+        final sections = <Widget>[
+          // Personal Data Section
+          _buildEnhancedSectionCard(
+            title: _translate('change_personal_data', languageProvider),
+            sectionIndex: 0,
+            children: [
+              // Name field
+              _buildFormField(
+                context,
+                _translate('name', languageProvider),
+                SolarIcons.userRoundedLinear,
+                AppColors.signal,
+                _nameController,
+                (value) {
+                  if (value == null || value.isEmpty) {
+                    return _translate('name_required', languageProvider);
+                  }
+                  return null;
+                },
+                fieldIndex: 0,
+                showEditIcon: true,
+                iconAsset: _getEditProfileIconAsset('name'),
+              ),
+              const SizedBox(height: AppSpacing.x3),
+              
+              // Email field
+              _buildFormField(
+                context,
+                _translate('email', languageProvider),
+                SolarIcons.letterLinear,
+                AppColors.signal,
+                _emailController,
+                (value) {
+                  if (value == null || value.isEmpty) {
+                    return _translate('email_required', languageProvider);
+                  }
+                  if (!_isValidEmail(value)) {
+                    return _translate('invalid_email', languageProvider);
+                  }
+                  return null;
+                },
+                fieldIndex: 1,
+                showEditIcon: true,
+                iconAsset: _getEditProfileIconAsset('email'),
+              ),
+              
+              // Password field (conditional)
+              if (_showPasswordField) ...[
+                const SizedBox(height: AppSpacing.x3),
+                _buildNote(
+                  SolarIcons.infoCircleLinear,
+                  _translate('password_needed_for_email', languageProvider),
+                  danger: false,
+                ),
+                const SizedBox(height: AppSpacing.x3),
+                _buildFormField(
+                  context,
+                  _translate('password', languageProvider),
+                  SolarIcons.lockKeyholeMinimalisticLinear,
+                  AppColors.signal,
+                  _passwordController,
+                  (value) {
+                    if (value == null || value.isEmpty) {
+                      return _translate('password_required', languageProvider);
+                    }
+                    return null;
+                  },
+                  isPassword: true,
+                  errorText: _passwordError,
+                  fieldIndex: 2,
+                ),
+              ],
+            ],
+          ),
+          
+          // Delete Account Section
+          _buildEnhancedSectionCard(
+            title: _translate('delete_account_section', languageProvider),
+            sectionIndex: 1,
+            asCard: true,
+            children: [
+              _buildNote(
+                SolarIcons.dangerTriangleLinear,
+                _translate('delete_account_desc', languageProvider),
+                danger: true,
+              ),
+              const SizedBox(height: AppSpacing.x3),
+              _buildDeleteButton(
+                _translate('delete_account', languageProvider),
+                () => _showDeleteConfirmation(context, languageProvider),
+              ),
+            ],
+          ),
+        ];
 
         return Scaffold(
-          appBar: AppBar(
-            title: _buildEnhancedTitle(
-              _translate('personal_info', languageProvider),
-              languageProvider,
-            ),
-            elevation: 0,
-            backgroundColor: Colors.white,
-            foregroundColor: Colors.black,
-            centerTitle: true,
-            leading: IconButton(
-              icon: Icon(SolarIcons.arrowLeftLinear),
-              onPressed: () => Navigator.pop(context),
-            ),
+          backgroundColor: AppColors.field,
+          appBar: bentoHeadingAppBar(
+            title: _translate('personal_info', languageProvider),
+            onBack: () => Navigator.pop(context),
             actions: [
               if (_isLoading)
                 Center(
@@ -949,7 +805,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.signal),
                       ),
                     ),
                   ),
@@ -963,214 +819,52 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
                   children: [
                     Expanded(
                       child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.x4 + AppSpacing.x1,
+                          AppSpacing.x3,
+                          AppSpacing.x4 + AppSpacing.x1,
+                          AppSpacing.x4,
+                        ),
                         child: Form(
                           key: _formKey,
                           child: Column(
                             children: [
-                              SizedBox(height: 8),
-                              // Personal Data Section
-                              AnimatedBuilder(
-                                animation: _cardAnimationController,
-                                builder: (context, child) {
-                                  return Transform.translate(
-                                    offset: Offset(0, _cardSlideAnimation.value),
-                                    child: Opacity(
-                                      opacity: _cardFadeAnimation.value,
-                                      child: _buildEnhancedSectionCard(
-                                        title: _translate('change_personal_data', languageProvider),
-                                        sectionIndex: 0,
-                                        children: [
-                                  // Name field
-                                  _buildFormField(
-                                    context,
-                                    _translate('name', languageProvider),
-                                    SolarIcons.userRoundedLinear,
-                                    Colors.green,
-                                    _nameController,
-                                    (value) {
-                                      if (value == null || value.isEmpty) {
-                                        return _translate('name_required', languageProvider);
-                                      }
-                                      return null;
-                                    },
-                                    fieldIndex: 0,
-                                    showEditIcon: true,
-                                    iconAsset: _getEditProfileIconAsset('name'),
+                              for (var i = 0; i < sections.length; i++)
+                                Padding(
+                                  padding: EdgeInsets.only(top: i > 0 ? AppSpacing.x8 : 0),
+                                  // One-shot entrance, capped at AppMotion.base.
+                                  child: StaggerIn(
+                                    index: i,
+                                    count: sections.length + 1,
+                                    curve: BentoTokens.curve,
+                                    child: sections[i],
                                   ),
-                                  SizedBox(height: 16),
-                                  
-                                  // Email field
-                                  _buildFormField(
-                                    context,
-                                    _translate('email', languageProvider),
-                                    SolarIcons.letterLinear,
-                                    Colors.blue,
-                                    _emailController,
-                                    (value) {
-                                      if (value == null || value.isEmpty) {
-                                        return _translate('email_required', languageProvider);
-                                      }
-                                      if (!_isValidEmail(value)) {
-                                        return _translate('invalid_email', languageProvider);
-                                      }
-                                      return null;
-                                    },
-                                    fieldIndex: 1,
-                                    showEditIcon: true,
-                                    iconAsset: _getEditProfileIconAsset('email'),
-                                  ),
-                                  
-                                  // Password field (conditional)
-                                  if (_showPasswordField) ...[
-                                    SizedBox(height: 16),
-                                    Container(
-                                      padding: EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                          colors: [Colors.white, Colors.purple.shade50.withOpacity(0.2)],
-                                        ),
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: Colors.purple.withOpacity(0.2),
-                                          width: 1,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            SolarIcons.infoCircleLinear,
-                                            size: 16,
-                                            color: Colors.purple.shade700,
-                                          ),
-                                          SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              _translate('password_needed_for_email', languageProvider),
-                                              style: TextStyle(
-                                                color: Colors.purple.shade700,
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    SizedBox(height: 12),
-                                    _buildFormField(
-                                      context,
-                                      _translate('password', languageProvider),
-                                      SolarIcons.lockKeyholeMinimalisticLinear,
-                                      Colors.purple,
-                                      _passwordController,
-                                      (value) {
-                                        if (value == null || value.isEmpty) {
-                                          return _translate('password_required', languageProvider);
-                                        }
-                                        return null;
-                                      },
-                                      isPassword: true,
-                                      errorText: _passwordError,
-                                      fieldIndex: 2,
-                                    ),
-                                  ],
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                              
-                              SizedBox(height: 16),
-                              
-                              // Delete Account Section
-                              AnimatedBuilder(
-                                animation: _featuresAnimationController,
-                                builder: (context, child) {
-                                  return Transform.translate(
-                                    offset: Offset(0, _cardSlideAnimation.value),
-                                    child: Opacity(
-                                      opacity: _cardFadeAnimation.value,
-                                      child: _buildEnhancedSectionCard(
-                                        title: _translate('delete_account_section', languageProvider),
-                                        sectionIndex: 1,
-                                        children: [
-                                  Container(
-                                    padding: EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [Colors.white, Colors.red.shade50.withOpacity(0.2)],
-                                      ),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: Colors.red.withOpacity(0.2),
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          SolarIcons.dangerTriangleLinear,
-                                          size: 16,
-                                          color: Colors.red.shade700,
-                                        ),
-                                        SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            _translate('delete_account_desc', languageProvider),
-                                            style: TextStyle(
-                                              color: Colors.red.shade700,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  SizedBox(height: 16),
-                                  _buildEnhancedButton(
-                                    text: _translate('delete_account', languageProvider),
-                                    onPressed: () => _showDeleteConfirmation(context, languageProvider),
-                                    buttonType: 'delete',
-                                  ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
+                                ),
                             ],
                           ),
                         ),
                       ),
                     ),
                     
-                    // Bottom Save Button
+                    // Bottom Save Button — blue when there is something to
+                    // save, grey until then.
                     Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: AnimatedBuilder(
-                        animation: _buttonAnimationController,
-                        builder: (context, child) {
-                          return Transform.translate(
-                            offset: Offset(0, _buttonSlideAnimation.value),
-                            child: Opacity(
-                              opacity: _buttonFadeAnimation.value,
-                              child: _buildEnhancedButton(
-                                text: _translate('save', languageProvider),
-                                onPressed: _isFormModified() 
-                                  ? () => _saveChanges(context, languageProvider)
-                                  : null,
-                                buttonType: 'save',
-                                height: 56,
-                              ),
-                            ),
-                          );
-                        },
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.x4,
+                        AppSpacing.x2,
+                        AppSpacing.x4,
+                        AppSpacing.x4,
+                      ),
+                      child: StaggerIn(
+                        index: sections.length,
+                        count: sections.length + 1,
+                        curve: BentoTokens.curve,
+                        child: BentoActionButton(
+                          text: _translate('save', languageProvider),
+                          onTap: _isFormModified() 
+                            ? () => _saveChanges(context, languageProvider)
+                            : null,
+                        ),
                       ),
                     ),
                   ],
@@ -1181,6 +875,41 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
     );
   }
 
+  /// «Удалить аккаунт»: a field-grey pill with a red label — red because it is
+  /// destructive; the confirmation dialog comes first.
+  Widget _buildDeleteButton(String text, VoidCallback onTap) {
+    final radius = BorderRadius.circular(BentoTokens.button);
+    return PressScale(
+      scale: 0.97,
+      duration: BentoTokens.state,
+      child: Material(
+        color: AppColors.field,
+        borderRadius: radius,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: radius,
+          child: SizedBox(
+            height: 52,
+            child: Center(
+              child: Text(
+                text,
+                style: AppTypography.label.copyWith(
+                  fontSize: 16,
+                  color: AppColors.stop,
+                  fontVariations: const [FontVariation('wght', 500)],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// A field as its own white tile, as the Тесты and Профиль tiles: the
+  /// labelled input, and the pen that says it can be edited. No 3D picture
+  /// (owner, 2026-09-26: removed with Профиль's); [icon], [iconColor] and
+  /// [iconAsset] are kept for callers but unused.
   Widget _buildFormField(
     BuildContext context,
     String label,
@@ -1195,126 +924,63 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> with TickerProv
       children: [
         Container(
           decoration: BoxDecoration(
-            gradient: _getFormFieldGradient(fieldIndex),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: _getStandardShadow(),
+            color: AppColors.paper,
+            borderRadius: BorderRadius.circular(BentoTokens.card),
+            boxShadow: AppColors.shadowCard,
           ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [iconColor.withOpacity(0.1), iconColor.withOpacity(0.2)],
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.x4 + AppSpacing.x1,
+            AppSpacing.x2,
+            AppSpacing.x4,
+            AppSpacing.x2,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: controller,
+                  decoration: InputDecoration(
+                    labelText: label,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
+                    filled: false,
+                    suffixIcon: showEditIcon
+                        ? const Icon(
+                            SolarIcons.penLinear,
+                            size: 18,
+                            color: AppColors.inkSecondary,
+                          )
+                        : null,
+                    suffixIconConstraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                    labelStyle: AppTypography.label.copyWith(
+                      color: AppColors.inkSecondary,
+                      fontVariations: const [FontVariation('wght', 400)],
                     ),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: iconColor.withOpacity(0.1),
-                        spreadRadius: 0,
-                        blurRadius: 4,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
+                    floatingLabelStyle: AppTypography.label.copyWith(
+                      color: AppColors.inkSecondary,
+                      fontVariations: const [FontVariation('wght', 400)],
+                    ),
                   ),
-                  child: iconAsset != null
-                      ? Image.asset(
-                          iconAsset,
-                          width: 32,
-                          height: 32,
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) {
-                            // Fallback to Material icon if asset fails to load
-                            debugPrint('❌ PersonalInfoScreen: Failed to load icon asset: $iconAsset');
-                            return Icon(
-                              icon,
-                              color: iconColor,
-                              size: 20,
-                            );
-                          },
-                        )
-                      : Icon(
-                          icon,
-                          color: iconColor,
-                          size: 20,
-                        ),
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: TextFormField(
-                    controller: controller,
-                    decoration: InputDecoration(
-                      labelText: label,
-                      border: InputBorder.none,
-                      labelStyle: TextStyle(
-                        color: Colors.black.withOpacity(0.7),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    obscureText: isPassword,
-                    validator: validator,
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  obscureText: isPassword,
+                  validator: validator,
+                  style: AppTypography.body.copyWith(
+                    fontSize: 17,
+                    color: AppColors.ink,
+                    fontVariations: const [FontVariation('wght', 500)],
                   ),
                 ),
-                if (showEditIcon)
-                  Icon(
-                    SolarIcons.penLinear,
-                    size: 16,
-                    color: Colors.grey.shade600,
-                  ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
-        // Enhanced error text display
+        // Error text under the field
         if (errorText != null)
-          Container(
-            margin: EdgeInsets.only(left: 16.0, top: 8.0, right: 16.0),
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Colors.white, Colors.red.shade50.withOpacity(0.3)],
-              ),
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.red.withOpacity(0.1),
-                  spreadRadius: 0,
-                  blurRadius: 4,
-                  offset: Offset(0, 1),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  SolarIcons.dangerCircleLinear,
-                  size: 16,
-                  color: Colors.red.shade700,
-                ),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    errorText,
-                    style: TextStyle(
-                      color: Colors.red.shade700,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.x2),
+            child: _buildNote(SolarIcons.dangerCircleLinear, errorText, danger: true),
           ),
       ],
     );

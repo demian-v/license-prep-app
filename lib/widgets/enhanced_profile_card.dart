@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+import '../theme/bento_tokens.dart';
+
 class EnhancedProfileCard extends StatefulWidget {
   final String title;
   final String subtitle;
@@ -8,6 +11,14 @@ class EnhancedProfileCard extends StatefulWidget {
   final int cardType; // For determining the gradient color
   final bool isHighlighted; // For highlighting the subtitle text if needed
   final String? iconAsset; // For custom asset icons
+
+  /// The dark `ink` card, as «Сохраненные» on Тесты — for the page's
+  /// secondary destination.
+  final bool dark;
+
+  /// A short line under the title saying what the setting is for, beside
+  /// the value (owner, 2026-09-26: the tiles looked empty).
+  final String? description;
 
   const EnhancedProfileCard({
     Key? key,
@@ -18,176 +29,206 @@ class EnhancedProfileCard extends StatefulWidget {
     this.cardType = 0,
     this.isHighlighted = false,
     this.iconAsset,
+    this.dark = false,
+    this.description,
   }) : super(key: key);
 
   @override
   _EnhancedProfileCardState createState() => _EnhancedProfileCardState();
 }
 
-class _EnhancedProfileCardState extends State<EnhancedProfileCard> with TickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
-  
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: 100),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.98).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
-  }
-  
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-  
-  // Helper method to determine gradient colors based on card type
-  LinearGradient _getGradientForCard(int cardType) {
-    // Start with white as base color
-    Color startColor = Colors.white;
-    Color endColor;
-    
-    // Determine subtle end color based on card type
-    switch(cardType) {
-      case 0: // Support - Green
-        endColor = Colors.green.shade50.withOpacity(0.4);
-        break;
-      case 1: // Language - Blue
-        endColor = Colors.blue.shade50.withOpacity(0.4);
-        break;
-      case 2: // State - Purple
-        endColor = Colors.purple.shade50.withOpacity(0.4);
-        break;
-      case 3: // Subscription - Amber
-        endColor = Colors.amber.shade50.withOpacity(0.4);
-        break;
-      case 4: // Reset Statistics - Light Pink
-        endColor = Colors.pink.shade50.withOpacity(0.4);
-        break;
-      default:
-        endColor = Colors.grey.shade50.withOpacity(0.4);
-    }
-    
-    return LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [startColor, endColor],
-      stops: [0.0, 1.0],
-    );
+class _EnhancedProfileCardState extends State<EnhancedProfileCard> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value) return;
+    setState(() => _pressed = value);
   }
 
-  // Helper method to get icon color based on card type
-  Color _getIconColor(int cardType) {
-    switch(cardType) {
-      case 0: return Colors.green;
-      case 1: return Colors.blue;
-      case 2: return Colors.purple;
-      case 3: return Colors.amber.shade700;
-      case 4: return Colors.pink;
-      default: return Colors.grey;
-    }
-  }
+  // The per-type pastel washes and icon colours (green, blue, purple,
+  // amber…) spent the semantic colours on decoration and are gone; the card
+  // is white and the 3D picture carries the identity. [cardType] is kept for
+  // callers.
+
+  /// Titles come from translations that end in a colon («Штат:»), which
+  /// reads as a form label on a card; the colon is dropped for display only.
+  String get _title => widget.title.replaceFirst(RegExp(r'\s*:\s*$'), '');
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => _controller.forward(),
-      onTapUp: (_) => _controller.reverse(),
-      onTapCancel: () => _controller.reverse(),
-      child: ScaleTransition(
-        scale: _scaleAnimation,
-        child: Card(
-          elevation: 3,
-          shadowColor: Colors.black.withOpacity(0.3),
-          margin: EdgeInsets.symmetric(horizontal: 2, vertical: 1),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+    return Semantics(
+      button: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => _setPressed(true),
+        onTapUp: (_) => _setPressed(false),
+        onTapCancel: () => _setPressed(false),
+        onTap: widget.onTap,
+        // Lifts a few points under the finger rather than shrinking, as the
+        // other Bento cards do. The whole card is the button — no chevron.
+        child: AnimatedSlide(
+          offset: Offset(0, _pressed ? -0.03 : 0),
+          duration: AppMotion.duration(context, BentoTokens.state),
+          curve: AppMotion.enter,
           child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              gradient: _getGradientForCard(widget.cardType),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
-                  spreadRadius: 0,
-                  blurRadius: 6,
-                  offset: Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: widget.onTap,
-                borderRadius: BorderRadius.circular(12),
-                splashColor: Colors.white.withOpacity(0.3),
-                highlightColor: Colors.white.withOpacity(0.2),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 16.0, horizontal: 20.0),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 50,
-                        height: 50,
-                        child: widget.iconAsset != null
-                            ? Image.asset(
-                                widget.iconAsset!,
-                                width: 50,
-                                height: 50,
-                                fit: BoxFit.contain,
-                                errorBuilder: (context, error, stackTrace) {
-                                  // Fallback to Material icon if asset fails to load
-                                  debugPrint('❌ ProfileCard: Failed to load icon asset: ${widget.iconAsset}');
-                                  return Icon(
-                                    widget.icon,
-                                    color: _getIconColor(widget.cardType),
-                                    size: 40,
-                                  );
-                                },
-                              )
-                            : Icon(
-                                widget.icon,
-                                color: _getIconColor(widget.cardType),
-                                size: 40,
-                              ),
+            padding: EdgeInsets.all(widget.dark ? AppSpacing.x4 + AppSpacing.x1 : AppSpacing.x4),
+            decoration: widget.dark
+                ? BoxDecoration(
+                    color: AppColors.ink,
+                    borderRadius: BorderRadius.circular(BentoTokens.card),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x290E1422),
+                        blurRadius: 24,
+                        offset: Offset(0, 10),
                       ),
-                      SizedBox(width: 20),
+                    ],
+                  )
+                : BoxDecoration(
+                    color: AppColors.paper,
+                    borderRadius: BorderRadius.circular(BentoTokens.card),
+                    boxShadow: AppColors.shadowCard,
+                  ),
+            // A setting (language, state) or the dark card: the title and a
+            // one-line description on the left, the value at the bottom right
+            // (owner, 2026-09-26: no empty side, keep the tile's size). A
+            // plain description tile (Поддержка) has no value.
+            child: (widget.isHighlighted || widget.dark)
+                ? Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              widget.title,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                            _buildTitleText(),
+                            if (widget.description != null) ...[
+                              const SizedBox(height: AppSpacing.x1),
+                              Text(
+                                widget.description!,
+                                style: AppTypography.body.copyWith(
+                                  fontSize: 14,
+                                  height: 20 / 14,
+                                  color: widget.dark
+                                      ? AppColors.onSignal.withValues(alpha: 0.64)
+                                      : AppColors.inkSecondary,
+                                ),
                               ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              widget.subtitle,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: widget.isHighlighted 
-                                  ? Colors.green
-                                  : Colors.grey.shade700,
-                              ),
-                            ),
+                            ] else
+                              const SizedBox(height: AppSpacing.x8),
                           ],
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.x3),
+                      // A long value scales down rather than wrapping.
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 160),
+                        child: widget.dark ? _buildDarkValue() : _buildValuePill(),
+                      ),
+                    ],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildTitleText(),
+                      const SizedBox(height: AppSpacing.x1),
+                      Text(
+                        widget.subtitle,
+                        style: AppTypography.body.copyWith(
+                          fontSize: 14,
+                          height: 20 / 14,
+                          color: AppColors.inkSecondary,
                         ),
                       ),
                     ],
                   ),
-                ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTitleText() {
+    return Text(
+      _title,
+      style: widget.dark
+          ? AppTypography.heading.copyWith(
+              fontSize: 18,
+              height: 24 / 18,
+              color: AppColors.onSignal,
+              fontVariations: const [FontVariation('wght', 600)],
+            )
+          : AppTypography.body.copyWith(
+              fontSize: 17,
+              height: 22 / 17,
+              letterSpacing: -0.2,
+              color: AppColors.ink,
+              fontVariations: const [FontVariation('wght', 600)],
+            ),
+    );
+  }
+
+  /// The dark card's value as an outlined white pill — the exam hero's
+  /// secondary pill («40 вопросов»).
+  Widget _buildDarkValue() {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerRight,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.x3,
+          vertical: AppSpacing.x1 + 2,
+        ),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(BentoTokens.chip),
+          border: Border.all(color: AppColors.onSignal.withValues(alpha: 0.5)),
+        ),
+        child: Text(
+          widget.subtitle,
+          maxLines: 1,
+          style: AppTypography.caption.copyWith(
+            fontSize: 13,
+            color: AppColors.onSignal,
+            fontVariations: const [FontVariation('wght', 500)],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The chosen value in a blue pill with its icon, as the counts on the
+  /// Тесты tiles («100+ вопросов»). One line; shrinks rather than wraps.
+  Widget _buildValuePill() {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerRight,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.x1 + 2,
+          AppSpacing.x1,
+          AppSpacing.x2 + 2,
+          AppSpacing.x1,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.signal50,
+          borderRadius: BorderRadius.circular(BentoTokens.chip),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(widget.icon, size: 16, color: AppColors.signal),
+            const SizedBox(width: AppSpacing.x1 + 2),
+            Text(
+              widget.subtitle,
+              maxLines: 1,
+              style: AppTypography.caption.copyWith(
+                color: AppColors.signal,
+                fontVariations: const [FontVariation('wght', 500)],
               ),
             ),
-          ),
+          ],
         ),
       ),
     );

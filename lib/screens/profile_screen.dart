@@ -25,6 +25,7 @@ import 'support_screen.dart';
 import '../widgets/trial_status_widget.dart';
 import '../theme/solar_icons.dart';
 import '../theme/app_theme.dart';
+import '../theme/bento_tokens.dart';
 
 class ProfileScreen extends StatefulWidget {
   @override
@@ -481,6 +482,9 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
             'edit_profile': 'Editar perfil',
             'support': 'Soporte',
             'support_desc': 'Respuestas a tus preguntas',
+            'language_desc': 'Idioma de preguntas y app',
+            'state_desc': 'Reglas y preguntas de tu estado',
+            'subscription_desc': 'Todos los tests y la teoría',
             'select_language': 'Seleccionar idioma:',
             'state': 'Estado:',
             'subscription': 'Suscripción:',
@@ -511,6 +515,9 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
             'edit_profile': 'Редагувати профіль',
             'support': 'Підтримка',
             'support_desc': 'Відповіді на ваші питання',
+            'language_desc': 'Мова питань і застосунку',
+            'state_desc': 'Правила й питання вашого штату',
+            'subscription_desc': 'Усі тести й уся теорія',
             'select_language': 'Обрати мову:',
             'state': 'Штат:',
             'subscription': 'Підписка:',
@@ -541,6 +548,9 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
             'edit_profile': 'Редактировать профиль',
             'support': 'Поддержка',
             'support_desc': 'Ответы на ваши вопросы',
+            'language_desc': 'Язык вопросов и приложения',
+            'state_desc': 'Правила и вопросы вашего штата',
+            'subscription_desc': 'Все тесты и вся теория',
             'select_language': 'Выбрать язык:',
             'state': 'Штат:',
             'subscription': 'Подписка:',
@@ -571,6 +581,9 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
             'edit_profile': 'Edytuj profil',
             'support': 'Wsparcie',
             'support_desc': 'Odpowiedzi na twoje pytania',
+            'language_desc': 'Język pytań i aplikacji',
+            'state_desc': 'Przepisy i pytania twojego stanu',
+            'subscription_desc': 'Wszystkie testy i teoria',
             'select_language': 'Wybierz język:',
             'state': 'Stan:',
             'subscription': 'Subskrypcja:',
@@ -602,6 +615,9 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
             'edit_profile': 'Edit profile',
             'support': 'Support',
             'support_desc': 'Answers to your questions',
+            'language_desc': 'Questions and app language',
+            'state_desc': 'Rules and questions for your state',
+            'subscription_desc': 'All tests and theory',
             'select_language': 'Select language:',
             'state': 'State:',
             'subscription': 'Subscription:',
@@ -651,273 +667,395 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
           );
         }
 
+        final blocks = <Widget>[
+          // The trial card sits inside the tab's gutter and scrolls with the
+          // page, as on Тесты and Теория.
+          TrialStatusWidget(),
+          const SizedBox(height: AppSpacing.x4),
+          // The page's one hero, in the Тесты exam card's blue (owner,
+          // 2026-09-26: "use such colours for Profile").
+          _buildProfileHeader(user, languageProvider),
+          const SizedBox(height: AppSpacing.x8),
+          _buildSectionHeader(AppLocalizations.of(context).translate('settings')),
+          _buildEnhancedMenuCard(
+            _translate('select_language', languageProvider),
+            languageProvider.languageName,
+            SolarIcons.globalLinear,
+            1,
+            true, // Highlight language name
+            () => _onLanguage(languageProvider),
+            iconAsset: _getProfileIconAsset(1),
+            description: _translate('language_desc', languageProvider),
+          ),
+          const SizedBox(height: AppSpacing.x3),
+          _buildEnhancedMenuCard(
+            _translate('state', languageProvider),
+            _isLoadingState 
+              ? "Loading..." // Show loading indicator while fetching state
+              : ((authProvider.user?.state?.isNotEmpty == true) 
+                  ? _getFullStateName(authProvider.user!.state!).split(' ').map((word) => 
+                      word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}' : ''
+                    ).join(' ') // Convert to title case
+                  : _translate('Not selected', languageProvider)),
+            SolarIcons.mapPointBold,
+            2,
+            true, // The chosen state, shown as a value pill
+            () => _onState(languageProvider),
+            iconAsset: _getProfileIconAsset(2),
+            description: _translate('state_desc', languageProvider),
+          ),
+          const SizedBox(height: AppSpacing.x3),
+          // The secondary destination as the dark card, as «Сохраненные».
+          _buildEnhancedMenuCard(
+            _translate('subscription', languageProvider),
+            subscriptionProvider.isSubscriptionActive 
+                ? _translate('active', languageProvider) 
+                : _translate('try_premium', languageProvider),
+            SolarIcons.medalRibbonsStarBold,
+            3,
+            subscriptionProvider.isSubscriptionActive, // Highlight if active
+            _onSubscription,
+            iconAsset: _getProfileIconAsset(3),
+            dark: true,
+            description: _translate('subscription_desc', languageProvider),
+          ),
+          const SizedBox(height: AppSpacing.x3),
+          _buildEnhancedMenuCard(
+            _translate('support', languageProvider),
+            _translate('support_desc', languageProvider),
+            SolarIcons.questionCircleLinear,
+            0,
+            false,
+            _onSupport,
+            iconAsset: _getProfileIconAsset(0),
+          ),
+          const SizedBox(height: AppSpacing.x6),
+          _buildLogoutButton(authProvider, languageProvider),
+          const SizedBox(height: AppSpacing.x4),
+          _buildVersion(languageProvider),
+          const SizedBox(height: AppSpacing.x6),
+        ];
+
         return Scaffold(
           // No title bar: the tab bar already says where you are, and the bar
           // took a full row above the content.
           body: SafeArea(
             bottom: false,
-            child: SingleChildScrollView(
-            child: Column(
-              children: [
-                SizedBox(height: AppSpacing.x2),
-                TrialStatusWidget(),
-                
-                Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      Container(
-                    padding: EdgeInsets.symmetric(vertical: 24, horizontal: 20),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [Colors.white, Colors.indigo.shade50.withOpacity(0.4)],
-                        stops: [0.0, 1.0],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.2),
-                          spreadRadius: 0,
-                          blurRadius: 6,
-                          offset: Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        ClipOval(
-                          child: Image.asset(
-                            'assets/images/profile/1_user_avatar.png',
-                            width: 60,
-                            height: 60,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              debugPrint('❌ ProfileScreen: Failed to load avatar asset: $error');
-                              // Show CircleAvatar with text only as fallback
-                              return CircleAvatar(
-                                radius: 30,
-                                backgroundColor: Colors.indigo.shade400,
-                                child: Text(
-                                  user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                user.name,
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              SizedBox(height: 4),
-                              // Email display (simplified)
-                              Row(
-                                children: [
-                                  Icon(
-                                    SolarIcons.letterBold,
-                                    size: 14,
-                                    color: Colors.grey[600],
-                                  ),
-                                  SizedBox(width: 4),
-                                  Expanded(
-                                    child: Text(
-                                      user.email,
-                                      style: TextStyle(
-                                        color: Colors.grey[600],
-                                        fontSize: 12,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 8),
-                              GestureDetector(
-                                onTap: () {
-                                  // Navigate to edit profile screen
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => PersonalInfoScreen(),
-                                    ),
-                                  );
-                                },
-                                child: Text(
-                                  _translate('edit_profile', languageProvider),
-                                  style: TextStyle(
-                                    color: Colors.indigo.shade400,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  _buildEnhancedMenuCard(
-                    _translate('support', languageProvider),
-                    _translate('support_desc', languageProvider),
-                    SolarIcons.questionCircleLinear,
-                    0, // Support - Green
-                    false,
-                    () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => SupportScreen(),
-                        ),
-                      );
-                    },
-                    iconAsset: _getProfileIconAsset(0),
-                  ),
-                  SizedBox(height: 16),
-                  _buildEnhancedMenuCard(
-                    _translate('select_language', languageProvider),
-                    languageProvider.languageName,
-                    SolarIcons.globalLinear,
-                    1, // Language - Blue
-                    true, // Highlight language name
-                    () {
-                      _showLanguageSelector(context, languageProvider);
-                    },
-                    iconAsset: _getProfileIconAsset(1),
-                  ),
-                  SizedBox(height: 16),
-                  _buildEnhancedMenuCard(
-                    _translate('state', languageProvider),
-                    _isLoadingState 
-                      ? "Loading..." // Show loading indicator while fetching state
-                      : ((authProvider.user?.state?.isNotEmpty == true) 
-                          ? _getFullStateName(authProvider.user!.state!).split(' ').map((word) => 
-                              word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}' : ''
-                            ).join(' ') // Convert to title case
-                          : _translate('Not selected', languageProvider)),
-                    SolarIcons.mapPointBold,
-                    2, // State - Purple
-                    false,
-                    () {
-                      // Force Firestore refresh and wait for it to complete before showing selector
-                      setState(() { _isLoadingState = true; });
-                      _ensureStateDataLoaded().then((_) {
-                        _showStateSelector(context, languageProvider);
-                      });
-                    },
-                    iconAsset: _getProfileIconAsset(2),
-                  ),
-                  SizedBox(height: 16),
-                  _buildEnhancedMenuCard(
-                    _translate('subscription', languageProvider),
-                    subscriptionProvider.isSubscriptionActive 
-                        ? _translate('active', languageProvider) 
-                        : _translate('try_premium', languageProvider),
-                    SolarIcons.medalRibbonsStarBold,
-                    3, // Subscription - Amber
-                    subscriptionProvider.isSubscriptionActive, // Highlight if active
-                    () {
-                      Navigator.pushNamed(context, '/subscription');
-                    },
-                    iconAsset: _getProfileIconAsset(3),
-                  ),
-                  SizedBox(height: 24),
-                  // Custom logout button with centered text
-                  Card(
-                    elevation: 3,
-                    shadowColor: Colors.black.withOpacity(0.3),
-                    margin: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [Colors.white, Colors.red.shade50.withOpacity(0.4)],
-                          stops: [0.0, 1.0],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.2),
-                            spreadRadius: 0,
-                            blurRadius: 6,
-                            offset: Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: () async {
-                            await authProvider.logout();
-                            Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-                          },
-                          borderRadius: BorderRadius.circular(12),
-                          splashColor: Colors.white.withOpacity(0.3),
-                          highlightColor: Colors.white.withOpacity(0.2),
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 16.0, horizontal: 20.0),
-                            child: Center(
-                              child: Text(
-                                _translate('logout', languageProvider),
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Hidden developer menu trigger
-                  SizedBox(height: 40),
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _versionTapCount++;
-                        if (_versionTapCount >= 5) {
-                          _versionTapCount = 0;
-                          _showDeveloperOptions(context, languageProvider);
-                        }
-                      });
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text(
-                        '${_translate('version', languageProvider)} $_appVersion',
-                        style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                      ),
-                    ),
-                  ),
-                    ],
-                  ),
-                ),
-              ],
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(
+                _gutter,
+                AppSpacing.x2,
+                _gutter,
+                0,
+              ),
+              itemCount: blocks.length,
+              // One-shot entrance, capped so the page lands inside
+              // AppMotion.base.
+              itemBuilder: (context, index) => StaggerIn(
+                index: index,
+                count: blocks.length,
+                curve: BentoTokens.curve,
+                child: blocks[index],
+              ),
             ),
-          ),
           ),
         );
       }
+    );
+  }
+
+  /// The tab's side gutter — the same as Тесты and Теория.
+  static const double _gutter = AppSpacing.x4 + AppSpacing.x1;
+
+  // Handlers — moved unchanged from the inline closures, so the cards can
+  // change without touching navigation, dialogs or logout.
+
+  void _onEditProfile() {
+    // Navigate to edit profile screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PersonalInfoScreen(),
+      ),
+    );
+  }
+
+  void _onSupport() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SupportScreen(),
+      ),
+    );
+  }
+
+  void _onLanguage(LanguageProvider languageProvider) {
+    _showLanguageSelector(context, languageProvider);
+  }
+
+  void _onState(LanguageProvider languageProvider) {
+    // Force Firestore refresh and wait for it to complete before showing selector
+    setState(() { _isLoadingState = true; });
+    _ensureStateDataLoaded().then((_) {
+      _showStateSelector(context, languageProvider);
+    });
+  }
+
+  void _onSubscription() {
+    Navigator.pushNamed(context, '/subscription');
+  }
+
+  Future<void> _onLogout(AuthProvider authProvider) async {
+    await authProvider.logout();
+    Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+  }
+
+  void _onVersionTap(LanguageProvider languageProvider) {
+    setState(() {
+      _versionTapCount++;
+      if (_versionTapCount >= 5) {
+        _versionTapCount = 0;
+        _showDeveloperOptions(context, languageProvider);
+      }
+    });
+  }
+
+  /// A section label, as on Тесты: 15/600 ink, 12 below.
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.x3),
+      child: Text(
+        title,
+        style: AppTypography.label.copyWith(
+          fontSize: 15,
+          color: AppColors.ink,
+          fontVariations: const [FontVariation('wght', 600)],
+        ),
+      ),
+    );
+  }
+
+  /// The page's hero, in the Тесты exam card's blue gradient: the avatar on a
+  /// white disc, the name (22/700, the page's largest title), the email, and
+  /// «Редактировать профиль» as the solid white pill. The whole card opens the
+  /// profile editor, like the exam card; the pill says what it does.
+  Widget _buildProfileHeader(User user, LanguageProvider languageProvider) {
+    return Semantics(
+      button: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _onEditProfile,
+        child: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(BentoTokens.card),
+            gradient: const LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [AppColors.signal600, AppColors.signal, AppColors.signal400],
+              stops: [0, 0.55, 1],
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x290048C3),
+                blurRadius: 24,
+                offset: Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              // The exam card's bar strip, larger and fainter, rising from
+              // the card's bottom edge behind the text (owner, 2026-09-26:
+              // "bigger, more in the background"). Decoration only.
+              Positioned(
+                right: AppSpacing.x4 + AppSpacing.x1,
+                bottom: 0,
+                child: ExcludeSemantics(child: _heroBars()),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.x4 + AppSpacing.x1),
+                child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: const BoxDecoration(
+                      color: AppColors.paper,
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/images/profile/1_user_avatar.png',
+                        width: 58,
+                        height: 58,
+                        fit: BoxFit.cover,
+                        excludeFromSemantics: true,
+                        errorBuilder: (context, error, stackTrace) {
+                          debugPrint('❌ ProfileScreen: Failed to load avatar asset: $error');
+                          // Show CircleAvatar with text only as fallback
+                          return CircleAvatar(
+                            radius: 29,
+                            backgroundColor: AppColors.signal50,
+                            child: Text(
+                              user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
+                              style: AppTypography.title.copyWith(
+                                color: AppColors.signal,
+                                fontVariations: const [FontVariation('wght', 600)],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.x4),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.title.copyWith(
+                            fontSize: 22,
+                            height: 28 / 22,
+                            color: AppColors.onSignal,
+                            fontVariations: const [FontVariation('wght', 700)],
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          user.email,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.label.copyWith(
+                            color: AppColors.signal100,
+                            fontVariations: const [FontVariation('wght', 400)],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.x4),
+              // The solid white pill, as «60 минут» on the exam card.
+              Container(
+                height: 36,
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x4),
+                decoration: BoxDecoration(
+                  color: AppColors.paper,
+                  borderRadius: BorderRadius.circular(BentoTokens.chip),
+                ),
+                child: Center(
+                  widthFactor: 1,
+                  child: Text(
+                    _translate('edit_profile', languageProvider),
+                    maxLines: 1,
+                    style: AppTypography.label.copyWith(
+                      color: AppColors.signal,
+                      fontVariations: const [FontVariation('wght', 600)],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The same rising bar strip as the Тесты exam card
+  /// (`EnhancedTestCard._questionBars`, frozen — copied, not shared).
+  Widget _heroBars() {
+    const heights = [
+      10, 16, 12, 22, 14, 26, 18, 30, 20, 34, 24, 28, 38, 26, 42, 30, 36, 46,
+      32, 40, 50, 36, 44, 54, 40, 48, 58, 44, 52, 60, 48, 56, 62, 52, 58, 64,
+      56, 60, 66, 62,
+    ];
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        for (final h in heights)
+          Container(
+            width: 3,
+            height: h * 1.5,
+            margin: const EdgeInsets.only(left: 3),
+            decoration: BoxDecoration(
+              color: AppColors.onSignal.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// «Выйти из аккаунта»: a white pill with a red label — red because it is
+  /// destructive, not decoration.
+  Widget _buildLogoutButton(AuthProvider authProvider, LanguageProvider languageProvider) {
+    final radius = BorderRadius.circular(BentoTokens.button);
+    return PressScale(
+      scale: 0.97,
+      duration: BentoTokens.state,
+      child: Container(
+        height: 56,
+        decoration: BoxDecoration(
+          color: AppColors.paper,
+          borderRadius: radius,
+          boxShadow: AppColors.shadowCard,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => _onLogout(authProvider),
+            borderRadius: radius,
+            child: Center(
+              child: Text(
+                _translate('logout', languageProvider),
+                style: AppTypography.label.copyWith(
+                  fontSize: 16,
+                  color: AppColors.stop,
+                  fontVariations: const [FontVariation('wght', 500)],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The version line; five taps open the developer options.
+  Widget _buildVersion(LanguageProvider languageProvider) {
+    return Center(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _onVersionTap(languageProvider),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.x4,
+            vertical: AppSpacing.x3,
+          ),
+          child: Text(
+            '${_translate('version', languageProvider)} $_appVersion',
+            style: AppTypography.caption.copyWith(
+              color: AppColors.inkSecondary,
+              fontVariations: const [FontVariation('wght', 400)],
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -928,7 +1066,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     int cardType,
     bool isHighlighted,
     VoidCallback onTap,
-    {String? iconAsset}
+    {String? iconAsset, bool dark = false, String? description}
   ) {
     return EnhancedProfileCard(
       title: title,
@@ -938,6 +1076,8 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
       isHighlighted: isHighlighted,
       onTap: onTap,
       iconAsset: iconAsset,
+      dark: dark,
+      description: description,
     );
   }
 
@@ -1018,7 +1158,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
       LanguageProvider provider, AuthProvider authProvider) {
     return ListTile(
       title: Text(language),
-      trailing: provider.language == code ? Icon(SolarIcons.checkLinear, color: Colors.green) : null,
+      trailing: provider.language == code ? Icon(SolarIcons.checkLinear, color: AppColors.signal) : null,
       onTap: () async {
         // Captured here, outside the try, for two reasons: the context is
         // certainly mounted at this point, and the catch block needs it too.
@@ -1154,40 +1294,53 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     // Get only visible states from StateData
     final visibleStates = StateData.getVisibleStates();
     
+    // Declared outside the builder so it survives setDialogState. Inside the
+    // builder it was reset to false on every rebuild, so the «Обновление
+    // штата…» spinner never showed and the rows were never disabled
+    // (fixed 2026-09-26, owner).
+    bool _isDialogLoading = false;
+    
     showDialog<Map<String, dynamic>>(
       context: context,
       barrierDismissible: true, // Allow dismissal by tapping outside
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) {
-          bool _isDialogLoading = false;
-          
           return AlertDialog(
             title: Text(_translate('select_state_dialog', languageProvider)),
             content: Container(
               width: double.maxFinite,
-              height: 400, // Fixed height for scrollable content
+              // Up to 400 tall, scrolling beyond — no empty band under a
+              // short list (was a fixed 400).
+              constraints: const BoxConstraints(maxHeight: 400),
               child: _isDialogLoading
-                  ? Center(
+                  // About as tall as the two-state list, so the dialog does
+                  // not jump to its 400 maximum while the state saves.
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.x8),
+                      child: Center(
+                      heightFactor: 1,
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.indigo),
+                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.signal),
                           ),
                           SizedBox(height: 16),
                           Text(
                             _translate('updating_state', languageProvider),
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 14,
+                            style: AppTypography.label.copyWith(
+                              color: AppColors.inkSecondary,
+                              fontVariations: const [FontVariation('wght', 400)],
                             ),
                           ),
                         ],
                       ),
+                    ),
                     )
                   : Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Expanded(
+                        Flexible(
                           child: ListView.builder(
                             shrinkWrap: true,
                             itemCount: visibleStates.length,
@@ -1204,7 +1357,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                               
                               return ListTile(
                                 title: Text(titleCaseState),
-                                trailing: isSelected ? Icon(SolarIcons.checkLinear, color: Colors.green) : null,
+                                trailing: isSelected ? Icon(SolarIcons.checkLinear, color: AppColors.signal) : null,
                                 enabled: !_isDialogLoading, // Disable during loading
                                 onTap: () async {
                                   // Set loading state. Safe today — this runs
@@ -1361,10 +1514,9 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                           padding: const EdgeInsets.symmetric(vertical: 16.0),
                           child: Text(
                             _translate('more_states_coming', languageProvider),
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 12,
-                              fontStyle: FontStyle.italic,
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.inkSecondary,
+                              fontVariations: const [FontVariation('wght', 400)],
                             ),
                             textAlign: TextAlign.center,
                           ),
