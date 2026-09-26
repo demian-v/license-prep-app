@@ -3,6 +3,7 @@ import '../services/crash_reporter.dart';
 import 'package:provider/provider.dart';
 import '../screens/test_screen.dart';
 import '../screens/theory_screen.dart';
+import '../screens/instructors_screen.dart';
 import '../screens/profile_screen.dart';
 import '../widgets/super_enhanced_footer.dart';
 import '../services/service_locator_extensions.dart';
@@ -30,14 +31,10 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   @override
   bool get wantKeepAlive => true;
   
-  /// «Инструкторы» — a marketplace of instructors and driving schools, not
-  /// built yet. The tab is shown, but tapping it goes nowhere.
-  static const int _instructorsTab = 2;
-
   final List<Widget> _screens = [
     TestScreen(),
     TheoryScreen(),
-    const SizedBox.shrink(), // Instructors — never shown, see _onTabTapped
+    const InstructorsScreen(),
     ProfileScreen(),
   ];
 
@@ -148,8 +145,6 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   }
 
   void _onTabTapped(int index) {
-    if (index == _instructorsTab) return;
-
     // Validate session before allowing navigation
     if (!SessionValidationService.validateBeforeActionSafely(context)) {
       print('🚨 HomeScreen: Session invalid, blocking tab navigation');
