@@ -5,7 +5,7 @@ import '../services/subscription_management_service.dart';
 import '../localization/app_localizations.dart';
 import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
-import '../theme/design_variant.dart';
+import '../theme/bento_tokens.dart';
 
 /// Subscription status, shown on every tab.
 ///
@@ -79,8 +79,8 @@ class TrialStatusWidget extends StatelessWidget {
   /// while nothing is wrong, amber when the trial is nearly out, red once
   /// access has actually lapsed. It is one card, not four hand-styled ones.
   ///
-  /// The design variant changes the shape of that one card — never which
-  /// state is shown, what it says, or where its action goes.
+  /// A small borderless card — bold label, the detail in a pill, and the
+  /// action as a solid blue pill.
   Widget _buildRow({
     required BuildContext context,
     required String iconAsset,
@@ -94,301 +94,95 @@ class TrialStatusWidget extends StatelessWidget {
     final bool hasSubtitle = subtitle != null && subtitle.trim().isNotEmpty;
     final bool hasAction = actionLabel != null && onAction != null;
 
-    return ValueListenableBuilder<DesignVariant>(
-      valueListenable: designVariant,
-      builder: (context, variant, _) {
-        final tokens = VariantTokens.of(variant);
-        switch (variant) {
-          case DesignVariant.refined:
-            return Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.x4,
-                vertical: AppSpacing.x3,
-              ),
-              decoration: BoxDecoration(
-                color: AppColors.paper,
-                borderRadius: BorderRadius.circular(tokens.card),
-                border: Border.all(color: AppColors.border),
-                boxShadow: AppColors.shadowResting,
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: toneSurface,
-                      borderRadius: BorderRadius.circular(tokens.chip),
-                    ),
-                    alignment: Alignment.center,
-                    child: AppIcons.icon(iconAsset, size: 18, color: tone),
-                  ),
-                  const SizedBox(width: AppSpacing.x3),
-                  Expanded(
-                    child: _texts(title, hasSubtitle ? subtitle : null,
-                        titleWeight: 600),
-                  ),
-                  if (hasAction) ...[
-                    const SizedBox(width: AppSpacing.x2),
-                    _textAction(actionLabel, onAction),
-                  ],
-                ],
-              ),
-            );
-
-          case DesignVariant.boldA:
-            // Signal: the status is a small card of its own, and its action
-            // is a real button rather than a link.
-            return Container(
-              padding: const EdgeInsets.all(AppSpacing.x3),
-              decoration: BoxDecoration(
-                color: AppColors.paper,
-                borderRadius: BorderRadius.circular(tokens.card),
-                boxShadow: AppColors.shadowResting,
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: toneSurface,
-                      shape: BoxShape.circle,
-                    ),
-                    alignment: Alignment.center,
-                    child: AppIcons.icon(iconAsset, size: 20, color: tone),
-                  ),
-                  const SizedBox(width: AppSpacing.x3),
-                  Expanded(
-                    child: _texts(title, hasSubtitle ? subtitle : null,
-                        titleWeight: 700),
-                  ),
-                  if (hasAction) ...[
-                    const SizedBox(width: AppSpacing.x2),
-                    FilledButton(
-                      onPressed: onAction,
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(0, 44),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.x4,
-                        ),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(tokens.button),
-                        ),
-                      ),
-                      child: Text(
-                        actionLabel,
-                        style: AppTypography.label.copyWith(
-                          color: AppColors.onSignal,
-                          fontVariations: const [FontVariation('wght', 700)],
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            );
-
-          case DesignVariant.bento:
-            // Bento: a small borderless card — bold label, the detail in a
-            // pill, and the action as a solid blue pill.
-            return Container(
-              padding: const EdgeInsets.all(AppSpacing.x4),
-              decoration: BoxDecoration(
-                color: AppColors.paper,
-                borderRadius: BorderRadius.circular(tokens.card),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x0F0E1F4D),
-                    blurRadius: 24,
-                    offset: Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: toneSurface,
-                      shape: BoxShape.circle,
-                    ),
-                    alignment: Alignment.center,
-                    child: AppIcons.icon(iconAsset, size: 18, color: tone),
-                  ),
-                  const SizedBox(width: AppSpacing.x3),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          title,
-                          style: AppTypography.label.copyWith(
-                            color: AppColors.ink,
-                            fontVariations: const [FontVariation('wght', 700)],
-                          ),
-                        ),
-                        if (hasSubtitle) ...[
-                          const SizedBox(height: AppSpacing.x1),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.x2,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.field,
-                              borderRadius: BorderRadius.circular(tokens.chip),
-                            ),
-                            child: Text(
-                              subtitle,
-                              style: AppTypography.caption.copyWith(
-                                color: AppColors.ink,
-                                fontVariations: const [
-                                  FontVariation('wght', 600),
-                                ],
-                                fontFeatures: const [
-                                  FontFeature.tabularFigures(),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  if (hasAction) ...[
-                    const SizedBox(width: AppSpacing.x2),
-                    FilledButton(
-                      onPressed: onAction,
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(0, 44),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.x4,
-                        ),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        shape: const StadiumBorder(),
-                      ),
-                      child: Text(
-                        actionLabel,
-                        style: AppTypography.label.copyWith(
-                          fontSize: 13,
-                          color: AppColors.onSignal,
-                          fontVariations: const [FontVariation('wght', 700)],
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            );
-
-          case DesignVariant.boldB:
-            // Ledger: one quiet strip. The glyph carries the tone; the text
-            // stays ink so the status never shouts louder than the content.
-            return Container(
-              constraints: const BoxConstraints(minHeight: 44),
-              padding: const EdgeInsets.only(
-                left: AppSpacing.x3,
-                right: AppSpacing.x1,
-              ),
-              decoration: BoxDecoration(
-                color: AppColors.paper,
-                borderRadius: BorderRadius.circular(tokens.card),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Row(
-                children: [
-                  AppIcons.icon(iconAsset, size: 16, color: tone),
-                  const SizedBox(width: AppSpacing.x2),
-                  Expanded(
-                    child: Padding(
-                      padding:
-                          const EdgeInsets.symmetric(vertical: AppSpacing.x2),
-                      // Two short lines rather than one run-on: a single
-                      // wrapped line broke "Дней осталось: 3" mid-phrase.
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            title,
-                            style: AppTypography.label.copyWith(
-                              color: AppColors.ink,
-                              fontSize: 13,
-                              height: 18 / 13,
-                              fontVariations: const [
-                                FontVariation('wght', 600),
-                              ],
-                            ),
-                          ),
-                          if (hasSubtitle)
-                            Text(
-                              subtitle,
-                              style: AppTypography.caption.copyWith(
-                                color: AppColors.inkSecondary,
-                                fontFeatures: const [
-                                  FontFeature.tabularFigures(),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (hasAction) _textAction(actionLabel, onAction),
-                ],
-              ),
-            );
-        }
-      },
-    );
-  }
-
-  Widget _texts(String title, String? subtitle, {required double titleWeight}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          title,
-          style: AppTypography.label.copyWith(
-            color: AppColors.ink,
-            fontVariations: [FontVariation('wght', titleWeight)],
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.x4),
+      decoration: BoxDecoration(
+        color: AppColors.paper,
+        borderRadius: BorderRadius.circular(BentoTokens.card),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F0E1F4D),
+            blurRadius: 24,
+            offset: Offset(0, 8),
           ),
-        ),
-        if (subtitle != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              subtitle,
-              style: AppTypography.caption.copyWith(
-                color: AppColors.inkSecondary,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: toneSurface,
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: AppIcons.icon(iconAsset, size: 18, color: tone),
+          ),
+          const SizedBox(width: AppSpacing.x3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: AppTypography.label.copyWith(
+                    color: AppColors.ink,
+                    fontVariations: const [FontVariation('wght', 700)],
+                  ),
+                ),
+                if (hasSubtitle) ...[
+                  const SizedBox(height: AppSpacing.x1),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.x2,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.field,
+                      borderRadius: BorderRadius.circular(BentoTokens.chip),
+                    ),
+                    child: Text(
+                      subtitle,
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.ink,
+                        fontVariations: const [
+                          FontVariation('wght', 600),
+                        ],
+                        fontFeatures: const [
+                          FontFeature.tabularFigures(),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-      ],
-    );
-  }
-
-  Widget _textAction(String label, VoidCallback onAction) {
-    return TextButton(
-      onPressed: onAction,
-      style: TextButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x2),
-        minimumSize: const Size(44, 44),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      ),
-      child: Text(
-        label,
-        style: AppTypography.label.copyWith(
-          fontSize: 13,
-          color: AppColors.signal,
-          fontVariations: const [FontVariation('wght', 700)],
-        ),
+          if (hasAction) ...[
+            const SizedBox(width: AppSpacing.x2),
+            FilledButton(
+              onPressed: onAction,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 44),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.x4,
+                ),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: const StadiumBorder(),
+              ),
+              child: Text(
+                actionLabel,
+                style: AppTypography.label.copyWith(
+                  fontSize: 13,
+                  color: AppColors.onSignal,
+                  fontVariations: const [FontVariation('wght', 700)],
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -396,52 +190,37 @@ class TrialStatusWidget extends StatelessWidget {
   /// A skeleton in the row's own shape, rather than a spinner that implies
   /// something is stuck.
   Widget _buildLoadingWidget() {
-    return ValueListenableBuilder<DesignVariant>(
-      valueListenable: designVariant,
-      builder: (context, variant, _) {
-        final tokens = VariantTokens.of(variant);
-        final bool strip = variant == DesignVariant.boldB;
-        final double glyph = strip
-            ? 16
-            : variant == DesignVariant.boldA
-                ? 44
-                : 36;
-        return Container(
-          height: strip ? 44 : null,
-          padding: EdgeInsets.symmetric(
-            horizontal: strip ? AppSpacing.x3 : AppSpacing.x4,
-            vertical: strip ? 0 : AppSpacing.x3,
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.x4,
+        vertical: AppSpacing.x3,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.paper,
+        borderRadius: BorderRadius.circular(BentoTokens.card),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: AppColors.border,
+              borderRadius: BorderRadius.circular(BentoTokens.chip),
+            ),
           ),
-          decoration: BoxDecoration(
-            color: AppColors.paper,
-            borderRadius: BorderRadius.circular(tokens.card),
-            border: Border.all(color: AppColors.border),
+          const SizedBox(width: AppSpacing.x3),
+          Container(
+            width: 168,
+            height: 12,
+            decoration: BoxDecoration(
+              color: AppColors.border,
+              borderRadius: BorderRadius.circular(BentoTokens.chip),
+            ),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: glyph,
-                height: glyph,
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(
-                    variant == DesignVariant.boldA ? glyph / 2 : tokens.chip,
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.x3),
-              Container(
-                width: 168,
-                height: 12,
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(tokens.chip),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+        ],
+      ),
     );
   }
 

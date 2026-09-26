@@ -95,6 +95,21 @@ class AppColors {
         ),
       ];
 
+  /// The Bento card: a soft, wide lift plus a 1px contact shadow, so a
+  /// borderless white card still separates from the `field` page.
+  static const List<BoxShadow> shadowCard = [
+    BoxShadow(
+      color: Color(0x0F0E1F4D),
+      blurRadius: 24,
+      offset: Offset(0, 8),
+    ),
+    BoxShadow(
+      color: Color(0x080E1F4D),
+      blurRadius: 2,
+      offset: Offset(0, 1),
+    ),
+  ];
+
   /// The full scheme. Replaces `ColorScheme.light(secondary: Colors.green)`,
   /// which left every unspecified role to Material 3's default seed — a purple
   /// nobody chose that surfaced on focus rings, the paywall CTA and, via

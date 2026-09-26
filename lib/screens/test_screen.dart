@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../data/license_data.dart';
 import '../widgets/enhanced_test_card.dart';
 import '../theme/app_theme.dart';
-import '../theme/design_variant.dart';
+import '../theme/bento_tokens.dart';
 import '../providers/exam_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/progress_provider.dart';
@@ -308,7 +308,7 @@ class _TestScreenState extends State<TestScreen> {
   }
 
   // Entry handlers. Moved here unchanged from the inline closures that used to
-  // sit inside `build`, so all three design variants run exactly the same
+  // sit inside `build`, so presentation can change without touching the same
   // session check, subscription gate, analytics and navigation.
 
   void _onTakeExam(BuildContext context, LanguageProvider languageProvider) {
@@ -464,82 +464,37 @@ class _TestScreenState extends State<TestScreen> {
       builder: (context, languageProvider, _) {
         print('🧪 [TEST SCREEN] Building with language: ${languageProvider.language}');
 
-        return ValueListenableBuilder<DesignVariant>(
-          valueListenable: designVariant,
-          builder: (context, variant, _) {
-            final List<Widget> blocks;
-            switch (variant) {
-              case DesignVariant.refined:
-                blocks = _refinedBlocks(context, languageProvider);
-                break;
-              case DesignVariant.boldA:
-                blocks = _signalBlocks(context, languageProvider);
-                break;
-              case DesignVariant.boldB:
-                blocks = _ledgerBlocks(context, languageProvider);
-                break;
-              case DesignVariant.bento:
-                // Same structure as Refined; the cards themselves change.
-                blocks = _refinedBlocks(context, languageProvider);
-                break;
-            }
+        final blocks = _blocks(context, languageProvider);
 
-            // One-shot entrance, keyed by variant so switching replays it.
-            // Refined: 240ms cascade. Signal: a longer, springier rise.
-            // Ledger: a single 180ms fade, no cascade.
-            final Duration total = variant == DesignVariant.boldA
-                ? AppMotion.slow
-                : variant == DesignVariant.boldB
-                    ? AppMotion.fast
-                    : AppMotion.base;
-            final Duration step = variant == DesignVariant.boldB
-                ? Duration.zero
-                : variant == DesignVariant.boldA
-                    ? AppMotion.stagger * 1.5
-                    : AppMotion.stagger;
-
-            return DesignVariantSwitcher(
-              child: Scaffold(
-                // No AppBar: the title is content, set large and left. A
-                // centred system title bar would put the chrome back.
-                backgroundColor: variant == DesignVariant.boldB
-                    ? AppColors.paper
-                    : AppColors.field,
-                body: SafeArea(
-                  bottom: false,
-                  child: SingleChildScrollView(
-                    key: ValueKey(variant),
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: variant == DesignVariant.boldB
-                            ? AppSpacing.gutter
-                            : AppSpacing.x4 + AppSpacing.x1,
+        return Scaffold(
+          // No AppBar: the tab bar already names the tab.
+          backgroundColor: AppColors.field,
+          body: SafeArea(
+            bottom: false,
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.x4 + AppSpacing.x1,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // One-shot entrance: a 240ms cascade, 8pt rise.
+                    for (var i = 0; i < blocks.length; i++)
+                      StaggerIn(
+                        index: i,
+                        count: blocks.length,
+                        total: AppMotion.base,
+                        step: AppMotion.stagger,
+                        rise: 8,
+                        curve: BentoTokens.curve,
+                        child: blocks[i],
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (var i = 0; i < blocks.length; i++)
-                            StaggerIn(
-                              index: i,
-                              count: blocks.length,
-                              total: total,
-                              step: step,
-                              rise: variant == DesignVariant.boldA
-                                  ? 16
-                                  : variant == DesignVariant.boldB
-                                      ? 0
-                                      : 8,
-                              curve: VariantTokens.of(variant).curve,
-                              child: blocks[i],
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
+                  ],
                 ),
               ),
-            );
-          },
+            ),
+          ),
         );
       },
     );
@@ -592,24 +547,7 @@ class _TestScreenState extends State<TestScreen> {
         cardType: 3,
       );
 
-  /// The two practice modes side by side: they are peers, and pairing them
-  /// keeps the exam above visually dominant.
-  Widget _practicePair(BuildContext context, LanguageProvider languageProvider,
-      {required double gap}) {
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(child: _topicsItem(context, languageProvider)),
-          SizedBox(width: gap),
-          Expanded(child: _practiceItem(context, languageProvider)),
-        ],
-      ),
-    );
-  }
-
-  /// Refined: direction A with a strict 4/8 rhythm.
-  List<Widget> _refinedBlocks(BuildContext context, LanguageProvider lp) => [
+  List<Widget> _blocks(BuildContext context, LanguageProvider lp) => [
         // No screen title: the tab bar already names the tab.
         const SizedBox(height: AppSpacing.x2),
         // Status sits above the modes: it tells the user whether any of them
@@ -620,44 +558,16 @@ class _TestScreenState extends State<TestScreen> {
           child: _buildSectionHeader(_translate('testing', lp)),
         ),
         _examItem(context, lp),
-        // Bento stacks the two practice modes full width: side by side they
-        // left a large empty band above the tab bar whenever the trial card
-        // is hidden (a paid subscriber sees none).
-        if (designVariant.value == DesignVariant.bento) ...[
-          Padding(
-            padding: const EdgeInsets.only(top: AppSpacing.x3),
-            child: _topicsItem(context, lp),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(top: AppSpacing.x3),
-            child: _practiceItem(context, lp),
-          ),
-        ] else
-          Padding(
-            padding: const EdgeInsets.only(top: AppSpacing.x3),
-            child: _practicePair(context, lp, gap: AppSpacing.x3),
-          ),
+        // The two practice modes stack full width: side by side they left a
+        // large empty band above the tab bar whenever the trial card is
+        // hidden (a paid subscriber sees none).
         Padding(
-          padding: const EdgeInsets.only(top: AppSpacing.x8),
-          child: _buildSectionHeader(_translate('working_on_mistakes', lp)),
+          padding: const EdgeInsets.only(top: AppSpacing.x3),
+          child: _topicsItem(context, lp),
         ),
-        _savedItem(context, lp),
-        const SizedBox(height: AppSpacing.x8),
-      ];
-
-  /// Signal: the exam is the hero; everything else steps back to support it.
-  List<Widget> _signalBlocks(BuildContext context, LanguageProvider lp) => [
-        // No screen title: the tab bar already names the tab.
-        const SizedBox(height: AppSpacing.x2),
-        TrialStatusWidget(),
         Padding(
-          padding: const EdgeInsets.only(top: AppSpacing.x8),
-          child: _buildSectionHeader(_translate('testing', lp)),
-        ),
-        _examItem(context, lp),
-        Padding(
-          padding: const EdgeInsets.only(top: AppSpacing.x4),
-          child: _practicePair(context, lp, gap: AppSpacing.x4),
+          padding: const EdgeInsets.only(top: AppSpacing.x3),
+          child: _practiceItem(context, lp),
         ),
         Padding(
           padding: const EdgeInsets.only(top: AppSpacing.x8),
@@ -666,53 +576,6 @@ class _TestScreenState extends State<TestScreen> {
         _savedItem(context, lp),
         const SizedBox(height: AppSpacing.x8),
       ];
-
-  /// Ledger: list-first. The exam leads; the rest are rows in one block.
-  List<Widget> _ledgerBlocks(BuildContext context, LanguageProvider lp) {
-    final tokens = VariantTokens.of(DesignVariant.boldB);
-    Widget block(List<Widget> rows) => Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(tokens.card),
-            border: Border.all(color: AppColors.borderStrong),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (var i = 0; i < rows.length; i++) ...[
-                if (i > 0)
-                  const Divider(
-                    height: 1,
-                    thickness: 1,
-                    indent: AppSpacing.x4 + 20 + AppSpacing.x3,
-                  ),
-                rows[i],
-              ],
-            ],
-          ),
-        );
-
-    return [
-      // No screen title: the tab bar already names the tab.
-      const SizedBox(height: AppSpacing.x2),
-      TrialStatusWidget(),
-      Padding(
-        padding: const EdgeInsets.only(top: AppSpacing.x6),
-        child: _buildSectionHeader(_translate('testing', lp)),
-      ),
-      _examItem(context, lp),
-      Padding(
-        padding: const EdgeInsets.only(top: AppSpacing.x2),
-        child: block([_topicsItem(context, lp), _practiceItem(context, lp)]),
-      ),
-      Padding(
-        padding: const EdgeInsets.only(top: AppSpacing.x6),
-        child: _buildSectionHeader(_translate('working_on_mistakes', lp)),
-      ),
-      block([_savedItem(context, lp)]),
-      const SizedBox(height: AppSpacing.x8),
-    ];
-  }
 
   /// A section label.
   ///
@@ -721,46 +584,15 @@ class _TestScreenState extends State<TestScreen> {
   /// left-aligned label, in sentence case: all-caps is harder to read in
   /// Cyrillic, and an eyebrow label above every heading is decoration, not
   /// information.
-  ///
-  /// Secondary ink, not tertiary: tertiary is 3.1:1 on the field grey and
-  /// fails body-text contrast.
   Widget _buildSectionHeader(String title) {
-    final variant = designVariant.value;
-    if (variant == DesignVariant.bento) {
-      // Bento: section titles are small bold labels, like a dashboard's
-      // panel headings.
-      return Padding(
-        padding: const EdgeInsets.only(bottom: AppSpacing.x3),
-        child: Text(
-          title,
-          style: AppTypography.label.copyWith(
-            fontSize: 15,
-            color: AppColors.ink,
-            fontVariations: const [FontVariation('wght', 700)],
-          ),
-        ),
-      );
-    }
-    if (variant == DesignVariant.boldA) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: AppSpacing.x3),
-        child: Text(
-          title,
-          style: AppTypography.heading.copyWith(
-            fontVariations: const [FontVariation('wght', 700)],
-          ),
-        ),
-      );
-    }
+    // Small bold labels, like a dashboard's panel headings.
     return Padding(
-      padding: EdgeInsets.only(
-        bottom: variant == DesignVariant.boldB ? AppSpacing.x2 : AppSpacing.x3,
-      ),
+      padding: const EdgeInsets.only(bottom: AppSpacing.x3),
       child: Text(
         title,
-        style: AppTypography.caption.copyWith(
-          fontSize: 13,
-          color: AppColors.inkSecondary,
+        style: AppTypography.label.copyWith(
+          fontSize: 15,
+          color: AppColors.ink,
           fontVariations: const [FontVariation('wght', 600)],
         ),
       ),

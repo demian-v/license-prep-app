@@ -1,5 +1,10 @@
 # Next session — roll the Bento design out to the rest of the app
 
+> **Status 2026-09-26:** Step 0 answered (Bento only, variants deleted,
+> Rubik lighter, retired files deleted). Items 1, 2, 5 and the saved page of
+> item 7 are done — the whole Тесты tab. Continue with
+> `design/prompts/next-session-theory.md`.
+
 Paste everything below the line into a fresh Claude Code session opened in
 `/Users/demianvyrozub/projects/license-prep-app`.
 

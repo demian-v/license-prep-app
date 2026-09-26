@@ -8,6 +8,11 @@ import '../services/service_locator.dart';
 import '../services/direct_firestore_service.dart';
 import '../localization/app_localizations.dart';
 import '../widgets/adaptive_question_image.dart';
+import '../widgets/bento_question_parts.dart';
+import '../widgets/bento_result_parts.dart';
+import '../theme/app_icons.dart';
+import '../theme/app_theme.dart';
+import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
 
 class SavedItemsScreen extends StatefulWidget {
@@ -17,7 +22,7 @@ class SavedItemsScreen extends StatefulWidget {
   State<SavedItemsScreen> createState() => _SavedItemsScreenState();
 }
 
-class _SavedItemsScreenState extends State<SavedItemsScreen> with TickerProviderStateMixin {
+class _SavedItemsScreenState extends State<SavedItemsScreen> {
   int? _expandedIndex;
   Map<String, Set<String>> _selectedAnswers = {}; // Changed to Set<String> for multiple selections
   Map<String, bool> _checkedAnswers = {};
@@ -25,45 +30,13 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> with TickerProvider
   bool _isLoading = true;
   String _error = '';
   
-  // Animation controllers
-  late AnimationController _titleAnimationController;
-  late Animation<double> _titlePulseAnimation;
-  late AnimationController _cardAnimationController;
-  late Animation<double> _cardScaleAnimation;
-  
-  // Animation state
-  double _heartAnimationValue = 1.0;
+  // Presentation only: questions being un-saved, animating out until the
+  // reload drops them from the list.
+  final Set<String> _leaving = {};
 
   @override
   void initState() {
     super.initState();
-    
-    // Initialize animations
-    _titleAnimationController = AnimationController(
-      duration: Duration(seconds: 3),
-      vsync: this,
-    );
-    
-    _titlePulseAnimation = Tween<double>(
-      begin: 1.0,
-      end: 1.02,
-    ).animate(CurvedAnimation(
-      parent: _titleAnimationController,
-      curve: Curves.easeInOut,
-    ));
-    
-    _cardAnimationController = AnimationController(
-      duration: Duration(milliseconds: 300),
-      vsync: this,
-    );
-    
-    _cardScaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.98,
-    ).animate(_cardAnimationController);
-    
-    // Start animations
-    _titleAnimationController.repeat(reverse: true);
     
     // Check if we need to migrate saved questions from old to new structure
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -74,85 +47,6 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> with TickerProvider
       progressProvider.migrateSavedQuestionsIfNeeded(userId);
       _loadSavedQuestions();
     });
-  }
-
-  @override
-  void dispose() {
-    _titleAnimationController.dispose();
-    _cardAnimationController.dispose();
-    super.dispose();
-  }
-
-  // Gradient helper methods to match Tests screen exactly
-  LinearGradient _getCardGradient(int index) {
-    Color startColor = Colors.white;
-    Color endColor;
-    
-    // Cycle through colors like Tests screen: blue, green, orange, purple
-    switch (index % 4) {
-      case 0: // Blue
-        endColor = Colors.blue.shade50.withOpacity(0.4);
-        break;
-      case 1: // Green
-        endColor = Colors.green.shade50.withOpacity(0.4);
-        break;
-      case 2: // Orange
-        endColor = Colors.orange.shade50.withOpacity(0.4);
-        break;
-      case 3: // Purple
-        endColor = Colors.purple.shade50.withOpacity(0.4);
-        break;
-      default:
-        endColor = Colors.blue.shade50.withOpacity(0.4);
-    }
-    
-    return LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [startColor, endColor],
-      stops: [0.0, 1.0],
-    );
-  }
-
-  // Clean minimal helper methods to match Tests screen
-  Color _getNumberCircleBackgroundColor(int index) {
-    switch (index % 4) {
-      case 0: return Colors.blue.shade50.withOpacity(0.8);
-      case 1: return Colors.green.shade50.withOpacity(0.8);
-      case 2: return Colors.orange.shade50.withOpacity(0.8);
-      case 3: return Colors.purple.shade50.withOpacity(0.8);
-      default: return Colors.blue.shade50.withOpacity(0.8);
-    }
-  }
-
-  Color _getNumberCircleTextColor(int index) {
-    switch (index % 4) {
-      case 0: return Colors.blue.shade600;
-      case 1: return Colors.green.shade600;
-      case 2: return Colors.orange.shade600;
-      case 3: return Colors.purple.shade600;
-      default: return Colors.blue.shade600;
-    }
-  }
-
-  // Clean minimal title widget
-  Widget _buildCleanTitle() {
-    return AnimatedBuilder(
-      animation: _titlePulseAnimation,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _titlePulseAnimation.value,
-          child: Text(
-            AppLocalizations.of(context).translate('saved'),
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-            ),
-          ),
-        );
-      },
-    );
   }
 
   Future<void> _loadSavedQuestions() async {
@@ -257,587 +151,490 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> with TickerProvider
   }
 
 
+  // Handlers moved unchanged from the inline closures in `build`, so the
+  // presentation can change without touching expanding, un-saving,
+  // selecting or checking.
+
+  void _toggleExpanded(int index, QuizQuestion question, bool isExpanded) {
+    setState(() {
+      if (isExpanded) {
+        _expandedIndex = null;
+      } else {
+        _expandedIndex = index;
+        // Reset answer state when expanding
+        _selectedAnswers.remove(question.id);
+        _checkedAnswers.remove(question.id);
+      }
+    });
+  }
+
+  void _unsave(ProgressProvider provider, QuizQuestion question) {
+    // Animation trigger: the heart empties and the card leaves the list.
+    setState(() {
+      _leaving.add(question.id);
+    });
+    
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userId = authProvider.user?.id ?? '';
+    provider.toggleSavedQuestionWithUserId(question.id, userId);
+    // Reload the questions after a short delay
+    Future.delayed(Duration(milliseconds: 500), () {
+      _loadSavedQuestions().then((_) {
+        if (mounted) setState(() => _leaving.remove(question.id));
+      });
+    });
+  }
+
+  void _selectOption(QuizQuestion question, String option, bool isSelected) {
+    setState(() {
+      if (question.type == QuestionType.multipleChoice) {
+        // Toggle selection for multiple choice
+        if (isSelected) {
+          _selectedAnswers[question.id]?.remove(option);
+        } else {
+          _selectedAnswers[question.id]?.add(option);
+        }
+      } else {
+        // Single selection for other types
+        _selectedAnswers[question.id] = {option};
+      }
+    });
+  }
+
+  void _checkAnswer(QuizQuestion question) {
+    setState(() {
+      // Check answers based on question type
+      if (question.type == QuestionType.multipleChoice) {
+        final selectedSet = _selectedAnswers[question.id] ?? <String>{};
+        
+        if (question.correctAnswer is List<String>) {
+          final correctList = question.correctAnswer as List<String>;
+          _checkedAnswers[question.id] = 
+            selectedSet.length == correctList.length &&
+            correctList.every((answer) => selectedSet.contains(answer));
+        } else {
+          _checkedAnswers[question.id] = 
+            selectedSet.contains(question.correctAnswer.toString());
+        }
+      } else {
+        // Single choice question
+        final selectedOption = _selectedAnswers[question.id]?.first;
+        
+        if (question.correctAnswer is List<String> && 
+            (question.correctAnswer as List<String>).isNotEmpty) {
+          _checkedAnswers[question.id] = 
+            selectedOption == (question.correctAnswer as List<String>)[0];
+        } else {
+          _checkedAnswers[question.id] = 
+            selectedOption == question.correctAnswer.toString();
+        }
+      }
+    });
+  }
+
+  void _tryAgain(QuizQuestion question) {
+    setState(() {
+      _selectedAnswers.remove(question.id);
+      _checkedAnswers.remove(question.id);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
     return Scaffold(
-      backgroundColor: Color(0xFFF8F9FA), // Clean light grey background like screenshots 1-4
-      appBar: AppBar(
-        title: _buildCleanTitle(),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(SolarIcons.arrowLeftLinear),
-          onPressed: () => Navigator.pop(context),
-        ),
+      backgroundColor: AppColors.field,
+      appBar: bentoHeadingAppBar(
+        title: localizations.translate('saved'),
+        onBack: () => Navigator.pop(context),
       ),
-      body: _isLoading 
-          ? Center(
-              child: Container(
-                padding: EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.05),
-                      spreadRadius: 0,
-                      blurRadius: 4,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.red.shade400),
-                ),
-              ),
-            )
-          : _error.isNotEmpty 
-              ? Center(
-                  child: Container(
-                    padding: EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.grey.withOpacity(0.05),
-                                spreadRadius: 0,
-                                blurRadius: 4,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Icon(
-                            SolarIcons.dangerCircleLinear,
-                            size: 64,
-                            color: Colors.red.shade400,
-                          ),
-                        ),
-                        SizedBox(height: 24),
-                        Text(
-                          _error,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey.shade700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+      // The spinner is for the first load only. A reload after un-saving
+      // keeps the list on screen, so the leaving card's motion is not cut
+      // by a flash to a spinner and a replayed entrance.
+      body: _isLoading && _savedQuestions.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : _error.isNotEmpty
+              ? _buildMessage(
+                  icon: SolarIcons.dangerCircleLinear,
+                  title: _error,
                 )
               : _savedQuestions.isEmpty
-                  ? Center(
-                      child: Container(
-                        padding: EdgeInsets.all(32),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: EdgeInsets.all(24),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.grey.withOpacity(0.05),
-                                    spreadRadius: 0,
-                                    blurRadius: 4,
-                                    offset: Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Icon(
-                                SolarIcons.heartLinear,
-                                size: 64,
-                                color: Colors.red.shade300,
-                              ),
-                            ),
-                            SizedBox(height: 24),
-                            Text(
-                              AppLocalizations.of(context).translate('no_saved_questions'),
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey.shade700,
-                              ),
-                            ),
-                            SizedBox(height: 12),
-                            Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 16),
-                              child: Text(
-                                AppLocalizations.of(context).translate('tap_heart_to_save'),
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey.shade500,
-                                  height: 1.5,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                  ? _buildMessage(
+                      icon: SolarIcons.heartLinear,
+                      title: localizations.translate('no_saved_questions'),
+                      message: localizations.translate('tap_heart_to_save'),
                     )
                   : ListView.builder(
-                      padding: EdgeInsets.all(16),
+                      padding: EdgeInsets.fromLTRB(
+                        AppSpacing.x4,
+                        AppSpacing.x2,
+                        AppSpacing.x4,
+                        AppSpacing.x6 + MediaQuery.of(context).padding.bottom,
+                      ),
                       itemCount: _savedQuestions.length,
-                      itemBuilder: (context, index) {
-                        final question = _savedQuestions[index];
-                        bool isExpanded = _expandedIndex == index;
+                      // Cards are matched by question, not position, so after
+                      // an un-save the cards below keep their state and slide
+                      // up instead of being rebuilt (and re-entering).
+                      findChildIndexCallback: (key) {
+                        final id = (key as ValueKey<String>).value;
+                        final i = _savedQuestions.indexWhere((q) => q.id == id);
+                        return i < 0 ? null : i;
+                      },
+                      itemBuilder: (context, index) => _LeaveTransition(
+                        key: ValueKey(_savedQuestions[index].id),
+                        leaving: _leaving.contains(_savedQuestions[index].id),
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.x3),
+                          child: StaggerIn(
+                            index: index,
+                            count: _savedQuestions.length,
+                            curve: BentoTokens.curve,
+                            child: _buildSavedCard(index),
+                          ),
+                        ),
+                      ),
+                    ),
+    );
+  }
 
-                        bool isAnswerChecked = _checkedAnswers.containsKey(question.id);
-                        bool? isCorrect = _checkedAnswers[question.id];
-                        
-                        return AnimatedContainer(
-                          duration: Duration(milliseconds: 300),
-                          margin: EdgeInsets.only(bottom: 16),
-                          decoration: BoxDecoration(
-                            gradient: _getCardGradient(index), // Tests screen gradient
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: Colors.grey.shade200, // Subtle border
-                              width: 1,
+  /// The empty and error states: a soft red disc (the saved heart's colour,
+  /// or the error's), a title, then one quiet line.
+  Widget _buildMessage({
+    required IconData icon,
+    required String title,
+    String? message,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.x8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 88,
+              height: 88,
+              decoration: const BoxDecoration(
+                color: AppColors.stopSurface,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Icon(icon, size: 40, color: AppColors.stop),
+            ),
+            const SizedBox(height: AppSpacing.x6),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: AppTypography.heading.copyWith(
+                fontSize: 20,
+                height: 26 / 20,
+                fontVariations: const [FontVariation('wght', 600)],
+              ),
+            ),
+            if (message != null) ...[
+              const SizedBox(height: AppSpacing.x2),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: AppTypography.body.copyWith(
+                  fontSize: 15,
+                  height: 22 / 15,
+                  color: AppColors.inkSecondary,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// A saved question as a Bento card: its number and text, the red saved
+  /// heart (tap to un-save), and a chevron — the card opens in place to
+  /// answer the question again. The number is neutral: the old
+  /// blue/green/orange/purple cycle by position spent the verdict colours on
+  /// decoration.
+  Widget _buildSavedCard(int index) {
+    final question = _savedQuestions[index];
+    final bool isExpanded = _expandedIndex == index;
+    final bool isAnswerChecked = _checkedAnswers.containsKey(question.id);
+    final localizations = AppLocalizations.of(context);
+    final Duration d = AppMotion.duration(context, AppMotion.base);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.paper,
+        borderRadius: BorderRadius.circular(BentoTokens.card),
+        boxShadow: AppColors.shadowCard,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
+        child: Column(
+          children: [
+            InkWell(
+              onTap: () => _toggleExpanded(index, question, isExpanded),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.x4,
+                  AppSpacing.x4,
+                  AppSpacing.x2,
+                  AppSpacing.x4,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: AppColors.field,
+                        borderRadius: BorderRadius.circular(BentoTokens.chip),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '${index + 1}',
+                        style: AppTypography.pill.copyWith(
+                          fontSize: 15,
+                          color: AppColors.inkSecondary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.x3),
+                    Expanded(
+                      child: Text(
+                        question.questionText,
+                        style: AppTypography.body.copyWith(
+                          fontSize: 16,
+                          height: 22 / 16,
+                          color: AppColors.ink,
+                          fontVariations: const [FontVariation('wght', 500)],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.x1),
+                    Consumer<ProgressProvider>(
+                      builder: (context, provider, _) {
+                        final bool leaving = _leaving.contains(question.id);
+                        return IconButton(
+                          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                          // The heart answers first: it empties with a short
+                          // pop, then the card leaves.
+                          icon: AnimatedSwitcher(
+                            duration: AppMotion.duration(context, AppMotion.fast),
+                            switchInCurve: AppMotion.enter,
+                            transitionBuilder: (child, animation) => ScaleTransition(
+                              scale: Tween<double>(begin: 0.6, end: 1).animate(animation),
+                              child: FadeTransition(opacity: animation, child: child),
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.grey.withOpacity(0.2),
-                                spreadRadius: 0,
-                                blurRadius: 6,
-                                offset: Offset(0, 3),
+                            child: KeyedSubtree(
+                              key: ValueKey(leaving),
+                              child: AppIcons.icon(
+                                leaving ? AppIcons.saved : AppIcons.savedFilled,
+                                size: 22,
+                                color: AppColors.stop,
                               ),
-                            ],
-                          ),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: Column(
-                              children: [
-                                // Clean minimal header with question number and title
-                                InkWell(
-                                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                                  onTap: () {
-                                    setState(() {
-                                      if (isExpanded) {
-                                        _expandedIndex = null;
-                                      } else {
-                                        _expandedIndex = index;
-                                        // Reset answer state when expanding
-                                        _selectedAnswers.remove(question.id);
-                                        _checkedAnswers.remove(question.id);
-                                      }
-                                    });
-                                  },
-                                  child: Padding(
-                                    padding: EdgeInsets.all(20),
-                                    child: Row(
-                                      children: [
-                                        // Clean minimal number circle
-                                        Container(
-                                          width: 40,
-                                          height: 40,
-                                          decoration: BoxDecoration(
-                                            color: _getNumberCircleBackgroundColor(index), // Subtle pastel background
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: Center(
-                                            child: Text(
-                                              '${index + 1}',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.w600,
-                                                color: _getNumberCircleTextColor(index), // Darker text color
-                                                fontSize: 16,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        Expanded(
-                                          child: Padding(
-                                            padding: EdgeInsets.symmetric(horizontal: 16),
-                                            child: Text(
-                                              question.questionText,
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 16,
-                                                color: Colors.black87,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        // Simple heart icon without shadows
-                                        Consumer<ProgressProvider>(
-                                          builder: (context, provider, _) => AnimatedScale(
-                                            scale: _heartAnimationValue,
-                                            duration: Duration(milliseconds: 150),
-                                            child: IconButton(
-                                              icon: Icon(
-                                                SolarIcons.heartBold,
-                                                color: Colors.red.shade400,
-                                                size: 24,
-                                              ),
-                                              onPressed: () {
-                                                // Add animation trigger
-                                                setState(() {
-                                                  _heartAnimationValue = 0.8;
-                                                });
-                                                Future.delayed(Duration(milliseconds: 150), () {
-                                                  setState(() {
-                                                    _heartAnimationValue = 1.0;
-                                                  });
-                                                });
-                                                
-                                                final authProvider = Provider.of<AuthProvider>(context, listen: false);
-                                                final userId = authProvider.user?.id ?? '';
-                                                provider.toggleSavedQuestionWithUserId(question.id, userId);
-                                                // Reload the questions after a short delay
-                                                Future.delayed(Duration(milliseconds: 500), () {
-                                                  _loadSavedQuestions();
-                                                });
-                                              },
-                                            ),
-                                          ),
-                                        ),
-                                        AnimatedRotation(
-                                          turns: isExpanded ? 0.5 : 0.0,
-                                          duration: Duration(milliseconds: 300),
-                                          child: Icon(
-                                            SolarIcons.altArrowDownLinear,
-                                            color: Colors.grey,
-                                            size: 28,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                
-                                // Clean expanded content with minimal animation
-                                AnimatedContainer(
-                                  duration: Duration(milliseconds: 300),
-                                  height: isExpanded ? null : 0,
-                                  child: isExpanded ? Column(
-                                    children: [
-                                      // Question image (if available)
-                                      if (question.imagePath != null)
-                                        Padding(
-                                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                          child: AdaptiveQuestionImage(
-                                            imagePath: question.imagePath!,
-                                            assetFallback: question.imagePath,
-                                          ),
-                                        ),
-                                      
-                                      // Clean multiple choice indicator if applicable
-                                      if (question.type == QuestionType.multipleChoice)
-                                        Container(
-                                          margin: EdgeInsets.only(top: 8, left: 16, right: 16, bottom: 8),
-                                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                          decoration: BoxDecoration(
-                                            color: Colors.blue.shade50.withOpacity(0.5), // Very subtle background
-                                            borderRadius: BorderRadius.circular(20),
-                                            border: Border.all(
-                                              color: Colors.blue.shade100,
-                                              width: 1,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            AppLocalizations.of(context).translate('select_all_correct_answers'),
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.blue.shade700,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ),
-                                        
-                                      // Clean minimal answer options
-                                      Padding(
-                                        padding: EdgeInsets.symmetric(horizontal: 16),
-                                        child: Column(
-                                          children: question.options.map((option) {
-                                            // Initialize the set if it doesn't exist yet
-                                            if (!_selectedAnswers.containsKey(question.id)) {
-                                              _selectedAnswers[question.id] = <String>{};
-                                            }
-                                            
-                                            bool isSelected = _selectedAnswers[question.id]?.contains(option) ?? false;
-                                            bool showResult = isAnswerChecked;
-                                            bool isCorrectOption = false;
-                                            
-                                            // Check if this option is a correct answer
-                                            if (question.correctAnswer is List<String>) {
-                                              isCorrectOption = (question.correctAnswer as List<String>).contains(option);
-                                            } else {
-                                              isCorrectOption = option == question.correctAnswer.toString();
-                                            }
-                                            
-                                            Color backgroundColor = Colors.white;
-                                            Color textColor = Colors.black87;
-                                            Color borderColor = Colors.grey.shade200;
-                                            
-                                            if (showResult) {
-                                              if (isSelected && isCorrectOption) {
-                                                backgroundColor = Colors.green.shade50; // Very subtle green
-                                                borderColor = Colors.green.shade200;
-                                                textColor = Colors.green.shade800;
-                                              } else if (isSelected && !isCorrectOption) {
-                                                backgroundColor = Colors.red.shade50; // Very subtle red
-                                                borderColor = Colors.red.shade200;
-                                                textColor = Colors.red.shade800;
-                                              } else if (isCorrectOption) {
-                                                backgroundColor = Colors.green.shade50;
-                                                borderColor = Colors.green.shade200;
-                                                textColor = Colors.green.shade800;
-                                              }
-                                            } else if (isSelected) {
-                                              backgroundColor = Colors.blue.shade50.withOpacity(0.3); // Very subtle blue tint
-                                              borderColor = Colors.blue.shade200;
-                                            }
-                                            
-                                            // Clean minimal selection indicator
-                                            Widget selectionIndicator = Container(
-                                              width: 24,
-                                              height: 24,
-                                              margin: EdgeInsets.only(right: 12),
-                                              decoration: BoxDecoration(
-                                                shape: BoxShape.circle,
-                                                color: isSelected ? Colors.blue.shade400 : Colors.white,
-                                                border: Border.all(
-                                                  color: isSelected ? Colors.blue.shade400 : Colors.grey.shade300,
-                                                  width: 2,
-                                                ),
-                                              ),
-                                              child: isSelected
-                                                ? Icon(
-                                                    SolarIcons.checkLinear,
-                                                    color: Colors.white,
-                                                    size: 14,
-                                                  )
-                                                : null,
-                                            );
-                                            
-                                            return GestureDetector(
-                                              onTap: isAnswerChecked 
-                                                  ? null 
-                                                  : () {
-                                                      setState(() {
-                                                        if (question.type == QuestionType.multipleChoice) {
-                                                          // Toggle selection for multiple choice
-                                                          if (isSelected) {
-                                                            _selectedAnswers[question.id]?.remove(option);
-                                                          } else {
-                                                            _selectedAnswers[question.id]?.add(option);
-                                                          }
-                                                        } else {
-                                                          // Single selection for other types
-                                                          _selectedAnswers[question.id] = {option};
-                                                        }
-                                                      });
-                                                    },
-                                              child: Container(
-                                                width: double.infinity,
-                                                margin: EdgeInsets.only(bottom: 12),
-                                                padding: EdgeInsets.all(16),
-                                                decoration: BoxDecoration(
-                                                  color: backgroundColor,
-                                                  borderRadius: BorderRadius.circular(12),
-                                                  border: Border.all(
-                                                    color: borderColor,
-                                                    width: 1,
-                                                  ),
-                                                ),
-                                                child: Row(
-                                                  children: [
-                                                    selectionIndicator,
-                                                    Expanded(
-                                                      child: Text(
-                                                        option,
-                                                        style: TextStyle(
-                                                          color: textColor,
-                                                          fontWeight: FontWeight.w500,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            );
-                                          }).toList(),
-                                        ),
-                                      ),
-                                      
-                                      // Explanation section matching first screenshot design
-                                      if (isAnswerChecked && question.explanation != null)
-                                        Padding(
-                                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              // Blue lightbulb header like first screenshot
-                                              Row(
-                                                children: [
-                                                  Icon(
-                                                    SolarIcons.lightbulbLinear,
-                                                    color: Colors.blue.shade600,
-                                                    size: 18,
-                                                  ),
-                                                  SizedBox(width: 6),
-                                                  Text(
-                                                    AppLocalizations.of(context).translate('explanation'),
-                                                    style: TextStyle(
-                                                      color: Colors.blue.shade600,
-                                                      fontWeight: FontWeight.w600,
-                                                      fontSize: 16,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              SizedBox(height: 8),
-                                              // Blue rule reference link like first screenshot
-                                              if (question.ruleReference != null)
-                                                Text(
-                                                  question.ruleReference!,
-                                                  style: TextStyle(
-                                                    color: Colors.blue.shade600,
-                                                    fontWeight: FontWeight.w500,
-                                                    fontSize: 14,
-                                                  ),
-                                                ),
-                                              if (question.ruleReference != null)
-                                                SizedBox(height: 8),
-                                              // Explanation text in black like first screenshot
-                                              Text(
-                                                question.explanation!,
-                                                style: TextStyle(
-                                                  color: Colors.black87,
-                                                  fontSize: 14,
-                                                  height: 1.4,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      
-                                      // Clean minimal action buttons
-                                      Padding(
-                                        padding: EdgeInsets.all(16),
-                                        child: isAnswerChecked
-                                          ? Container(
-                                              width: double.infinity,
-                                              height: 48,
-                                              decoration: BoxDecoration(
-                                                color: Colors.grey.shade100, // Light grey background
-                                                borderRadius: BorderRadius.circular(24),
-                                                border: Border.all(
-                                                  color: Colors.grey.shade200,
-                                                  width: 1,
-                                                ),
-                                              ),
-                                              child: Material(
-                                                color: Colors.transparent,
-                                                child: InkWell(
-                                                  borderRadius: BorderRadius.circular(24),
-                                                  onTap: () {
-                                                    setState(() {
-                                                      _selectedAnswers.remove(question.id);
-                                                      _checkedAnswers.remove(question.id);
-                                                    });
-                                                  },
-                                                  child: Center(
-                                                    child: Text(
-                                                      AppLocalizations.of(context).translate('try_again'),
-                                                      style: TextStyle(
-                                                        color: Colors.grey.shade700,
-                                                        fontWeight: FontWeight.w600,
-                                                        fontSize: 16,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            )
-                                          : Container(
-                                              width: double.infinity,
-                                              height: 48,
-                                              decoration: BoxDecoration(
-                                                color: (_selectedAnswers[question.id]?.isEmpty ?? true)
-                                                  ? Colors.grey.shade200 // Light grey when disabled
-                                                  : Colors.blue.shade50, // Very subtle blue when enabled
-                                                borderRadius: BorderRadius.circular(24),
-                                                border: Border.all(
-                                                  color: (_selectedAnswers[question.id]?.isEmpty ?? true)
-                                                    ? Colors.grey.shade300
-                                                    : Colors.blue.shade200,
-                                                  width: 1,
-                                                ),
-                                              ),
-                                              child: Material(
-                                                color: Colors.transparent,
-                                                child: InkWell(
-                                                  borderRadius: BorderRadius.circular(24),
-                                                  onTap: (_selectedAnswers[question.id]?.isEmpty ?? true)
-                                                    ? null
-                                                    : () {
-                                                        setState(() {
-                                                          // Check answers based on question type
-                                                          if (question.type == QuestionType.multipleChoice) {
-                                                            final selectedSet = _selectedAnswers[question.id] ?? <String>{};
-                                                            
-                                                            if (question.correctAnswer is List<String>) {
-                                                              final correctList = question.correctAnswer as List<String>;
-                                                              _checkedAnswers[question.id] = 
-                                                                selectedSet.length == correctList.length &&
-                                                                correctList.every((answer) => selectedSet.contains(answer));
-                                                            } else {
-                                                              _checkedAnswers[question.id] = 
-                                                                selectedSet.contains(question.correctAnswer.toString());
-                                                            }
-                                                          } else {
-                                                            // Single choice question
-                                                            final selectedOption = _selectedAnswers[question.id]?.first;
-                                                            
-                                                            if (question.correctAnswer is List<String> && 
-                                                                (question.correctAnswer as List<String>).isNotEmpty) {
-                                                              _checkedAnswers[question.id] = 
-                                                                selectedOption == (question.correctAnswer as List<String>)[0];
-                                                            } else {
-                                                              _checkedAnswers[question.id] = 
-                                                                selectedOption == question.correctAnswer.toString();
-                                                            }
-                                                          }
-                                                        });
-                                                      },
-                                                  child: Center(
-                                                    child: Text(
-                                                      AppLocalizations.of(context).translate('check'),
-                                                      style: TextStyle(
-                                                        color: (_selectedAnswers[question.id]?.isEmpty ?? true)
-                                                          ? Colors.grey.shade500
-                                                          : Colors.blue.shade700,
-                                                        fontWeight: FontWeight.w600,
-                                                        fontSize: 16,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                      ),
-                                    ],
-                                  ) : SizedBox.shrink(),
-                                ),
-                              ],
                             ),
                           ),
+                          onPressed: leaving ? null : () => _unsave(provider, question),
                         );
                       },
                     ),
+                    AnimatedRotation(
+                      turns: isExpanded ? 0.5 : 0.0,
+                      duration: d,
+                      curve: AppMotion.enter,
+                      child: const Icon(
+                        SolarIcons.altArrowDownLinear,
+                        color: AppColors.inkSecondary,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.x2),
+                  ],
+                ),
+              ),
+            ),
+            AnimatedSize(
+              duration: d,
+              curve: AppMotion.enter,
+              alignment: Alignment.topCenter,
+              child: isExpanded
+                  ? Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.x4,
+                        0,
+                        AppSpacing.x4,
+                        AppSpacing.x4,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Question image (if available)
+                          if (question.imagePath != null)
+                            AdaptiveQuestionImage(
+                              imagePath: question.imagePath!,
+                              assetFallback: question.imagePath,
+                            ),
+                          if (question.type == QuestionType.multipleChoice)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: AppSpacing.x3),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    SolarIcons.infoCircleLinear,
+                                    size: 16,
+                                    color: AppColors.inkSecondary,
+                                  ),
+                                  const SizedBox(width: AppSpacing.x2),
+                                  Expanded(
+                                    child: Text(
+                                      localizations.translate('select_all_correct_answers'),
+                                      style: AppTypography.label.copyWith(
+                                        color: AppColors.inkSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ..._buildOptions(question, isAnswerChecked),
+                          if (isAnswerChecked && question.explanation != null)
+                            BentoExplanation(
+                              title: localizations.translate('explanation'),
+                              ruleReference: question.ruleReference,
+                              text: question.explanation!,
+                              onCard: true,
+                            ),
+                          const SizedBox(height: AppSpacing.x3),
+                          isAnswerChecked
+                              ? BentoActionButton(
+                                  text: localizations.translate('try_again'),
+                                  onTap: () => _tryAgain(question),
+                                  primary: false,
+                                  onCard: true,
+                                )
+                              : BentoActionButton(
+                                  text: localizations.translate('check'),
+                                  onTap: (_selectedAnswers[question.id]?.isEmpty ?? true)
+                                      ? null
+                                      : () => _checkAnswer(question),
+                                ),
+                        ],
+                      ),
+                    )
+                  : const SizedBox(width: double.infinity),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The options, with the same ✓/✕ verdict as the question pages, drawn as
+  /// field panels inside the card.
+  List<Widget> _buildOptions(QuizQuestion question, bool isAnswerChecked) {
+    // Initialize the set if it doesn't exist yet
+    if (!_selectedAnswers.containsKey(question.id)) {
+      _selectedAnswers[question.id] = <String>{};
+    }
+    return [
+      for (final entry in question.options.asMap().entries)
+        Builder(builder: (context) {
+          final option = entry.value;
+          final bool isSelected =
+              _selectedAnswers[question.id]?.contains(option) ?? false;
+          bool isCorrectOption = false;
+          
+          // Check if this option is a correct answer
+          if (question.correctAnswer is List<String>) {
+            isCorrectOption = (question.correctAnswer as List<String>).contains(option);
+          } else {
+            isCorrectOption = option == question.correctAnswer.toString();
+          }
+          
+          return BentoOptionTile(
+            index: entry.key,
+            text: option,
+            isSelected: isSelected,
+            showResult: isAnswerChecked,
+            isCorrectOption: isCorrectOption,
+            onCard: true,
+            onTap: isAnswerChecked
+                ? null
+                : () => _selectOption(question, option, isSelected),
+          );
+        }),
+    ];
+  }
+}
+
+/// Takes an un-saved card out of the list: after the heart's pop, the card
+/// fades and drifts right while its height closes, so the cards below glide
+/// up into its place. One-shot; under Reduce Motion it is gone at once.
+class _LeaveTransition extends StatefulWidget {
+  const _LeaveTransition({
+    super.key,
+    required this.leaving,
+    required this.child,
+  });
+
+  final bool leaving;
+  final Widget child;
+
+  @override
+  State<_LeaveTransition> createState() => _LeaveTransitionState();
+}
+
+class _LeaveTransitionState extends State<_LeaveTransition>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller =
+      AnimationController(vsync: this, value: 1);
+
+  @override
+  void didUpdateWidget(covariant _LeaveTransition oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.leaving == oldWidget.leaving) return;
+    // Heart pop (fast), then the card leaves (base).
+    final duration = AppMotion.duration(context, AppMotion.fast + AppMotion.base);
+    _controller.duration = duration;
+    if (widget.leaving) {
+      duration == Duration.zero ? _controller.value = 0 : _controller.reverse();
+    } else {
+      _controller.value = 1;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Played in reverse (1 → 0). The first ~40% of the time is the heart's
+    // pop; the card then fades and slides, and its height closes last.
+    final fade = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.35, 0.8, curve: AppMotion.exit),
+      reverseCurve: const Interval(0.35, 0.8, curve: AppMotion.exit),
+    );
+    final size = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0, 0.6, curve: AppMotion.enter),
+      reverseCurve: const Interval(0, 0.6, curve: AppMotion.enter),
+    );
+    return SizeTransition(
+      sizeFactor: size,
+      axisAlignment: -1,
+      child: FadeTransition(
+        opacity: fade,
+        child: SlideTransition(
+          position: Tween<Offset>(begin: const Offset(0.08, 0), end: Offset.zero)
+              .animate(fade),
+          child: widget.child,
+        ),
+      ),
     );
   }
 }

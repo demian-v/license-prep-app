@@ -6,12 +6,17 @@ class Exam {
   int currentQuestionIndex;
   bool isCompleted;
 
+  /// When the exam was completed. Freezes [elapsedTime], so a result page
+  /// left open does not keep counting.
+  final DateTime? completedAt;
+
   Exam({
     required this.questionIds,
     required this.startTime,
     required this.timeLimit,
     this.currentQuestionIndex = 0,
     this.isCompleted = false,
+    this.completedAt,
     Map<String, bool>? answers,
   }) : this.answers = answers ?? {};
 
@@ -42,6 +47,11 @@ class Exam {
   }
   
   Duration get elapsedTime {
+    if (isCompleted && completedAt != null) {
+      final elapsed = completedAt!.difference(startTime);
+      final limit = Duration(minutes: timeLimit);
+      return elapsed > limit ? limit : elapsed;
+    }
     if (isCompleted) {
       return Duration(minutes: timeLimit) - remainingTime;
     } else {
@@ -56,6 +66,7 @@ class Exam {
     int? timeLimit,
     int? currentQuestionIndex,
     bool? isCompleted,
+    DateTime? completedAt,
   }) {
     return Exam(
       questionIds: questionIds ?? this.questionIds,
@@ -64,6 +75,7 @@ class Exam {
       timeLimit: timeLimit ?? this.timeLimit,
       currentQuestionIndex: currentQuestionIndex ?? this.currentQuestionIndex,
       isCompleted: isCompleted ?? this.isCompleted,
+      completedAt: completedAt ?? this.completedAt,
     );
   }
 }

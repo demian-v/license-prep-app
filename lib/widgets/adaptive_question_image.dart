@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/service_locator.dart';
 import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
-import '../theme/design_variant.dart';
+import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
 
 /// The illustration attached to a question.
@@ -63,10 +63,6 @@ class AdaptiveQuestionImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // The frame follows the design variant's radius scale; size, fit and the
-    // tap-to-zoom behaviour are the same in every variant.
-    final variant = designVariant.value;
-    final tokens = VariantTokens.of(variant);
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.x4),
       child: Semantics(
@@ -81,18 +77,9 @@ class AdaptiveQuestionImage extends StatelessWidget {
             ),
             decoration: BoxDecoration(
               color: AppColors.paper,
-              borderRadius: BorderRadius.circular(tokens.card),
-              border: Border.all(
-                color: variant == DesignVariant.boldB
-                    ? AppColors.borderStrong
-                    : variant == DesignVariant.bento
-                        ? AppColors.paper
-                        : AppColors.border,
-              ),
-              boxShadow: variant == DesignVariant.boldA ||
-                      variant == DesignVariant.bento
-                  ? AppColors.shadowResting
-                  : null,
+              borderRadius: BorderRadius.circular(BentoTokens.card),
+              border: Border.all(color: AppColors.paper),
+              boxShadow: AppColors.shadowResting,
             ),
             clipBehavior: Clip.antiAlias,
             child: Stack(
@@ -110,7 +97,7 @@ class AdaptiveQuestionImage extends StatelessWidget {
                       padding: const EdgeInsets.all(7),
                       decoration: BoxDecoration(
                         color: AppColors.paper.withValues(alpha: 0.94),
-                        borderRadius: BorderRadius.circular(tokens.chip),
+                        borderRadius: BorderRadius.circular(BentoTokens.chip),
                         border: Border.all(color: AppColors.border),
                       ),
                       child: AppIcons.icon(

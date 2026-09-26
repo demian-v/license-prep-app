@@ -11,8 +11,9 @@ import '../services/analytics_service.dart';
 import '../localization/app_localizations.dart';
 import '../widgets/report_sheet.dart';
 import '../widgets/adaptive_question_image.dart';
+import '../widgets/bento_question_parts.dart';
 import 'quiz_result_screen.dart';
-import '../theme/solar_icons.dart';
+import '../theme/app_theme.dart';
 
 class QuizQuestionScreen extends StatefulWidget {
   final QuizTopic topic;
@@ -32,7 +33,7 @@ class QuizQuestionScreen extends StatefulWidget {
   _QuizQuestionScreenState createState() => _QuizQuestionScreenState();
 }
 
-class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProviderStateMixin {
+class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
   int currentQuestionIndex = 0;
   List<QuizQuestion> questions = [];
   Set<String> selectedAnswers = {};
@@ -43,8 +44,6 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
   String? errorMessage;
   ScrollController _pillsScrollController = ScrollController();
   ScrollController _mainScrollController = ScrollController();
-  late AnimationController _titleAnimationController;
-  late Animation<double> _titlePulseAnimation;
   late String _sessionId;
   DateTime? _startTime;
   
@@ -56,29 +55,11 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
     _sessionId = widget.sessionId ?? DateTime.now().millisecondsSinceEpoch.toString();
     _startTime = widget.startTime ?? DateTime.now();
     
-    // Initialize title animation
-    _titleAnimationController = AnimationController(
-      duration: Duration(seconds: 3),
-      vsync: this,
-    );
-    
-    _titlePulseAnimation = Tween<double>(
-      begin: 1.0,
-      end: 1.03,
-    ).animate(CurvedAnimation(
-      parent: _titleAnimationController,
-      curve: Curves.easeInOut,
-    ));
-    
-    // Start the subtle pulse animation
-    _titleAnimationController.repeat(reverse: true);
-    
     loadQuestions();
   }
   
   @override
   void dispose() {
-    _titleAnimationController.dispose();
     _pillsScrollController.dispose();
     _mainScrollController.dispose();
     super.dispose();
@@ -144,379 +125,6 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
       print('🚨 [QUIZ] Error getting translation: $e');
       return key;
     }
-  }
-
-  // Enhanced topic title widget
-  Widget _buildEnhancedTopicTitle(String topicTitle) {
-    // Choose gradient color based on topic for variety
-    Color endColor;
-    IconData topicIcon;
-    
-    // Dynamic theming based on topic content
-    if (topicTitle.toLowerCase().contains('загальн')) {
-      endColor = Colors.purple.shade50.withOpacity(0.6);
-      topicIcon = SolarIcons.infoCircleLinear;
-    } else if (topicTitle.toLowerCase().contains('правила')) {
-      endColor = Colors.blue.shade50.withOpacity(0.6);
-      topicIcon = SolarIcons.checklistMinimalisticLinear;
-    } else if (topicTitle.toLowerCase().contains('безпек')) {
-      endColor = Colors.green.shade50.withOpacity(0.6);
-      topicIcon = SolarIcons.shieldCheckBold;
-    } else if (topicTitle.toLowerCase().contains('велосипед')) {
-      endColor = Colors.orange.shade50.withOpacity(0.6);
-      topicIcon = SolarIcons.bicyclingLinear;
-    } else {
-      endColor = Colors.indigo.shade50.withOpacity(0.6);
-      topicIcon = SolarIcons.squareAcademicCapBold;
-    }
-    
-    return AnimatedBuilder(
-      animation: _titlePulseAnimation,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _titlePulseAnimation.value,
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Colors.white, endColor],
-                stops: [0.0, 1.0],
-              ),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
-                  spreadRadius: 0,
-                  blurRadius: 6,
-                  offset: Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  topicIcon,
-                  size: 16,
-                  color: Colors.black,
-                ),
-                SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    topicTitle,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // Helper method for question card gradient
-  LinearGradient _getQuestionCardGradient(int currentQuestionNumber) {
-    Color startColor = Colors.white;
-    Color endColor;
-    
-    // Cycle through pastel colors based on question number
-    switch (currentQuestionNumber % 4) {
-      case 0:
-        endColor = Colors.blue.shade50.withOpacity(0.3);
-        break;
-      case 1:
-        endColor = Colors.green.shade50.withOpacity(0.3);
-        break;
-      case 2:
-        endColor = Colors.orange.shade50.withOpacity(0.3);
-        break;
-      case 3:
-        endColor = Colors.purple.shade50.withOpacity(0.3);
-        break;
-      default:
-        endColor = Colors.blue.shade50.withOpacity(0.3);
-    }
-    
-    return LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [startColor, endColor],
-      stops: [0.0, 1.0],
-    );
-  }
-
-  // Enhanced question card widget with reactive translation
-  Widget _buildEnhancedQuestionCard(QuizQuestion currentQuestion, int currentQuestionNumber, int totalQuestions) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: _getQuestionCardGradient(currentQuestionNumber),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 0,
-            blurRadius: 6,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Question number indicator
-          Row(
-            children: [
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  AppLocalizations.of(context).translate('question_x_of_y')
-                    .replaceAll('{0}', currentQuestionNumber.toString())
-                    .replaceAll('{1}', totalQuestions.toString()),
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black.withOpacity(0.7),
-                  ),
-                ),
-              ),
-              if (currentQuestion.type == QuestionType.multipleChoice) ...[
-                SizedBox(width: 8),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    AppLocalizations.of(context).translate('multiple_answers'),
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.blue.shade700,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-          SizedBox(height: 12),
-          // Question text
-          Text(
-            currentQuestion.questionText,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-              height: 1.4,
-            ),
-          ),
-          if (currentQuestion.type == QuestionType.multipleChoice)
-            Padding(
-              padding: EdgeInsets.only(top: 12),
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: Colors.blue.withOpacity(0.2),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      SolarIcons.infoCircleLinear,
-                      size: 16,
-                      color: Colors.blue.shade700,
-                    ),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Consumer<LanguageProvider>(
-                        builder: (context, languageProvider, _) {
-                          return Text(
-                            _translate('select_all_correct', languageProvider),
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.blue.shade700,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  // Helper method for button gradients
-  LinearGradient _getGradientForButton(int buttonType) {
-    Color startColor = Colors.white;
-    Color endColor;
-    
-    switch(buttonType) {
-      case 0: // Skip/Next button
-        endColor = Colors.blue.shade50.withOpacity(0.4);
-        break;
-      case 1: // Check button
-        endColor = Colors.green.shade50.withOpacity(0.4);
-        break;
-      case 2: // End Topic button
-        endColor = Colors.purple.shade50.withOpacity(0.4);
-        break;
-      default:
-        endColor = Colors.grey.shade50.withOpacity(0.4);
-    }
-    
-    return LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [startColor, endColor],
-      stops: [0.0, 1.0],
-    );
-  }
-
-  // Helper method for answer card gradients
-  LinearGradient _getGradientForAnswerCard(bool isSelected, bool showResult, bool isCorrectOption, [int index = 0]) {
-    Color startColor = Colors.white;
-    Color endColor;
-    
-    if (showResult) {
-      if (isSelected && isCorrectOption) {
-        endColor = Colors.green.shade50.withOpacity(0.6);
-      } else if (isSelected && !isCorrectOption) {
-        endColor = Colors.red.shade50.withOpacity(0.6);
-      } else if (isCorrectOption) {
-        endColor = Colors.green.shade50.withOpacity(0.6);
-      } else {
-        endColor = Colors.grey.shade50.withOpacity(0.2);
-      }
-    } else if (isSelected) {
-      endColor = Colors.blue.shade50.withOpacity(0.4);
-    } else {
-      // Cycle through pastel colors
-      switch (index % 4) {
-        case 0:
-          endColor = Colors.blue.shade50.withOpacity(0.4);
-          break;
-        case 1:
-          endColor = Colors.green.shade50.withOpacity(0.4);
-          break;
-        case 2:
-          endColor = Colors.orange.shade50.withOpacity(0.4);
-          break;
-        case 3:
-          endColor = Colors.purple.shade50.withOpacity(0.4);
-          break;
-        default:
-          endColor = Colors.grey.shade50.withOpacity(0.2);
-      }
-    }
-    
-    return LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [startColor, endColor],
-      stops: [0.0, 1.0],
-    );
-  }
-
-  // Enhanced explanation panel
-  Widget _buildEnhancedExplanationPanel(QuizQuestion question) {
-    if (!isAnswerChecked || question.explanation == null) {
-      return SizedBox.shrink();
-    }
-    
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Colors.white, Colors.indigo.shade50.withOpacity(0.3)],
-          stops: [0.0, 1.0],
-        ),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 0,
-            blurRadius: 6,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                SolarIcons.lightbulbLinear,
-                size: 20,
-                color: Colors.indigo.shade700,
-              ),
-              SizedBox(width: 8),
-                              Text(
-                                AppLocalizations.of(context).translate('explanation'),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.indigo.shade700,
-                                  fontSize: 16,
-                                ),
-                              ),
-            ],
-          ),
-          if (question.ruleReference != null) ...[
-            SizedBox(height: 12),
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.indigo.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                question.ruleReference!,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: Colors.indigo.shade800,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ],
-          SizedBox(height: 12),
-          Text(
-            question.explanation!,
-            style: TextStyle(
-              fontSize: 14,
-              height: 1.4,
-              color: Colors.black87,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _trackTopicTerminated(String exitMethod) async {
@@ -649,33 +257,63 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
     }
   }
   
-  void _scrollToCurrentPill() {
-    if (_pillsScrollController.hasClients) {
-      final pillWidth = 48.0; // Width of pill including margins
-      final screenWidth = MediaQuery.of(context).size.width;
-      final targetPosition = pillWidth * currentQuestionIndex;
-      final screenCenter = screenWidth / 2;
-      
-      final scrollOffset = targetPosition - screenCenter + (pillWidth / 2);
-      
-      _pillsScrollController.animateTo(
-        scrollOffset.clamp(0.0, _pillsScrollController.position.maxScrollExtent),
-        duration: Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    }
+  void _scrollToCurrentPill() =>
+      BentoPillTray.scrollToPill(context, _pillsScrollController, currentQuestionIndex);
+
+  void _resetMainScrollPosition() =>
+      BentoPillTray.scrollToTop(context, _mainScrollController);
+
+  // Handlers moved unchanged from the inline closures in `build`, so the
+  // presentation can change without touching selection, saving or exit.
+
+  void _selectOption(QuizQuestion question, String option, bool isSelected) {
+    setState(() {
+      if (question.type == QuestionType.multipleChoice) {
+        // Toggle selection for multiple choice
+        if (isSelected) {
+          selectedAnswers.remove(option);
+        } else {
+          selectedAnswers.add(option);
+        }
+      } else {
+        // Single selection for other types
+        selectedAnswers = {option};
+      }
+    });
   }
-  
-  void _resetMainScrollPosition() {
-    if (_mainScrollController.hasClients) {
-      _mainScrollController.animateTo(
-        0.0,
-        duration: Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    }
+
+  Future<void> _onBack() async {
+    await _trackTopicTerminated('back_arrow');
+    Navigator.pop(context);
   }
-  
+
+  void _toggleSaved(ProgressProvider progressProvider, String questionId) {
+    // Get auth provider to check if user is logged in
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userId = authProvider.user?.id ?? '';
+    progressProvider.toggleSavedQuestionWithUserId(questionId, userId);
+  }
+
+  /// Move to the question tapped in the strip (added 2026-09-26, as on
+  /// Экзамен). A selection that was never checked is not an answer, so it is
+  /// cleared rather than carried onto another question. A question already
+  /// checked can be answered again; the new result replaces the old one.
+  void _jumpToQuestion(int index) {
+    if (index == currentQuestionIndex) return;
+
+    setState(() {
+      currentQuestionIndex = index;
+      selectedAnswers = {};
+      isAnswerChecked = false;
+      isCorrect = null;
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _resetMainScrollPosition();
+      _scrollToCurrentPill();
+    });
+  }
+
   void _showReportSheet(BuildContext context) {
     if (questions.isEmpty) return;
     
@@ -699,582 +337,194 @@ class _QuizQuestionScreenState extends State<QuizQuestionScreen> with TickerProv
     );
   }
   
+  /// Whether an option is a correct answer — moved unchanged from the old
+  /// inline option builder.
+  bool _isCorrectOption(QuizQuestion question, String option) {
+    bool isCorrectOption = false;
+
+    // Check if this option is a correct answer
+    if (question.correctAnswer is List<String>) {
+      isCorrectOption = (question.correctAnswer as List<String>).contains(option);
+    } else {
+      isCorrectOption = option == question.correctAnswer.toString();
+    }
+    return isCorrectOption;
+  }
+
   @override
   Widget build(BuildContext context) {
     // Common AppBar for all states
-    final appBar = AppBar(
-      title: _buildEnhancedTopicTitle(widget.topic.title),
-      centerTitle: true,
-      backgroundColor: Colors.white,
-      foregroundColor: Colors.black,
-      elevation: 0,
-      leading: IconButton(
-        icon: Icon(SolarIcons.arrowLeftLinear),
-        onPressed: () => Navigator.pop(context),
-      ),
-    );
-    
+    final appBar = bentoQuestionAppBar(onBack: () => Navigator.pop(context));
+
     // Show loading state
     if (isLoading) {
       return Scaffold(
+        backgroundColor: AppColors.field,
         appBar: appBar,
         body: Center(
           child: CircularProgressIndicator(),
         ),
       );
     }
-    
+
     // Show error state with reactive translation
     if (errorMessage != null) {
       return Scaffold(
+        backgroundColor: AppColors.field,
         appBar: appBar,
         body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                errorMessage!,
-                style: TextStyle(color: Colors.red),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 16),
-              Consumer<LanguageProvider>(
-                builder: (context, languageProvider, _) {
-                  return ElevatedButton(
-                    onPressed: loadQuestions,
-                    child: Text(_translate('try_again', languageProvider)),
-                  );
-                },
-              ),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  errorMessage!,
+                  style: AppTypography.body.copyWith(color: AppColors.ink),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppSpacing.x4),
+                Consumer<LanguageProvider>(
+                  builder: (context, languageProvider, _) {
+                    return FilledButton(
+                      onPressed: loadQuestions,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(0, 48),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.x6),
+                        shape: const StadiumBorder(),
+                      ),
+                      child: Text(_translate('try_again', languageProvider)),
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       );
     }
-    
+
     // Show empty state with reactive translation
     if (questions.isEmpty) {
       return Scaffold(
+        backgroundColor: AppColors.field,
         appBar: appBar,
         body: Center(
           child: Consumer<LanguageProvider>(
             builder: (context, languageProvider, _) {
-              return Text(_translate('no_questions', languageProvider));
+              return Text(
+                _translate('no_questions', languageProvider),
+                style:
+                    AppTypography.body.copyWith(color: AppColors.inkSecondary),
+              );
             },
           ),
         ),
       );
     }
-    
+
     final question = questions[currentQuestionIndex];
-    
-    // Create AppBar with actions for the question view
-    final questionAppBar = AppBar(
-      title: _buildEnhancedTopicTitle(widget.topic.title),
-      centerTitle: true,
-      backgroundColor: Colors.white,
-      foregroundColor: Colors.black,
-      elevation: 0,
-      leading: IconButton(
-        icon: Icon(SolarIcons.arrowLeftLinear),
-        onPressed: () async {
-          await _trackTopicTerminated('back_arrow');
-          Navigator.pop(context);
-        },
+
+    // The question view adds report and save, both one tap away.
+    final questionAppBar = bentoQuestionAppBar(
+      onBack: _onBack,
+      actions: bentoQuestionActions(
+        context,
+        reportTooltip: AppLocalizations.of(context).translate('report_issue'),
+        onReport: () => _showReportSheet(context),
+        isSaved: Provider.of<ProgressProvider>(context)
+            .isQuestionSaved(questions[currentQuestionIndex].id),
+        onToggleSaved: () => _toggleSaved(
+          Provider.of<ProgressProvider>(context, listen: false),
+          questions[currentQuestionIndex].id,
+        ),
       ),
-      actions: [
-        IconButton(
-          icon: Icon(SolarIcons.dangerTriangleLinear),
-          onPressed: () => _showReportSheet(context),
-        ),
-        Consumer<ProgressProvider>(
-          builder: (context, progressProvider, child) {
-            final questionId = questions[currentQuestionIndex].id;
-            final isSaved = progressProvider.isQuestionSaved(questionId);
-            
-            return IconButton(
-              icon: Icon(
-                isSaved ? SolarIcons.heartBold : SolarIcons.heartLinear,
-                color: isSaved ? Colors.red : null,
-              ),
-              onPressed: () {
-                // Get auth provider to check if user is logged in
-                final authProvider = Provider.of<AuthProvider>(context, listen: false);
-                final userId = authProvider.user?.id ?? '';
-                progressProvider.toggleSavedQuestionWithUserId(questionId, userId);
-              },
-            );
-          },
-        ),
-      ],
     );
-    
+
     return Scaffold(
+      backgroundColor: AppColors.field,
       appBar: questionAppBar,
       body: Column(
         children: [
-          // Enhanced question number pills
-          Container(
-            height: 50,
-            child: ListView.builder(
-              controller: _pillsScrollController,
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              itemCount: questions.length,
-              itemBuilder: (context, index) {
-                bool isActive = index == currentQuestionIndex;
-                bool isAnswered = answers.containsKey(questions[index].id);
-                bool isAnsweredCorrectly = isAnswered ? answers[questions[index].id]! : false;
-                
-                // Determine gradient for pill
-                LinearGradient pillGradient;
-                if (isActive) {
-                  pillGradient = LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Colors.white, Colors.blue.shade100],
-                  );
-                } else if (isAnswered) {
-                  if (isAnsweredCorrectly) {
-                    pillGradient = LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Colors.white, Colors.green.shade100],
-                    );
-                  } else {
-                    pillGradient = LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Colors.white, Colors.red.shade100],
-                    );
-                  }
-                } else {
-                  pillGradient = LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Colors.white, Colors.grey.shade100],
-                  );
-                }
-                
-                return Container(
-                  width: 40,
-                  margin: EdgeInsets.symmetric(horizontal: 4),
-                  decoration: BoxDecoration(
-                    gradient: pillGradient,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.2),
-                        spreadRadius: 0,
-                        blurRadius: 4,
-                        offset: Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Text(
-                      '${index + 1}',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
+          BentoPillTray(
+            controller: _pillsScrollController,
+            count: questions.length,
+            stateOf: (index) {
+              if (index == currentQuestionIndex) return BentoPillState.current;
+              final answer = answers[questions[index].id];
+              if (answer == null) return BentoPillState.unseen;
+              return answer ? BentoPillState.correct : BentoPillState.wrong;
+            },
+            onTap: _jumpToQuestion,
           ),
-          
-          // Enhanced answer options, question content, and explanation in single scrollable area
+
+          // Question, options and explanation in one scrollable area
           Expanded(
             child: SingleChildScrollView(
               controller: _mainScrollController,
-              padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 24),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.x4,
+                AppSpacing.x2,
+                AppSpacing.x4,
+                AppSpacing.x6,
+              ),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Enhanced question image (if available) - moved inside scroll view
                   if (question.imagePath != null)
                     AdaptiveQuestionImage(
                       imagePath: question.imagePath!,
                       assetFallback: 'assets/images/quiz/default.png',
                     ),
-                  
-                  // Enhanced question card - moved inside scroll view
-                  Container(
-                    margin: EdgeInsets.only(bottom: 16),
-                    padding: EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: _getQuestionCardGradient(currentQuestionIndex + 1),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.2),
-                          spreadRadius: 0,
-                          blurRadius: 6,
-                          offset: Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Question number indicator
-                        Row(
-                          children: [
-                            Container(
-                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                AppLocalizations.of(context).translate('question_x_of_y')
-                                  .replaceAll('{0}', (currentQuestionIndex + 1).toString())
-                                  .replaceAll('{1}', questions.length.toString()),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.black.withOpacity(0.7),
-                                ),
-                              ),
-                            ),
-                            if (question.type == QuestionType.multipleChoice) ...[
-                              SizedBox(width: 8),
-                              Container(
-                                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  AppLocalizations.of(context).translate('multiple_answers'),
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.blue.shade700,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        SizedBox(height: 12),
-                        // Question text
-                        Text(
-                          question.questionText,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                            height: 1.4,
-                          ),
-                        ),
-                        if (question.type == QuestionType.multipleChoice)
-                          Padding(
-                            padding: EdgeInsets.only(top: 12),
-                            child: Container(
-                              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: Colors.blue.withOpacity(0.2),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    SolarIcons.infoCircleLinear,
-                                    size: 16,
-                                    color: Colors.blue.shade700,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Expanded(
-                                    child: Consumer<LanguageProvider>(
-                                      builder: (context, languageProvider, _) {
-                                        return Text(
-                                          _translate('select_all_correct', languageProvider),
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.blue.shade700,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
+                  BentoQuestionCard(
+                    counter: AppLocalizations.of(context)
+                        .translate('question_x_of_y')
+                        .replaceAll('{0}', (currentQuestionIndex + 1).toString())
+                        .replaceAll('{1}', questions.length.toString()),
+                    question: question.questionText,
+                    multipleLabel: question.type == QuestionType.multipleChoice
+                        ? AppLocalizations.of(context).translate('multiple_answers')
+                        : null,
+                    selectAllHint: question.type == QuestionType.multipleChoice
+                        ? _translate('select_all_correct',
+                            Provider.of<LanguageProvider>(context))
+                        : null,
                   ),
-                  
-                  // Answer options
-                  ...question.options.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final option = entry.value;
-                    bool isSelected = selectedAnswers.contains(option);
-                    bool showResult = isAnswerChecked;
-                    bool isCorrectOption = false;
-                    
-                    // Check if this option is a correct answer
-                    if (question.correctAnswer is List<String>) {
-                      isCorrectOption = (question.correctAnswer as List<String>).contains(option);
-                    } else {
-                      isCorrectOption = option == question.correctAnswer.toString();
-                    }
-                    
-                    // Get gradient for answer card
-                    LinearGradient cardGradient = _getGradientForAnswerCard(isSelected, showResult, isCorrectOption, index);
-                    
-                    // Use circular indicators
-                    Widget selectionIndicator = Container(
-                      width: 24,
-                      height: 24,
-                      margin: EdgeInsets.only(right: 12),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.grey),
-                      ),
-                      child: isSelected
-                          ? Container(
-                              margin: EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.blue,
-                              ),
-                            )
-                          : null,
-                    );
-                    
-                    return GestureDetector(
-                      onTap: isAnswerChecked 
-                          ? null 
-                          : () {
-                              setState(() {
-                                if (question.type == QuestionType.multipleChoice) {
-                                  // Toggle selection for multiple choice
-                                  if (isSelected) {
-                                    selectedAnswers.remove(option);
-                                  } else {
-                                    selectedAnswers.add(option);
-                                  }
-                                } else {
-                                  // Single selection for other types
-                                  selectedAnswers = {option};
-                                }
-                              });
-                            },
-                      child: Container(
-                        margin: EdgeInsets.only(bottom: 12),
-                        padding: EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          gradient: cardGradient,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.2),
-                              spreadRadius: 0,
-                              blurRadius: 6,
-                              offset: Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            selectionIndicator,
-                            Expanded(
-                              child: Text(
-                                option,
-                                style: TextStyle(
-                                  color: showResult && (isSelected || isCorrectOption)
-                                      ? (isSelected && !isCorrectOption) ? Colors.red.shade900 : Colors.green.shade900
-                                      : Colors.black,
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                  
-                  // Enhanced explanation panel with improved spacing
-                  if (isAnswerChecked && question.explanation != null) ...[
-                    SizedBox(height: 20), // Space between answers and explanation
-                    Container(
-                      width: double.infinity,
-                      padding: EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [Colors.white, Colors.indigo.shade50.withOpacity(0.3)],
-                          stops: [0.0, 1.0],
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.2),
-                            spreadRadius: 0,
-                            blurRadius: 6,
-                            offset: Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                SolarIcons.lightbulbLinear,
-                                size: 20,
-                                color: Colors.indigo.shade700,
-                              ),
-                              SizedBox(width: 8),
-                              Text(
-                                AppLocalizations.of(context).translate('explanation'),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.indigo.shade700,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (question.ruleReference != null) ...[
-                            SizedBox(height: 12),
-                            Container(
-                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.indigo.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                question.ruleReference!,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.indigo.shade800,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          ],
-                          SizedBox(height: 12),
-                          Text(
-                            question.explanation!,
-                            style: TextStyle(
-                              fontSize: 14,
-                              height: 1.4,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ],
-                      ),
+                  for (final entry in question.options.asMap().entries)
+                    BentoOptionTile(
+                      index: entry.key,
+                      text: entry.value,
+                      isSelected: selectedAnswers.contains(entry.value),
+                      showResult: isAnswerChecked,
+                      isCorrectOption: _isCorrectOption(question, entry.value),
+                      onTap: isAnswerChecked
+                          ? null
+                          : () => _selectOption(question, entry.value,
+                              selectedAnswers.contains(entry.value)),
                     ),
-                    SizedBox(height: 20), // Extra space at the bottom for better scrolling
-                  ],
+                  if (isAnswerChecked && question.explanation != null)
+                    BentoExplanation(
+                      title: AppLocalizations.of(context).translate('explanation'),
+                      ruleReference: question.ruleReference,
+                      text: question.explanation!,
+                    ),
                 ],
               ),
             ),
           ),
-          
-          // Enhanced action buttons positioned like "Back to Theory" button
-          Padding(
-            padding: EdgeInsets.only(left: 16, right: 16, bottom: 24, top: 4),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    height: 56,
-                    decoration: BoxDecoration(
-                      gradient: _getGradientForButton(0), // Skip/Next button
-                      borderRadius: BorderRadius.circular(30),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.2),
-                          spreadRadius: 0,
-                          blurRadius: 6,
-                          offset: Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: isAnswerChecked ? goToNextQuestion : skipQuestion,
-                        borderRadius: BorderRadius.circular(30),
-                        child: Center(
-                          child: Consumer<LanguageProvider>(
-                            builder: (context, languageProvider, _) {
-                              return Text(
-                                isAnswerChecked 
-                                  ? _translate('next', languageProvider)
-                                  : _translate('skip', languageProvider),
-                                style: TextStyle(
-                                  color: Colors.black,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: Container(
-                    height: 56,
-                    decoration: BoxDecoration(
-                      gradient: selectedAnswers.isEmpty || isAnswerChecked
-                          ? LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [Colors.grey.shade300, Colors.grey.shade200],
-                            )
-                          : _getGradientForButton(1), // Check button
-                      borderRadius: BorderRadius.circular(30),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.2),
-                          spreadRadius: 0,
-                          blurRadius: 6,
-                          offset: Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: selectedAnswers.isEmpty || isAnswerChecked 
-                            ? null 
-                            : checkAnswer,
-                        borderRadius: BorderRadius.circular(30),
-                        child: Center(
-                          child: Consumer<LanguageProvider>(
-                            builder: (context, languageProvider, _) {
-                              return Text(
-                                _translate('check', languageProvider),
-                                style: TextStyle(
-                                  color: selectedAnswers.isEmpty || isAnswerChecked ? Colors.grey.shade600 : Colors.black,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+
+          Consumer<LanguageProvider>(
+            builder: (context, languageProvider, _) => BentoCheckActions(
+              isChecked: isAnswerChecked,
+              skipLabel: _translate('skip', languageProvider),
+              onSkip: skipQuestion,
+              checkLabel: _translate('check', languageProvider),
+              onCheck: selectedAnswers.isEmpty || isAnswerChecked
+                  ? null
+                  : checkAnswer,
+              nextLabel: _translate('next', languageProvider),
+              onNext: goToNextQuestion,
             ),
           ),
         ],

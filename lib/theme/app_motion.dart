@@ -39,13 +39,6 @@ class AppMotion {
   /// Presses want a little weight without bounce.
   static const Curve press = Curves.easeOut;
 
-  /// A short, contained overshoot (~4%) for the Signal variant. Springy enough
-  /// to read as physical, damped enough that it settles inside [base].
-  static const Curve spring = Cubic(0.34, 1.32, 0.64, 1);
-
-  /// A crisp decelerate with no overshoot, for the Ledger variant.
-  static const Curve crisp = Cubic(0.2, 0, 0, 1);
-
   /// Gap between siblings in a staggered entrance.
   static const Duration stagger = Duration(milliseconds: 24);
 

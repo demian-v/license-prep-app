@@ -188,6 +188,7 @@ class ExamProvider extends ChangeNotifier {
     
     _currentExam = _currentExam!.copyWith(
       isCompleted: true,
+      completedAt: DateTime.now(),
     );
     
     _stopTimer();

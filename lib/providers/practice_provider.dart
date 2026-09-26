@@ -157,6 +157,7 @@ class PracticeProvider extends ChangeNotifier {
     
     _currentPractice = _currentPractice!.copyWith(
       isCompleted: true,
+      completedAt: DateTime.now(),
     );
     
     notifyListeners();

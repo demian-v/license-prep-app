@@ -10,7 +10,10 @@ import '../providers/progress_provider.dart';
 import '../services/service_locator.dart';
 import '../services/analytics_service.dart';
 import '../services/session_validation_service.dart';
+import '../localization/app_localizations.dart';
 import '../screens/quiz_question_screen.dart';
+import '../theme/app_theme.dart';
+import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
 
 class TopicQuizScreen extends StatefulWidget {
@@ -25,12 +28,10 @@ class TopicQuizScreen extends StatefulWidget {
   _TopicQuizScreenState createState() => _TopicQuizScreenState();
 }
 
-class _TopicQuizScreenState extends State<TopicQuizScreen> with TickerProviderStateMixin {
+class _TopicQuizScreenState extends State<TopicQuizScreen> {
   List<QuizTopic> topics = [];
   bool isLoading = true;
   String? errorMessage;
-  late AnimationController _titleAnimationController;
-  late Animation<double> _titlePulseAnimation;
   late String _sessionId;
   
   // Helper method to get subtitle text based on language
@@ -56,17 +57,17 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> with TickerProviderSt
   String _getQuestionsCountText(String language, int count) {
     switch (language) {
       case 'en':
-        return '$count Questions';
+        return '$count questions';
       case 'es':
-        return '$count Preguntas';
+        return '$count preguntas';
       case 'uk':
-        return '$count Запитань';
+        return '$count запитань';
       case 'pl':
-        return '$count Pytań';
+        return '$count pytań';
       case 'ru':
-        return '$count Вопросов';
+        return '$count вопросов';
       default:
-        return '$count Questions';
+        return '$count questions';
     }
   }
   
@@ -131,152 +132,7 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> with TickerProviderSt
     // Generate or use provided session ID
     _sessionId = widget.sessionId ?? DateTime.now().millisecondsSinceEpoch.toString();
     
-    // Initialize title animation
-    _titleAnimationController = AnimationController(
-      duration: Duration(seconds: 3),
-      vsync: this,
-    );
-    
-    _titlePulseAnimation = Tween<double>(
-      begin: 1.0,
-      end: 1.03,
-    ).animate(CurvedAnimation(
-      parent: _titleAnimationController,
-      curve: Curves.easeInOut,
-    ));
-    
-    // Start the subtle pulse animation
-    _titleAnimationController.repeat(reverse: true);
-    
     loadTopics();
-  }
-  
-  @override
-  void dispose() {
-    _titleAnimationController.dispose();
-    super.dispose();
-  }
-
-  // Enhanced topic title widget with animation
-  Widget _buildEnhancedTopicTitle(String topicTitle) {
-    // Choose gradient color based on topic for variety
-    Color endColor;
-    IconData topicIcon;
-    
-    // Dynamic theming based on topic content
-    if (topicTitle.toLowerCase().contains('загальн') || topicTitle.toLowerCase().contains('general')) {
-      endColor = Colors.purple.shade50.withOpacity(0.6);
-      topicIcon = SolarIcons.infoCircleLinear;
-    } else if (topicTitle.toLowerCase().contains('правила') || topicTitle.toLowerCase().contains('rule')) {
-      endColor = Colors.blue.shade50.withOpacity(0.6);
-      topicIcon = SolarIcons.checklistMinimalisticLinear;
-    } else if (topicTitle.toLowerCase().contains('безпек') || topicTitle.toLowerCase().contains('safety')) {
-      endColor = Colors.green.shade50.withOpacity(0.6);
-      topicIcon = SolarIcons.shieldCheckBold;
-    } else if (topicTitle.toLowerCase().contains('велосипед') || topicTitle.toLowerCase().contains('bike')) {
-      endColor = Colors.orange.shade50.withOpacity(0.6);
-      topicIcon = SolarIcons.bicyclingLinear;
-    } else {
-      endColor = Colors.indigo.shade50.withOpacity(0.6);
-      topicIcon = SolarIcons.squareAcademicCapBold;
-    }
-    
-    return AnimatedBuilder(
-      animation: _titlePulseAnimation,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _titlePulseAnimation.value,
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Colors.white, endColor],
-                stops: [0.0, 1.0],
-              ),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
-                  spreadRadius: 0,
-                  blurRadius: 6,
-                  offset: Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  topicIcon,
-                  size: 16,
-                  color: Colors.black,
-                ),
-                SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    topicTitle,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // Helper method for topic card gradients
-  LinearGradient _getTopicCardGradient(int index, String topicTitle) {
-    Color startColor = Colors.white;
-    Color endColor;
-    
-    // Cycle through the exact same pastel colors as main test screen cards
-    if (topicTitle.toLowerCase().contains('загальн') || topicTitle.toLowerCase().contains('general')) {
-      endColor = Colors.purple.shade50.withOpacity(0.4);
-    } else if (topicTitle.toLowerCase().contains('правила') || topicTitle.toLowerCase().contains('rule')) {
-      endColor = Colors.blue.shade50.withOpacity(0.4);
-    } else if (topicTitle.toLowerCase().contains('безпек') || topicTitle.toLowerCase().contains('safety')) {
-      endColor = Colors.green.shade50.withOpacity(0.4);
-    } else if (topicTitle.toLowerCase().contains('велосипед') || topicTitle.toLowerCase().contains('bike')) {
-      endColor = Colors.orange.shade50.withOpacity(0.4);
-    } else if (topicTitle.toLowerCase().contains('пішоход') || topicTitle.toLowerCase().contains('pedestrian')) {
-      endColor = Colors.teal.shade50.withOpacity(0.4);
-    } else if (topicTitle.toLowerCase().contains('транспорт') || topicTitle.toLowerCase().contains('transport')) {
-      endColor = Colors.indigo.shade50.withOpacity(0.4);
-    } else {
-      // Fallback to cycling through colors
-      switch (index % 3) {
-        case 0:
-          endColor = Colors.blue.shade50.withOpacity(0.3);
-          break;
-        case 1:
-          endColor = Colors.green.shade50.withOpacity(0.3);
-          break;
-        case 2:
-          endColor = Colors.orange.shade50.withOpacity(0.3);
-          break;
-        case 3:
-          endColor = Colors.purple.shade50.withOpacity(0.4);
-          break;
-        default:
-          endColor = Colors.blue.shade50.withOpacity(0.4);
-      }
-    }
-    
-    return LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [Colors.white, endColor],
-      stops: [0.0, 1.0],
-    );
   }
 
   // Helper method to get thematic icon for topics
@@ -296,189 +152,148 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> with TickerProviderSt
     } else if (topicTitle.toLowerCase().contains('водінн') || topicTitle.toLowerCase().contains('driving')) {
       return SolarIcons.carLinear;
     } else {
-      return SolarIcons.questionSquareBold;
+      return SolarIcons.documentTextLinear;
     }
   }
 
 
-  // Section header styled exactly like "Тестування" on test screen
-  Widget _buildSectionHeader(String title) {
-    return Container(
-      margin: EdgeInsets.symmetric(vertical: 16),
-      child: Row(
-        children: [
-          Expanded(
-            child: Divider(color: Colors.grey[300]),
-          ),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              title,
-              style: TextStyle(
-                color: Colors.grey[500],
-                fontWeight: FontWeight.w500,
-              ),
+  /// The page heading, beside the back button: the screen's name, then one
+  /// line on what it holds — title first, then description. Each line stays
+  /// on one line; a long translation shrinks to fit rather than wrapping.
+  ///
+  /// Replaces two competing lines: a centred title in the app bar and, under
+  /// it, «Вопросы сгруппированы по темам» centred between hairline rules.
+  Widget _buildSectionHeader(String title, String subtitle) {
+    Widget oneLine(Widget child) => FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: child,
+        );
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        oneLine(
+          Text(
+            title,
+            maxLines: 1,
+            style: AppTypography.title.copyWith(
+              fontSize: 22,
+              height: 28 / 22,
+              letterSpacing: -0.4,
+              fontVariations: const [FontVariation('wght', 600)],
             ),
           ),
-          Expanded(
-            child: Divider(color: Colors.grey[300]),
+        ),
+        oneLine(
+          Text(
+            subtitle,
+            maxLines: 1,
+            style: AppTypography.body.copyWith(
+              fontSize: 14,
+              height: 20 / 14,
+              color: AppColors.inkSecondary,
+            ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  // Enhanced topic card widget - NO percentage indicators on individual cards
-  Widget _buildEnhancedTopicCard(QuizTopic topic, int index, String currentLanguage) {
-    return Container(
-      margin: EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        gradient: _getTopicCardGradient(index, topic.title),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 0,
-            blurRadius: 8,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () async {
-            // Session validation - validate before starting topic quiz
-            if (!SessionValidationService.validateBeforeActionSafely(context)) {
-              print('🚨 TopicQuizScreen: Session invalid, blocking topic selection: ${topic.title}');
-              return; // User will be logged out by the validation service
-            }
-            
-            try {
-              // Track topic started analytics event
-              final stateProvider = Provider.of<StateProvider>(context, listen: false);
-              final authProvider = Provider.of<AuthProvider>(context, listen: false);
-              final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
-              final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
-              
-              final stateId = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'IL';
-              final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
-              
-              await analyticsService.trackQTopicStarted(
-                sessionId: _sessionId,
-                stateId: stateId,
-                licenseType: licenseType,
-                topicId: topic.id,
-                topicName: topic.title,
-                questionCount: topic.questionCount,
-              );
-              
-              print('📊 Analytics: q_topic_started logged (session_id: $_sessionId, topic_id: ${topic.id}, topic_name: ${topic.title})');
-            } catch (e) {
-              print('❌ Analytics error: $e');
-              // Don't block user flow if analytics fails
-            }
-            
-            // Navigate to quiz questions with session ID and parameters for analytics
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => QuizQuestionScreen(
-                  topic: topic,
-                  sessionId: _sessionId,
-                  isTopicMode: true,
-                  startTime: DateTime.now(),
-                ),
-              ),
-            );
-          },
-          child: Padding(
-            padding: EdgeInsets.all(20),
-            child: Row(
-              children: [
-                // Enhanced topic icon with Firebase Storage support
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Colors.white, Colors.grey.shade100],
-                    ),
-                    borderRadius: BorderRadius.circular(25),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.1),
-                        spreadRadius: 0,
-                        blurRadius: 4,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(25),
-                    child: topic.iconAsset != null
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(25),
-                            child: Image.asset(
-                              topic.iconAsset!,
-                              width: 50,
-                              height: 50,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                // Fallback to default icon if asset fails to load
-                                return Center(
-                                  child: Icon(
-                                    _getTopicIcon(topic.title),
-                                    color: Colors.black54,
-                                    size: 24,
-                                  ),
-                                );
-                              },
-                            ),
-                          )
-                        : Center(
-                            child: Icon(
-                              _getTopicIcon(topic.title),
-                              color: Colors.black54,
-                              size: 24,
-                            ),
-                          ),
-                  ),
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        topic.title,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        _getQuestionsCountText(currentLanguage, topic.questionCount),
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+
+  /// Opens a topic. Moved unchanged from the card's inline `onTap`, so the
+  /// card can change without touching the session check, analytics or
+  /// navigation.
+  Future<void> _onTopicTap(QuizTopic topic) async {
+    // Session validation - validate before starting topic quiz
+    if (!SessionValidationService.validateBeforeActionSafely(context)) {
+      print('🚨 TopicQuizScreen: Session invalid, blocking topic selection: ${topic.title}');
+      return; // User will be logged out by the validation service
+    }
+    
+    try {
+      // Track topic started analytics event
+      final stateProvider = Provider.of<StateProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
+      final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+      
+      final stateId = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'IL';
+      final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
+      
+      await analyticsService.trackQTopicStarted(
+        sessionId: _sessionId,
+        stateId: stateId,
+        licenseType: licenseType,
+        topicId: topic.id,
+        topicName: topic.title,
+        questionCount: topic.questionCount,
+      );
+      
+      print('📊 Analytics: q_topic_started logged (session_id: $_sessionId, topic_id: ${topic.id}, topic_name: ${topic.title})');
+    } catch (e) {
+      print('❌ Analytics error: $e');
+      // Don't block user flow if analytics fails
+    }
+    
+    // Navigate to quiz questions with session ID and parameters for analytics
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => QuizQuestionScreen(
+          topic: topic,
+          sessionId: _sessionId,
+          isTopicMode: true,
+          startTime: DateTime.now(),
         ),
       ),
     );
   }
+
+  /// A topic: its 3D picture, then the title, with the question count as a
+  /// pill in the bottom-right corner. The whole card is the button — no
+  /// chevron. Colour is neutral: the old per-topic pastel washes (green,
+  /// orange, purple…) spent the semantic colours on decoration.
+  Widget _buildEnhancedTopicCard(QuizTopic topic, int index, String currentLanguage) {
+    return _TopicCard(
+      title: topic.title,
+      count: _getQuestionsCountText(currentLanguage, topic.questionCount),
+      picture: _buildTopicPicture(topic),
+      onTap: () => _onTopicTap(topic),
+    );
+  }
+
+  /// The topic's 3D picture (owner decision, 2026-09-26: keep the pictures).
+  /// Falls back to a Solar glyph if the topic has no picture or it fails to
+  /// load, as before.
+  Widget _buildTopicPicture(QuizTopic topic) {
+    Widget fallback() => Container(
+          width: _topicPictureSize,
+          height: _topicPictureSize,
+          decoration: const BoxDecoration(
+            color: AppColors.signal50,
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: Icon(
+            _getTopicIcon(topic.title),
+            size: 28,
+            color: AppColors.signal,
+          ),
+        );
+
+    if (topic.iconAsset == null) return fallback();
+    return Image.asset(
+      topic.iconAsset!,
+      width: _topicPictureSize,
+      height: _topicPictureSize,
+      fit: BoxFit.contain,
+      excludeFromSemantics: true,
+      errorBuilder: (context, error, stackTrace) => fallback(),
+    );
+  }
+
+  static const double _topicPictureSize = 64;
   
   Future<void> loadTopics() async {
     setState(() {
@@ -524,44 +339,39 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> with TickerProviderSt
     final languageProvider = Provider.of<LanguageProvider>(context);
     final currentLanguage = languageProvider.language;
     
-    // Title based on language
-    String screenTitle = '';
-    switch (currentLanguage) {
-      case 'en':
-        screenTitle = 'Learn by Topics';
-        break;
-      case 'es':
-        screenTitle = 'Aprender por Temas';
-        break;
-      case 'uk':
-        screenTitle = 'Вчити по темах';
-        break;
-      case 'pl':
-        screenTitle = 'Ucz się według tematów';
-        break;
-      case 'ru':
-        screenTitle = 'Учиться по темам';
-        break;
-      default:
-        screenTitle = 'Learn by Topics';
-    }
+    // The same name as the Тесты tile and the topic result page — one
+    // translation key, rather than a separate inline wording
+    // («Учиться по темам» vs «Обучение по темам», unified 2026-09-26).
+    final screenTitle = AppLocalizations.of(context).translate('learn_by_topics');
     
-    // Create enhanced app bar
+    // A pushed screen: back as a round white button on the field page, and
+    // the page heading beside it, left-aligned.
     final appBar = AppBar(
-      title: _buildEnhancedTopicTitle(screenTitle),
-      centerTitle: true,
-      backgroundColor: Colors.white,
-      foregroundColor: Colors.black,
+      title: _buildSectionHeader(screenTitle, _getSubtitleText(currentLanguage)),
+      centerTitle: false,
+      titleSpacing: AppSpacing.x2,
+      toolbarHeight: 72,
+      backgroundColor: AppColors.field,
+      surfaceTintColor: Colors.transparent,
+      foregroundColor: AppColors.ink,
       elevation: 0,
-      leading: IconButton(
-        icon: Icon(SolarIcons.arrowLeftLinear),
-        onPressed: () => Navigator.pop(context),
+      scrolledUnderElevation: 0,
+      leading: Padding(
+        padding: const EdgeInsets.only(left: AppSpacing.x2),
+        child: Center(
+          child: IconButton(
+            style: _roundIconStyle,
+            icon: const Icon(SolarIcons.arrowLeftLinear, color: AppColors.ink, size: 24),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
       ),
     );
     
     // Show loading state
     if (isLoading) {
       return Scaffold(
+        backgroundColor: AppColors.field,
         appBar: appBar,
         body: Center(
           child: CircularProgressIndicator(),
@@ -572,106 +382,230 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> with TickerProviderSt
     // Show error state
     if (errorMessage != null) {
       return Scaffold(
+        backgroundColor: AppColors.field,
         appBar: appBar,
         body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 32),
-                child: Text(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
                   errorMessage!,
-                  style: TextStyle(color: Colors.red),
+                  style: AppTypography.body.copyWith(color: AppColors.ink),
                   textAlign: TextAlign.center,
                 ),
-              ),
-              SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: loadTopics,
-                child: Text(_getTryAgainText(currentLanguage)),
-              ),
-            ],
+                const SizedBox(height: AppSpacing.x4),
+                FilledButton(
+                  onPressed: loadTopics,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x6),
+                    shape: const StadiumBorder(),
+                  ),
+                  child: Text(_getTryAgainText(currentLanguage)),
+                ),
+              ],
+            ),
           ),
         ),
       );
     }
     
     return Scaffold(
+      backgroundColor: AppColors.field,
       appBar: appBar,
-      body: Column(
-        children: [
-          // Section header styled exactly like "Тестування"
-          _buildSectionHeader(_getSubtitleText(currentLanguage)),
-          
-          // Enhanced topic list
-          Expanded(
-            // Risk #3 follow-up — distinguish a refusal from an empty shelf.
-            child: Provider.of<ContentProvider>(context).contentRequiresSubscription
-            ? const SubscriptionRequiredView()
-            : topics.isEmpty 
-            ? Container(
-                padding: EdgeInsets.all(32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [Colors.white, Colors.grey.shade50.withOpacity(0.8)],
-                        ),
-                        borderRadius: BorderRadius.circular(50),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.1),
-                            spreadRadius: 0,
-                            blurRadius: 8,
-                            offset: Offset(0, 4),
-                          ),
-                        ],
+      // Risk #3 follow-up — distinguish a refusal from an empty shelf.
+      body: Provider.of<ContentProvider>(context).contentRequiresSubscription
+          ? const SubscriptionRequiredView()
+          : topics.isEmpty
+              ? _buildEmptyState(currentLanguage)
+              : ListView.builder(
+                  padding: EdgeInsets.fromLTRB(
+                    AppSpacing.x4,
+                    AppSpacing.x3,
+                    AppSpacing.x4,
+                    AppSpacing.x6 + MediaQuery.of(context).padding.bottom,
+                  ),
+                  itemCount: topics.length,
+                  itemBuilder: (context, index) {
+                    final topic = topics[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.x3),
+                      // One-shot entrance, capped so the whole list lands
+                      // inside AppMotion.base.
+                      child: StaggerIn(
+                        index: index,
+                        count: topics.length,
+                        curve: BentoTokens.curve,
+                        child: _buildEnhancedTopicCard(topic, index, currentLanguage),
                       ),
-                      child: Icon(
-                        SolarIcons.listLinear,
-                        size: 48,
-                        color: Colors.grey[400],
-                      ),
-                    ),
-                    SizedBox(height: 24),
-                    Text(
-                      _getEmptyStateTitle(currentLanguage),
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[700],
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: 12),
-                    Text(
-                      _getEmptyStateMessage(currentLanguage),
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[500],
-                        height: 1.4,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+                    );
+                  },
                 ),
-              ) 
-            : ListView.builder(
-                padding: EdgeInsets.all(16),
-                itemCount: topics.length,
-                itemBuilder: (context, index) {
-                  final topic = topics[index];
-                  
-                  return _buildEnhancedTopicCard(topic, index, currentLanguage);
-                },
+      );
+  }
+
+  Widget _buildEmptyState(String currentLanguage) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.x8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: const BoxDecoration(
+                color: AppColors.signal50,
+                shape: BoxShape.circle,
               ),
+              alignment: Alignment.center,
+              child: const Icon(
+                SolarIcons.listLinear,
+                size: 28,
+                color: AppColors.signal,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.x6),
+            Text(
+              _getEmptyStateTitle(currentLanguage),
+              style: AppTypography.heading.copyWith(
+                fontSize: 18,
+                height: 24 / 18,
+                fontVariations: const [FontVariation('wght', 600)],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.x2),
+            Text(
+              _getEmptyStateMessage(currentLanguage),
+              style: AppTypography.label.copyWith(
+                color: AppColors.inkSecondary,
+                fontVariations: const [FontVariation('wght', 400)],
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static final ButtonStyle _roundIconStyle = IconButton.styleFrom(
+    backgroundColor: AppColors.paper,
+    fixedSize: const Size(44, 44),
+    shape: const CircleBorder(),
+  );
+}
+
+/// One topic as a Bento card. Presses lift the card a few points rather than
+/// shrinking it, as on Тесты.
+class _TopicCard extends StatefulWidget {
+  const _TopicCard({
+    required this.title,
+    required this.count,
+    required this.picture,
+    required this.onTap,
+  });
+
+  final String title;
+  final String count;
+  final Widget picture;
+  final VoidCallback onTap;
+
+  @override
+  State<_TopicCard> createState() => _TopicCardState();
+}
+
+class _TopicCardState extends State<_TopicCard> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: '${widget.title}. ${widget.count}',
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => _setPressed(true),
+        onTapUp: (_) => _setPressed(false),
+        onTapCancel: () => _setPressed(false),
+        onTap: widget.onTap,
+        child: AnimatedSlide(
+          offset: Offset(0, _pressed ? -0.025 : 0),
+          duration: AppMotion.duration(context, BentoTokens.state),
+          curve: AppMotion.enter,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.x4),
+            decoration: BoxDecoration(
+              color: AppColors.paper,
+              borderRadius: BorderRadius.circular(BentoTokens.card),
+              boxShadow: AppColors.shadowCard,
+            ),
+            // Picture first, then the title; the count sits in the bottom
+            // right corner, so the card is filled edge to edge.
+            child: Row(
+              children: [
+                widget.picture,
+                const SizedBox(width: AppSpacing.x4),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        widget.title,
+                        style: AppTypography.body.copyWith(
+                          fontSize: 17,
+                          height: 22 / 17,
+                          letterSpacing: -0.2,
+                          color: AppColors.ink,
+                          fontVariations: const [FontVariation('wght', 600)],
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.x2),
+                      // One line always: a long translation shrinks slightly
+                      // to fit rather than wrapping the pill.
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.x2 + 2,
+                              vertical: AppSpacing.x1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.signal50,
+                              borderRadius: BorderRadius.circular(BentoTokens.chip),
+                            ),
+                            child: Text(
+                              widget.count,
+                              maxLines: 1,
+                              style: AppTypography.caption.copyWith(
+                                color: AppColors.signal,
+                                fontVariations: const [FontVariation('wght', 500)],
+                                fontFeatures: const [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }

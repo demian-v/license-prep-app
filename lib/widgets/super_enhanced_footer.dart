@@ -7,7 +7,6 @@ import 'package:provider/provider.dart';
 import '../providers/language_provider.dart';
 import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
-import '../theme/design_variant.dart';
 
 /// The tab bar — the app's most persistent piece of chrome.
 ///
@@ -41,42 +40,28 @@ class SuperEnhancedFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Consumer<LanguageProvider>(
-      builder: (context, languageProvider, _) =>
-          ValueListenableBuilder<DesignVariant>(
-        valueListenable: designVariant,
-        builder: (context, variant, _) {
-          final bool ledger = variant == DesignVariant.boldB;
-          // The bar floats, so it clears the home indicator itself rather
-          // than sitting flush against it.
-          final bottomInset = MediaQuery.of(context).padding.bottom;
+      builder: (context, languageProvider, _) {
+        // The bar floats, so it clears the home indicator itself rather
+        // than sitting flush against it.
+        final bottomInset = MediaQuery.of(context).padding.bottom;
 
-          // Ledger's pages are paper, not field; the bar's surround matches
-          // the page so no grey band shows around it.
-          return ColoredBox(
-            color: ledger ? AppColors.paper : Colors.transparent,
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                AppSpacing.gutter,
-                AppSpacing.x1,
-                AppSpacing.gutter,
-                bottomInset > 0 ? AppSpacing.x6 : AppSpacing.x4,
-              ),
-              child: _MeniscusBar(
-                currentIndex: currentIndex,
-                onTap: onTap,
-                tabs: _tabs,
-                labels: [
-                  for (final tab in _tabs)
-                    _translate(tab.key, languageProvider),
-                ],
-                // Ledger keeps its flat, hairline character; the others float.
-                edge: ledger ? AppColors.borderStrong : AppColors.border,
-                floating: !ledger,
-              ),
-            ),
-          );
-        },
-      ),
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.gutter,
+            AppSpacing.x1,
+            AppSpacing.gutter,
+            bottomInset > 0 ? AppSpacing.x6 : AppSpacing.x4,
+          ),
+          child: _MeniscusBar(
+            currentIndex: currentIndex,
+            onTap: onTap,
+            tabs: _tabs,
+            labels: [
+              for (final tab in _tabs) _translate(tab.key, languageProvider),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -151,16 +136,12 @@ class _MeniscusBar extends StatefulWidget {
     required this.onTap,
     required this.tabs,
     required this.labels,
-    required this.edge,
-    required this.floating,
   });
 
   final int currentIndex;
   final Function(int) onTap;
   final List<_Tab> tabs;
   final List<String> labels;
-  final Color edge;
-  final bool floating;
 
   @override
   State<_MeniscusBar> createState() => _MeniscusBarState();
@@ -319,8 +300,6 @@ class _MeniscusBarState extends State<_MeniscusBar>
                     painter: _MeniscusPainter(
                       cx: cx,
                       lean: _lean,
-                      edge: widget.edge,
-                      floating: widget.floating,
                     ),
                   ),
                 ),
@@ -443,14 +422,10 @@ class _MeniscusPainter extends CustomPainter {
   _MeniscusPainter({
     required this.cx,
     required this.lean,
-    required this.edge,
-    required this.floating,
   });
 
   final double cx;
   final double lean;
-  final Color edge;
-  final bool floating;
 
   static const double _corner = AppRadius.xl;
 
@@ -512,20 +487,18 @@ class _MeniscusPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final skin = _skin(size);
-    if (floating) {
-      // Tinted to the surface beneath, not generic black.
-      canvas.drawPath(
-        skin.shift(const Offset(0, 6)),
-        Paint()
-          ..color = const Color(0x1A0E1F4D)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
-      );
-    }
+    // Tinted to the surface beneath, not generic black.
+    canvas.drawPath(
+      skin.shift(const Offset(0, 6)),
+      Paint()
+        ..color = const Color(0x1A0E1F4D)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
+    );
     canvas.drawPath(skin, Paint()..color = AppColors.paper);
     canvas.drawPath(
       skin,
       Paint()
-        ..color = edge
+        ..color = AppColors.border
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1,
     );
@@ -534,7 +507,5 @@ class _MeniscusPainter extends CustomPainter {
   @override
   bool shouldRepaint(_MeniscusPainter old) =>
       old.cx != cx ||
-      old.lean != lean ||
-      old.edge != edge ||
-      old.floating != floating;
+      old.lean != lean;
 }

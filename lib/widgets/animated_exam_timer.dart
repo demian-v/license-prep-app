@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/exam_timer_provider.dart';
-import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
-import '../theme/design_variant.dart';
+import '../theme/bento_tokens.dart';
 
 /// The exam countdown.
 ///
@@ -39,15 +38,9 @@ class AnimatedExamTimer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<DesignVariant>(
-      valueListenable: designVariant,
-      builder: (context, selected, _) => ValueListenableBuilder<Duration?>(
-        valueListenable: debugTimerPreview,
-        builder: (context, preview, _) => Consumer<ExamTimerProvider>(
+    return Consumer<ExamTimerProvider>(
       builder: (context, timerProvider, child) {
-        // The debug preview only ever changes what is drawn; the provider,
-        // and so the exam, keep their real time.
-        final remaining = preview ?? timerProvider.remainingTime;
+        final remaining = timerProvider.remainingTime;
         final minutes = remaining.inMinutes;
         final seconds = remaining.inSeconds % 60;
         final timeText =
@@ -56,153 +49,52 @@ class AnimatedExamTimer extends StatelessWidget {
         final bool isCritical = remaining <= _critical;
         final bool isLow = remaining <= _low;
 
-        final Color foreground = isCritical
-            ? AppColors.stop
-            : isLow
-                ? AppColors.warn
-                : AppColors.ink;
-
-        // Bare text, no pill. The countdown sits in the middle of the app bar
-        // with a back arrow on one side and two actions on the other — a
-        // filled capsule there reads as a fourth control, and the app bar
-        // already separates itself from the page with a hairline. Colour is
-        // the only thing that changes as time runs out.
         return Semantics(
           liveRegion: isLow,
           label: '$minutes мин $seconds сек',
           child: _buildFace(
             context,
-            selected,
             timeText,
-            foreground,
             isLow: isLow,
             isCritical: isCritical,
           ),
         );
       },
-        ),
-      ),
     );
   }
 
+  /// The countdown is a pill — ink while time is ample, then the pill itself
+  /// turns amber and red. White on each passes as large text.
   Widget _buildFace(
     BuildContext context,
-    DesignVariant variant,
-    String timeText,
-    Color foreground, {
+    String timeText, {
     required bool isLow,
     required bool isCritical,
   }) {
-    final tokens = VariantTokens.of(variant);
-    final duration = AppMotion.duration(context, AppMotion.base);
-
-    switch (variant) {
-      case DesignVariant.refined:
-        return AnimatedDefaultTextStyle(
-          duration: duration,
-          curve: AppMotion.enter,
-          style: AppTypography.timer.copyWith(color: foreground),
-          child: Text(timeText),
-        );
-
-      case DesignVariant.boldA:
-        // Signal: the countdown is the hero of the bar. Once time is short it
-        // gains a surface in its own semantic colour, so the state reads from
-        // across the room — not just the digits.
-        final Color surface = isCritical
-            ? AppColors.stopSurface
-            : isLow
-                ? AppColors.warnSurface
-                : AppColors.paper.withValues(alpha: 0);
-        return AnimatedContainer(
-          duration: duration,
-          curve: AppMotion.enter,
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.x3,
-            vertical: AppSpacing.x1,
-          ),
-          decoration: BoxDecoration(
-            color: surface,
-            borderRadius: BorderRadius.circular(tokens.chip),
-          ),
-          child: AnimatedDefaultTextStyle(
-            duration: duration,
-            curve: AppMotion.enter,
-            style: AppTypography.timer.copyWith(
-              fontSize: 26,
-              height: 30 / 26,
-              color: foreground,
-              fontVariations: const [FontVariation('wght', 800)],
-            ),
-            child: Text(timeText),
-          ),
-        );
-
-      case DesignVariant.bento:
-        // Bento: the countdown is a pill — ink while time is ample, then the
-        // pill itself turns amber and red. White on each passes as large text.
-        final Color fill = isCritical
-            ? AppColors.stop
-            : isLow
-                ? AppColors.warn
-                : AppColors.ink;
-        return AnimatedContainer(
-          duration: duration,
-          curve: AppMotion.enter,
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.x4,
-            vertical: AppSpacing.x1 + 2,
-          ),
-          decoration: BoxDecoration(
-            color: fill,
-            borderRadius: BorderRadius.circular(tokens.chip),
-          ),
-          child: Text(
-            timeText,
-            style: AppTypography.timer.copyWith(
-              fontSize: 20,
-              height: 24 / 20,
-              color: AppColors.onSignal,
-            ),
-          ),
-        );
-
-      case DesignVariant.boldB:
-        // Ledger: small and exact. A clock glyph joins the digits only when
-        // time is short, so colour is never the sole signal.
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedSize(
-              duration: AppMotion.duration(context, AppMotion.fast),
-              curve: AppMotion.crisp,
-              child: isLow
-                  ? Padding(
-                      padding: const EdgeInsets.only(right: AppSpacing.x1),
-                      child: AppIcons.icon(
-                        AppIcons.clock,
-                        size: 16,
-                        color: foreground,
-                      ),
-                    )
-                  : const SizedBox.shrink(),
-            ),
-            AnimatedDefaultTextStyle(
-              duration: AppMotion.duration(context, AppMotion.fast),
-              curve: AppMotion.crisp,
-              style: AppTypography.timer.copyWith(
-                // 20/700 keeps it "large text" for WCAG, which amber on
-                // paper (4.2:1) needs.
-                fontSize: 20,
-                height: 24 / 20,
-                letterSpacing: 0.2,
-                color: foreground,
-                fontVariations: const [FontVariation('wght', 700)],
-              ),
-              child: Text(timeText),
-            ),
-          ],
-        );
-    }
+    final Color fill = isCritical
+        ? AppColors.stop
+        : isLow
+            ? AppColors.warn
+            : AppColors.ink;
+    return AnimatedContainer(
+      duration: AppMotion.duration(context, AppMotion.base),
+      curve: AppMotion.enter,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.x4,
+        vertical: AppSpacing.x1 + 2,
+      ),
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: BorderRadius.circular(BentoTokens.chip),
+      ),
+      child: Text(
+        timeText,
+        style: AppTypography.timer.copyWith(
+          fontSize: 20,
+          height: 24 / 20,
+          color: AppColors.onSignal,
+        ),
+      ),
+    );
   }
 }
