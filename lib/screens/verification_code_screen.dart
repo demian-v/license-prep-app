@@ -7,7 +7,10 @@ import 'package:provider/provider.dart';
 import '../localization/app_localizations.dart';
 import '../providers/language_provider.dart';
 import '../services/email_verification_service.dart';
+import '../theme/app_theme.dart';
+import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
+import '../widgets/bento_auth_parts.dart';
 
 /// Risk #12 — the code-entry step of signup.
 ///
@@ -282,9 +285,14 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
     }
   }
 
+  /// One digit as a grey field panel, as the login fields: no outline at
+  /// rest, a blue ring on the box being typed in.
   Widget _buildBox(int index) {
-    return SizedBox(
-      width: 48,
+    OutlineInputBorder ring(Color color, double width) => OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          borderSide: BorderSide(color: color, width: width),
+        );
+    return Expanded(
       child: KeyboardListener(
         focusNode: FocusNode(),
         onKeyEvent: (event) => _onKey(index, event),
@@ -294,11 +302,22 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
           autofocus: index == 0,
           textAlign: TextAlign.center,
           keyboardType: TextInputType.number,
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          decoration: const InputDecoration(
+          cursorColor: AppColors.signal,
+          style: AppTypography.title.copyWith(
+            fontSize: 24,
+            height: 1,
+            color: AppColors.ink,
+            fontVariations: const [FontVariation('wght', 600)],
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+          decoration: InputDecoration(
             counterText: '',
-            border: OutlineInputBorder(),
-            contentPadding: EdgeInsets.symmetric(vertical: 16),
+            filled: true,
+            fillColor: AppColors.field,
+            contentPadding: const EdgeInsets.symmetric(vertical: AppSpacing.x4),
+            border: ring(Colors.transparent, 0),
+            enabledBorder: ring(Colors.transparent, 0),
+            focusedBorder: ring(AppColors.signal, 1.5),
           ),
           onChanged: (value) => _onChanged(index, value),
         ),
@@ -310,70 +329,87 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
   Widget build(BuildContext context) {
     final canResend = _resendIn <= 0 && !_sending;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_t(_codeSent ? 'verify_title' : 'verify_title_unsent')),
-        leading: widget.onBack == null
-            ? null
-            : IconButton(icon: const Icon(SolarIcons.arrowLeftLinear), onPressed: widget.onBack),
+    final blocks = <Widget>[
+      bentoAuthBadge(SolarIcons.letterLinear),
+      const SizedBox(height: AppSpacing.x6),
+      BentoAuthCard(
+        title: _t(_codeSent ? 'verify_title' : 'verify_title_unsent'),
+        children: [
+          Text(
+            // #67 — only claim a code was sent when one was.
+            _t(_codeSent ? 'verify_subtitle' : 'verify_subtitle_unsent')
+                .replaceAll('{email}', widget.email),
+            textAlign: TextAlign.center,
+            style: AppTypography.body.copyWith(
+              fontSize: 15,
+              height: 22 / 15,
+              color: AppColors.inkSecondary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.x6),
+          Row(
+            children: [
+              for (var i = 0; i < _codeLength; i++) ...[
+                if (i > 0) const SizedBox(width: AppSpacing.x2),
+                _buildBox(i),
+              ],
+            ],
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: AppSpacing.x4),
+            BentoAuthError(_error!),
+          ],
+          if (_notice != null && _error == null) ...[
+            const SizedBox(height: AppSpacing.x4),
+            BentoAuthNotice(_notice!),
+          ],
+          const SizedBox(height: AppSpacing.x6),
+          BentoAuthPrimaryButton(
+            label: _t('verify_cta'),
+            loading: _submitting,
+            onPressed:
+                _submitting || _code.length != _codeLength ? null : _submit,
+          ),
+          const SizedBox(height: AppSpacing.x2),
+          BentoAuthLink(
+            label: canResend
+                ? _t('verify_resend')
+                : _t('verify_resend_in').replaceAll('{seconds}', '$_resendIn'),
+            onPressed: canResend ? () => _send() : null,
+          ),
+        ],
       ),
+      if (widget.onBack != null) ...[
+        const SizedBox(height: AppSpacing.x3),
+        Center(
+          child: BentoAuthLink(
+            label: _t('verify_change_email'),
+            onPressed: widget.onBack!,
+          ),
+        ),
+      ],
+    ];
+
+    return Scaffold(
+      backgroundColor: AppColors.field,
+      appBar: widget.onBack == null ? null : bentoAuthAppBar(onBack: widget.onBack!),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.x4 + AppSpacing.x1,
+            AppSpacing.x2,
+            AppSpacing.x4 + AppSpacing.x1,
+            AppSpacing.x6,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 16),
-              Text(
-                // #67 — only claim a code was sent when one was.
-                _t(_codeSent ? 'verify_subtitle' : 'verify_subtitle_unsent')
-                    .replaceAll('{email}', widget.email),
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 16),
-              ),
-              const SizedBox(height: 32),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: List.generate(_codeLength, _buildBox),
-              ),
-              const SizedBox(height: 16),
-              if (_error != null)
-                Text(
-                  _error!,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.red),
-                ),
-              if (_notice != null && _error == null)
-                Text(
-                  _notice!,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.green),
-                ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed:
-                    _submitting || _code.length != _codeLength ? null : _submit,
-                child: _submitting
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(_t('verify_cta')),
-              ),
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: canResend ? () => _send() : null,
-                child: Text(
-                  canResend
-                      ? _t('verify_resend')
-                      : _t('verify_resend_in').replaceAll('{seconds}', '$_resendIn'),
-                ),
-              ),
-              if (widget.onBack != null)
-                TextButton(
-                  onPressed: widget.onBack,
-                  child: Text(_t('verify_change_email')),
+              for (var i = 0; i < blocks.length; i++)
+                StaggerIn(
+                  index: i,
+                  count: blocks.length,
+                  curve: BentoTokens.curve,
+                  child: blocks[i],
                 ),
             ],
           ),

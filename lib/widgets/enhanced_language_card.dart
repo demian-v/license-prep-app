@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
+import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
 
+/// A language in the signup picker, as a Bento row: the flag, the language in
+/// its own name with the English name under it, a chevron. The chosen row
+/// turns the dark `ink` row while the app switches, as the Профиль pickers
+/// (owner: "select black, not blue… no check"). The old per-language pastel
+/// washes are gone.
 class EnhancedLanguageCard extends StatefulWidget {
   final String language;
   final String languageCode;
   final VoidCallback? onTap;
   final bool isEnabled;
+  final bool isSelected;
   
   const EnhancedLanguageCard({
     Key? key,
@@ -13,34 +21,24 @@ class EnhancedLanguageCard extends StatefulWidget {
     required this.languageCode,
     this.onTap,
     this.isEnabled = true,
+    this.isSelected = false,
   }) : super(key: key);
 
   @override
   _EnhancedLanguageCardState createState() => _EnhancedLanguageCardState();
 }
 
-class _EnhancedLanguageCardState extends State<EnhancedLanguageCard> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
-  
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: 100),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.98).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
-  }
-  
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-  
+class _EnhancedLanguageCardState extends State<EnhancedLanguageCard> {
+  /// Each language in its own name, as the Профиль picker — display only;
+  /// [EnhancedLanguageCard.language] (English) still goes to analytics.
+  static const Map<String, String> _nativeNames = {
+    'en': 'English',
+    'es': 'Español',
+    'uk': 'Українська',
+    'pl': 'Polski',
+    'ru': 'Русский',
+  };
+
   // Helper method to get language icon asset path
   String? _getLanguageIconAsset(String languageCode) {
     // Map language codes to their corresponding asset paths
@@ -87,180 +85,121 @@ class _EnhancedLanguageCardState extends State<EnhancedLanguageCard> with Single
     }
   }
   
-  // Helper method to get softer pastel colors for language icons
-  Color _getSofterPastelColor(String code) {
-    switch(code) {
-      case 'en': // English - soft blue
-        return Color(0xFF90CAF9); // Blue 200
-      case 'es': // Spanish - soft pink
-        return Color(0xFFF48FB1); // Pink 200
-      case 'uk': // Ukrainian - soft cyan
-        return Color(0xFF80DEEA); // Cyan 200
-      case 'pl': // Polish - soft green
-        return Color(0xFFA5D6A7); // Green 200
-      case 'ru': // Russian - soft red
-        return Color(0xFFEF9A9A); // Red 200
-      default:
-        return Color(0xFFB0BEC5); // Blue Grey 200
-    }
-  }
-  
-  // Helper method to get gradient for language cards
-  LinearGradient _getGradientForLanguage(String code) {
-    // Start with white as base color
-    Color startColor = Colors.white;
-    Color endColor;
-    
-    // Apply the same pattern as ModuleCard
-    switch(code) {
-      case 'en': // English
-        endColor = Colors.blue.shade50.withOpacity(0.4);
-        break;
-      case 'es': // Spanish
-        endColor = Colors.pink.shade50.withOpacity(0.4);
-        break;
-      case 'uk': // Ukrainian
-        endColor = Colors.cyan.shade50.withOpacity(0.4);
-        break;
-      case 'pl': // Polish
-        endColor = Colors.green.shade50.withOpacity(0.4);
-        break;
-      case 'ru': // Russian
-        endColor = Colors.red.shade50.withOpacity(0.4);
-        break;
-      default:
-        endColor = Colors.grey.shade50.withOpacity(0.4);
-    }
-    
-    return LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [startColor, endColor],
-      stops: [0.0, 1.0],
+  /// The language code on a grey chip, if a flag picture is missing.
+  Widget _buildFallbackFlag() {
+    return Container(
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(
+        color: AppColors.field,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        widget.languageCode.toUpperCase(),
+        style: AppTypography.caption.copyWith(
+          color: AppColors.inkSecondary,
+          fontVariations: const [FontVariation('wght', 600)],
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final selected = widget.isSelected;
+    final asset = _getLanguageIconAsset(widget.languageCode);
+    final nativeName = _nativeNames[widget.languageCode] ?? widget.language;
+    final showEnglish = nativeName != widget.language;
+
     return Opacity(
-      opacity: widget.isEnabled ? 1.0 : 0.5,
-      child: GestureDetector(
-        onTapDown: (_) => widget.isEnabled ? _controller.forward() : null,
-        onTapUp: (_) => widget.isEnabled ? _controller.reverse() : null,
-        onTapCancel: () => widget.isEnabled ? _controller.reverse() : null,
-        child: ScaleTransition(
-          scale: _scaleAnimation,
-          child: Card(
-            elevation: 3,
-            shadowColor: Colors.black.withOpacity(0.3),
-            margin: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Container(
+      opacity: widget.isEnabled || selected ? 1.0 : 0.5,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.x3),
+        child: PressScale(
+          enabled: widget.isEnabled,
+          child: DecoratedBox(
+            // The fill and shadow sit under the Material, so the shadow does
+            // not paint over the white.
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              gradient: _getGradientForLanguage(widget.languageCode),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
-                  spreadRadius: 0,
-                  blurRadius: 6,
-                  offset: Offset(0, 3),
-                ),
-              ],
+              color: selected ? AppColors.ink : AppColors.paper,
+              borderRadius: BorderRadius.circular(BentoTokens.card),
+              boxShadow: selected ? null : AppColors.shadowCard,
             ),
             child: Material(
-              color: Colors.transparent,
+              type: MaterialType.transparency,
               child: InkWell(
                 onTap: widget.onTap,
-                borderRadius: BorderRadius.circular(12),
-                splashColor: Colors.white.withOpacity(0.3),
-                highlightColor: Colors.white.withOpacity(0.2),
-                child: Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Row(
-                    children: [
-                      // Language icon with fallback to current design
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: _getLanguageIconAsset(widget.languageCode) != null
-                              ? Center(
-                                  child: Image.asset(
-                                    _getLanguageIconAsset(widget.languageCode)!,
+                borderRadius: BorderRadius.circular(BentoTokens.card),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 72),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.x4,
+                      vertical: AppSpacing.x3,
+                    ),
+                    child: Row(
+                      children: [
+                        // The mark on a tile, so the blue letters still
+                        // read on the dark row.
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: selected ? AppColors.paper : AppColors.field,
+                            borderRadius: BorderRadius.circular(AppRadius.lg),
+                          ),
+                          child: Center(
+                            child: asset != null
+                                ? Image.asset(
+                                    asset,
                                     width: 28,
                                     height: 28,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      // Fallback to current colored container design
-                                      return Container(
-                                        width: 28,
-                                        height: 28,
-                                        decoration: BoxDecoration(
-                                          color: _getSofterPastelColor(widget.languageCode),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            widget.languageCode.toUpperCase(),
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                )
-                              : Center(
-                                  child: Container(
-                                    // Fallback when no icon asset is defined
-                                    width: 28,
-                                    height: 28,
-                                    decoration: BoxDecoration(
-                                      color: _getSofterPastelColor(widget.languageCode),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        widget.languageCode.toUpperCase(),
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                        ),
-                      ),
-                      SizedBox(width: 16),
-                      // Language name
-                      Expanded(
-                        child: Text(
-                          widget.language,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                                    errorBuilder: (context, error, stackTrace) =>
+                                        _buildFallbackFlag(),
+                                  )
+                                : _buildFallbackFlag(),
                           ),
                         ),
-                      ),
-                      // Arrow icon
-                      Icon(
-                        SolarIcons.altArrowRightLinear,
-                        color: Colors.grey[400],
-                        size: 16,
-                      ),
-                    ],
+                        const SizedBox(width: AppSpacing.x4),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                nativeName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTypography.body.copyWith(
+                                  fontSize: 17,
+                                  height: 22 / 17,
+                                  color: selected ? AppColors.onSignal : AppColors.ink,
+                                  fontVariations: const [FontVariation('wght', 600)],
+                                ),
+                              ),
+                              if (showEnglish)
+                                Text(
+                                  widget.language,
+                                  maxLines: 1,
+                                  style: AppTypography.label.copyWith(
+                                    color: selected
+                                        ? AppColors.onSignal.withValues(alpha: 0.7)
+                                        : AppColors.inkSecondary,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.x2),
+                        Icon(
+                          SolarIcons.altArrowRightLinear,
+                          color: selected ? AppColors.onSignal : AppColors.inkTertiary,
+                          size: 20,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -268,7 +207,6 @@ class _EnhancedLanguageCardState extends State<EnhancedLanguageCard> with Single
           ),
         ),
       ),
-    ),
     );
   }
 }

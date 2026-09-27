@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 import '../data/state_data.dart';
+import '../theme/app_theme.dart';
+import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
 
+/// A state in the signup picker, as a Bento row: the state's picture, its
+/// name and a hint, a chevron. The chosen row is the dark `ink` row with no
+/// tick — the fill says it, as the Профиль pickers (owner: "select black, not
+/// blue… don't use check box"). The old pastel washes are gone.
 class EnhancedStateCard extends StatefulWidget {
   final String stateName;
   final bool isSelected;
@@ -20,28 +26,7 @@ class EnhancedStateCard extends StatefulWidget {
   _EnhancedStateCardState createState() => _EnhancedStateCardState();
 }
 
-class _EnhancedStateCardState extends State<EnhancedStateCard> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
-  
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: 100),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.98).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
-  }
-  
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-  
+class _EnhancedStateCardState extends State<EnhancedStateCard> {
   /// State icon assignment method following the topic icons pattern
   /// Maps state names to their corresponding asset files
   String? _getStateIconAsset(String stateName) {
@@ -170,102 +155,6 @@ class _EnhancedStateCardState extends State<EnhancedStateCard> with SingleTicker
     return stateIdIconMap[stateId];
   }
   
-  // Helper method to get softer pastel icon colors that are still visible
-  Color _getBrighterIconColor(String stateName) {
-    final int stateNameHash = stateName.length + (stateName.isNotEmpty ? stateName.codeUnitAt(0) : 0);
-    final int colorIndex = stateNameHash % 7;
-    
-    // Softer pastel colors that are still visible
-    switch (colorIndex) {
-      case 0:
-        // Soft purple
-        return Color(0xFFB39DDB); // Purple 200
-      case 1:
-        // Soft green
-        return Color(0xFFA5D6A7); // Green 200
-      case 2:
-        // Soft orange
-        return Color(0xFFFFCC80); // Orange 200
-      case 3:
-        // Soft blue
-        return Color(0xFF90CAF9); // Blue 200
-      case 4:
-        // Soft pink
-        return Color(0xFFF48FB1); // Pink 200
-      case 5:
-        // Soft yellow-green
-        return Color(0xFFE6EE9C); // Lime 200
-      case 6:
-        // Soft cyan
-        return Color(0xFF80DEEA); // Cyan 200
-      default:
-        // Default color
-        return Color(0xFF80CBC4); // Teal 200
-    }
-  }
-  
-  // Helper method to get gradient for state cards with consistent pastel colors
-  LinearGradient _getGradientForState(bool isSelected, String stateName) {
-    // Start with white as base color
-    Color startColor = Colors.white;
-    Color endColor;
-    
-    // Create a more uniform color distribution based on state names
-    // Using modulo with a prime number to distribute colors more evenly
-    final int stateNameHash = stateName.length + (stateName.isNotEmpty ? stateName.codeUnitAt(0) : 0);
-    final int colorIndex = stateNameHash % 7;
-    
-    // Softer pastel colors with consistent opacity
-    const double baseOpacity = 0.3; // Lower base opacity for all states
-    
-    switch (colorIndex) {
-      case 0:
-        // Lavender - very soft purple
-        endColor = Color(0xFFE6E6FA).withOpacity(baseOpacity);
-        break;
-      case 1:
-        // Mint - soft green
-        endColor = Color(0xFFF5FFFA).withOpacity(baseOpacity);
-        break;
-      case 2:
-        // Peach - softer orange (similar to Passenger Safety card)
-        endColor = Color(0xFFFFF0E6).withOpacity(baseOpacity);
-        break;
-      case 3:
-        // Sky - soft blue
-        endColor = Color(0xFFF0F8FF).withOpacity(baseOpacity);
-        break;
-      case 4:
-        // Rose - soft pink
-        endColor = Color(0xFFFFF0F5).withOpacity(baseOpacity);
-        break;
-      case 5:
-        // Honeydew - soft yellow-green
-        endColor = Color(0xFFF0FFF0).withOpacity(baseOpacity);
-        break;
-      case 6:
-        // Misty - soft cyan
-        endColor = Color(0xFFE0FFFF).withOpacity(baseOpacity);
-        break;
-      default:
-        // Almond - soft beige
-        endColor = Color(0xFFFFEBCD).withOpacity(baseOpacity);
-    }
-    
-    // If selected, make the color slightly more vivid but still soft
-    if (isSelected) {
-      // Increase opacity for selected state but maintain pastel tone
-      endColor = endColor.withOpacity(baseOpacity + 0.1);
-    }
-    
-    return LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [startColor, endColor],
-      stops: [0.0, 1.0],
-    );
-  }
-
   /// Build state icon widget with comprehensive fallback system
   /// Following the topic icons pattern for error handling
   /// Updated to remove grey background and optimize for transparent PNGs
@@ -280,7 +169,7 @@ class _EnhancedStateCardState extends State<EnhancedStateCard> with SingleTicker
       iconAsset = _getStateIconAssetById(stateName);
     }
     
-    return Container(
+    return SizedBox(
       width: 42,
       height: 42,
       child: ClipRRect(
@@ -302,24 +191,21 @@ class _EnhancedStateCardState extends State<EnhancedStateCard> with SingleTicker
     );
   }
 
-  /// Build fallback letter icon (original implementation)
-  /// Used when state icon assets are not available or fail to load
+  /// The state's first two letters on a grey chip, if its picture is missing.
   Widget _buildFallbackLetterIcon() {
     return Container(
       width: 42,
       height: 42,
       decoration: BoxDecoration(
-        color: _getBrighterIconColor(widget.stateName),
-        borderRadius: BorderRadius.circular(6),
+        color: AppColors.field,
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
-      child: Center(
-        child: Text(
-          widget.stateName.isNotEmpty ? widget.stateName.substring(0, 2).toUpperCase() : "",
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-          ),
+      alignment: Alignment.center,
+      child: Text(
+        widget.stateName.isNotEmpty ? widget.stateName.substring(0, 2).toUpperCase() : "",
+        style: AppTypography.label.copyWith(
+          color: AppColors.inkSecondary,
+          fontVariations: const [FontVariation('wght', 600)],
         ),
       ),
     );
@@ -327,86 +213,85 @@ class _EnhancedStateCardState extends State<EnhancedStateCard> with SingleTicker
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => _controller.forward(),
-      onTapUp: (_) => _controller.reverse(),
-      onTapCancel: () => _controller.reverse(),
-      child: ScaleTransition(
-        scale: _scaleAnimation,
-        child: Card(
-          elevation: 3,
-          shadowColor: Colors.black.withOpacity(0.3),
-          margin: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+    final selected = widget.isSelected;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.x3),
+      child: PressScale(
+        child: DecoratedBox(
+          // The fill and shadow sit under the Material, so the shadow does
+          // not paint over the white.
+          decoration: BoxDecoration(
+            color: selected ? AppColors.ink : AppColors.paper,
+            borderRadius: BorderRadius.circular(BentoTokens.card),
+            boxShadow: selected ? null : AppColors.shadowCard,
           ),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              gradient: _getGradientForState(widget.isSelected, widget.stateName),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
-                  spreadRadius: 0,
-                  blurRadius: 6,
-                  offset: Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: widget.onTap,
-                borderRadius: BorderRadius.circular(12),
-                splashColor: Colors.white.withOpacity(0.3),
-                highlightColor: Colors.white.withOpacity(0.2),
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              onTap: widget.onTap,
+              borderRadius: BorderRadius.circular(BentoTokens.card),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 72),
                 child: Padding(
-                  padding: EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.x4,
+                    vertical: AppSpacing.x3,
+                  ),
                   child: Row(
                     children: [
-                      // State icon with fallback to letter abbreviation
-                      _buildStateIcon(),
-                      SizedBox(width: 16),
-                      // State name
+                      // State icon with fallback to letter abbreviation, on a
+                      // tile so the thin outline still reads on the dark row.
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: selected ? AppColors.paper : AppColors.field,
+                          borderRadius: BorderRadius.circular(AppRadius.lg),
+                        ),
+                        alignment: Alignment.center,
+                        child: SizedBox(width: 36, height: 36, child: _buildStateIcon()),
+                      ),
+                      const SizedBox(width: AppSpacing.x4),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
                               // Convert state name to title case for display
                               widget.stateName.split(' ').map((word) => 
                                 word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}' : ''
                               ).join(' '),
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.body.copyWith(
+                                fontSize: 17,
+                                height: 22 / 17,
+                                color: selected ? AppColors.onSignal : AppColors.ink,
+                                fontVariations: const [FontVariation('wght', 600)],
                               ),
                             ),
-                            SizedBox(height: 4),
                             Text(
                               widget.subtitleText,
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 14,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.label.copyWith(
+                                color: selected
+                                    ? AppColors.onSignal.withValues(alpha: 0.7)
+                                    : AppColors.inkSecondary,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      // Checkmark for selected state
-                      if (widget.isSelected)
-                        Icon(
-                          SolarIcons.checkCircleBold,
-                          color: Colors.green,
-                          size: 24,
-                        ),
-                      // Arrow icon if not selected
-                      if (!widget.isSelected)
-                        Icon(
+                      if (!selected) ...[
+                        const SizedBox(width: AppSpacing.x2),
+                        const Icon(
                           SolarIcons.altArrowRightLinear,
-                          color: Colors.grey[400],
-                          size: 16,
+                          color: AppColors.inkTertiary,
+                          size: 20,
                         ),
+                      ],
                     ],
                   ),
                 ),

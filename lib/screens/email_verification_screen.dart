@@ -3,7 +3,11 @@ import 'package:provider/provider.dart';
 import '../services/email_verification_handler.dart';
 import '../providers/auth_provider.dart';
 import '../localization/app_localizations.dart';
+import '../theme/app_theme.dart';
+import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
+import '../widgets/bento_auth_parts.dart';
+import '../widgets/bento_result_parts.dart';
 
 class EmailVerificationScreen extends StatefulWidget {
   final String oobCode;
@@ -35,8 +39,9 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
       duration: Duration(milliseconds: 600),
       vsync: this,
     );
-    _scaleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.elasticOut),
+    // One settle-in as the result lands — no bounce (AppMotion.enter).
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: AppMotion.enter),
     );
     
     // Start processing verification
@@ -118,123 +123,107 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
     
     return Scaffold(
-      backgroundColor: Color(0xFFF5F7FA),
+      backgroundColor: AppColors.field,
+      appBar: bentoHeadingAppBar(
+        title: _getHeaderTitle(localizations),
+        onBack: _goToProfile,
+      ),
       body: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.all(24.0),
-          child: Column(
-            children: [
-              // Header with back button
-              Row(
-                children: [
-                  IconButton(
-                    icon: Icon(SolarIcons.arrowLeftLinear, color: Colors.grey[600]),
-                    onPressed: _goToProfile,
-                  ),
-                  Expanded(
-                    child: Text(
-                      _getHeaderTitle(localizations),
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[800],
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.x4 + AppSpacing.x1,
+              vertical: AppSpacing.x6,
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 400),
+              child: Container(
+                padding: const EdgeInsets.all(AppSpacing.x6),
+                decoration: BoxDecoration(
+                  color: AppColors.paper,
+                  borderRadius: BorderRadius.circular(BentoTokens.card),
+                  boxShadow: AppColors.shadowCard,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // The status on its disc, settling in once as it lands
+                    AnimatedBuilder(
+                      animation: _scaleAnimation,
+                      builder: (context, child) {
+                        return Transform.scale(
+                          scale: _isProcessing || reduceMotion ? 1.0 : _scaleAnimation.value,
+                          child: _buildStatusIcon(),
+                        );
+                      },
+                    ),
+                    
+                    const SizedBox(height: AppSpacing.x4 + AppSpacing.x1),
+                    
+                    // Title — one line; a long translation shrinks rather than wraps
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        _getStatusTitle(localizations),
+                        maxLines: 1,
+                        style: AppTypography.title.copyWith(
+                          fontSize: 22,
+                          height: 28 / 22,
+                          color: AppColors.ink,
+                          fontVariations: const [FontVariation('wght', 700)],
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    
+                    const SizedBox(height: AppSpacing.x2),
+                    
+                    // Message
+                    Text(
+                      _getStatusMessage(localizations),
+                      style: AppTypography.body.copyWith(
+                        fontSize: 15,
+                        height: 22 / 15,
+                        color: AppColors.inkSecondary,
                       ),
                       textAlign: TextAlign.center,
                     ),
-                  ),
-                  SizedBox(width: 48), // Balance the back button
-                ],
-              ),
-              
-              SizedBox(height: 20),
-              
-              Expanded(
-                child: Center(
-                  child: Container(
-                    width: double.infinity,
-                    constraints: BoxConstraints(maxWidth: 400),
-                    child: Card(
-                      elevation: 8,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Padding(
-                        padding: EdgeInsets.all(32.0),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Animated icon
-                            AnimatedBuilder(
-                              animation: _scaleAnimation,
-                              builder: (context, child) {
-                                return Transform.scale(
-                                  scale: _isProcessing ? 1.0 : _scaleAnimation.value,
-                                  child: _buildStatusIcon(),
-                                );
-                              },
-                            ),
-                            
-                            SizedBox(height: 24),
-                            
-                            // Title
-                            Text(
-                              _getStatusTitle(localizations),
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey[800],
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            
-                            SizedBox(height: 12),
-                            
-                            // Message
-                            Text(
-                              _getStatusMessage(localizations),
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                                height: 1.4,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            
-                            SizedBox(height: 24),
-                            
-                            // Action buttons
-                            _buildActionButtons(localizations),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+                    
+                    const SizedBox(height: AppSpacing.x6),
+                    
+                    // Action buttons
+                    _buildActionButtons(localizations),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
   
+  /// Blue while it works, green once verified, red if it failed.
   Widget _buildStatusIcon() {
     if (_isProcessing) {
-      return Container(
-        width: 80,
-        height: 80,
-        decoration: BoxDecoration(
-          color: Color(0xFFFF6B35),
-          shape: BoxShape.circle,
-        ),
-        child: Center(
-          child: SizedBox(
+      return Center(
+        child: Container(
+          width: 72,
+          height: 72,
+          decoration: const BoxDecoration(
+            color: AppColors.signal50,
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: const SizedBox(
             width: 30,
             height: 30,
             child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              color: AppColors.signal,
               strokeWidth: 3,
             ),
           ),
@@ -242,32 +231,16 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
       );
     } else if (_result == EmailVerificationResult.success || 
                _result == EmailVerificationResult.successButSignedOut) {
-      return Container(
-        width: 80,
-        height: 80,
-        decoration: BoxDecoration(
-          color: Color(0xFF4CAF50),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(
-          SolarIcons.checkLinear,
-          color: Colors.white,
-          size: 40,
-        ),
+      return bentoAuthBadge(
+        SolarIcons.checkLinear,
+        tone: AppColors.guide,
+        surface: AppColors.guideSurface,
       );
     } else {
-      return Container(
-        width: 80,
-        height: 80,
-        decoration: BoxDecoration(
-          color: Color(0xFFFF6B35),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(
-          SolarIcons.closeLinear,
-          color: Colors.white,
-          size: 40,
-        ),
+      return bentoAuthBadge(
+        SolarIcons.closeLinear,
+        tone: AppColors.stop,
+        surface: AppColors.stopSurface,
       );
     }
   }
@@ -276,95 +249,29 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
     if (_isProcessing) {
       return SizedBox.shrink(); // No buttons while processing
     } else if (_result == EmailVerificationResult.success) {
-      return SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          onPressed: _goToProfile,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Color(0xFF667eea),
-            foregroundColor: Colors.white,
-            padding: EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            elevation: 2,
-          ),
-          child: Text(
-            localizations.translate('go_to_profile') ?? 'Go To Profile',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
+      return BentoAuthPrimaryButton(
+        label: localizations.translate('go_to_profile') ?? 'Go To Profile',
+        onPressed: _goToProfile,
       );
     } else if (_result == EmailVerificationResult.successButSignedOut) {
-      return SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Color(0xFF667eea),
-            foregroundColor: Colors.white,
-            padding: EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            elevation: 2,
-          ),
-          child: Text(
-            localizations.translate('go_to_signin') ?? 'Go to Sign In',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
+      return BentoAuthPrimaryButton(
+        label: localizations.translate('go_to_signin') ?? 'Go to Sign In',
+        onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
       );
     } else {
       return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _retryVerification,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFF667eea),
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 2,
-              ),
-              child: Text(
-                localizations.translate('try_again') ?? 'Try Again',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
+          BentoAuthPrimaryButton(
+            label: localizations.translate('try_again') ?? 'Try Again',
+            onPressed: _retryVerification,
           ),
           
-          SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.x2),
           
-          SizedBox(
-            width: double.infinity,
-            child: TextButton(
-              onPressed: _goToProfile,
-              style: TextButton.styleFrom(
-                foregroundColor: Color(0xFF667eea),
-                padding: EdgeInsets.symmetric(vertical: 12),
-              ),
-              child: Text(
-                localizations.translate('go_to_profile') ?? 'Go To Profile',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
+          BentoAuthLink(
+            label: localizations.translate('go_to_profile') ?? 'Go To Profile',
+            onPressed: _goToProfile,
           ),
         ],
       );

@@ -13,6 +13,10 @@ import '../services/service_locator_extensions.dart';
 import '../providers/subscription_provider.dart';
 import '../services/analytics_service.dart';
 import '../widgets/enhanced_state_card.dart';
+import '../widgets/bento_auth_parts.dart';
+import '../widgets/bento_result_parts.dart';
+import '../theme/app_theme.dart';
+import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
 
 class StateSelectionScreen extends StatefulWidget {
@@ -23,16 +27,12 @@ class StateSelectionScreen extends StatefulWidget {
   _StateSelectionScreenState createState() => _StateSelectionScreenState();
 }
 
-class _StateSelectionScreenState extends State<StateSelectionScreen> with TickerProviderStateMixin {
+class _StateSelectionScreenState extends State<StateSelectionScreen> {
   final TextEditingController _searchController = TextEditingController();
   String? _selectedState;
   bool _showStateList = true; // Show state list by default
   List<String> _filteredStates = [];
   AppLocalizations? _localizations;
-  
-  // Animation controller for continue button press effect
-  late AnimationController _continueButtonController;
-  late Animation<double> _continueButtonScaleAnimation;
 
   // Analytics tracking variables
   DateTime? _stateSelectionStartTime;
@@ -48,15 +48,6 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> with Ticker
     // Initialize filtered states with all states
     _filteredStates = List.from(_allStates);
     print('🔧 [STATE SCREEN] initState - filteredStates initialized with ${_filteredStates.length} states');
-    
-    // Initialize animation controller for continue button
-    _continueButtonController = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: 100),
-    );
-    _continueButtonScaleAnimation = Tween<double>(begin: 1.0, end: 0.98).animate(
-      CurvedAnimation(parent: _continueButtonController, curve: Curves.easeInOut),
-    );
     
     // No longer forcing language to English
     // This allows the selected language from the Language Selection screen to be used
@@ -78,7 +69,6 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> with Ticker
   @override
   void dispose() {
     _searchController.dispose();
-    _continueButtonController.dispose();
     super.dispose();
   }
 
@@ -196,29 +186,22 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> with Ticker
         
         return Scaffold(
           key: ValueKey('state_selection_screen_${languageProvider.language}_${DateTime.now().millisecondsSinceEpoch}'),
-          appBar: AppBar(
-            title: Text(
-              title,
-              key: ValueKey('state_selection_title_${languageProvider.language}_${DateTime.now().millisecondsSinceEpoch}'),
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            elevation: 0,
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            foregroundColor: Colors.black,
-            centerTitle: true,
-            leading: IconButton(
-              icon: Icon(SolarIcons.arrowLeftLinear),
-              onPressed: () {
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (context) => LanguageSelectionScreen(),
-                  ),
-                );
-              },
-            ),
+          backgroundColor: AppColors.field,
+          appBar: bentoHeadingAppBar(
+            title: title,
+            onBack: () {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => LanguageSelectionScreen(),
+                ),
+              );
+            },
             // No skip button - state selection is mandatory
           ),
+          // The bottom bar runs under the home indicator; its own padding
+          // keeps the button clear of it.
           body: SafeArea(
+            bottom: false,
             child: Column(
               children: [
                 _buildStateListView(),
@@ -232,142 +215,135 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> with Ticker
   }
 
   Widget _buildStateListView() {
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    OutlineInputBorder ring(Color color, double width) => OutlineInputBorder(
+          borderRadius: BorderRadius.circular(BentoTokens.card),
+          borderSide: BorderSide(color: color, width: width),
+        );
     return Expanded(
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Section header
-          _buildSectionHeader(_translate('select_state', Provider.of<LanguageProvider>(context, listen: false))),
+          _buildSectionHeader(_translate('select_state', languageProvider)),
           
-          // Enhanced search bar styled like Language Selection
-          Container(
-            margin: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
-                  spreadRadius: 0,
-                  blurRadius: 3,
-                  offset: Offset(0, 1),
-                ),
-              ],
-            ),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: _translate('search_state', Provider.of<LanguageProvider>(context, listen: false)),
-                hintStyle: TextStyle(color: Colors.grey[400]),
-                contentPadding: EdgeInsets.symmetric(vertical: 16),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: Colors.white,
-                prefixIcon: Container(
-                  width: 42,
-                  height: 42,
-                  padding: EdgeInsets.all(10),
-                  child: Icon(
+          // Search as a white panel on the field page; a blue ring while typing.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.x4, 0, AppSpacing.x4, AppSpacing.x3),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(BentoTokens.card),
+                boxShadow: AppColors.shadowCard,
+              ),
+              child: TextField(
+                controller: _searchController,
+                cursorColor: AppColors.signal,
+                decoration: InputDecoration(
+                  hintText: _translate('search_state', languageProvider),
+                  hintStyle: AppTypography.body.copyWith(color: AppColors.inkTertiary),
+                  contentPadding: const EdgeInsets.symmetric(vertical: AppSpacing.x4),
+                  border: ring(Colors.transparent, 0),
+                  enabledBorder: ring(Colors.transparent, 0),
+                  focusedBorder: ring(AppColors.signal, 1.5),
+                  filled: true,
+                  fillColor: AppColors.paper,
+                  prefixIcon: const Icon(
                     SolarIcons.magniferLinear,
-                    color: Color(0xFF2196F3),
-                    size: 26,
+                    color: AppColors.inkSecondary,
+                    size: 22,
                   ),
-                ),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? Container(
-                        margin: EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          icon: Icon(
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(
                             SolarIcons.closeLinear,
-                            color: Colors.grey[600],
-                            size: 18,
+                            color: AppColors.inkSecondary,
+                            size: 20,
                           ),
-                          padding: EdgeInsets.zero,
-                          constraints: BoxConstraints(),
                           onPressed: () {
                             _searchController.clear();
                             _filterStates('');
                           },
-                        ),
-                      )
-                    : null,
+                        )
+                      : null,
+                ),
+                style: AppTypography.body.copyWith(
+                  fontSize: 16,
+                  color: AppColors.ink,
+                ),
+                onChanged: _filterStates,
               ),
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
-              onChanged: _filterStates,
             ),
           ),
-          // Enhanced state list with EnhancedStateCard widget
+          // The states as Bento rows (EnhancedStateCard)
           Expanded(
             child: _filteredStates.isEmpty
                 ? Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          SolarIcons.magniferBugLinear,
-                          size: 70,
-                          color: Colors.grey[300],
+                        Container(
+                          width: 72,
+                          height: 72,
+                          decoration: const BoxDecoration(
+                            color: AppColors.paper,
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: const Icon(
+                            SolarIcons.magniferBugLinear,
+                            size: 34,
+                            color: AppColors.inkTertiary,
+                          ),
                         ),
-                        SizedBox(height: 16),
+                        const SizedBox(height: AppSpacing.x4),
                         Text(
-                          _translate('no_states_found', Provider.of<LanguageProvider>(context, listen: false)),
-                          style: TextStyle(
-                            color: Colors.grey[500],
-                            fontSize: 18,
+                          _translate('no_states_found', languageProvider),
+                          style: AppTypography.body.copyWith(
+                            fontSize: 16,
+                            color: AppColors.inkSecondary,
                           ),
                         ),
                       ],
                     ),
                   )
-                : Column(
-                    children: [
-                      Expanded(
-                        child: ListView.builder(
-                          itemCount: _filteredStates.length,
-                          padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                          itemBuilder: (context, index) {
-                            final state = _filteredStates[index];
-                            final isSelected = state == _selectedState;
-                            final subtitleText = isSelected 
-                                ? _translate('selected', Provider.of<LanguageProvider>(context, listen: false)) 
-                                : _translate('tap_to_select', Provider.of<LanguageProvider>(context, listen: false));
-                            
-                            // Use the new enhanced state card
-                            return EnhancedStateCard(
-                              stateName: state,
-                              isSelected: isSelected,
-                              subtitleText: subtitleText,
-                              onTap: () {
-                                setState(() {
-                                  _selectedState = state;
-                                });
-                              },
-                            );
-                          },
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
-                        child: Text(
-                          _translate('more_states_coming', Provider.of<LanguageProvider>(context, listen: false)),
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 12,
-                            fontStyle: FontStyle.italic,
+                : ListView.builder(
+                    // The last row carries the "more states" note, so it
+                    // scrolls with the list instead of pinning a line.
+                    itemCount: _filteredStates.length + 1,
+                    padding: EdgeInsets.fromLTRB(
+                      AppSpacing.x4, AppSpacing.x1, AppSpacing.x4,
+                      AppSpacing.x4 + (_selectedState == null ? MediaQuery.paddingOf(context).bottom : 0)),
+                    itemBuilder: (context, index) {
+                      if (index == _filteredStates.length) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.x2),
+                          child: Text(
+                            _translate('more_states_coming', languageProvider),
+                            style: AppTypography.label.copyWith(
+                              color: AppColors.inkTertiary,
+                            ),
+                            textAlign: TextAlign.center,
                           ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ],
+                        );
+                      }
+                      final state = _filteredStates[index];
+                      final isSelected = state == _selectedState;
+                      final subtitleText = isSelected 
+                          ? _translate('selected', languageProvider) 
+                          : _translate('tap_to_select', languageProvider);
+                      
+                      return EnhancedStateCard(
+                        stateName: state,
+                        isSelected: isSelected,
+                        subtitleText: subtitleText,
+                        onTap: () {
+                          setState(() {
+                            _selectedState = state;
+                          });
+                        },
+                      );
+                    },
                   ),
           ),
         ],
@@ -376,91 +352,71 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> with Ticker
   }
 
   Widget _buildSectionHeader(String title) {
-    return Container(
-      margin: EdgeInsets.symmetric(vertical: 16),
-      child: Row(
-        children: [
-          Expanded(
-            child: Divider(color: Colors.grey[300]),
-          ),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              title,
-              style: TextStyle(
-                color: Colors.grey[500],
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Divider(color: Colors.grey[300]),
-          ),
-        ],
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.x4 + AppSpacing.x1, AppSpacing.x1, AppSpacing.x4, AppSpacing.x3),
+      child: Text(
+        title,
+        style: AppTypography.body.copyWith(
+          fontSize: 15,
+          color: AppColors.inkSecondary,
+        ),
       ),
     );
   }
 
+  /// The pick and the way on, as a white bar along the bottom: which state is
+  /// chosen on the left, the dark Continue pill on the right.
   Widget _buildContinueButton() {
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final stateName = _selectedState!.split(' ').map((word) =>
+      word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}' : ''
+    ).join(' ');
     return Container(
-      padding: EdgeInsets.all(16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.x4 + AppSpacing.x1, AppSpacing.x4, AppSpacing.x4,
+        AppSpacing.x4 + MediaQuery.paddingOf(context).bottom),
+      decoration: BoxDecoration(
+        color: AppColors.paper,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(BentoTokens.card)),
+        boxShadow: AppColors.shadowRaised,
+      ),
+      child: Row(
         children: [
-          _buildSectionHeader(_translate('selected_state', Provider.of<LanguageProvider>(context, listen: false))),
-          
-          // Selected state card using EnhancedStateCard
-          EnhancedStateCard(
-            stateName: _selectedState!,
-            isSelected: true,
-            subtitleText: _translate('selected_state', Provider.of<LanguageProvider>(context, listen: false)),
-            onTap: () {}, // No action needed here as it's already selected
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _translate('selected_state', languageProvider),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.label.copyWith(color: AppColors.inkSecondary),
+                ),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    stateName,
+                    maxLines: 1,
+                    style: AppTypography.title.copyWith(
+                      fontSize: 20,
+                      height: 26 / 20,
+                      color: AppColors.ink,
+                      fontVariations: const [FontVariation('wght', 600)],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-          
-          // Styled continue button that matches Log In button
-          GestureDetector(
-            onTapDown: (_) => _continueButtonController.forward(),
-            onTapUp: (_) => _continueButtonController.reverse(),
-            onTapCancel: () => _continueButtonController.reverse(),
-            child: ScaleTransition(
-              scale: _continueButtonScaleAnimation,
-              child: Container(
-                margin: EdgeInsets.only(top: 8),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Colors.white, Colors.indigo.shade50.withOpacity(0.7)],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () => _continueToApp(context),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      alignment: Alignment.center,
-                      child: Text(
-                        _translate('continue', Provider.of<LanguageProvider>(context, listen: false)),
-                        style: TextStyle(
-                          color: Colors.indigo.shade700,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+          const SizedBox(width: AppSpacing.x3),
+          SizedBox(
+            width: 168,
+            child: BentoAuthPrimaryButton(
+              label: _translate('continue', languageProvider),
+              onPressed: () => _continueToApp(context),
             ),
           ),
         ],

@@ -81,6 +81,12 @@ class TrialStatusWidget extends StatelessWidget {
   ///
   /// A small borderless card — bold label, the detail in a pill, and the
   /// action as a solid blue pill.
+  ///
+  /// [stacked] is for a detail that is a sentence, not a value (the no-plan
+  /// state, 2026-09-26): the pill was made for «Дней осталось: 3» and wrapped a
+  /// sentence into a five-line bold blob, and the long action label beside it
+  /// squeezed the title small. Stacked, the sentence is plain grey text under
+  /// the title and the action a full-width pill below.
   Widget _buildRow({
     required BuildContext context,
     required String iconAsset,
@@ -90,9 +96,109 @@ class TrialStatusWidget extends StatelessWidget {
     VoidCallback? onAction,
     Color tone = AppColors.inkSecondary,
     Color toneSurface = AppColors.field,
+    bool stacked = false,
   }) {
     final bool hasSubtitle = subtitle != null && subtitle.trim().isNotEmpty;
     final bool hasAction = actionLabel != null && onAction != null;
+
+    final actionStyle = FilledButton.styleFrom(
+      minimumSize: const Size(0, 44),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.x4,
+      ),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      shape: const StadiumBorder(),
+    );
+    Widget actionText(String label) => Text(
+          label,
+          style: AppTypography.label.copyWith(
+            fontSize: 13,
+            color: AppColors.onSignal,
+            fontVariations: const [FontVariation('wght', 700)],
+          ),
+        );
+    final icon = Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: toneSurface,
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: AppIcons.icon(iconAsset, size: 18, color: tone),
+    );
+    final titleText = FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: Text(
+        title,
+        maxLines: 1,
+        style: AppTypography.label.copyWith(
+          color: AppColors.ink,
+          fontVariations: const [FontVariation('wght', 700)],
+        ),
+      ),
+    );
+
+    if (stacked) {
+      return Container(
+        padding: const EdgeInsets.all(AppSpacing.x4),
+        decoration: BoxDecoration(
+          color: AppColors.paper,
+          borderRadius: BorderRadius.circular(BentoTokens.card),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0F0E1F4D),
+              blurRadius: 24,
+              offset: Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              crossAxisAlignment: hasSubtitle
+                  ? CrossAxisAlignment.start
+                  : CrossAxisAlignment.center,
+              children: [
+                icon,
+                const SizedBox(width: AppSpacing.x3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      titleText,
+                      if (hasSubtitle) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: AppTypography.body.copyWith(
+                            fontSize: 14,
+                            height: 20 / 14,
+                            color: AppColors.inkSecondary,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (hasAction) ...[
+              const SizedBox(height: AppSpacing.x3),
+              FilledButton(
+                onPressed: onAction,
+                style: actionStyle,
+                child: actionText(actionLabel),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.x4),
@@ -109,16 +215,7 @@ class TrialStatusWidget extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: toneSurface,
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: AppIcons.icon(iconAsset, size: 18, color: tone),
-          ),
+          icon,
           const SizedBox(width: AppSpacing.x3),
           Expanded(
             child: Column(
@@ -127,18 +224,7 @@ class TrialStatusWidget extends StatelessWidget {
               children: [
                 // One line (owner, 2026-09-26): a long title — «Пробный
                 // период активен» — shrinks slightly rather than wrapping.
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    title,
-                    maxLines: 1,
-                    style: AppTypography.label.copyWith(
-                      color: AppColors.ink,
-                      fontVariations: const [FontVariation('wght', 700)],
-                    ),
-                  ),
-                ),
+                titleText,
                 if (hasSubtitle) ...[
                   const SizedBox(height: AppSpacing.x1),
                   Container(
@@ -171,22 +257,8 @@ class TrialStatusWidget extends StatelessWidget {
             const SizedBox(width: AppSpacing.x2),
             FilledButton(
               onPressed: onAction,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(0, 44),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.x4,
-                ),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                shape: const StadiumBorder(),
-              ),
-              child: Text(
-                actionLabel,
-                style: AppTypography.label.copyWith(
-                  fontSize: 13,
-                  color: AppColors.onSignal,
-                  fontVariations: const [FontVariation('wght', 700)],
-                ),
-              ),
+              style: actionStyle,
+              child: actionText(actionLabel),
             ),
           ],
         ],
@@ -256,6 +328,7 @@ class TrialStatusWidget extends StatelessWidget {
       subtitle: message,
       tone: AppColors.warn,
       toneSurface: AppColors.warnSurface,
+      stacked: true,
       // An unverified email is fixed in the app, not on the paywall, so only
       // the genuine no-subscription case offers to subscribe.
       actionLabel: needsVerification
@@ -298,6 +371,9 @@ class TrialStatusWidget extends StatelessWidget {
               ? AppColors.warn
               : AppColors.warn,
       toneSurface: isExpired ? AppColors.stopSurface : AppColors.warnSurface,
+      // Expired, the detail is a sentence («Потрібна підписка для
+      // продовження»), not the days-left value the pill is for.
+      stacked: isExpired,
       actionLabel: localizations.translate('upgrade_now'),
       onAction: () => Navigator.pushNamed(context, '/subscription'),
     );
@@ -316,6 +392,7 @@ class TrialStatusWidget extends StatelessWidget {
       subtitle: localizations.translate('renew_to_continue'),
       tone: AppColors.stop,
       toneSurface: AppColors.stopSurface,
+      stacked: true,
       actionLabel: localizations.translate('renew_now'),
       onAction: () => Navigator.pushNamed(context, '/subscription'),
     );

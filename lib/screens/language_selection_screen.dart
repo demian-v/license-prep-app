@@ -6,6 +6,11 @@ import '../providers/language_provider.dart';
 import '../localization/app_localizations.dart';
 import '../widgets/enhanced_language_card.dart';
 import '../services/analytics_service.dart';
+import '../theme/app_theme.dart';
+import '../theme/bento_tokens.dart';
+import '../theme/solar_icons.dart';
+import '../widgets/bento_auth_parts.dart';
+import '../main.dart' show navigatorKey;
 import 'state_selection_screen.dart';
 
 class LanguageSelectionScreen extends StatefulWidget {
@@ -14,6 +19,21 @@ class LanguageSelectionScreen extends StatefulWidget {
 }
 
 class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
+  /// The language (English name) being applied, while a pick is in flight.
+  ///
+  /// Risk #77. A pick that changes the language rebuilds the whole app —
+  /// `MaterialApp` is keyed by language (`main.dart`) — so this screen is
+  /// thrown away and built again from `home` while the pick is still being
+  /// saved. The new copy used to run `_verifyUserDefaults`, see the new
+  /// language, call it a bad default and put English back; the old copy, now
+  /// unmounted, skipped its navigation. Only English ever got through.
+  ///
+  /// So the pick lives here, outside any one State: a copy built while it is
+  /// set shows the overlay and leaves the defaults alone, and the pick
+  /// navigates through [navigatorKey], which reaches whichever navigator is
+  /// live.
+  static final ValueNotifier<String?> _pickInProgress = ValueNotifier(null);
+
   // Analytics tracking variables
   DateTime? _selectionStartTime;
   String? _initialLanguage;
@@ -31,6 +51,18 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
     final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
     _initialLanguage = languageProvider.language;
     
+    // Built again mid-pick (the language change rebuilt the app): wait for
+    // the pick to finish instead of starting over — no second "started"
+    // event, and no reset of the language just chosen.
+    _pickInProgress.addListener(_onPickInProgressChanged);
+    final pendingPick = _pickInProgress.value;
+    if (pendingPick != null) {
+      debugPrint('🔁 [LANGUAGE SCREEN] Rebuilt while "$pendingPick" is being applied — waiting for it');
+      _isLoading = true;
+      _selectedLanguageName = pendingPick;
+      return;
+    }
+    
     // Log selection started
     analyticsService.logLanguageSelectionStarted(
       selectionContext: 'signup',
@@ -44,6 +76,20 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
     });
   }
   
+  /// A pick finished or failed: drop the overlay (on success the screen is
+  /// being replaced by state selection anyway).
+  void _onPickInProgressChanged() {
+    if (_pickInProgress.value == null && mounted && _isLoading) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pickInProgress.removeListener(_onPickInProgressChanged);
+    super.dispose();
+  }
+
   Future<void> _verifyUserDefaults(BuildContext context) async {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -99,73 +145,84 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
   Widget build(BuildContext context) {
     debugPrint('🏳️‍🌈 [LANGUAGE SCREEN] Building language selection screen');
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Language Selection', // This remains hardcoded in English as specified
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        elevation: 0,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: Colors.black,
-        centerTitle: true,
-        automaticallyImplyLeading: false, // Prevent automatic back button
-      ),
-      body: SafeArea(
-        child: Stack(
-          children: [
-            SingleChildScrollView(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+      backgroundColor: AppColors.field,
+      // The overlay's dim covers the whole screen, status bar included, so
+      // the Stack sits outside the SafeArea — and expands, or it is only as
+      // tall as the list and the dim stops short of the bottom.
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.x4 + AppSpacing.x1,
+                AppSpacing.x8,
+                AppSpacing.x4 + AppSpacing.x1,
+                AppSpacing.x6,
+              ),
+              child: Consumer<LanguageProvider>(
+                builder: (context, languageProvider, _) {
+                  final blocks = <Widget>[
+                    bentoAuthBadge(SolarIcons.globalLinear),
+                    const SizedBox(height: AppSpacing.x4),
                     _buildSectionHeader('Select your language'), // This remains hardcoded in English as specified
-                    SizedBox(height: 8),
-                    Consumer<LanguageProvider>(
-                      builder: (context, languageProvider, _) => Column(
-                        children: [
-                          _buildLanguageButton(context, 'English', 'en'),
-                          _buildLanguageButton(context, 'Spanish', 'es'),
-                          _buildLanguageButton(context, 'Ukrainian', 'uk'),
-                          _buildLanguageButton(context, 'Polish', 'pl'),
-                          _buildLanguageButton(context, 'Russian', 'ru'),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                    _buildLanguageButton(context, 'English', 'en'),
+                    _buildLanguageButton(context, 'Spanish', 'es'),
+                    _buildLanguageButton(context, 'Ukrainian', 'uk'),
+                    _buildLanguageButton(context, 'Polish', 'pl'),
+                    _buildLanguageButton(context, 'Russian', 'ru'),
+                  ];
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var i = 0; i < blocks.length; i++)
+                        StaggerIn(
+                          index: i,
+                          count: blocks.length,
+                          curve: BentoTokens.curve,
+                          child: blocks[i],
+                        ),
+                    ],
+                  );
+                },
               ),
             ),
-            // Loading overlay
-            if (_isLoading) _buildLoadingOverlay(),
-          ],
-        ),
+          ),
+          // Loading overlay
+          if (_isLoading) Positioned.fill(child: _buildLoadingOverlay()),
+        ],
       ),
     );
   }
 
+  /// The page's heading: the screen's name, then the ask under it — both
+  /// English, since no language has been chosen yet.
   Widget _buildSectionHeader(String title) {
-    return Container(
-      margin: EdgeInsets.symmetric(vertical: 16),
-      child: Row(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.x6),
+      child: Column(
         children: [
-          Expanded(
-            child: Divider(color: Colors.grey[300]),
-          ),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
+          FittedBox(
+            fit: BoxFit.scaleDown,
             child: Text(
-              title,
-              style: TextStyle(
-                color: Colors.grey[500],
-                fontWeight: FontWeight.w500,
-                fontSize: 16,
+              'Language Selection', // This remains hardcoded in English as specified
+              maxLines: 1,
+              style: AppTypography.title.copyWith(
+                fontSize: 26,
+                height: 32 / 26,
+                color: AppColors.ink,
+                fontVariations: const [FontVariation('wght', 700)],
               ),
-              textAlign: TextAlign.center,
             ),
           ),
-          Expanded(
-            child: Divider(color: Colors.grey[300]),
+          const SizedBox(height: AppSpacing.x1),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: AppTypography.body.copyWith(
+              fontSize: 15,
+              color: AppColors.inkSecondary,
+            ),
           ),
         ],
       ),
@@ -174,48 +231,43 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
 
   Widget _buildLoadingOverlay() {
     return Container(
-      color: Colors.black.withOpacity(0.5),
+      color: AppColors.ink.withValues(alpha: 0.4),
       child: Center(
         child: Container(
-          padding: EdgeInsets.all(24),
-          margin: EdgeInsets.symmetric(horizontal: 40),
+          padding: const EdgeInsets.all(AppSpacing.x6),
+          margin: const EdgeInsets.symmetric(horizontal: 40),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 10,
-                offset: Offset(0, 4),
-              ),
-            ],
+            color: AppColors.paper,
+            borderRadius: BorderRadius.circular(BentoTokens.card),
+            boxShadow: AppColors.shadowRaised,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.indigo.shade400),
-                strokeWidth: 4,
+              const SizedBox(
+                width: 36,
+                height: 36,
+                child: CircularProgressIndicator(
+                  color: AppColors.signal,
+                  strokeWidth: 3.5,
+                ),
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: AppSpacing.x4 + AppSpacing.x1),
               Text(
                 _selectedLanguageName != null
                     ? 'Setting up $_selectedLanguageName...'
                     : 'Please wait...',
-                style: TextStyle(
+                style: AppTypography.body.copyWith(
                   fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black87,
+                  color: AppColors.ink,
+                  fontVariations: const [FontVariation('wght', 600)],
                 ),
                 textAlign: TextAlign.center,
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.x2),
               Text(
                 'This may take a few seconds',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
+                style: AppTypography.label.copyWith(color: AppColors.inkSecondary),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -251,6 +303,7 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
       language: language,
       languageCode: code,
       isEnabled: !_isLoading,
+      isSelected: _isLoading && _selectedLanguageName == language,
       onTap: _isLoading ? null : () async {
         // Set loading state
         setState(() {
@@ -261,10 +314,16 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
         // Visual feedback
         ScaffoldMessenger.of(context).clearSnackBars();
         
+        // Survives this screen being rebuilt by the language change (#77).
+        _pickInProgress.value = language;
+        
         try {
           // Get current language before change
           final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
           final previousLanguage = languageProvider.language;
+          // Read before any await: the language change below can unmount
+          // this screen, and a lookup through its context would then throw.
+          final authProvider = Provider.of<AuthProvider>(context, listen: false);
           
           // Update language provider
           print('🔄 [LANGUAGE SCREEN] Setting language to: $code');
@@ -274,7 +333,6 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
           print('✅ [LANGUAGE SCREEN] Language set to: ${languageProvider.language}');
           
           // Update auth provider
-          final authProvider = Provider.of<AuthProvider>(context, listen: false);
           await authProvider.updateUserLanguage(code);
           print('✅ [LANGUAGE SCREEN] User language updated in auth provider');
           
@@ -297,15 +355,18 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
           print('⏳ [LANGUAGE SCREEN] Waiting for language to propagate...');
           await Future.delayed(Duration(milliseconds: 800));
           
-          if (context.mounted) {
+          // The live navigator, not this screen's: if the language changed,
+          // this screen's context belongs to the app that was thrown away.
+          final navigator = navigatorKey.currentState;
+          if (navigator != null && navigator.mounted) {
             // Pop all routes except first one
-            Navigator.of(context).popUntil((route) => route.isFirst);
+            navigator.popUntil((route) => route.isFirst);
             
             print('🔍 [LANGUAGE SCREEN] Current language before navigation: ${languageProvider.language}');
             print('🔍 [LANGUAGE SCREEN] About to navigate to StateSelectionScreen');
             
             // Use pushReplacement with unique key to force rebuild
-            Navigator.of(context).pushReplacement(
+            navigator.pushReplacement(
               PageRouteBuilder(
                 settings: RouteSettings(
                   name: 'state_selection_${code}_${DateTime.now().millisecondsSinceEpoch}'
@@ -329,13 +390,21 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
           debugPrint('📊 Analytics: language_change_failed logged (signup: $code)');
           
           print('🚨 [LANGUAGE SCREEN] Error updating language: $e');
-          // Show error snackbar
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error selecting language: $e'), // Error message in English
-              backgroundColor: Colors.red,
-            ),
-          );
+          // The overlay used to stay up for good after a failure. Clear it,
+          // here and — through the listener — on a copy built mid-pick.
+          if (mounted) setState(() => _isLoading = false);
+          // Show error snackbar, through the live app (see above)
+          final messengerContext = navigatorKey.currentContext;
+          if (messengerContext != null) {
+            ScaffoldMessenger.maybeOf(messengerContext)?.showSnackBar(
+              SnackBar(
+                content: Text('Error selecting language: $e'), // Error message in English
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        } finally {
+          _pickInProgress.value = null;
         }
       },
     );

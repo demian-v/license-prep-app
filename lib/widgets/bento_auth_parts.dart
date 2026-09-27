@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
+import 'bento_question_parts.dart';
 
 /// The Bento pieces the sign-in screens share (login, signup, and the
 /// password-reset pages that follow). Presentation only: each screen keeps
@@ -24,6 +25,49 @@ Widget bentoAuthLogo(String fallbackTitle) {
             color: AppColors.signal,
             fontVariations: const [FontVariation('wght', 700)],
           ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// A page's picture where there is no logo (the code check, the email-change
+/// result): the icon on a soft [tone] disc.
+Widget bentoAuthBadge(
+  IconData icon, {
+  Color tone = AppColors.signal,
+  Color surface = AppColors.signal50,
+}) {
+  return Center(
+    child: Container(
+      width: 72,
+      height: 72,
+      decoration: BoxDecoration(color: surface, shape: BoxShape.circle),
+      alignment: Alignment.center,
+      child: Icon(icon, size: 34, color: tone),
+    ),
+  );
+}
+
+/// A back-only app bar on the field page: the round white back button, no
+/// title (the page's card carries it).
+AppBar bentoAuthAppBar({required VoidCallback onBack}) {
+  return AppBar(
+    toolbarHeight: 64,
+    backgroundColor: AppColors.field,
+    surfaceTintColor: Colors.transparent,
+    foregroundColor: AppColors.ink,
+    elevation: 0,
+    scrolledUnderElevation: 0,
+    automaticallyImplyLeading: false,
+    leading: Padding(
+      padding: const EdgeInsets.only(left: AppSpacing.x2),
+      child: Center(
+        child: IconButton(
+          style: bentoRoundIconStyle,
+          icon: const Icon(SolarIcons.arrowLeftLinear,
+              color: AppColors.ink, size: 24),
+          onPressed: onBack,
         ),
       ),
     ),
@@ -140,8 +184,44 @@ class BentoAuthError extends StatelessWidget {
   }
 }
 
+/// A good-news line (a code went out), as a soft green panel with its tick.
+class BentoAuthNotice extends StatelessWidget {
+  const BentoAuthNotice(this.message, {super.key});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.x3),
+      decoration: BoxDecoration(
+        color: AppColors.guideSurface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(SolarIcons.checkCircleBold, color: AppColors.guide, size: 20),
+          const SizedBox(width: AppSpacing.x2),
+          Expanded(
+            child: Text(
+              message,
+              style: AppTypography.label.copyWith(
+                color: AppColors.guide,
+                fontVariations: const [FontVariation('wght', 500)],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// The form's action: the dark `ink` pill, as the paywall's buy button; a
-/// spinner in place of the label while it works. [onPressed] null = disabled.
+/// spinner in place of the label while it works. [onPressed] null = disabled:
+/// solid while [loading], faded when it is waiting on the form (the code check
+/// before six digits are in).
 class BentoAuthPrimaryButton extends StatelessWidget {
   const BentoAuthPrimaryButton({
     super.key,
@@ -165,7 +245,8 @@ class BentoAuthPrimaryButton extends StatelessWidget {
         style: FilledButton.styleFrom(
           backgroundColor: AppColors.ink,
           foregroundColor: AppColors.onSignal,
-          disabledBackgroundColor: AppColors.ink,
+          disabledBackgroundColor:
+              loading ? AppColors.ink : AppColors.ink.withValues(alpha: 0.25),
           disabledForegroundColor: AppColors.onSignal,
           minimumSize: const Size.fromHeight(56),
           shape: const StadiumBorder(),
@@ -190,7 +271,8 @@ class BentoAuthPrimaryButton extends StatelessWidget {
 }
 
 /// A text link (forgot password, switch between login and signup): blue,
-/// at least 44 tall.
+/// at least 44 tall. [onPressed] null = disabled (grey), e.g. a resend link
+/// counting down.
 class BentoAuthLink extends StatelessWidget {
   const BentoAuthLink({
     super.key,
@@ -199,7 +281,7 @@ class BentoAuthLink extends StatelessWidget {
   });
 
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -207,6 +289,7 @@ class BentoAuthLink extends StatelessWidget {
       onPressed: onPressed,
       style: TextButton.styleFrom(
         foregroundColor: AppColors.signal,
+        disabledForegroundColor: AppColors.inkTertiary,
         minimumSize: const Size(44, 44),
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x2),
         textStyle: AppTypography.label.copyWith(
