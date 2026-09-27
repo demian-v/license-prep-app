@@ -34,6 +34,11 @@ class _TheoryScreenState extends State<TheoryScreen> {
   DateTime? _loadingStartTime;
   bool _hasTrackedListViewed = false;
   bool _hasTrackedEmptyState = false;
+
+  /// True until this screen's first content request has finished. Before it,
+  /// an empty list only means "not asked yet", and showing "No theory modules
+  /// found" for that split second read as a real empty state (2026-09-26).
+  bool _initializing = true;
   
   @override
   void initState() {
@@ -87,6 +92,8 @@ class _TheoryScreenState extends State<TheoryScreen> {
       }
     } catch (e) {
       print('TheoryScreen: Error initializing content: $e');
+    } finally {
+      if (mounted) setState(() => _initializing = false);
     }
   }
 
@@ -284,7 +291,10 @@ class _TheoryScreenState extends State<TheoryScreen> {
         bottom: false,
         child: Consumer<ContentProvider>(
               builder: (context, contentProvider, child) {
-          if (contentProvider.isLoading) {
+          // Still starting with nothing in memory: the spinner, not a false
+          // "no modules" page.
+          if (contentProvider.isLoading ||
+              (_initializing && contentProvider.modules.isEmpty)) {
             return _withTrialCard(Center(
               child: CircularProgressIndicator(),
             ));
