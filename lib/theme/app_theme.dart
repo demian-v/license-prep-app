@@ -125,6 +125,28 @@ class AppTheme {
         ),
       ),
 
+      // Snackbars as the Bento dark pill (2026-09-26): floating, `ink`, the
+      // card corner, white label text. Neutral by default; a message that
+      // means something passes its own semantic background — `guide` for
+      // done, `stop` for failed, `warn` for access at risk.
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppColors.ink,
+        elevation: 0,
+        // The cards' 20pt gutter, so the bar lines up with them.
+        insetPadding: const EdgeInsets.fromLTRB(
+          AppSpacing.x4 + AppSpacing.x1, 0, AppSpacing.x4 + AppSpacing.x1, AppSpacing.x4),
+        contentTextStyle: AppTypography.label.copyWith(
+          fontSize: 15,
+          color: AppColors.onSignal,
+          fontVariations: const [FontVariation('wght', 500)],
+        ),
+        actionTextColor: AppColors.signal100,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+        ),
+      ),
+
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: AppColors.paper,
         selectedItemColor: AppColors.signal,

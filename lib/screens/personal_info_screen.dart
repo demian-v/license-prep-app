@@ -254,7 +254,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('Email successfully changed to $authEmail'),
-                    backgroundColor: Colors.green,
+                    backgroundColor: AppColors.guide,
                   ),
                 );
               }
@@ -333,7 +333,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Account deletion completed. Please log in again.'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.guide,
             duration: Duration(seconds: 3),
           ),
         );
@@ -436,7 +436,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('Error updating email: $e'),
-                  backgroundColor: Colors.red,
+                  backgroundColor: AppColors.stop,
                 ),
               );
               setState(() {
@@ -455,7 +455,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
               content: Text(
                 'Verification email sent. Please check your inbox to confirm the new email address.'
               ),
-              backgroundColor: Colors.green,
+              backgroundColor: AppColors.guide,
               duration: Duration(seconds: 5),  // Show longer for verification message
             ),
           );
@@ -467,7 +467,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(_translate('changes_saved', languageProvider)),
-              backgroundColor: Colors.green,
+              backgroundColor: AppColors.guide,
               duration: Duration(seconds: 2),
             ),
           );
@@ -481,7 +481,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.stop,
           ),
         );
       } finally {
@@ -625,7 +625,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Error: $e'),
-                      backgroundColor: Colors.red,
+                      backgroundColor: AppColors.stop,
                       duration: Duration(seconds: 5),
                     ),
                   );

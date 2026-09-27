@@ -116,7 +116,7 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(AppLocalizations.of(context).translate('subscription_successful')),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.guide,
             duration: Duration(seconds: 3),
           ),
         );
@@ -165,8 +165,8 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> {
         // Optional: Show cancellation message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Purchase canceled'),
-            backgroundColor: Colors.orange,
+            // Neutral: cancelling is the user's own choice, not a warning.
+            content: Text(AppLocalizations.of(context).translate('purchase_canceled')),
             duration: Duration(seconds: 2),
           ),
         );
@@ -1060,7 +1060,7 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(AppLocalizations.of(context).translate('cancel_subscription_open_failed')),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.stop,
           ),
         );
       }

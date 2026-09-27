@@ -27,9 +27,6 @@ class ReportSheet extends StatefulWidget {
 }
 
 class _ReportSheetState extends State<ReportSheet> {
-  // Snackbar colour for the thank-you message (used by _submit, unchanged).
-  static const Color primaryGreen = Colors.green;
-
   ReportReason? _reason;
   final _ctrl = TextEditingController();
   bool _submitting = false;
@@ -85,17 +82,8 @@ class _ReportSheetState extends State<ReportSheet> {
           SnackBar(
             content: Text(
               AppLocalizations.of(context).translate('report_thanks'),
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w500,
-              ),
             ),
-            backgroundColor: primaryGreen,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            elevation: 6,
+            backgroundColor: AppColors.guide,
           ),
         );
       }
@@ -106,17 +94,8 @@ class _ReportSheetState extends State<ReportSheet> {
           SnackBar(
             content: Text(
               AppLocalizations.of(context).translate('report_error'),
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w500,
-              ),
             ),
-            backgroundColor: Colors.red.shade600,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            elevation: 6,
+            backgroundColor: AppColors.stop,
           ),
         );
       }

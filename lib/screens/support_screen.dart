@@ -61,31 +61,27 @@ class _SupportScreenState extends State<SupportScreen> {
                   Container(
                     width: 24,
                     height: 24,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
+                    decoration: const BoxDecoration(
+                      color: AppColors.paper,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(SolarIcons.checkLinear, color: Colors.green, size: 16),
+                    child: const Icon(SolarIcons.checkLinear, color: AppColors.guide, size: 16),
                   ),
                   SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       AppLocalizations.of(context).translate('support_thanks'),
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
+                      style: AppTypography.label.copyWith(
+                        fontSize: 15,
+                        color: AppColors.onSignal,
+                        fontVariations: const [FontVariation('wght', 600)],
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-            backgroundColor: Colors.green.shade600,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            elevation: 8,
-            margin: EdgeInsets.all(16),
+            backgroundColor: AppColors.guide,
           ),
         );
       }

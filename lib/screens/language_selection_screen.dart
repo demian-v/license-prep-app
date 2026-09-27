@@ -399,7 +399,7 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
             ScaffoldMessenger.maybeOf(messengerContext)?.showSnackBar(
               SnackBar(
                 content: Text('Error selecting language: $e'), // Error message in English
-                backgroundColor: Colors.red,
+                backgroundColor: AppColors.stop,
               ),
             );
           }

@@ -336,17 +336,20 @@ class _TheoryScreenState extends State<TheoryScreen> {
                 final requestedLanguage = contentProvider.requestedLanguage;
                 final requestedState = contentProvider.requestedState;
                 
-                // Create user-friendly language names
+                final l = AppLocalizations.of(context);
+
+                // Each language in its own name, as in the pickers (the
+                // message around it is now translated, 2026-09-26).
                 final languageNames = {
                   'en': 'English',
-                  'es': 'Spanish', 
-                  'uk': 'Ukrainian',
-                  'ru': 'Russian',
-                  'pl': 'Polish',
+                  'es': 'Español',
+                  'uk': 'Українська',
+                  'ru': 'Русский',
+                  'pl': 'Polski',
                 };
                 
                 final friendlyLanguage = languageNames[requestedLanguage] ?? requestedLanguage;
-                final friendlyState = requestedState ?? 'selected state';
+                final friendlyState = requestedState ?? l.translate('theory_empty_selected_state');
                 
                 // Risk #3 follow-up — a refusal is not an empty shelf. Before the
                 // entitlement gate existed this branch could only mean "no
@@ -361,27 +364,35 @@ class _TheoryScreenState extends State<TheoryScreen> {
                 // Generate context-aware message
                 switch (reason) {
                   case 'language':
-                    emptyStateMessage = 'We couldn\'t find any theory modules for language \'$friendlyLanguage\' with your current settings.';
+                    emptyStateMessage = l.translate('theory_empty_language')
+                        .replaceAll('{language}', friendlyLanguage);
                     break;
                   case 'state':
-                    emptyStateMessage = 'We couldn\'t find any theory modules for state \'$friendlyState\' with your current language settings.';
+                    emptyStateMessage = l.translate('theory_empty_state')
+                        .replaceAll('{state}', friendlyState);
                     break;
                   case 'language_and_state':
-                    emptyStateMessage = 'We couldn\'t find any theory modules for language \'$friendlyLanguage\' in state \'$friendlyState\'.';
+                    emptyStateMessage = l.translate('theory_empty_language_state')
+                        .replaceAll('{language}', friendlyLanguage)
+                        .replaceAll('{state}', friendlyState);
                     break;
                   default:
                     // Fallback to original message format
-                    final stateText = stateProvider.selectedStateId != null
-                        ? "for state '${stateProvider.selectedStateName}'"
-                        : "- no state selected";
-                    emptyStateMessage = 'We couldn\'t find any theory modules $stateText with your current language settings.';
+                    emptyStateMessage = stateProvider.selectedStateId != null
+                        ? l.translate('theory_empty_state')
+                            .replaceAll('{state}', stateProvider.selectedStateName ?? friendlyState)
+                        : l.translate('theory_empty_no_state');
                 }
                     
                 // As on the topic list: a soft blue disc, a title, one quiet
-                // line, then the action as a blue pill.
-                return Center(
+                // line, then the action as a blue pill. From the top, under
+                // the trial card, not centred (owner, 2026-09-26: centred it
+                // sat too low).
+                return Align(
+                  alignment: Alignment.topCenter,
                   child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.x8),
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.x8, AppSpacing.x8, AppSpacing.x8, AppSpacing.x6),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -401,7 +412,7 @@ class _TheoryScreenState extends State<TheoryScreen> {
                         ),
                         const SizedBox(height: AppSpacing.x6),
                         Text(
-                          'No theory modules found',
+                          l.translate('theory_empty_title'),
                           textAlign: TextAlign.center,
                           style: AppTypography.heading.copyWith(
                             fontSize: 20,
@@ -427,7 +438,7 @@ class _TheoryScreenState extends State<TheoryScreen> {
                             shape: const StadiumBorder(),
                           ),
                           icon: const Icon(SolarIcons.refreshLinear, size: 20),
-                          label: Text('Refresh'),
+                          label: Text(l.translate('refresh')),
                           onPressed: () {
                             contentProvider.fetchContentAfterSelection(forceRefresh: true);
                           },

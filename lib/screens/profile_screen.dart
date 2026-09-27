@@ -1146,7 +1146,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(result['error']),
-              backgroundColor: Colors.red,
+              backgroundColor: AppColors.stop,
             ),
           );
         }
@@ -1582,7 +1582,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(result['error']),
-              backgroundColor: Colors.red,
+              backgroundColor: AppColors.stop,
             ),
           );
         }
@@ -1613,67 +1613,132 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Test failed: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.stop,
         ),
       );
     }
   }
 
+  /// A developer-sheet row: a white tile with its icon on a soft disc.
+  Widget _devOption({
+    required IconData icon,
+    required Color tone,
+    required Color surface,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.x2),
+      child: ListTile(
+        tileColor: AppColors.paper,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.x4,
+          vertical: AppSpacing.x1,
+        ),
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(color: surface, shape: BoxShape.circle),
+          alignment: Alignment.center,
+          child: Icon(icon, color: tone, size: 20),
+        ),
+        title: Text(
+          title,
+          style: AppTypography.body.copyWith(
+            fontSize: 16,
+            color: AppColors.ink,
+            fontVariations: const [FontVariation('wght', 600)],
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: AppTypography.label.copyWith(color: AppColors.inkSecondary),
+        ),
+        onTap: onTap,
+      ),
+    );
+  }
+
+  /// Hidden developer tools (five taps on the version line), as a Bento
+  /// sheet: field background, the card corner, a drag handle, white rows.
+  /// Sized to its rows rather than 80% of the screen.
   void _showDeveloperOptions(BuildContext context, LanguageProvider languageProvider) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.8,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                _translate('developer_options', languageProvider),
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-            ),
-            Divider(),
-            Expanded(
-              child: ListView(
-                children: [
-                  // Removed developer example navigation options for production build
-                  ListTile(
-                    leading: Icon(SolarIcons.settingsBold),
-                    title: Text(_translate('app_settings_reset', languageProvider)),
-                    subtitle: Text(_translate('app_settings_reset_desc', languageProvider)),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, '/settings/reset');
-                    },
+      backgroundColor: AppColors.field,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+      ),
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.x4 + AppSpacing.x1,
+            0,
+            AppSpacing.x4 + AppSpacing.x1,
+            AppSpacing.x4,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.x4),
+                child: Text(
+                  _translate('developer_options', languageProvider),
+                  style: AppTypography.title.copyWith(
+                    fontSize: 22,
+                    height: 28 / 22,
+                    color: AppColors.ink,
+                    fontVariations: const [FontVariation('wght', 700)],
                   ),
-                  // Debug option for testing session conflict notifications
-                  if (kDebugMode)
-                    ListTile(
-                      leading: Icon(SolarIcons.logout2Linear, color: Colors.orange),
-                      title: Text('Test Session Conflict Notification'),
-                      subtitle: Text('Show session conflict notification for testing'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        SessionNotificationService.showTestNotification(context);
-                      },
-                    ),
-                  // Debug option for testing full session conflict flow
-                  if (kDebugMode)
-                    ListTile(
-                      leading: Icon(SolarIcons.shieldCheckBold, color: Colors.red),
-                      title: Text('Test Full Session Conflict Flow'),
-                      subtitle: Text('Simulate session conflict with immediate logout'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        _testFullSessionConflictFlow(context);
-                      },
-                    ),
-                ],
+                ),
               ),
-            ),
-          ],
+              // Removed developer example navigation options for production build
+              _devOption(
+                icon: SolarIcons.settingsBold,
+                tone: AppColors.signal,
+                surface: AppColors.signal50,
+                title: _translate('app_settings_reset', languageProvider),
+                subtitle: _translate('app_settings_reset_desc', languageProvider),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.pushNamed(context, '/settings/reset');
+                },
+              ),
+              // Debug option for testing session conflict notifications
+              if (kDebugMode)
+                _devOption(
+                  icon: SolarIcons.logout2Linear,
+                  tone: AppColors.warn,
+                  surface: AppColors.warnSurface,
+                  title: 'Test Session Conflict Notification',
+                  subtitle: 'Show session conflict notification for testing',
+                  onTap: () {
+                    Navigator.pop(context);
+                    SessionNotificationService.showTestNotification(context);
+                  },
+                ),
+              // Debug option for testing full session conflict flow
+              if (kDebugMode)
+                _devOption(
+                  icon: SolarIcons.shieldCheckBold,
+                  tone: AppColors.stop,
+                  surface: AppColors.stopSurface,
+                  title: 'Test Full Session Conflict Flow',
+                  subtitle: 'Simulate session conflict with immediate logout',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _testFullSessionConflictFlow(context);
+                  },
+                ),
+            ],
+          ),
         ),
       ),
     );

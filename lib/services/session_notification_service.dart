@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
 import '../localization/app_localizations.dart';
+import '../theme/app_theme.dart';
 import '../theme/solar_icons.dart';
 
 /// Service for handling session-related user notifications
@@ -38,33 +39,29 @@ class SessionNotificationService {
         SnackBar(
           content: Row(
             children: [
-              Icon(
+              const Icon(
                 SolarIcons.infoCircleLinear,
-                color: Colors.white,
+                color: AppColors.onSignal,
                 size: 20,
               ),
               SizedBox(width: 12),
               Expanded(
                 child: Text(
                   localizations.translate('sessionConflictMessage'),
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
+                  style: AppTypography.label.copyWith(
+                    color: AppColors.onSignal,
+                    fontVariations: const [FontVariation('wght', 500)],
                   ),
                 ),
               ),
             ],
           ),
-          backgroundColor: Colors.orange[700],
+          // Amber: the session (access) is at risk.
+          backgroundColor: AppColors.warn,
           duration: Duration(seconds: 5),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
           action: SnackBarAction(
             label: localizations.translate('sessionConflictButton'),
-            textColor: Colors.white,
+            textColor: AppColors.onSignal,
             onPressed: () {
               ScaffoldMessenger.of(context).hideCurrentSnackBar();
             },
