@@ -11,6 +11,7 @@ import '../theme/app_theme.dart';
 import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
 import '../widgets/bento_auth_parts.dart';
+import '../widgets/otp_motion.dart';
 
 /// Risk #12 — the code-entry step of signup.
 ///
@@ -48,7 +49,8 @@ class VerificationCodeScreen extends StatefulWidget {
   State<VerificationCodeScreen> createState() => _VerificationCodeScreenState();
 }
 
-class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
+class _VerificationCodeScreenState extends State<VerificationCodeScreen>
+    with TickerProviderStateMixin {
   static const int _codeLength = 6;
 
   /// Mirrors the server's RESEND_COOLDOWN_MS. If the two ever disagree the
@@ -81,6 +83,46 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
   int _resendIn = 0;
   Timer? _resendTimer;
 
+  // Motion (owner, 2026-09-26 — see OtpBoxesMotion): the boxes regroup while
+  // the code is checked, then fold and burst on success. One-shot, and zero
+  // length under reduced motion.
+  late final AnimationController _gather = AnimationController(vsync: this);
+  late final AnimationController _collapse = AnimationController(vsync: this);
+  late final AnimationController _burst = AnimationController(vsync: this);
+  bool _verified = false;
+
+  static const Duration _gatherTime = Duration(milliseconds: 560);
+  static const Duration _collapseTime = Duration(milliseconds: 380);
+  static const Duration _burstTime = Duration(milliseconds: 900);
+  static const Duration _holdTime = Duration(milliseconds: 450);
+
+  /// Regroups the boxes (checking) or lays them back in a row (refused).
+  void _runGather(bool forward) {
+    _gather.duration = AppMotion.duration(context, _gatherTime);
+    forward ? _gather.forward() : _gather.reverse();
+  }
+
+  /// The accepted code: fold, burst, a short hold on the ✓, then on to the
+  /// next step through the same [VerificationCodeScreen.onVerified] as before.
+  Future<void> _celebrateThenContinue() async {
+    setState(() => _verified = true);
+    _collapse.duration = AppMotion.duration(context, _collapseTime);
+    _burst.duration = AppMotion.duration(context, _burstTime);
+    final hold = AppMotion.duration(context, _holdTime);
+    // Each step checks the screen is still here: it can be closed mid-way.
+    if (_gather.value < 1) {
+      _runGather(true);
+      await _gather.forward().orCancel.catchError((_) {});
+      if (!mounted) return;
+    }
+    await _collapse.forward().orCancel.catchError((_) {});
+    if (!mounted) return;
+    await _burst.forward().orCancel.catchError((_) {});
+    if (!mounted) return;
+    await Future.delayed(hold);
+    if (mounted) widget.onVerified();
+  }
+
   String get _code => _controllers.map((c) => c.text).join();
 
   @override
@@ -98,6 +140,9 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
 
   @override
   void dispose() {
+    _gather.dispose();
+    _collapse.dispose();
+    _burst.dispose();
     _resendTimer?.cancel();
     for (final c in _controllers) {
       c.dispose();
@@ -189,14 +234,16 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
       _error = null;
       _notice = null;
     });
+    _runGather(true);
 
     final result = await _service.verify(_code);
     if (!mounted) return;
     setState(() => _submitting = false);
+    if (result.outcome != VerifyOutcome.verified) _runGather(false);
 
     switch (result.outcome) {
       case VerifyOutcome.verified:
-        widget.onVerified();
+        _celebrateThenContinue();
         break;
       case VerifyOutcome.wrongCode:
         final left = result.attemptsLeft;
@@ -292,7 +339,7 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
           borderRadius: BorderRadius.circular(AppRadius.lg),
           borderSide: BorderSide(color: color, width: width),
         );
-    return Expanded(
+    return SizedBox.expand(
       child: KeyboardListener(
         focusNode: FocusNode(),
         onKeyEvent: (event) => _onKey(index, event),
@@ -301,6 +348,9 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
           focusNode: _focusNodes[index],
           autofocus: index == 0,
           textAlign: TextAlign.center,
+          // Single line (multi-line fields upset focus after a refused code
+          // on iOS); the box's fixed 56pt height sizes it in both layouts.
+          textAlignVertical: TextAlignVertical.center,
           keyboardType: TextInputType.number,
           cursorColor: AppColors.signal,
           style: AppTypography.title.copyWith(
@@ -314,6 +364,7 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
             counterText: '',
             filled: true,
             fillColor: AppColors.field,
+            // 16 + 24 + 16 = the box's 56pt, so fill and ring cover it.
             contentPadding: const EdgeInsets.symmetric(vertical: AppSpacing.x4),
             border: ring(Colors.transparent, 0),
             enabledBorder: ring(Colors.transparent, 0),
@@ -333,12 +384,17 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
       bentoAuthBadge(SolarIcons.letterLinear),
       const SizedBox(height: AppSpacing.x6),
       BentoAuthCard(
-        title: _t(_codeSent ? 'verify_title' : 'verify_title_unsent'),
+        title: _verified
+            ? _t('verify_done_title')
+            : _t(_codeSent ? 'verify_title' : 'verify_title_unsent'),
+        titleColor: _verified ? AppColors.guide : AppColors.ink,
         children: [
           Text(
             // #67 — only claim a code was sent when one was.
-            _t(_codeSent ? 'verify_subtitle' : 'verify_subtitle_unsent')
-                .replaceAll('{email}', widget.email),
+            _verified
+                ? _t('verify_done_message')
+                : _t(_codeSent ? 'verify_subtitle' : 'verify_subtitle_unsent')
+                    .replaceAll('{email}', widget.email),
             textAlign: TextAlign.center,
             style: AppTypography.body.copyWith(
               fontSize: 15,
@@ -347,14 +403,30 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
             ),
           ),
           const SizedBox(height: AppSpacing.x6),
-          Row(
-            children: [
-              for (var i = 0; i < _codeLength; i++) ...[
-                if (i > 0) const SizedBox(width: AppSpacing.x2),
-                _buildBox(i),
-              ],
-            ],
+          OtpBoxesMotion(
+            length: _codeLength,
+            boxBuilder: _buildBox,
+            gather: _gather,
+            collapse: _collapse,
+            burst: _burst,
           ),
+          if (_verified) ...[
+            const SizedBox(height: AppSpacing.x6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(SolarIcons.shieldCheckBold, color: AppColors.guide, size: 18),
+                const SizedBox(width: AppSpacing.x2),
+                Text(
+                  _t('verify_done_secure'),
+                  style: AppTypography.label.copyWith(
+                    color: AppColors.guide,
+                    fontVariations: const [FontVariation('wght', 600)],
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
           if (_error != null) ...[
             const SizedBox(height: AppSpacing.x4),
             BentoAuthError(_error!),
@@ -377,9 +449,10 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
                 : _t('verify_resend_in').replaceAll('{seconds}', '$_resendIn'),
             onPressed: canResend ? () => _send() : null,
           ),
+          ],
         ],
       ),
-      if (widget.onBack != null) ...[
+      if (widget.onBack != null && !_verified) ...[
         const SizedBox(height: AppSpacing.x3),
         Center(
           child: BentoAuthLink(

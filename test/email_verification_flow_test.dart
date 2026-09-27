@@ -119,6 +119,12 @@ void main() {
     var verified = false;
     await pumpScreen(tester, service, onVerified: () => verified = true);
     await enterCode(tester, '123456');
+    // The success motion plays first (fold, burst, a short hold on the ✓ —
+    // about 1.8s), then the screen hands on.
+    expect(verified, isFalse, reason: 'not before the motion has played');
+    for (var i = 0; i < 40; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
     expect(verified, isTrue);
   });
 

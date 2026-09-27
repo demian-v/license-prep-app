@@ -304,5 +304,8 @@
   "dev_reset_done_state_cleared": "Wyczyszczono wybór stanu",
   "dev_reset_err_state_cleared": "Błąd czyszczenia wyboru stanu: {error}",
   "dev_reset_done_all": "Zresetowano wszystkie ustawienia",
-  "dev_reset_err_all": "Błąd resetowania ustawień: {error}"
+  "dev_reset_err_all": "Błąd resetowania ustawień: {error}",
+  "verify_done_title": "E-mail zweryfikowany",
+  "verify_done_message": "Adres potwierdzony. Teraz skonfigurujmy aplikację.",
+  "verify_done_secure": "Zweryfikowano i zabezpieczono"
 }

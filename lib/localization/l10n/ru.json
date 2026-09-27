@@ -304,5 +304,8 @@
   "dev_reset_done_state_cleared": "Выбор штата сброшен",
   "dev_reset_err_state_cleared": "Ошибка сброса выбора штата: {error}",
   "dev_reset_done_all": "Все настройки сброшены",
-  "dev_reset_err_all": "Ошибка сброса настроек: {error}"
+  "dev_reset_err_all": "Ошибка сброса настроек: {error}",
+  "verify_done_title": "Почта подтверждена",
+  "verify_done_message": "Адрес подтверждён. Теперь настроим приложение.",
+  "verify_done_secure": "Проверено и защищено"
 }

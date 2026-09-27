@@ -76,10 +76,18 @@ AppBar bentoAuthAppBar({required VoidCallback onBack}) {
 
 /// The form's white card, as the Bento cards elsewhere.
 class BentoAuthCard extends StatelessWidget {
-  const BentoAuthCard({super.key, required this.title, required this.children});
+  const BentoAuthCard({
+    super.key,
+    required this.title,
+    required this.children,
+    this.titleColor = AppColors.ink,
+  });
 
   final String title;
   final List<Widget> children;
+
+  /// `guide` once the step is done (the email check's success state).
+  final Color titleColor;
 
   @override
   Widget build(BuildContext context) {
@@ -103,7 +111,7 @@ class BentoAuthCard extends StatelessWidget {
               style: AppTypography.title.copyWith(
                 fontSize: 26,
                 height: 32 / 26,
-                color: AppColors.ink,
+                color: titleColor,
                 fontVariations: const [FontVariation('wght', 700)],
               ),
             ),

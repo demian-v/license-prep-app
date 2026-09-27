@@ -304,5 +304,8 @@
   "dev_reset_done_state_cleared": "State selection cleared",
   "dev_reset_err_state_cleared": "Error clearing state selection: {error}",
   "dev_reset_done_all": "All settings reset",
-  "dev_reset_err_all": "Error resetting settings: {error}"
+  "dev_reset_err_all": "Error resetting settings: {error}",
+  "verify_done_title": "Email verified",
+  "verify_done_message": "Your address is confirmed. Next, let's set up the app.",
+  "verify_done_secure": "Verified and secure"
 }
