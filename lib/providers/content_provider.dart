@@ -525,6 +525,13 @@ class ContentProvider extends ChangeNotifier {
       if (_isEntitlementDenial(e)) {
         _contentRequiresSubscription = true;
         print('🔒 Content refused: an active subscription or trial is required');
+        // What is in memory was loaded for an EARLIER request — another
+        // language, state or account. Kept, it hid the refusal (Теория only
+        // shows SubscriptionRequiredView when the list is empty) and showed
+        // the previous account's content: seen 2026-09-26, a new account with
+        // no trial, app in Ukrainian, listing the last user's Russian modules.
+        _modules = [];
+        _topics = [];
       }
 
       // Risk #3 follow-up — do NOT fall back to hardcoded content when the

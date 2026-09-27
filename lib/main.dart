@@ -423,22 +423,25 @@ Future<void> _startApp() async {
   // user and legacy unscoped data is migrated once, instead of every account on
   // the device sharing one blob.
   final progressString = await ProgressStorage.read();
-  if (progressString != null) {
-    progress = UserProgress.fromJson(jsonDecode(progressString));
-  } else {
-    progress = UserProgress(
-      completedModules: [],
-      testScores: {},
-      selectedLicense: null,
-      topicProgress: {}, // Initialize empty topic progress
-      savedQuestions: [], // Initialize empty saved questions
-    );
-  }
+  progress = ProgressProvider.fromStored(progressString);
   
   // Create providers
   final authProvider = AuthProvider(user);
   final subscriptionProvider = SubscriptionProvider();
   final progressProvider = ProgressProvider(progress);
+
+  // The progress above, and the subscription loaded below, belong to whoever
+  // was signed in at launch. When the signed-in account changes (sign-out,
+  // sign-in as someone else, signup), load that account's own progress and
+  // drop the previous account's plan, or the new account sees — and for
+  // progress, saves over its own record with — the previous account's data.
+  String? accountUid = firebase_auth.FirebaseAuth.instance.currentUser?.uid;
+  firebase_auth.FirebaseAuth.instance.authStateChanges().listen((authUser) async {
+    if (authUser?.uid == accountUid) return;
+    accountUid = authUser?.uid;
+    subscriptionProvider.resetForAccountChange();
+    progressProvider.reloadFrom(await ProgressStorage.read());
+  });
   
   // Connect lifecycle observer to auth provider
   lifecycleObserver.setAuthProvider(authProvider);

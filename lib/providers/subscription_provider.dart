@@ -328,6 +328,27 @@ class SubscriptionProvider extends ChangeNotifier {
     );
   }
 
+  /// Forgets the previous account's subscription (risk #78 follow-up,
+  /// 2026-09-26).
+  ///
+  /// This provider lives for the whole app session and `HomeScreen` only loads
+  /// it when [subscription] is null, so after a sign-out and a sign-in as
+  /// someone else the card kept showing the previous account's plan until a
+  /// restart. `main.dart` calls this when the signed-in uid changes; the next
+  /// `HomeScreen` then loads the new account's plan through its usual path.
+  /// Deliberately does not load anything itself: during signup the trial is
+  /// still being created, and a load here would race it.
+  void resetForAccountChange() {
+    _subscription = null;
+    _cachedTrialDaysRemaining = null;
+    _cacheTimestamp = null;
+    _errorMessage = null;
+    // The one recovery attempt (risk #24) is per account, not per app run.
+    _trialRecoveryAttempted = false;
+    _publishCrashContext();
+    notifyListeners();
+  }
+
   // STATE MANAGEMENT HELPERS
   void _setLoading(bool loading) {
     _isLoading = loading;

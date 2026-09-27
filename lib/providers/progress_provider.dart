@@ -11,6 +11,30 @@ class ProgressProvider extends ChangeNotifier {
 
   ProgressProvider(this.progress);
 
+  /// Progress from its stored JSON, or a fresh empty record if there is none.
+  static UserProgress fromStored(String? json) {
+    if (json != null) return UserProgress.fromJson(jsonDecode(json));
+    return UserProgress(
+      completedModules: [],
+      testScores: {},
+      selectedLicense: null,
+      topicProgress: {}, // Initialize empty topic progress
+      savedQuestions: [], // Initialize empty saved questions
+    );
+  }
+
+  /// Swaps in another account's progress (risk #21 follow-up, 2026-09-26).
+  ///
+  /// Storage has been per account since #21, but this in-memory copy was read
+  /// once at launch and never again. After a sign-out and a sign-in as someone
+  /// else, the new account was shown the previous one's ticks, scores and
+  /// saved questions — and its next save wrote them into its own record.
+  /// `main.dart` calls this whenever the signed-in uid changes.
+  void reloadFrom(String? json) {
+    progress = fromStored(json);
+    notifyListeners();
+  }
+
   Future<void> selectLicense(String licenseId) async {
     final updatedProgress = progress.copyWith(
       selectedLicense: licenseId,
