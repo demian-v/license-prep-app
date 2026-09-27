@@ -940,8 +940,12 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> {
                       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x4),
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
+                        // The action only (owner, 2026-09-26): the price is
+                        // already the hero's headline right above.
                         child: Text(
-                          '${isActiveTrial ? AppLocalizations.of(context).translate('upgrade_now') : AppLocalizations.of(context).translate('subscribe_now')} - ${widget.price}${widget.period}',
+                          isActiveTrial
+                              ? AppLocalizations.of(context).translate('upgrade_now')
+                              : AppLocalizations.of(context).translate('subscribe_now'),
                           maxLines: 1,
                           style: AppTypography.label.copyWith(
                             fontSize: 16,

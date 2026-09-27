@@ -135,13 +135,16 @@ class _EnhancedTestCardState extends State<EnhancedTestCard> {
               ],
       ),
       child: Stack(
+        clipBehavior: Clip.none,
         children: [
           // The 40 questions, drawn as a quiet bar strip. Decoration in
-          // white only; it never borrows a semantic hue.
-          // Sits above the pill row, never under it.
+          // white only; it never borrows a semantic hue. The same size as
+          // the Профиль / Подписка / Поддержка heroes (owner, 2026-09-26):
+          // rising from the card's bottom edge (out through the padding),
+          // faint enough to sit behind the pills.
           Positioned(
             right: 0,
-            bottom: 44,
+            bottom: -(AppSpacing.x4 + AppSpacing.x1),
             child: ExcludeSemantics(child: _questionBars()),
           ),
           Column(
@@ -186,9 +189,10 @@ class _EnhancedTestCardState extends State<EnhancedTestCard> {
                     for (var i = 0; i < _facts.length; i++)
                       _bentoPill(
                         _facts[i],
-                        // The first fact is a solid white pill, the rest
-                        // outlined — the dashboard's primary/secondary pair.
-                        solid: i == 0,
+                        // The last fact («40 запитань») is the solid white
+                        // pill, the rest outlined (owner, 2026-09-26: the
+                        // solid one reads better beside the bar strip).
+                        solid: i == _facts.length - 1,
                       ),
                   ],
                 ),
@@ -237,11 +241,11 @@ class _EnhancedTestCardState extends State<EnhancedTestCard> {
       children: [
         for (final h in heights)
           Container(
-            width: 2,
-            height: h * 0.6,
-            margin: const EdgeInsets.only(left: 2),
+            width: 3,
+            height: h * 1.5,
+            margin: const EdgeInsets.only(left: 3),
             decoration: BoxDecoration(
-              color: AppColors.onSignal.withValues(alpha: 0.28),
+              color: AppColors.onSignal.withValues(alpha: 0.14),
               borderRadius: BorderRadius.circular(AppRadius.pill),
             ),
           ),

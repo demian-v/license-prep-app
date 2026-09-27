@@ -70,7 +70,9 @@ void main() {
     });
 
     test('the card still renders the price it is given', () {
-      expect(card, contains(r'${widget.price}'));
+      // The hero headline shows the store string as is. (The buy button
+      // carried a second copy until 2026-09-26; the owner dropped it.)
+      expect(card, contains(RegExp(r'Text\(\s*widget\.price,')));
     });
   });
 }
