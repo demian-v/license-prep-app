@@ -1,167 +1,73 @@
 import 'package:flutter/material.dart';
 import '../localization/app_localizations.dart';
+import '../theme/app_theme.dart';
+import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
+import '../widgets/bento_auth_parts.dart';
 
 class PasswordResetSuccessScreen extends StatefulWidget {
   @override
   _PasswordResetSuccessScreenState createState() => _PasswordResetSuccessScreenState();
 }
 
-class _PasswordResetSuccessScreenState extends State<PasswordResetSuccessScreen> with TickerProviderStateMixin {
-  // Animation controller for card press effect
-  late AnimationController _animationController;
-  late Animation<double> _scaleAnimation;
-  
-  @override
-  void initState() {
-    super.initState();
-    // Initialize animation controller
-    _animationController = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: 100),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.98).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-  }
-  
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
+class _PasswordResetSuccessScreenState extends State<PasswordResetSuccessScreen> {
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(24.0),
-            child: GestureDetector(
-              onTapDown: (_) => _animationController.forward(),
-              onTapUp: (_) => _animationController.reverse(),
-              onTapCancel: () => _animationController.reverse(),
-              child: ScaleTransition(
-                scale: _scaleAnimation,
-                child: Card(
-                  elevation: 3,
-                  shadowColor: Colors.black.withOpacity(0.3),
-                  margin: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [Colors.white, Colors.grey.shade50.withOpacity(0.5)],
-                        stops: [0.0, 1.0],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.2),
-                          spreadRadius: 0,
-                          blurRadius: 6,
-                          offset: Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Padding(
-                      padding: EdgeInsets.all(32.0),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                              color: Colors.indigo.withOpacity(0.2),
-                                  spreadRadius: 2,
-                                  blurRadius: 10,
-                                  offset: Offset(0, 3),
-                                ),
-                              ],
-                            ),
-                            child: CircleAvatar(
-                              radius: 50,
-                              backgroundColor: Colors.indigo.shade50,
-                              child: Icon(
-                                SolarIcons.checkLinear,
-                                size: 60,
-                                color: Colors.indigo.shade400,
-                              ),
-                            ),
-                          ),
-                          SizedBox(height: 32),
-                          Text(
-                            AppLocalizations.of(context).translate('auth_password_changed_title'),
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          SizedBox(height: 16),
-                          Text(
-                            AppLocalizations.of(context).translate('auth_password_changed_message'),
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey[700],
-                            ),
-                          ),
-                          SizedBox(height: 32),
-                          Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [Colors.white, Colors.indigo.shade50.withOpacity(0.7)],
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.grey.withOpacity(0.3),
-                                  blurRadius: 8,
-                                  offset: Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: ElevatedButton(
-                              onPressed: () {
-                                Navigator.pushReplacementNamed(context, '/login');
-                              },
-                              style: ElevatedButton.styleFrom(
-                                padding: EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                backgroundColor: Colors.transparent,
-                                shadowColor: Colors.transparent,
-                                foregroundColor: Colors.indigo.shade700,
-                                elevation: 0,
-                                minimumSize: Size(double.infinity, 50),
-                              ),
-                              child: Text(
-                                AppLocalizations.of(context).translate('auth_return_to_login'),
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+    final l = AppLocalizations.of(context);
+    final blocks = <Widget>[
+      // Green: done.
+      bentoAuthBadge(
+        SolarIcons.checkLinear,
+        tone: AppColors.guide,
+        surface: AppColors.guideSurface,
+      ),
+      const SizedBox(height: AppSpacing.x6),
+      BentoAuthCard(
+        title: l.translate('auth_password_changed_title'),
+        children: [
+          Text(
+            l.translate('auth_password_changed_message'),
+            textAlign: TextAlign.center,
+            style: AppTypography.body.copyWith(
+              fontSize: 15,
+              height: 22 / 15,
+              color: AppColors.inkSecondary,
             ),
+          ),
+          const SizedBox(height: AppSpacing.x6),
+          BentoAuthPrimaryButton(
+            label: l.translate('auth_return_to_login'),
+            onPressed: () {
+              Navigator.pushReplacementNamed(context, '/login');
+            },
+          ),
+        ],
+      ),
+    ];
+
+    return Scaffold(
+      backgroundColor: AppColors.field,
+      // From the top, as the reset form before it (owner, 2026-09-26:
+      // centred, the card sat too low).
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.x4 + AppSpacing.x1,
+            AppSpacing.x8,
+            AppSpacing.x4 + AppSpacing.x1,
+            AppSpacing.x6,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < blocks.length; i++)
+                StaggerIn(
+                  index: i,
+                  count: blocks.length,
+                  curve: BentoTokens.curve,
+                  child: blocks[i],
+                ),
+            ],
           ),
         ),
       ),

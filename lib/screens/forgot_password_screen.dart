@@ -3,22 +3,21 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/analytics_service.dart';
 import '../localization/app_localizations.dart';
+import '../theme/app_theme.dart';
+import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
+import '../widgets/bento_auth_parts.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   @override
   _ForgotPasswordScreenState createState() => _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with TickerProviderStateMixin {
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   bool _isLoading = false;
   String? _errorMessage;
-  
-  // Animation controller for card press effect
-  late AnimationController _animationController;
-  late Animation<double> _scaleAnimation;
   
   // Analytics tracking variables
   DateTime? _formStartTime;
@@ -27,22 +26,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
   String? _formErrors;
   
   @override
-  void initState() {
-    super.initState();
-    // Initialize animation controller
-    _animationController = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: 100),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.98).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
   void dispose() {
     _emailController.dispose();
-    _animationController.dispose();
     super.dispose();
   }
 
@@ -126,7 +111,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
       if (mounted) {
         setState(() {
           // For security reasons, we don't show specific errors
-          _errorMessage = 'An error occurred. Please try again.';
+          _errorMessage = AppLocalizations.of(context).translate('auth_error_try_again');
         });
       }
     } finally {
@@ -140,213 +125,103 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> with Ticker
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: Icon(SolarIcons.arrowLeftLinear),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text(
-          AppLocalizations.of(context).translate('auth_forgot_title'),
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        elevation: 0,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: Colors.black,
-      ),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(24.0),
+    final l = AppLocalizations.of(context);
+    final blocks = <Widget>[
+      bentoAuthBadge(SolarIcons.lockKeyholeMinimalisticLinear),
+      const SizedBox(height: AppSpacing.x6),
+      BentoAuthCard(
+        title: l.translate('auth_forgot_heading'),
+        children: [
+          Form(
+            key: _formKey,
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                GestureDetector(
-                  onTapDown: (_) => _animationController.forward(),
-                  onTapUp: (_) => _animationController.reverse(),
-                  onTapCancel: () => _animationController.reverse(),
-                  child: ScaleTransition(
-                    scale: _scaleAnimation,
-                    child: Card(
-                      elevation: 3,
-                      shadowColor: Colors.black.withOpacity(0.3),
-                      margin: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Colors.white, Colors.grey.shade50.withOpacity(0.5)],
-                            stops: [0.0, 1.0],
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.2),
-                              spreadRadius: 0,
-                              blurRadius: 6,
-                              offset: Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: Padding(
-                          padding: EdgeInsets.all(24.0),
-                          child: Form(
-                            key: _formKey,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Text(
-                                  AppLocalizations.of(context).translate('auth_forgot_heading'),
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                SizedBox(height: 16),
-                                Text(
-                                  AppLocalizations.of(context).translate('auth_forgot_instructions'),
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: Colors.grey[700],
-                                  ),
-                                ),
-                                SizedBox(height: 24),
-                                if (_errorMessage != null) ...[
-                                  Container(
-                                    padding: EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: Colors.red.shade50,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: Colors.red.shade200),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(SolarIcons.dangerCircleLinear, color: Colors.red.shade700, size: 20),
-                                        SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            _errorMessage!,
-                                            style: TextStyle(color: Colors.red.shade800, fontSize: 14),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  SizedBox(height: 16),
-                                ],
-                                TextFormField(
-                                  controller: _emailController,
-                                  onTap: _onFormStarted,
-                                  onChanged: (value) => _onFormStarted(),
-                                  decoration: InputDecoration(
-                                    labelText: AppLocalizations.of(context).translate('auth_email_address'),
-                                    hintText: AppLocalizations.of(context).translate('auth_enter_your_email'),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(color: Colors.grey.shade300),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(color: Colors.grey.shade300),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(color: Colors.indigo.shade400),
-                                    ),
-                                    prefixIcon: Icon(SolarIcons.letterBold, color: Colors.grey.shade600),
-                                    filled: true,
-                                    fillColor: Colors.white,
-                                    contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                                  ),
-                                  keyboardType: TextInputType.emailAddress,
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return AppLocalizations.of(context).translate('auth_enter_email');
-                                    }
-                                    
-                                    // Basic email validation
-                                    final emailRegExp = RegExp(r'^[^@]+@[^@]+\.[^@]+');
-                                    if (!emailRegExp.hasMatch(value)) {
-                                      return AppLocalizations.of(context).translate('auth_enter_valid_email');
-                                    }
-                                    
-                                    return null;
-                                  },
-                                ),
-                                SizedBox(height: 24),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(12),
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: [Colors.white, Colors.indigo.shade50.withOpacity(0.7)],
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.grey.withOpacity(0.3),
-                                        blurRadius: 8,
-                                        offset: Offset(0, 4),
-                                      ),
-                                    ],
-                                  ),
-                                  child: ElevatedButton(
-                                    onPressed: _isLoading ? null : _sendResetEmail,
-                                    style: ElevatedButton.styleFrom(
-                                      padding: EdgeInsets.symmetric(vertical: 16),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      backgroundColor: Colors.transparent,
-                                      shadowColor: Colors.transparent,
-                                      foregroundColor: Colors.indigo.shade700,
-                                      elevation: 0,
-                                      minimumSize: Size(double.infinity, 50),
-                                    ),
-                                    child: _isLoading
-                                        ? SizedBox(
-                                            height: 24,
-                                            width: 24,
-                                            child: CircularProgressIndicator(
-                                              color: Colors.indigo.shade700,
-                                              strokeWidth: 3,
-                                            ),
-                                          )
-                                        : Text(
-                                            AppLocalizations.of(context).translate('continue'),
-                                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                                          ),
-                                  ),
-                                ),
-                                SizedBox(height: 16),
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.pop(context);
-                                  },
-                                  child: Text(
-                                    AppLocalizations.of(context).translate('auth_back_to_login'),
-                                    style: TextStyle(
-                                      color: Colors.indigo.shade400,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+                Text(
+                  l.translate('auth_forgot_instructions'),
+                  textAlign: TextAlign.center,
+                  style: AppTypography.body.copyWith(
+                    fontSize: 15,
+                    height: 22 / 15,
+                    color: AppColors.inkSecondary,
                   ),
+                ),
+                const SizedBox(height: AppSpacing.x6),
+                if (_errorMessage != null) ...[
+                  BentoAuthError(_errorMessage!),
+                  const SizedBox(height: AppSpacing.x4),
+                ],
+                TextFormField(
+                  controller: _emailController,
+                  onTap: _onFormStarted,
+                  onChanged: (value) => _onFormStarted(),
+                  cursorColor: AppColors.signal,
+                  style: AppTypography.body.copyWith(color: AppColors.ink),
+                  decoration: bentoFieldDecoration(
+                    label: l.translate('auth_email_address'),
+                    icon: SolarIcons.letterLinear,
+                  ).copyWith(
+                    hintText: l.translate('auth_enter_your_email'),
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return AppLocalizations.of(context).translate('auth_enter_email');
+                    }
+                    
+                    // Basic email validation
+                    final emailRegExp = RegExp(r'^[^@]+@[^@]+\.[^@]+');
+                    if (!emailRegExp.hasMatch(value)) {
+                      return AppLocalizations.of(context).translate('auth_enter_valid_email');
+                    }
+                    
+                    return null;
+                  },
+                ),
+                const SizedBox(height: AppSpacing.x6),
+                BentoAuthPrimaryButton(
+                  label: l.translate('continue'),
+                  loading: _isLoading,
+                  onPressed: _isLoading ? null : _sendResetEmail,
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+      const SizedBox(height: AppSpacing.x3),
+      Center(
+        child: BentoAuthLink(
+          label: l.translate('auth_back_to_login'),
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ),
+      ),
+    ];
+
+    return Scaffold(
+      backgroundColor: AppColors.field,
+      appBar: bentoAuthAppBar(onBack: () => Navigator.of(context).pop()),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.x4 + AppSpacing.x1,
+            AppSpacing.x2,
+            AppSpacing.x4 + AppSpacing.x1,
+            AppSpacing.x6,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < blocks.length; i++)
+                StaggerIn(
+                  index: i,
+                  count: blocks.length,
+                  curve: BentoTokens.curve,
+                  child: blocks[i],
+                ),
+            ],
           ),
         ),
       ),

@@ -4,7 +4,10 @@ import '../providers/auth_provider.dart';
 import '../services/analytics_service.dart';
 import '../services/password_reset_handler.dart';
 import '../localization/app_localizations.dart';
+import '../theme/app_theme.dart';
+import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
+import '../widgets/bento_auth_parts.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   final String code;
@@ -15,7 +18,7 @@ class ResetPasswordScreen extends StatefulWidget {
   _ResetPasswordScreenState createState() => _ResetPasswordScreenState();
 }
 
-class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerProviderStateMixin {
+class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -27,10 +30,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
   List<String> _validationErrors = [];
   bool _showValidationErrors = false;
   
-  // Animation controller for card press effect
-  late AnimationController _animationController;
-  late Animation<double> _scaleAnimation;
-  
   // Analytics tracking variables
   DateTime? _formStartTime;
   int _validationAttempts = 0;
@@ -38,15 +37,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
   @override
   void initState() {
     super.initState();
-    
-    // Initialize animation controller
-    _animationController = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: 100),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.98).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
     
     // Track form start time
     _formStartTime = DateTime.now();
@@ -58,7 +48,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
   void dispose() {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _animationController.dispose();
     super.dispose();
   }
   
@@ -163,7 +152,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
     if (!_formKey.currentState!.validate()) return;
     
     if (_passwordController.text != _confirmPasswordController.text) {
-      setState(() => _errorMessage = 'Passwords do not match');
+      setState(() => _errorMessage =
+          AppLocalizations.of(context).translate('auth_passwords_do_not_match'));
       return;
     }
     
@@ -229,468 +219,287 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
   
   @override
   Widget build(BuildContext context) {
+    final Widget body;
+    if (_isLoading && _email == null) {
+      body = const Center(
+        child: CircularProgressIndicator(color: AppColors.signal),
+      );
+    } else if (_errorMessage != null && _email == null) {
+      body = _buildErrorWidget();
+    } else {
+      body = _buildResetForm();
+    }
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          AppLocalizations.of(context).translate('auth_change_password_heading'),
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        elevation: 0,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: Colors.black,
+      backgroundColor: AppColors.field,
+      // Opened from an email link this is the first page, with nowhere to go
+      // back to; the round back button shows only when there is.
+      appBar: Navigator.of(context).canPop()
+          ? bentoAuthAppBar(onBack: () => Navigator.of(context).pop())
+          : null,
+      body: SafeArea(child: body),
+    );
+  }
+
+  /// The page's blocks, stepping in once, from the top of the page as on the
+  /// other sign-in pages (owner, 2026-09-26: centred, it sat too low).
+  Widget _page(List<Widget> blocks) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.x4 + AppSpacing.x1,
+        // Opened from an email link there is no app bar above, so the page
+        // keeps a little more room at the top.
+        Navigator.of(context).canPop() ? AppSpacing.x2 : AppSpacing.x8,
+        AppSpacing.x4 + AppSpacing.x1,
+        AppSpacing.x6,
       ),
-      body: SafeArea(
-        child: _isLoading && _email == null
-            ? Center(child: CircularProgressIndicator())
-            : _errorMessage != null && _email == null
-                ? _buildErrorWidget()
-                : _buildResetForm(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < blocks.length; i++)
+            StaggerIn(
+              index: i,
+              count: blocks.length,
+              curve: BentoTokens.curve,
+              child: blocks[i],
+            ),
+        ],
       ),
     );
   }
-  
+
+  TextStyle get _leadStyle => AppTypography.body.copyWith(
+        fontSize: 15,
+        height: 22 / 15,
+        color: AppColors.inkSecondary,
+      );
+
   Widget _buildErrorWidget() {
-    return Center(
-      child: SingleChildScrollView(
-        padding: EdgeInsets.all(24.0),
-        child: GestureDetector(
-          onTapDown: (_) => _animationController.forward(),
-          onTapUp: (_) => _animationController.reverse(),
-          onTapCancel: () => _animationController.reverse(),
-          child: ScaleTransition(
-            scale: _scaleAnimation,
-            child: Card(
-              elevation: 3,
-              shadowColor: Colors.black.withOpacity(0.3),
-              margin: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Colors.white, Colors.grey.shade50.withOpacity(0.5)],
-                    stops: [0.0, 1.0],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.2),
-                      spreadRadius: 0,
-                      blurRadius: 6,
-                      offset: Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: EdgeInsets.all(24.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        SolarIcons.dangerCircleLinear,
-                        color: Colors.red,
-                        size: 60,
-                      ),
-                      SizedBox(height: 16),
-                      Text(
-                        AppLocalizations.of(context).translate('auth_reset_link_error'),
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: 16),
-                      Text(
-                        _errorMessage ?? 'The password reset link is invalid or has expired.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 16),
-                      ),
-                      SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [Colors.white, Colors.indigo.shade50.withOpacity(0.7)],
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.grey.withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: ElevatedButton(
-                            onPressed: () {
-                              Navigator.pushReplacementNamed(context, '/forgot-password');
-                            },
-                            style: ElevatedButton.styleFrom(
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              backgroundColor: Colors.transparent,
-                              shadowColor: Colors.transparent,
-                              foregroundColor: Colors.indigo.shade700,
-                              elevation: 0,
-                              minimumSize: Size(double.infinity, 50),
-                            ),
-                            child: Text(
-                              AppLocalizations.of(context).translate('auth_request_new_link'),
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
+    final l = AppLocalizations.of(context);
+    return _page([
+      // Red: the link failed.
+      bentoAuthBadge(
+        SolarIcons.dangerCircleLinear,
+        tone: AppColors.stop,
+        surface: AppColors.stopSurface,
       ),
+      const SizedBox(height: AppSpacing.x6),
+      BentoAuthCard(
+        title: l.translate('auth_reset_link_error'),
+        children: [
+          // The translated line, not the raw Firebase error (owner,
+          // 2026-09-26): that still goes to analytics in _verifyResetCode.
+          Text(
+            l.translate('auth_reset_link_invalid'),
+            textAlign: TextAlign.center,
+            style: _leadStyle,
+          ),
+          const SizedBox(height: AppSpacing.x6),
+          BentoAuthPrimaryButton(
+            label: l.translate('auth_request_new_link'),
+            onPressed: () {
+              Navigator.pushReplacementNamed(context, '/forgot-password');
+            },
+          ),
+        ],
+      ),
+    ]);
+  }
+
+  /// A password field as the login fields; the ring turns red while the
+  /// submitted value breaks a rule ([invalid]).
+  InputDecoration _passwordDecoration({
+    required String label,
+    required bool invalid,
+    required bool obscured,
+    required VoidCallback onToggle,
+  }) {
+    final base = bentoFieldDecoration(
+      label: label,
+      icon: SolarIcons.lockKeyholeMinimalisticLinear,
+    );
+    OutlineInputBorder ring(Color color, double width) => OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          borderSide: BorderSide(color: color, width: width),
+        );
+    return base.copyWith(
+      prefixIcon: Icon(
+        SolarIcons.lockKeyholeMinimalisticLinear,
+        color: invalid ? AppColors.stop : AppColors.inkSecondary,
+        size: 22,
+      ),
+      suffixIcon: IconButton(
+        icon: Icon(
+          obscured ? SolarIcons.eyeLinear : SolarIcons.eyeClosedLinear,
+          color: AppColors.inkSecondary,
+          size: 22,
+        ),
+        onPressed: onToggle,
+      ),
+      enabledBorder: invalid ? ring(AppColors.stop, 1.5) : null,
+      focusedBorder: invalid ? ring(AppColors.stop, 1.5) : null,
     );
   }
-  
+
   Widget _buildResetForm() {
-    return Center(
-      child: SingleChildScrollView(
-        padding: EdgeInsets.all(24.0),
-        child: GestureDetector(
-          onTapDown: (_) => _animationController.forward(),
-          onTapUp: (_) => _animationController.reverse(),
-          onTapCancel: () => _animationController.reverse(),
-          child: ScaleTransition(
-            scale: _scaleAnimation,
-            child: Card(
-              elevation: 3,
-              shadowColor: Colors.black.withOpacity(0.3),
-              margin: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Colors.white, Colors.grey.shade50.withOpacity(0.5)],
-                    stops: [0.0, 1.0],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.2),
-                      spreadRadius: 0,
-                      blurRadius: 6,
-                      offset: Offset(0, 3),
-                    ),
-                  ],
+    final l = AppLocalizations.of(context);
+    final passwordInvalid =
+        _showValidationErrors && !_validatePassword(_passwordController.text);
+    final confirmInvalid = _showValidationErrors &&
+        (_passwordController.text != _confirmPasswordController.text);
+
+    // No badge above the form (owner, 2026-09-26): the rules panel needs the
+    // room, and the form should sit high enough to read without scrolling.
+    return _page([
+      BentoAuthCard(
+        title: l.translate('auth_change_password_heading'),
+        children: [
+          Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  l.translate('auth_change_password_instructions'),
+                  textAlign: TextAlign.center,
+                  style: _leadStyle,
                 ),
-                child: Padding(
-                  padding: EdgeInsets.all(24.0),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          AppLocalizations.of(context).translate('auth_change_password_heading'),
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        SizedBox(height: 16),
-                        Text(
-                          AppLocalizations.of(context).translate('auth_change_password_instructions'),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.grey[700],
-                          ),
-                        ),
-                        SizedBox(height: 24),
-                        if (_errorMessage != null) ...[
-                          Container(
-                            padding: EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade50,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.red.shade200),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(SolarIcons.dangerCircleLinear, color: Colors.red.shade700, size: 20),
-                                SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _errorMessage!,
-                                    style: TextStyle(color: Colors.red.shade800, fontSize: 14),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          SizedBox(height: 16),
-                        ],
-                        TextFormField(
-                          controller: _passwordController,
-                          decoration: InputDecoration(
-                            labelText: AppLocalizations.of(context).translate('auth_new_password'),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
-                            ),
-                            enabledBorder: _showValidationErrors && !_validatePassword(_passwordController.text)
-                                ? OutlineInputBorder(
-                                    borderSide: BorderSide(color: Colors.red, width: 2.0),
-                                    borderRadius: BorderRadius.circular(12),
-                                  )
-                                : OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: Colors.grey.shade300),
-                                  ),
-                            focusedBorder: _showValidationErrors && !_validatePassword(_passwordController.text)
-                                ? OutlineInputBorder(
-                                    borderSide: BorderSide(color: Colors.red, width: 2.0),
-                                    borderRadius: BorderRadius.circular(12),
-                                  )
-                                : OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: Colors.indigo.shade400),
-                                  ),
-                            prefixIcon: Icon(
-                              SolarIcons.lockKeyholeMinimalisticLinear,
-                              color: _showValidationErrors && !_validatePassword(_passwordController.text) 
-                                  ? Colors.red 
-                                  : Colors.grey.shade600,
-                            ),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePassword ? SolarIcons.eyeLinear : SolarIcons.eyeClosedLinear,
-                                color: Colors.grey.shade600,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _obscurePassword = !_obscurePassword;
-                                });
-                              },
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
-                            contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                          ),
-                          obscureText: _obscurePassword,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return AppLocalizations.of(context).translate('auth_enter_a_password');
-                            }
-                            
-                            _validatePassword(value);
-                            return null;
-                          },
-                          onChanged: (value) {
-                            setState(() {
-                              _validatePassword(value);
-                              _showValidationErrors = false; // Reset validation error highlighting
-                            });
-                          },
-                        ),
-                        SizedBox(height: 16),
-                        TextFormField(
-                          controller: _confirmPasswordController,
-                          decoration: InputDecoration(
-                            labelText: AppLocalizations.of(context).translate('auth_confirm_new_password'),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
-                            ),
-                            enabledBorder: _showValidationErrors && (_passwordController.text != _confirmPasswordController.text)
-                                ? OutlineInputBorder(
-                                    borderSide: BorderSide(color: Colors.red, width: 2.0),
-                                    borderRadius: BorderRadius.circular(12),
-                                  )
-                                : OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: Colors.grey.shade300),
-                                  ),
-                            focusedBorder: _showValidationErrors && (_passwordController.text != _confirmPasswordController.text)
-                                ? OutlineInputBorder(
-                                    borderSide: BorderSide(color: Colors.red, width: 2.0),
-                                    borderRadius: BorderRadius.circular(12),
-                                  )
-                                : OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: Colors.indigo.shade400),
-                                  ),
-                            prefixIcon: Icon(
-                              SolarIcons.lockKeyholeMinimalisticLinear,
-                              color: _showValidationErrors && (_passwordController.text != _confirmPasswordController.text)
-                                  ? Colors.red
-                                  : Colors.grey.shade600,
-                            ),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscureConfirmPassword ? SolarIcons.eyeLinear : SolarIcons.eyeClosedLinear,
-                                color: Colors.grey.shade600,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _obscureConfirmPassword = !_obscureConfirmPassword;
-                                });
-                              },
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
-                            contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                          ),
-                          obscureText: _obscureConfirmPassword,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return AppLocalizations.of(context).translate('auth_confirm_password_required');
-                            }
-                            if (value != _passwordController.text) {
-                              return AppLocalizations.of(context).translate('auth_passwords_do_not_match');
-                            }
-                            return null;
-                          },
-                          onChanged: (value) {
-                            setState(() {
-                              _showValidationErrors = false; // Reset validation error highlighting
-                            });
-                          },
-                        ),
-                        SizedBox(height: 16),
-                        if (_validationErrors.isNotEmpty || _passwordController.text.isNotEmpty) ...[
-                          Container(
-                            padding: EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: _showValidationErrors && !_validatePassword(_passwordController.text)
-                                    ? Colors.red 
-                                    : Colors.grey.shade300,
-                                width: _showValidationErrors && !_validatePassword(_passwordController.text) ? 2.0 : 1.0,
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                              color: _showValidationErrors && !_validatePassword(_passwordController.text)
-                                  ? Colors.red.shade50
-                                  : Colors.grey.shade50.withOpacity(0.3),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  AppLocalizations.of(context).translate('auth_password_requirements'),
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                                SizedBox(height: 8),
-                                _buildValidationItem(
-                                  'At least 8 characters', 
-                                  _passwordController.text.length >= 8
-                                ),
-                                SizedBox(height: 8),
-                                _buildValidationItem(
-                                  'All of the following criteria are required:', 
-                                  true
-                                ),
-                                SizedBox(height: 4),
-                                Padding(
-                                  padding: EdgeInsets.only(left: 16),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      _buildValidationSubItem(
-                                        'Lower case letters (a-z)',
-                                        _passwordController.text.contains(RegExp(r'[a-z]'))
-                                      ),
-                                      SizedBox(height: 4),
-                                      _buildValidationSubItem(
-                                        'Upper case letters (A-Z)',
-                                        _passwordController.text.contains(RegExp(r'[A-Z]'))
-                                      ),
-                                      SizedBox(height: 4),
-                                      _buildValidationSubItem(
-                                        'Numbers (0-9)',
-                                        _passwordController.text.contains(RegExp(r'[0-9]'))
-                                      ),
-                                      SizedBox(height: 4),
-                                      _buildValidationSubItem(
-                                        'Special characters (e.g. !@#\$%^&*)',
-                                        _passwordController.text.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          SizedBox(height: 16),
-                        ],
-                        SizedBox(
-                          width: double.infinity,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [Colors.white, Colors.indigo.shade50.withOpacity(0.7)],
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.grey.withOpacity(0.3),
-                                  blurRadius: 8,
-                                  offset: Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _resetPassword,
-                              style: ElevatedButton.styleFrom(
-                                padding: EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                backgroundColor: Colors.transparent,
-                                shadowColor: Colors.transparent,
-                                foregroundColor: Colors.indigo.shade700,
-                                elevation: 0,
-                                minimumSize: Size(double.infinity, 50),
-                              ),
-                              child: _isLoading
-                                  ? SizedBox(
-                                      height: 24,
-                                      width: 24,
-                                      child: CircularProgressIndicator(
-                                        color: Colors.indigo.shade700,
-                                        strokeWidth: 3,
-                                      ),
-                                    )
-                                  : Text(
-                                      AppLocalizations.of(context).translate('auth_reset_password'),
-                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                                    ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                const SizedBox(height: AppSpacing.x6),
+                if (_errorMessage != null) ...[
+                  BentoAuthError(_errorMessage!),
+                  const SizedBox(height: AppSpacing.x4),
+                ],
+                TextFormField(
+                  controller: _passwordController,
+                  cursorColor: AppColors.signal,
+                  style: AppTypography.body.copyWith(color: AppColors.ink),
+                  decoration: _passwordDecoration(
+                    label: l.translate('auth_new_password'),
+                    invalid: passwordInvalid,
+                    obscured: _obscurePassword,
+                    onToggle: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
                   ),
+                  obscureText: _obscurePassword,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return AppLocalizations.of(context).translate('auth_enter_a_password');
+                    }
+                    
+                    _validatePassword(value);
+                    return null;
+                  },
+                  onChanged: (value) {
+                    setState(() {
+                      _validatePassword(value);
+                      _showValidationErrors = false; // Reset validation error highlighting
+                    });
+                  },
                 ),
-              ),
+                const SizedBox(height: AppSpacing.x3),
+                TextFormField(
+                  controller: _confirmPasswordController,
+                  cursorColor: AppColors.signal,
+                  style: AppTypography.body.copyWith(color: AppColors.ink),
+                  decoration: _passwordDecoration(
+                    label: l.translate('auth_confirm_new_password'),
+                    invalid: confirmInvalid,
+                    obscured: _obscureConfirmPassword,
+                    onToggle: () {
+                      setState(() {
+                        _obscureConfirmPassword = !_obscureConfirmPassword;
+                      });
+                    },
+                  ),
+                  obscureText: _obscureConfirmPassword,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return AppLocalizations.of(context).translate('auth_confirm_password_required');
+                    }
+                    if (value != _passwordController.text) {
+                      return AppLocalizations.of(context).translate('auth_passwords_do_not_match');
+                    }
+                    return null;
+                  },
+                  onChanged: (value) {
+                    setState(() {
+                      _showValidationErrors = false; // Reset validation error highlighting
+                    });
+                  },
+                ),
+                if (_validationErrors.isNotEmpty || _passwordController.text.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.x4),
+                  _buildRequirements(l, highlighted: passwordInvalid),
+                ],
+                const SizedBox(height: AppSpacing.x6),
+                BentoAuthPrimaryButton(
+                  label: l.translate('auth_reset_password'),
+                  loading: _isLoading,
+                  onPressed: _isLoading ? null : _resetPassword,
+                ),
+              ],
             ),
           ),
-        ),
+        ],
+      ),
+    ]);
+  }
+
+  /// The rules as a grey panel inside the card (a soft red one once a
+  /// submit broke them): met rules turn green, broken ones red.
+  Widget _buildRequirements(AppLocalizations l, {required bool highlighted}) {
+    final text = _passwordController.text;
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.x4),
+      decoration: BoxDecoration(
+        color: highlighted ? AppColors.stopSurface : AppColors.field,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l.translate('auth_password_requirements'),
+            style: AppTypography.label.copyWith(
+              color: AppColors.ink,
+              fontVariations: const [FontVariation('wght', 600)],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.x2),
+          _buildValidationItem(l.translate('auth_pw_rule_min_length'), text.length >= 8),
+          const SizedBox(height: AppSpacing.x2),
+          _buildValidationItem(l.translate('auth_pw_rule_all_required'), true),
+          const SizedBox(height: AppSpacing.x1),
+          Padding(
+            padding: const EdgeInsets.only(left: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildValidationSubItem(
+                  l.translate('auth_pw_rule_lower'),
+                  text.contains(RegExp(r'[a-z]')),
+                ),
+                const SizedBox(height: AppSpacing.x1),
+                _buildValidationSubItem(
+                  l.translate('auth_pw_rule_upper'),
+                  text.contains(RegExp(r'[A-Z]')),
+                ),
+                const SizedBox(height: AppSpacing.x1),
+                _buildValidationSubItem(
+                  l.translate('auth_pw_rule_number'),
+                  text.contains(RegExp(r'[0-9]')),
+                ),
+                const SizedBox(height: AppSpacing.x1),
+                _buildValidationSubItem(
+                  l.translate('auth_pw_rule_special'),
+                  text.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]')),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -703,10 +512,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
   /// means it overflowed on every device, and by more on the narrow ones.
   ///
   /// Wrapping rather than shrinking the font on purpose: a smaller font only
-  /// moves the width at which this breaks. These strings are still hardcoded
-  /// English, and the app ships in five languages whose translations of them
-  /// are longer, so the next occurrence would arrive with the translations
-  /// rather than being fixed by them.
+  /// moves the width at which this breaks, and the translations (2026-09-26)
+  /// run longer than the English.
   Widget _buildValidationItem(String text, bool isValid) {
     final bool highlightError = _showValidationErrors && !isValid;
     
@@ -720,17 +527,17 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
           padding: const EdgeInsets.only(top: 2),
           child: Icon(
             isValid ? SolarIcons.checkCircleBold : (highlightError ? SolarIcons.closeCircleBold : SolarIcons.recordLinear),
-            color: isValid ? Colors.green.shade600 : (highlightError ? Colors.red.shade600 : Colors.grey),
+            color: isValid ? AppColors.guide : (highlightError ? AppColors.stop : AppColors.inkTertiary),
             size: 16,
           ),
         ),
-        SizedBox(width: 8),
+        const SizedBox(width: 8),
         Expanded(
           child: Text(
             text,
-            style: TextStyle(
-              color: highlightError ? Colors.red.shade800 : (isValid ? Colors.grey.shade800 : Colors.grey.shade700),
-              fontWeight: highlightError ? FontWeight.bold : null,
+            style: AppTypography.label.copyWith(
+              color: highlightError ? AppColors.stop : (isValid ? AppColors.ink : AppColors.inkSecondary),
+              fontVariations: [FontVariation('wght', highlightError ? 600 : 400)],
             ),
           ),
         ),
@@ -742,30 +549,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with TickerPr
   /// more: these sit inside a 16px indent, so they have less room, and
   /// "Special characters (e.g. !@#\$%^&*)" is the longest string on the panel.
   Widget _buildValidationSubItem(String text, bool isValid) {
-    final bool highlightError = _showValidationErrors && !isValid;
-    
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 2),
-          child: Icon(
-            isValid ? SolarIcons.checkCircleBold : (highlightError ? SolarIcons.closeCircleBold : SolarIcons.recordLinear),
-            color: isValid ? Colors.green.shade600 : (highlightError ? Colors.red.shade600 : Colors.grey),
-            size: 16,
-          ),
-        ),
-        SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: TextStyle(
-              color: highlightError ? Colors.red.shade800 : (isValid ? Colors.grey.shade800 : Colors.grey.shade700),
-              fontWeight: highlightError ? FontWeight.bold : null,
-            ),
-          ),
-        ),
-      ],
-    );
+    return _buildValidationItem(text, isValid);
   }
 }
