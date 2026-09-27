@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/crash_reporter.dart';
 import 'package:provider/provider.dart';
-import '../data/license_data.dart';
 import '../widgets/enhanced_test_card.dart';
 import '../theme/app_theme.dart';
 import '../theme/bento_tokens.dart';

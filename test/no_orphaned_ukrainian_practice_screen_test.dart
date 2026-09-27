@@ -44,17 +44,18 @@ void main() {
     });
 
     test('no hardcoded Ukrainian practice data survives', () {
-      final data = File('lib/data/license_data.dart').readAsStringSync();
-      expect(data.contains('practiceTests'), isFalse,
-          reason: 'the hardcoded list was only read by the deleted screen');
-      // Scoped to the practice cards on purpose. A first draft asserted the
-      // whole file was free of Cyrillic and FAILED — correctly: `licenseTypes`
-      // and `theoryModules` are ALSO legacy Ukrainian ('Правила Дорожнього
-      // Руху', 'Знаки'), and `LicenseSelectionScreen`, their only reader,
-      // is orphaned too. That is a larger cleanup than this deletion, and was
-      // left as an owner decision rather than quietly widened here.
-      expect(data.contains('Складай іспит'), isFalse,
-          reason: 'the practice cards specifically must not come back');
+      // The whole legacy data file is gone (owner, 2026-09-26): after the
+      // practice cards went, its `licenseTypes` and `theoryModules` were also
+      // legacy Ukrainian ('Правила Дорожнього Руху', 'Знаки') whose only
+      // reader, `LicenseSelectionScreen`, was deleted as unused. Its model,
+      // `LicenseType`, had no other user and went with it.
+      for (final path in const [
+        'lib/data/license_data.dart',
+        'lib/models/license_type.dart',
+      ]) {
+        expect(File(path).existsSync(), isFalse,
+            reason: '$path is legacy from the Ukrainian app and was deleted');
+      }
     });
 
     test('positive control — the LIVE practice flow is untouched', () {
