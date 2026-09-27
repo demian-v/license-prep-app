@@ -2,67 +2,31 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../localization/app_localizations.dart';
+import '../theme/app_theme.dart';
+import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
+import '../widgets/bento_auth_parts.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
   _LoginScreenState createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   String? _errorMessage;
-  
-  // Animation controller for card press effect
-  late AnimationController _animationController;
-  late Animation<double> _scaleAnimation;
-  
-  @override
-  void initState() {
-    super.initState();
-    // Initialize animation controller
-    _animationController = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: 100),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.98).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-  }
+
+  // The whole-card press scale was removed with the Bento restyle
+  // (2026-09-26): the card is not a button.
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _animationController.dispose();
     super.dispose();
-  }
-
-  // Helper method to build app logo with fallback
-  Widget _buildAppLogo() {
-    return Container(
-      height: 80,
-      child: Image.asset(
-        'assets/images/logo/logo.png',
-        height: 80,
-        fit: BoxFit.contain,
-        errorBuilder: (context, error, stackTrace) {
-          debugPrint('❌ LoginScreen: Failed to load logo asset: $error');
-          return Text(
-            AppLocalizations.of(context).translate('auth_app_title'),
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Colors.indigo.shade400,
-            ),
-            textAlign: TextAlign.center,
-          );
-        },
-      ),
-    );
   }
 
   Future<void> _login() async {
@@ -136,235 +100,113 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     }
   }
 
+  // Navigation — moved unchanged from the inline handlers.
+  void _onForgotPassword() {
+    Navigator.pushNamed(context, '/forgot-password');
+  }
+
+  void _onSignup() {
+    Navigator.pushNamed(context, '/signup');
+  }
+
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    // Bento (2026-09-26): the logo on the field page, the form as one white
+    // card with grey field panels, the dark `ink` pill to log in, and the
+    // switch to signup as a blue link under the card.
+    final blocks = <Widget>[
+      bentoAuthLogo(l.translate('auth_app_title')),
+      const SizedBox(height: AppSpacing.x6),
+      BentoAuthCard(
+        title: l.translate('auth_log_in'),
+        children: [
+          Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_errorMessage != null) ...[
+                  BentoAuthError(_errorMessage!),
+                  const SizedBox(height: AppSpacing.x4),
+                ],
+                TextFormField(
+                  controller: _emailController,
+                  decoration: bentoFieldDecoration(
+                    label: l.translate('email'),
+                    icon: SolarIcons.letterLinear,
+                  ),
+                  style: AppTypography.body.copyWith(color: AppColors.ink),
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return AppLocalizations.of(context).translate('auth_enter_email');
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: AppSpacing.x3),
+                TextFormField(
+                  controller: _passwordController,
+                  decoration: bentoFieldDecoration(
+                    label: l.translate('password'),
+                    icon: SolarIcons.lockKeyholeMinimalisticLinear,
+                  ),
+                  style: AppTypography.body.copyWith(color: AppColors.ink),
+                  obscureText: true,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return AppLocalizations.of(context).translate('auth_enter_password');
+                    }
+                    return null;
+                  },
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: BentoAuthLink(
+                    label: l.translate('auth_forgot_password_link'),
+                    onPressed: _onForgotPassword,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.x3),
+                BentoAuthPrimaryButton(
+                  label: l.translate('auth_log_in'),
+                  onPressed: _isLoading ? null : _login,
+                  loading: _isLoading,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: AppSpacing.x3),
+      Center(
+        child: BentoAuthLink(
+          label: l.translate('auth_no_account_signup'),
+          onPressed: _onSignup,
+        ),
+      ),
+    ];
+
     return Scaffold(
+      backgroundColor: AppColors.field,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: EdgeInsets.all(24.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.x4 + AppSpacing.x1,
+              vertical: AppSpacing.x6,
+            ),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                SizedBox(height: 0),
-                _buildAppLogo(),
-                SizedBox(height: 20),
-                GestureDetector(
-                  onTapDown: (_) => _animationController.forward(),
-                  onTapUp: (_) => _animationController.reverse(),
-                  onTapCancel: () => _animationController.reverse(),
-                  child: ScaleTransition(
-                    scale: _scaleAnimation,
-                    child: Card(
-                      elevation: 3,
-                      shadowColor: Colors.black.withOpacity(0.3),
-                      margin: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Colors.white, Colors.grey.shade50.withOpacity(0.5)],
-                            stops: [0.0, 1.0],
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.2),
-                              spreadRadius: 0,
-                              blurRadius: 6,
-                              offset: Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: Padding(
-                          padding: EdgeInsets.all(24.0),
-                          child: Form(
-                            key: _formKey,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Text(
-                                  AppLocalizations.of(context).translate('auth_log_in'),
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                SizedBox(height: 24),
-                                if (_errorMessage != null) ...[
-                                  Container(
-                                    padding: EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: Colors.red.shade50,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: Colors.red.shade200),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(SolarIcons.dangerCircleLinear, color: Colors.red.shade700, size: 20),
-                                        SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            _errorMessage!,
-                                            style: TextStyle(color: Colors.red.shade800, fontSize: 14),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  SizedBox(height: 16),
-                                ],
-                                TextFormField(
-                                  controller: _emailController,
-                                  decoration: InputDecoration(
-                                    labelText: AppLocalizations.of(context).translate('email'),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(color: Colors.grey.shade300),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(color: Colors.grey.shade300),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(color: Colors.indigo.shade400),
-                                    ),
-                                    prefixIcon: Icon(SolarIcons.letterBold, color: Colors.grey.shade600),
-                                    filled: true,
-                                    fillColor: Colors.white,
-                                    contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                                  ),
-                                  keyboardType: TextInputType.emailAddress,
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return AppLocalizations.of(context).translate('auth_enter_email');
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                SizedBox(height: 16),
-                                TextFormField(
-                                  controller: _passwordController,
-                                  decoration: InputDecoration(
-                                    labelText: AppLocalizations.of(context).translate('password'),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(color: Colors.grey.shade300),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(color: Colors.grey.shade300),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(color: Colors.indigo.shade400),
-                                    ),
-                                    prefixIcon: Icon(SolarIcons.lockKeyholeMinimalisticBold, color: Colors.grey.shade600),
-                                    filled: true,
-                                    fillColor: Colors.white,
-                                    contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                                  ),
-                                  obscureText: true,
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return AppLocalizations.of(context).translate('auth_enter_password');
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                SizedBox(height: 8),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: TextButton(
-                                    onPressed: () {
-                                      Navigator.pushNamed(context, '/forgot-password');
-                                    },
-                                    child: Text(
-                                      AppLocalizations.of(context).translate('auth_forgot_password_link'),
-                                      style: TextStyle(
-                                        color: Colors.indigo.shade400,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    style: TextButton.styleFrom(
-                                      padding: EdgeInsets.zero,
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    ),
-                                  ),
-                                ),
-                                SizedBox(height: 24),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(12),
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: [Colors.white, Colors.indigo.shade50.withOpacity(0.7)],
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.grey.withOpacity(0.3),
-                                        blurRadius: 8,
-                                        offset: Offset(0, 4),
-                                      ),
-                                    ],
-                                  ),
-                                  child: ElevatedButton(
-                                    onPressed: _isLoading ? null : _login,
-                                    style: ElevatedButton.styleFrom(
-                                      padding: EdgeInsets.symmetric(vertical: 16),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      backgroundColor: Colors.transparent,
-                                      shadowColor: Colors.transparent,
-                                      foregroundColor: Colors.indigo.shade700,
-                                      elevation: 0,
-                                      minimumSize: Size(double.infinity, 50),
-                                    ),
-                                    child: _isLoading
-                                        ? SizedBox(
-                                            height: 24,
-                                            width: 24,
-                                            child: CircularProgressIndicator(
-                                              color: Colors.indigo.shade700,
-                                              strokeWidth: 3,
-                                            ),
-                                          )
-                                        : Text(
-                                            AppLocalizations.of(context).translate('auth_log_in'),
-                                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                                          ),
-                                  ),
-                                ),
-                                SizedBox(height: 16),
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.pushNamed(context, '/signup');
-                                  },
-                                  child: Text(
-                                    AppLocalizations.of(context).translate('auth_no_account_signup'),
-                                    style: TextStyle(
-                                      color: Colors.indigo.shade400,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+                for (var i = 0; i < blocks.length; i++)
+                  StaggerIn(
+                    index: i,
+                    count: blocks.length,
+                    curve: BentoTokens.curve,
+                    child: blocks[i],
                   ),
-                ),
               ],
             ),
           ),

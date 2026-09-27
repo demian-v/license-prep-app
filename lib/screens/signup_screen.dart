@@ -4,17 +4,21 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/auth_provider.dart';
 import '../services/analytics_service.dart';
+import '../services/in_app_purchase_service.dart';
 import 'language_selection_screen.dart';
 import 'verification_code_screen.dart';
 import '../localization/app_localizations.dart';
+import '../theme/app_theme.dart';
+import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
+import '../widgets/bento_auth_parts.dart';
 
 class SignupScreen extends StatefulWidget {
   @override
   _SignupScreenState createState() => _SignupScreenState();
 }
 
-class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMixin {
+class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -24,62 +28,23 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
   bool _agreedToTerms = false;
   bool _termsError = false;
   
-  // Animation controller for card press effect
-  late AnimationController _animationController;
-  late Animation<double> _scaleAnimation;
+  // The whole-card press scale was removed with the Bento restyle
+  // (2026-09-26): the card is not a button.
   
   // Analytics tracking variables
   DateTime? _formStartTime;
   bool _formStarted = false;
   bool _hasFormErrors = false;
   String? _formErrors;
-  
-  @override
-  void initState() {
-    super.initState();
-    // Initialize animation controller
-    _animationController = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: 100),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.98).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-  }
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
-    _animationController.dispose();
     super.dispose();
   }
 
-  // Helper method to build app logo with fallback
-  Widget _buildAppLogo() {
-    return Container(
-      height: 80,
-      child: Image.asset(
-        'assets/images/logo/logo.png',
-        height: 80,
-        fit: BoxFit.contain,
-        errorBuilder: (context, error, stackTrace) {
-          debugPrint('❌ SignupScreen: Failed to load logo asset: $error');
-          return Text(
-            AppLocalizations.of(context).translate('auth_app_title'),
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Colors.indigo.shade400,
-            ),
-            textAlign: TextAlign.center,
-          );
-        },
-      ),
-    );
-  }
-  
   // Analytics tracking methods
   void _onFormStarted() {
     if (!_formStarted) {
@@ -362,335 +327,239 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.start,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(height: 0),
-                _buildAppLogo(),
-                SizedBox(height: 20),
-                GestureDetector(
-                  onTapDown: (_) => _animationController.forward(),
-                  onTapUp: (_) => _animationController.reverse(),
-                  onTapCancel: () => _animationController.reverse(),
-                  child: ScaleTransition(
-                    scale: _scaleAnimation,
-                    child: Card(
-                      elevation: 3,
-                      shadowColor: Colors.black.withOpacity(0.3),
-                      margin: EdgeInsets.symmetric(horizontal: 2, vertical: 8),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+  // Moved unchanged from the inline handlers.
+  void _onTermsChanged(bool? value) {
+    setState(() {
+      _agreedToTerms = value ?? false;
+      if (_agreedToTerms) {
+        _termsError = false;
+      }
+    });
+  }
+
+  void _onLogin() {
+    Navigator.pushReplacementNamed(context, '/login');
+  }
+
+  /// The terms agreement as a grey panel with the checkbox; red while the
+  /// user tried to sign up without ticking it.
+  Widget _buildTerms(AppLocalizations l) {
+    // The price exactly as the store formats it for this storefront, as on
+    // the paywall — never a typed-in «$9.99». Before the store has answered
+    // (or without a store) the price sentence is left out rather than
+    // guessed.
+    final storePrice = Provider.of<InAppPurchaseService>(context, listen: false)
+        .getProduct(InAppPurchaseService.monthlyProductId)
+        ?.price;
+    return AnimatedContainer(
+      duration: AppMotion.duration(context, BentoTokens.state),
+      curve: AppMotion.enter,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.x1,
+        AppSpacing.x2,
+        AppSpacing.x3,
+        AppSpacing.x3,
+      ),
+      decoration: BoxDecoration(
+        color: _termsError ? AppColors.stopSurface : AppColors.field,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Checkbox(
+                value: _agreedToTerms,
+                onChanged: _onTermsChanged,
+                activeColor: AppColors.signal,
+                side: BorderSide(
+                  color: _termsError ? AppColors.stop : AppColors.inkSecondary,
+                  width: 1.5,
+                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.x2 + 2),
+                  child: RichText(
+                    text: TextSpan(
+                      style: AppTypography.caption.copyWith(
+                        fontSize: 13,
+                        height: 19 / 13,
+                        color: _termsError ? AppColors.stop : AppColors.inkSecondary,
+                        fontVariations: const [FontVariation('wght', 400)],
                       ),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Colors.white, Colors.grey.shade50.withOpacity(0.5)],
-                            stops: [0.0, 1.0],
+                      children: [
+                        TextSpan(text: l.translate('signup_terms_prefix')),
+                        TextSpan(
+                          text: l.translate('terms_of_use'),
+                          style: TextStyle(
+                            color: _termsError ? AppColors.stop : AppColors.signal,
+                            decoration: TextDecoration.underline,
+                            decorationColor: _termsError ? AppColors.stop : AppColors.signal,
+                            fontVariations: const [FontVariation('wght', 500)],
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.2),
-                              spreadRadius: 0,
-                              blurRadius: 6,
-                              offset: Offset(0, 3),
-                            ),
-                          ],
+                          recognizer: TapGestureRecognizer()
+                            ..onTap = () {
+                              _launchTermsOfService();
+                            },
                         ),
-                        child: Padding(
-                          padding: EdgeInsets.all(24.0),
-                          child: Form(
-                            key: _formKey,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Text(
-                                  AppLocalizations.of(context).translate('auth_create_account'),
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                SizedBox(height: 24),
-                                if (_errorMessage != null) ...[
-                                  Container(
-                                    padding: EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: Colors.red.shade50,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: Colors.red.shade200),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(SolarIcons.dangerCircleLinear, color: Colors.red.shade700, size: 20),
-                                        SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            _errorMessage!,
-                                            style: TextStyle(color: Colors.red.shade800, fontSize: 14),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  SizedBox(height: 16),
-                                ],
-                                TextFormField(
-                                  controller: _nameController,
-                                  onTap: _onFormStarted,
-                                  onChanged: (value) => _onFormStarted(),
-                                  decoration: InputDecoration(
-                                    labelText: AppLocalizations.of(context).translate('auth_full_name'),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(color: Colors.grey.shade300),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(color: Colors.grey.shade300),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(color: Colors.indigo.shade400),
-                                    ),
-                                    prefixIcon: Icon(SolarIcons.userRoundedBold, color: Colors.grey.shade600),
-                                    filled: true,
-                                    fillColor: Colors.white,
-                                    contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                                  ),
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return AppLocalizations.of(context).translate('auth_enter_name');
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                SizedBox(height: 16),
-                                TextFormField(
-                                  controller: _emailController,
-                                  onTap: _onFormStarted,
-                                  onChanged: (value) => _onFormStarted(),
-                                  decoration: InputDecoration(
-                                    labelText: AppLocalizations.of(context).translate('email'),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(color: Colors.grey.shade300),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(color: Colors.grey.shade300),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(color: Colors.indigo.shade400),
-                                    ),
-                                    prefixIcon: Icon(SolarIcons.letterBold, color: Colors.grey.shade600),
-                                    filled: true,
-                                    fillColor: Colors.white,
-                                    contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                                  ),
-                                  keyboardType: TextInputType.emailAddress,
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return AppLocalizations.of(context).translate('auth_enter_email');
-                                    }
-                                    // Check for valid email format
-                                    final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
-                                    if (!emailRegex.hasMatch(value)) {
-                                      return AppLocalizations.of(context).translate('auth_enter_valid_email');
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                SizedBox(height: 16),
-                                TextFormField(
-                                  controller: _passwordController,
-                                  onTap: _onFormStarted,
-                                  onChanged: (value) => _onFormStarted(),
-                                  decoration: InputDecoration(
-                                    labelText: AppLocalizations.of(context).translate('password'),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(color: Colors.grey.shade300),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(color: Colors.grey.shade300),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(color: Colors.indigo.shade400),
-                                    ),
-                                    prefixIcon: Icon(SolarIcons.lockKeyholeMinimalisticBold, color: Colors.grey.shade600),
-                                    filled: true,
-                                    fillColor: Colors.white,
-                                    contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                                  ),
-                                  obscureText: true,
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return AppLocalizations.of(context).translate('auth_enter_a_password');
-                                    }
-                                    if (value.length < 6) {
-                                      return AppLocalizations.of(context).translate('auth_password_min_length');
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                SizedBox(height: 16),
-                                Container(
-                                  padding: EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: _termsError ? Colors.red.shade50 : Colors.blue.shade50,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: _termsError ? Colors.red.shade300 : Colors.blue.shade100,
-                                      width: _termsError ? 2 : 1,
-                                    ),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        crossAxisAlignment: CrossAxisAlignment.center,
-                                        children: [
-                                          Checkbox(
-                                            value: _agreedToTerms,
-                                            onChanged: (value) {
-                                              setState(() {
-                                                _agreedToTerms = value ?? false;
-                                                if (_agreedToTerms) {
-                                                  _termsError = false;
-                                                }
-                                              });
-                                            },
-                                            activeColor: Colors.indigo.shade400,
-                                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                            visualDensity: VisualDensity.compact,
-                                          ),
-                                          Expanded(
-                                            child: RichText(
-                                              text: TextSpan(
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: _termsError ? Colors.red.shade800 : Colors.blue.shade800,
-                                                ),
-                                                children: [
-                                                  TextSpan(text: 'By signing up, you agree to our '),
-                                                  TextSpan(
-                                                    text: 'Terms of Service',
-                                                    style: TextStyle(
-                                                      color: _termsError ? Colors.red.shade800 : Colors.blue.shade700,
-                                                      decoration: TextDecoration.underline,
-                                                      fontWeight: FontWeight.w500,
-                                                    ),
-                                                    recognizer: TapGestureRecognizer()
-                                                      ..onTap = () {
-                                                        _launchTermsOfService();
-                                                      },
-                                                  ),
-                                                  TextSpan(
-                                                    text: ' and start your 3-day free trial. After the trial ends, you\'ll lose access to premium features. You can subscribe for \$9.99/month.',
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      if (_termsError) ...[
-                                        Padding(
-                                          padding: const EdgeInsets.only(left: 12.0, top: 4.0),
-                                          child: Text(
-                                            AppLocalizations.of(context).translate('auth_agree_terms_required'),
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.red.shade800,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                                SizedBox(height: 24),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(12),
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: [Colors.white, Colors.indigo.shade50.withOpacity(0.7)],
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.grey.withOpacity(0.3),
-                                        blurRadius: 8,
-                                        offset: Offset(0, 4),
-                                      ),
-                                    ],
-                                  ),
-                                  child: ElevatedButton(
-                                    onPressed: _isLoading ? null : _signup,
-                                    style: ElevatedButton.styleFrom(
-                                      padding: EdgeInsets.symmetric(vertical: 16),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      backgroundColor: Colors.transparent,
-                                      shadowColor: Colors.transparent,
-                                      foregroundColor: Colors.indigo.shade700,
-                                      elevation: 0,
-                                      minimumSize: Size(double.infinity, 50),
-                                    ),
-                                    child: _isLoading
-                                        ? SizedBox(
-                                            height: 24,
-                                            width: 24,
-                                            child: CircularProgressIndicator(
-                                              color: Colors.indigo.shade700,
-                                              strokeWidth: 3,
-                                            ),
-                                          )
-                                        : Text(
-                                            AppLocalizations.of(context).translate('signup'),
-                                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                                          ),
-                                  ),
-                                ),
-                                SizedBox(height: 16),
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.pushReplacementNamed(context, '/login');
-                                  },
-                                  child: Text(
-                                    AppLocalizations.of(context).translate('auth_have_account_login'),
-                                    style: TextStyle(
-                                      color: Colors.indigo.shade400,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
+                        TextSpan(text: l.translate('signup_terms_trial')),
+                        if (storePrice != null)
+                          TextSpan(
+                            text: l
+                                .translate('signup_terms_price')
+                                .replaceAll('{price}', '$storePrice${l.translate('per_month')}'),
                           ),
-                        ),
-                      ),
+                      ],
                     ),
                   ),
                 ),
+              ),
+            ],
+          ),
+          if (_termsError) ...[
+            Padding(
+              padding: const EdgeInsets.only(left: AppSpacing.x3, top: AppSpacing.x1),
+              child: Text(
+                l.translate('auth_agree_terms_required'),
+                style: AppTypography.caption.copyWith(
+                  fontSize: 13,
+                  color: AppColors.stop,
+                  fontVariations: const [FontVariation('wght', 500)],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    // Bento (2026-09-26), as the login screen: the logo, the form as one
+    // white card with grey field panels and the terms panel, the dark `ink`
+    // pill to sign up, and the switch to login as a blue link.
+    final blocks = <Widget>[
+      bentoAuthLogo(l.translate('auth_app_title')),
+      const SizedBox(height: AppSpacing.x6),
+      BentoAuthCard(
+        title: l.translate('auth_create_account'),
+        children: [
+          Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_errorMessage != null) ...[
+                  BentoAuthError(_errorMessage!),
+                  const SizedBox(height: AppSpacing.x4),
+                ],
+                TextFormField(
+                  controller: _nameController,
+                  onTap: _onFormStarted,
+                  onChanged: (value) => _onFormStarted(),
+                  decoration: bentoFieldDecoration(
+                    label: l.translate('auth_full_name'),
+                    icon: SolarIcons.userRoundedLinear,
+                  ),
+                  style: AppTypography.body.copyWith(color: AppColors.ink),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return AppLocalizations.of(context).translate('auth_enter_name');
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: AppSpacing.x3),
+                TextFormField(
+                  controller: _emailController,
+                  onTap: _onFormStarted,
+                  onChanged: (value) => _onFormStarted(),
+                  decoration: bentoFieldDecoration(
+                    label: l.translate('email'),
+                    icon: SolarIcons.letterLinear,
+                  ),
+                  style: AppTypography.body.copyWith(color: AppColors.ink),
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return AppLocalizations.of(context).translate('auth_enter_email');
+                    }
+                    // Check for valid email format
+                    final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+                    if (!emailRegex.hasMatch(value)) {
+                      return AppLocalizations.of(context).translate('auth_enter_valid_email');
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: AppSpacing.x3),
+                TextFormField(
+                  controller: _passwordController,
+                  onTap: _onFormStarted,
+                  onChanged: (value) => _onFormStarted(),
+                  decoration: bentoFieldDecoration(
+                    label: l.translate('password'),
+                    icon: SolarIcons.lockKeyholeMinimalisticLinear,
+                  ),
+                  style: AppTypography.body.copyWith(color: AppColors.ink),
+                  obscureText: true,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return AppLocalizations.of(context).translate('auth_enter_a_password');
+                    }
+                    if (value.length < 6) {
+                      return AppLocalizations.of(context).translate('auth_password_min_length');
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: AppSpacing.x3),
+                _buildTerms(l),
+                const SizedBox(height: AppSpacing.x4 + AppSpacing.x1),
+                BentoAuthPrimaryButton(
+                  label: l.translate('signup'),
+                  onPressed: _isLoading ? null : _signup,
+                  loading: _isLoading,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: AppSpacing.x3),
+      Center(
+        child: BentoAuthLink(
+          label: l.translate('auth_have_account_login'),
+          onPressed: _onLogin,
+        ),
+      ),
+    ];
+
+    return Scaffold(
+      backgroundColor: AppColors.field,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.x4 + AppSpacing.x1,
+              vertical: AppSpacing.x6,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < blocks.length; i++)
+                  StaggerIn(
+                    index: i,
+                    count: blocks.length,
+                    curve: BentoTokens.curve,
+                    child: blocks[i],
+                  ),
               ],
             ),
           ),
