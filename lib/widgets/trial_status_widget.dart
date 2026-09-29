@@ -79,18 +79,16 @@ class TrialStatusWidget extends StatelessWidget {
   /// while nothing is wrong, amber when the trial is nearly out, red once
   /// access has actually lapsed. It is one card, not four hand-styled ones.
   ///
-  /// A small borderless card — bold label, the detail in a pill, and the
-  /// action as a solid blue pill.
+  /// A small borderless card, stacked (owner, 2026-09-28): the tone disc and
+  /// bold title, the detail under the title, and the action as a full-width
+  /// dark `ink` pill at the bottom — like the other secondary actions, so the
+  /// card never competes with the blue exam hero below it. It used to be one
+  /// row, where the action beside the title squeezed «Пробный период активен»
+  /// small and a sentence in the value pill wrapped into a five-line blob.
   ///
-  /// [stacked] is for a detail that is a sentence, not a value (the no-plan
-  /// state, 2026-09-26): the pill was made for «Дней осталось: 3» and wrapped a
-  /// sentence into a five-line bold blob, and the long action label beside it
-  /// squeezed the title small. Stacked, the sentence is plain grey text under
-  /// the title and the action a full-width pill below.
-  ///
-  /// [pillSubtitle] keeps the detail in its pill inside the stacked layout —
-  /// the active trial's «Дней осталось: 3» is a value, not a sentence, and
-  /// stacks only so its action can run full width (owner, 2026-09-28).
+  /// [pillSubtitle] shows the detail in a pill — for a value, the active
+  /// trial's «Дней осталось: 3». Otherwise the detail is a sentence and is
+  /// plain grey text.
   Widget _buildRow({
     required BuildContext context,
     required String iconAsset,
@@ -100,61 +98,21 @@ class TrialStatusWidget extends StatelessWidget {
     VoidCallback? onAction,
     Color tone = AppColors.inkSecondary,
     Color toneSurface = AppColors.field,
-    bool stacked = false,
     bool pillSubtitle = false,
-    bool softAction = false,
   }) {
     final bool hasSubtitle = subtitle != null && subtitle.trim().isNotEmpty;
     final bool hasAction = actionLabel != null && onAction != null;
 
-    final actionStyle = FilledButton.styleFrom(
-      minimumSize: const Size(0, 44),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.x4,
-      ),
-      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      shape: const StadiumBorder(),
-    );
-    Widget actionText(String label) => Text(
-          label,
-          style: AppTypography.label.copyWith(
-            fontSize: 13,
-            color: AppColors.onSignal,
-            fontVariations: const [FontVariation('wght', 700)],
-          ),
-        );
     final icon = Container(
-      width: stacked ? 44 : 40,
-      height: stacked ? 44 : 40,
+      width: 44,
+      height: 44,
       decoration: BoxDecoration(
         color: toneSurface,
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
-      child: AppIcons.icon(iconAsset, size: stacked ? 20 : 18, color: tone),
+      child: AppIcons.icon(iconAsset, size: 20, color: tone),
     );
-    Widget subtitlePill(String text) => Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.x2,
-            vertical: 2,
-          ),
-          decoration: BoxDecoration(
-            color: AppColors.field,
-            borderRadius: BorderRadius.circular(BentoTokens.chip),
-          ),
-          child: Text(
-            text,
-            style: AppTypography.caption.copyWith(
-              color: AppColors.ink,
-              fontVariations: const [
-                FontVariation('wght', 600),
-              ],
-              fontFeatures: const [
-                FontFeature.tabularFigures(),
-              ],
-            ),
-          ),
-        );
     final titleText = FittedBox(
       fit: BoxFit.scaleDown,
       alignment: Alignment.centerLeft,
@@ -167,94 +125,6 @@ class TrialStatusWidget extends StatelessWidget {
         ),
       ),
     );
-
-    if (stacked) {
-      return Container(
-        padding: const EdgeInsets.all(AppSpacing.x4),
-        decoration: BoxDecoration(
-          color: AppColors.paper,
-          borderRadius: BorderRadius.circular(BentoTokens.card),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x0F0E1F4D),
-              blurRadius: 24,
-              offset: Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              // The disc sits centred on a short title + pill block; beside a
-              // sentence it stays at the top.
-              crossAxisAlignment: hasSubtitle && !pillSubtitle
-                  ? CrossAxisAlignment.start
-                  : CrossAxisAlignment.center,
-              children: [
-                icon,
-                const SizedBox(width: AppSpacing.x3),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      titleText,
-                      if (hasSubtitle && pillSubtitle) ...[
-                        const SizedBox(height: AppSpacing.x1),
-                        subtitlePill(subtitle),
-                      ] else if (hasSubtitle) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          subtitle,
-                          style: AppTypography.body.copyWith(
-                            fontSize: 14,
-                            height: 20 / 14,
-                            color: AppColors.inkSecondary,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            if (hasAction) ...[
-              const SizedBox(height: AppSpacing.x4),
-              if (softAction)
-                // A live trial is not an emergency: the dark `ink` pill, like
-                // the other secondary actions (owner, 2026-09-28), so the card
-                // does not out-shout the blue exam hero below it.
-                FilledButton(
-                  onPressed: onAction,
-                  style: actionStyle.copyWith(
-                    minimumSize: const WidgetStatePropertyAll(Size(0, 48)),
-                    backgroundColor: const WidgetStatePropertyAll(AppColors.ink),
-                    overlayColor: WidgetStatePropertyAll(
-                        AppColors.onSignal.withValues(alpha: 0.08)),
-                    elevation: const WidgetStatePropertyAll(0),
-                  ),
-                  child: Text(
-                    actionLabel,
-                    style: AppTypography.label.copyWith(
-                      fontSize: 15,
-                      color: AppColors.onSignal,
-                      fontVariations: const [FontVariation('wght', 600)],
-                    ),
-                  ),
-                )
-              else
-                FilledButton(
-                  onPressed: onAction,
-                  style: actionStyle,
-                  child: actionText(actionLabel),
-                ),
-            ],
-          ],
-        ),
-      );
-    }
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.x4),
@@ -269,31 +139,89 @@ class TrialStatusWidget extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          icon,
-          const SizedBox(width: AppSpacing.x3),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // One line (owner, 2026-09-26): a long title — «Пробный
-                // период активен» — shrinks slightly rather than wrapping.
-                titleText,
-                if (hasSubtitle) ...[
-                  const SizedBox(height: AppSpacing.x1),
-                  subtitlePill(subtitle),
-                ],
-              ],
-            ),
+          Row(
+            // The disc sits centred on a short title + pill block; beside a
+            // sentence it stays at the top.
+            crossAxisAlignment: hasSubtitle && !pillSubtitle
+                ? CrossAxisAlignment.start
+                : CrossAxisAlignment.center,
+            children: [
+              icon,
+              const SizedBox(width: AppSpacing.x3),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    titleText,
+                    if (hasSubtitle && pillSubtitle) ...[
+                      const SizedBox(height: AppSpacing.x1),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.x2,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.field,
+                          borderRadius:
+                              BorderRadius.circular(BentoTokens.chip),
+                        ),
+                        child: Text(
+                          subtitle,
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.ink,
+                            fontVariations: const [
+                              FontVariation('wght', 600),
+                            ],
+                            fontFeatures: const [
+                              FontFeature.tabularFigures(),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ] else if (hasSubtitle) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: AppTypography.body.copyWith(
+                          fontSize: 14,
+                          height: 20 / 14,
+                          color: AppColors.inkSecondary,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
           if (hasAction) ...[
-            const SizedBox(width: AppSpacing.x2),
+            const SizedBox(height: AppSpacing.x4),
             FilledButton(
               onPressed: onAction,
-              style: actionStyle,
-              child: actionText(actionLabel),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 48),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.x4,
+                ),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: const StadiumBorder(),
+                backgroundColor: AppColors.ink,
+                overlayColor: AppColors.onSignal,
+                elevation: 0,
+              ),
+              child: Text(
+                actionLabel,
+                style: AppTypography.label.copyWith(
+                  fontSize: 15,
+                  color: AppColors.onSignal,
+                  fontVariations: const [FontVariation('wght', 600)],
+                ),
+              ),
             ),
           ],
         ],
@@ -363,7 +291,6 @@ class TrialStatusWidget extends StatelessWidget {
       subtitle: message,
       tone: AppColors.warn,
       toneSurface: AppColors.warnSurface,
-      stacked: true,
       // An unverified email is fixed in the app, not on the paywall, so only
       // the genuine no-subscription case offers to subscribe.
       actionLabel: needsVerification
@@ -406,13 +333,9 @@ class TrialStatusWidget extends StatelessWidget {
               ? AppColors.warn
               : AppColors.warn,
       toneSurface: isExpired ? AppColors.stopSurface : AppColors.warnSurface,
-      // Stacked in every state, so the action is a full-width pill under the
-      // title (owner, 2026-09-28) and the title no longer shrinks beside it.
       // Active, the days left stay in their pill; expired, the detail is a
       // sentence («Потрібна підписка для продовження») and goes plain grey.
-      stacked: true,
       pillSubtitle: !isExpired,
-      softAction: !isExpired,
       actionLabel: localizations.translate('upgrade_now'),
       onAction: () => Navigator.pushNamed(context, '/subscription'),
     );
@@ -431,7 +354,6 @@ class TrialStatusWidget extends StatelessWidget {
       subtitle: localizations.translate('renew_to_continue'),
       tone: AppColors.stop,
       toneSurface: AppColors.stopSurface,
-      stacked: true,
       actionLabel: localizations.translate('renew_now'),
       onAction: () => Navigator.pushNamed(context, '/subscription'),
     );
