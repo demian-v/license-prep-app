@@ -903,8 +903,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                       ),
                     ),
                     
-                    // Bottom Save Button — blue when there is something to
-                    // save, grey until then.
+                    // Bottom Save Button — the dark ink pill when there is
+                    // something to save (owner, 2026-09-28), grey until then.
                     Padding(
                       padding: const EdgeInsets.fromLTRB(
                         AppSpacing.x4,
@@ -918,6 +918,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                         curve: BentoTokens.curve,
                         child: BentoActionButton(
                           text: _translate('save', languageProvider),
+                          ink: true,
                           onTap: _isFormModified() 
                             ? () => _saveChanges(context, languageProvider)
                             : null,

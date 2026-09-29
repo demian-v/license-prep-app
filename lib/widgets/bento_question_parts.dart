@@ -557,11 +557,17 @@ class BentoActionButton extends StatelessWidget {
     required this.onTap,
     this.primary = true,
     this.onCard = false,
+    this.ink = false,
   });
 
   final String text;
   final VoidCallback? onTap;
   final bool primary;
+
+  /// The dark `ink` pill — for a page's own action that is not the step
+  /// forward in a flow (Сохранить on Персональная информация, owner
+  /// 2026-09-28). Disabled it greys out like the others.
+  final bool ink;
 
   /// Inside a white card the secondary pill is a field fill, not a lifted
   /// white one.
@@ -573,14 +579,16 @@ class BentoActionButton extends StatelessWidget {
     final bool enabled = onTap != null;
     final Color bg = !enabled
         ? AppColors.border
-        : primary
+        : ink
+            ? AppColors.ink
+            : primary
             ? AppColors.signal
             : onCard
                 ? AppColors.field
                 : AppColors.paper;
     final Color fg = !enabled
         ? AppColors.inkTertiary
-        : primary
+        : ink || primary
             ? AppColors.onSignal
             : AppColors.ink;
     return PressScale(
@@ -594,7 +602,7 @@ class BentoActionButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: bg,
           borderRadius: radius,
-          boxShadow: primary
+          boxShadow: primary || ink
               ? (enabled ? AppColors.shadowRaised : null)
               : onCard
                   ? null
