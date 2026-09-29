@@ -1,0 +1,459 @@
+<meta charset="utf-8">
+<title>DriveUSA Story Drafts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a review sheet — three phones side by side (stacked on narrow screens), each a live prototype with its notes underneath. */
+:root{
+  --bg:#EEF1F6; --surface:#FFFFFF; --fg:#0E1422; --muted:#5A6475; --line:#D3D9E6; --accent:#0048C3; --accent-soft:#D6E3FD;
+  --font:'Rubik', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0B0F18;--surface:#151B28;--fg:#E8ECF4;--muted:#9AA4B8;--line:#2A3346;--accent:#7AA3F8;--accent-soft:#1C2A4A;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0B0F18;--surface:#151B28;--fg:#E8ECF4;--muted:#9AA4B8;--line:#2A3346;--accent:#7AA3F8;--accent-soft:#1C2A4A;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);margin:0;padding-inline:16px;padding-block:28px 56px}
+.wrap{max-width:1260px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500}
+h1{font-size:30px;line-height:1.15;margin:6px 0 8px;font-weight:600;text-wrap:balance}
+header p{margin:0;color:var(--muted);font-size:15px;line-height:1.5;max-width:62ch}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:28px 24px;align-items:start}
+.opt{display:flex;flex-direction:column;gap:14px;min-width:0}
+.opt-head{display:flex;align-items:flex-start;gap:12px}
+.badge{flex:none;width:34px;height:34px;border-radius:12px;background:var(--fg);color:var(--bg);display:grid;place-items:center;font-weight:600;font-size:16px}
+.opt-head h2{margin:0;font-size:19px;font-weight:600}
+.opt-head p{margin:3px 0 0;color:var(--muted);font-size:14px;line-height:1.4}
+.ctl{display:flex;gap:8px;flex-wrap:wrap}
+.ctl button{font:500 13px var(--font);border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:8px 14px;border-radius:999px;cursor:pointer}
+.ctl button:hover{border-color:var(--accent)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.pwrap{width:100%;max-width:380px;position:relative}
+.notes{margin:0;display:grid;gap:10px;font-size:14px;line-height:1.5;max-width:380px}
+.notes dt{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500}
+.notes dd{margin:2px 0 0}
+
+/* ---------- phone ---------- */
+.phone{position:absolute;left:0;top:0;width:380px;height:803px;border-radius:58px;background:#0E1422;padding:10px;transform-origin:0 0;box-shadow:0 30px 60px -30px rgba(14,31,77,.45)}
+.screen{position:relative;width:360px;height:783px;border-radius:48px;overflow:hidden;background:#F2F4F8;color:#0E1422;font-family:var(--font);-webkit-font-smoothing:antialiased;user-select:none}
+.screen button{font-family:var(--font);cursor:pointer}
+.sb{position:absolute;inset:0 0 auto 0;height:50px;z-index:60;pointer-events:none}
+.sb .t{position:absolute;left:36px;top:17px;font-weight:600;font-size:15px}
+.sb .isl{position:absolute;left:50%;top:11px;width:112px;height:32px;margin-left:-56px;border-radius:20px;background:#000}
+.sb .r{position:absolute;right:30px;top:19px;display:flex;gap:5px;align-items:center}
+.sb .r i{display:block;background:#0E1422;border-radius:2px}
+.home-ind{position:absolute;left:50%;bottom:8px;width:124px;height:5px;margin-left:-62px;border-radius:3px;background:#0E1422;z-index:60}
+
+/* story */
+.story{position:absolute;inset:0}
+.skip{position:absolute;right:22px;top:56px;border:0;background:none;font-size:15px;font-weight:500;color:#5A6475;padding:6px;transition:opacity .25s}
+.a-card{position:absolute;left:16px;right:16px;top:98px;height:548px;background:#fff;border-radius:28px;box-shadow:0 1px 2px rgba(14,31,77,.06),0 12px 32px -12px rgba(14,31,77,.14)}
+.stage{position:absolute;left:0;right:0;top:34px;height:300px}
+.stage svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.copy{position:absolute;left:28px;right:28px;text-align:center}
+.a-card .copy{top:360px}
+.copy h3{margin:0 0 10px;font-size:26px;line-height:1.15;font-weight:600;text-wrap:balance}
+.copy p{margin:0;font-size:15px;line-height:1.45;color:#5A6475;text-wrap:balance}
+.b-hero{position:absolute;left:16px;right:16px;top:98px;height:404px;border-radius:28px;overflow:hidden;background:linear-gradient(140deg,#0048C3 0%,#1C5FD9 55%,#3D79F0 100%);box-shadow:0 18px 36px -18px rgba(0,72,195,.55)}
+.b-hero svg{position:absolute;inset:0;width:100%;height:100%}
+.b-copy{top:526px}
+.nav{position:absolute;left:50%;bottom:44px;width:120px;margin-left:-60px;height:56px}
+.dot{position:absolute;top:25px;width:6px;height:6px;border-radius:3px;background:#D6E3FD;transition:left .5s cubic-bezier(.34,1.4,.64,1),background .3s,opacity .3s}
+.dot.done{background:#7AA3F8}
+.go{position:absolute;top:0;height:56px;width:56px;border:0;border-radius:28px;background:#0048C3;color:#fff;display:flex;align-items:center;justify-content:center;gap:8px;overflow:hidden;white-space:nowrap;transition:left .55s cubic-bezier(.34,1.5,.64,1),width .45s cubic-bezier(.34,1.3,.64,1);box-shadow:0 10px 22px -10px rgba(0,72,195,.7)}
+.v-b .go{background:#0E1422;box-shadow:0 10px 22px -10px rgba(14,20,34,.7)}
+.go svg{flex:none;width:22px;height:22px}
+.go .lb{font-size:16px;font-weight:500;max-width:0;opacity:0;transition:max-width .4s,opacity .3s}
+.go.wide .lb{max-width:140px;opacity:1}
+.go.wide svg{display:none}
+
+/* A line-art */
+.ln{fill:none;stroke:#0048C3;stroke-width:3.4;stroke-linecap:round;stroke-linejoin:round}
+.ln .thin{stroke-width:2.2}
+.ln text{stroke:none;fill:#0048C3;font-family:var(--font);font-weight:600}
+.dash{stroke-dasharray:14 12;animation:dash 1s linear infinite}
+.dotted{stroke-dasharray:2 7}
+@keyframes dash{to{stroke-dashoffset:-26}}
+.flt{animation:flt 3.2s ease-in-out infinite;animation-delay:var(--d,0s)}
+@keyframes flt{50%{transform:translateY(-7px)}}
+.blink{animation:blink 1.6s ease-in-out infinite}
+@keyframes blink{50%{opacity:.25}}
+.spin{transform-box:fill-box;transform-origin:center;animation:spin .7s linear infinite}
+.spin-slow{transform-box:fill-box;transform-origin:center;animation:spin 9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.bob{animation:bob .5s ease-in-out infinite alternate}
+@keyframes bob{to{transform:translateY(-3px)}}
+.bnc{animation:bnc 1.4s cubic-bezier(.3,0,.3,1) infinite}
+@keyframes bnc{0%,100%{transform:translateY(0)}40%{transform:translateY(-10px)}}
+.drift{animation:drift 7s linear infinite}
+@keyframes drift{from{transform:translateX(40px)}to{transform:translateX(-60px)}}
+
+/* B Beep */
+.pose{transition:opacity .12s}
+.bw{transition:transform .75s cubic-bezier(.34,1.25,.64,1)}
+.idle{animation:idle 2.2s ease-in-out infinite}
+@keyframes idle{50%{transform:scale(1.012,.985)}}
+.drv{animation:drv .32s ease-in-out infinite alternate}
+@keyframes drv{to{transform:translateY(-4px) rotate(.6deg)}}
+.pg{transform-box:fill-box;transform-origin:left center;animation:pg 2.6s cubic-bezier(.6,0,.3,1) infinite}
+@keyframes pg{0%,30%{transform:scaleX(1)}55%,100%{transform:scaleX(-1)}}
+.road-dash{stroke-dasharray:18 22;animation:rd .45s linear infinite}
+@keyframes rd{to{stroke-dashoffset:-40}}
+
+/* screenshots */
+.sc{position:absolute;left:0;top:0;width:360px;height:783px;display:block;transition:opacity .01s}
+.sc.off{opacity:0}
+.shot .sb{z-index:10}
+.piece{position:absolute;z-index:30;background-size:360px 783px;background-repeat:no-repeat}
+/* tour */
+.scrim{position:absolute;inset:0;background:rgba(10,14,24,.64);z-index:20;opacity:0;pointer-events:none;transition:opacity .35s}
+.scrim.on{opacity:1;pointer-events:auto}
+.ring{position:absolute;z-index:32;border:2px solid #fff;border-radius:22px;pointer-events:auto;cursor:pointer;opacity:0;transition:left .5s cubic-bezier(.34,1.3,.64,1),top .5s cubic-bezier(.34,1.3,.64,1),width .5s cubic-bezier(.34,1.3,.64,1),height .5s cubic-bezier(.34,1.3,.64,1),opacity .25s}
+.ring.on{opacity:1}
+.ring::after{content:"";position:absolute;inset:-2px;border-radius:inherit;border:2px solid #fff;animation:pulse 1.6s ease-out infinite}
+@keyframes pulse{from{transform:scale(1);opacity:.7}to{transform:scale(1.18,1.3);opacity:0}}
+.shotw{position:absolute;left:72px;top:92px;width:216px;height:470px;z-index:5}
+.shot{position:absolute;left:0;top:0;width:360px;height:783px;transform:scale(.6);transform-origin:0 0;border-radius:48px;overflow:hidden;background:#F2F4F8;box-shadow:0 0 0 1px rgba(14,31,77,.07),0 30px 60px -24px rgba(14,31,77,.45)}
+.tcopy{top:584px;z-index:6}
+.tcopy h3{font-size:22px;margin-bottom:8px}
+.tcopy p{font-size:14.5px}
+.skip,.nav{z-index:10}
+.peekB{position:absolute;left:250px;top:450px;width:116px;height:116px;z-index:4;pointer-events:none}
+.peekB svg{width:100%;height:100%;overflow:visible}
+@media (prefers-reduced-motion: reduce){*{animation-duration:.001s!important;animation-iteration-count:1!important;transition-duration:.001s!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">DriveUSA · first-run onboarding</div>
+      <h1>Three ways to welcome a new driver</h1>
+      <p>Each phone is a live prototype: tap the round button (or the highlighted ring) for the next step, and use Replay to start again. A and B tell the story (theory, DMV exam, instructor, driving), then walk through screenshots of the app with the tab bar highlighted. C skips the story and walks through the screens in more detail. None of them opens the real app until the last «Начать», so the app has time to load its cache in the background. Instructors is left out of the screenshots because it gets its own onboarding.</p>
+    </div>
+</div>
+  </header>
+
+  <main class="grid">
+    <section class="opt">
+      <div class="opt-head"><div class="badge">A</div><div><h2>Line</h2><p>The BERD reference, redrawn in our blue: drawings that draw themselves.</p></div></div>
+      <div class="ctl"><button type="button" data-replay="a">Replay</button><button type="button" data-tour="a">Screenshots only</button></div>
+      <div class="pwrap" id="p-a"></div>
+      <dl class="notes">
+        <div><dt>Motion</dt><dd>Each drawing draws in over 0.8 s, then whooshes out sideways with a blur. The round button springs to the next dot and becomes «Начать» on the last card. Then the story card becomes a screenshot of the app: the screenshot dims, one tab lifts onto a white square, and a ring springs from tab to tab. Changing screens swaps the screenshot card like a page. «Начать» zooms the screenshot into the real app.</dd></div>
+        <div><dt>To build in Flutter</dt><dd>CustomPainter with PathMetric for the drawing, and the same screenshot steps as C. No new packages.</dd></div>
+      </dl>
+    </section>
+
+    <section class="opt">
+      <div class="opt-head"><div class="badge">B</div><div><h2>Beep</h2><p>Our mascot lives the whole story, from the book to the open road.</p></div></div>
+      <div class="ctl"><button type="button" data-replay="b">Replay</button><button type="button" data-tour="b">Screenshots only</button></div>
+      <div class="pwrap" id="p-b"></div>
+      <dl class="notes">
+        <div><dt>Motion</dt><dd>Beep stays on stage while the world slides past. Each Next is a hop, and the pose changes mid-air: reading, then the exam with a PASSED stamp, then the instructor car rolls in, then the open road with confetti. In the screenshot steps Beep peeks from behind the screenshot and looks at the highlighted tab.</dd></div>
+        <div><dt>To build in Flutter</dt><dd>Beep poses exported as SVG from the meme generator (flutter_svg is already in the app), moved with AnimationController. No new packages.</dd></div>
+      </dl>
+    </section>
+
+    <section class="opt">
+      <div class="opt-head"><div class="badge">C</div><div><h2>Real pages</h2><p>No story and no drawings: screenshots of the app, one highlight at a time.</p></div></div>
+      <div class="ctl"><button type="button" data-replay="c">Replay</button></div>
+      <div class="pwrap" id="p-c"></div>
+      <dl class="notes">
+        <div><dt>Motion</dt><dd>Kept calm. Each step lifts one element plus its tab out of the dimmed screenshot and gives it a small pop. Moving to another screen swaps the screenshot card, and the bead slides to the new tab like a real tap.</dd></div>
+        <div><dt>To build in Flutter</dt><dd>Screenshots are drawn from static widget copies (or PNGs) with highlight rectangles, so the real screens and their data aren't touched. Cheapest of the three. Screenshots need a refresh when the screens change.</dd></div>
+      </dl>
+    </section>
+  </main>
+</div>
+
+<script>
+const POSES = /*POSES*/;
+const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let LANG = 'ru';
+
+const T = {
+ru:{
+  skip:'Пропустить', start:'Начать', next:'Далее', done:'Готово', of:'из', show:'Показать',
+  tabs:['Тесты','Теория','Инструкторы','Профиль'],
+  story:[
+    ['Учите правила','Короткая теория по справочнику водителя вашего штата — на вашем языке.'],
+    ['Сдайте тест в DMV','Тренируйтесь на вопросах как на экзамене, потом сдайте пробный: 40 вопросов, 60 минут.'],
+    ['Найдите инструктора','Когда теория позади, выберите инструктора по вождению рядом с вами.'],
+    ['В путь!','Получите права и водите уверенно.']
+  ],
+  ready:'Готовы?', passed:'СДАНО', rating:'★ 4.9 · 1.2 mi',
+  tour:[
+    ['Тесты','Экзамен, практические билеты, вопросы по темам и работа над ошибками.'],
+    ['Теория','Справочник водителя вашего штата, по модулям.'],
+    ['Профиль','Подписка, штат, язык и настройки.']
+  ],
+  c:[
+    ['Добро пожаловать!','Пока приложение готовится, покажем, где что находится.'],
+    ['Тесты','Здесь всё для подготовки к письменному экзамену.'],
+    ['Сдать экзамен','Симуляция настоящего экзамена: 40 вопросов, 60 минут.'],
+    ['Темы и билеты','Учите вопросы по темам или решайте практические билеты.'],
+    ['Работа над ошибками','Вопросы, в которых вы ошиблись, собираются здесь.'],
+    ['Теория','Справочник водителя вашего штата, разбитый на модули.'],
+    ['Профиль','Меняйте язык и штат в любой момент.']
+  ],
+  m:{tests:'Тесты',trial:'Пробный период активен',days:'Дней осталось: 3',upg:'Обновить',testing:'Тестирование',exam:'Сдать экзамен',sim:'Симуляция экзамена',min:'60 минут',q:'40 вопросов',
+     topics:'Обучение по темам',topicsN:'100+ вопросов',tickets:'Практические билеты',ticketsN:'40 вопросов',mist:'Работа над ошибками',mistD:'Сохраненные вопросы из разных разделов',
+     mods:[['Общие положения','6 модулей','Типы удостоверений, возраст, процесс получения, REAL ID'],['Правила дорожного движения','10 модулей','Знаки, скорость, остановка полицией'],['Безопасность пассажиров','5 модулей','Ремни, детские кресла, подушки безопасности'],['Права пешеходов','5 модулей','Правила для пешеходов, лиц с инвалидностью'],['Велосипеды и мотоциклы','4 модуля','Правила для велосипедистов и мотоциклистов']],
+     name:'Алекс Иванов',edit:'Редактировать профиль',settings:'Настройки',lang:'Выбрать язык',langD:'Язык вопросов и приложения',langV:'Русский',state:'Штат',stateD:'Правила и вопросы вашего штата',sub:'Подписка',subD:'Все тесты и вся теория',subV:'Активна',sup:'Поддержка',supD:'Ответы на ваши вопросы'}
+}};
+
+const ARROW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>';
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+/* ---------- A: line drawings (viewBox 280×230) ---------- */
+function octagon(cx,cy,r){let p=[];for(let k=0;k<8;k++){const a=(22.5+45*k)*Math.PI/180;p.push((cx+r*Math.cos(a)).toFixed(1)+','+(cy+r*Math.sin(a)).toFixed(1))}return p.join(' ')}
+const A_ART = [
+ L=>`<svg viewBox="0 0 280 230" class="ln">
+   <path class="f dotted thin" d="M112,178 Q96,160 86,146"/><path class="f dotted thin" d="M170,178 Q190,160 198,146"/>
+   <g class="flt" style="--d:0s"><polygon class="d" points="${octagon(84,92,28)}"/><text class="f" x="84" y="97" font-size="12" text-anchor="middle">STOP</text><path class="d" d="M84,120 V140"/></g>
+   <g class="flt" style="--d:.8s"><path class="d" d="M170,70 H230 L200,120 Z"/><path class="d thin" d="M183,78 H217 L200,106 Z"/><path class="d" d="M200,120 V140"/></g>
+   <path class="d" d="M128,50 a14,14 0 1 1 24,0 c-4,5 -5,8 -5,12 h-14 c0,-4 -1,-7 -5,-12 z"/><path class="d" d="M134,68 h12 M136,74 h8"/>
+   <g class="blink"><path class="d thin" d="M140,14 v-7 M118,24 l-5,-5 M162,24 l5,-5 M112,44 h-7 M168,44 h7"/></g>
+   <path class="d" d="M40,190 Q90,172 140,184 Q190,172 240,190 V212 Q190,196 140,208 Q90,196 40,212 Z"/><path class="d" d="M140,184 V208"/>
+   <path class="d thin" d="M62,192 Q92,184 122,190 M158,190 Q188,184 218,192"/>
+ </svg>`,
+ L=>`<svg viewBox="0 0 280 230" class="ln">
+   <path class="d" d="M140,40 V14"/><path class="d" d="M140,14 H162 L156,21 L162,28 H140"/>
+   <path class="d" d="M60,76 L140,40 L220,76 Z"/><text class="f" x="140" y="69" font-size="13" text-anchor="middle">DMV</text>
+   <path class="d" d="M56,76 H224 V86 H56 Z"/>
+   <path class="d" d="M74,86 V150 M100,86 V150 M180,86 V150 M206,86 V150"/>
+   <path class="d" d="M122,150 V114 Q140,102 158,114 V150"/>
+   <path class="d" d="M48,150 H232 M40,162 H240"/>
+   <g class="flt" style="--d:.3s"><rect class="d" x="176" y="118" width="70" height="92" rx="9" fill="#fff"/><rect class="d" x="197" y="111" width="28" height="13" rx="4" fill="#fff"/>
+   <rect class="d thin" x="187" y="138" width="11" height="11" rx="2"/><rect class="d thin" x="187" y="160" width="11" height="11" rx="2"/><rect class="d thin" x="187" y="182" width="11" height="11" rx="2"/>
+   <path class="d thin" d="M205,143.5 h30 M205,165.5 h26 M205,187.5 h30"/>
+   <path class="d late" d="M188,143 l4,4 l8,-9"/><path class="d late2" d="M188,165 l4,4 l8,-9"/><path class="d late3" d="M188,187 l4,4 l8,-9"/></g>
+ </svg>`,
+ L=>`<svg viewBox="0 0 280 230" class="ln">
+   <path class="f dotted" d="M40,214 Q130,196 214,192"/>
+   <path class="d" d="M58,210 V176 Q58,130 104,128 Q150,130 150,176 V210"/><path class="d" d="M90,130 L104,146 L118,130"/>
+   <circle class="d" cx="104" cy="96" r="22"/>
+   <path class="d" d="M80,88 Q82,58 104,58 Q126,58 128,88 Z" fill="#fff"/><path class="d" d="M78,88 H146"/><circle class="d thin" cx="104" cy="73" r="4"/>
+   <circle class="f" cx="97" cy="98" r="2" style="fill:#0048C3;stroke:none"/><circle class="f" cx="111" cy="98" r="2" style="fill:#0048C3;stroke:none"/>
+   <path class="d thin" d="M96,106 Q104,112 112,106"/>
+   <rect class="d" x="122" y="150" width="36" height="44" rx="6" fill="#fff"/><path class="d thin late" d="M130,165 l4,4 l8,-9"/><path class="d thin" d="M130,180 h20 M130,187 h13"/>
+   <g class="flt" style="--d:.2s"><path class="d" d="M172,38 H236 Q248,38 248,50 V78 Q248,90 236,90 H194 L180,104 L183,90 H172 Q160,90 160,78 V50 Q160,38 172,38 Z"/><text class="f" x="204" y="69" font-size="14" text-anchor="middle">${esc(L.ready)}</text></g>
+   <g class="bnc"><path class="d" d="M222,188 C222,188 200,164 200,148 A22,22 0 0 1 244,148 C244,164 222,188 222,188 Z"/><circle class="d thin" cx="222" cy="148" r="7"/></g>
+ </svg>`,
+ L=>`<svg viewBox="0 0 280 230" class="ln">
+   <circle class="d" cx="226" cy="50" r="17"/><g class="spin-slow"><path class="d thin" d="M226,20 v-8 M226,80 v8 M196,50 h-8 M256,50 h8 M205,29 l-5,-5 M247,71 l5,5 M247,29 l5,-5 M205,71 l-5,5"/></g>
+   <g class="drift"><path class="d thin" d="M40,76 a11,11 0 0 1 20,-6 a13,13 0 0 1 25,7 a9,9 0 0 1 -2,18 H44 a10,10 0 0 1 -4,-19 z"/></g>
+   <path class="d thin" d="M0,150 Q60,112 130,142 T280,128"/>
+   <path class="d" d="M0,200 H280"/><path class="f dash" d="M-20,220 H300"/>
+   <g class="f thin"><path d="M24,160 H54 M14,172 H48 M30,184 H58"/></g>
+   <g class="bob">
+     <path class="d" d="M68,190 V176 Q68,166 78,164 L98,161 L112,143 Q116,137 124,137 H168 Q176,137 181,143 L196,161 L214,165 Q222,167 222,176 V190 Z" fill="#fff"/>
+     <path class="d thin" d="M118,159 L127,147 H146 V159 Z M154,159 V147 H170 L180,159 Z"/><path class="d thin" d="M208,172 h8"/>
+     <circle class="d" cx="102" cy="192" r="13" fill="#fff"/><circle class="d" cx="190" cy="192" r="13" fill="#fff"/>
+     <g class="spin"><path class="f thin" d="M102,184 V200 M94,192 H110"/></g><g class="spin"><path class="f thin" d="M190,184 V200 M182,192 H198"/></g>
+   </g>
+ </svg>`
+];
+
+/* ---------- B: Beep scenes (viewBox 328×404) ---------- */
+function poseG(k, vis){return `<g class="pose" data-k="${k}" style="opacity:${vis?1:0}">${POSES[k]}</g>`}
+function bScenes(L){
+  const bars = Array.from({length:22},(_,i)=>{const h=16+i*3.1+(i%3)*4;return `<rect x="${152+i*7.6}" y="${404-18-h}" width="3" height="${h}" rx="1.5"/>`}).join('');
+  const conf = Array.from({length:16},(_,i)=>{const c=['#FFE066','#FF7A8A','#FFFFFF','#8FD3FF'][i%4];return `<rect class="cf" x="${14+i*19}" y="-14" width="7" height="11" rx="2" fill="${c}"/>`}).join('');
+  const tree = x=>`<g><rect x="${x-2}" y="228" width="4" height="22" fill="rgba(255,255,255,.35)"/><circle cx="${x}" cy="222" r="14" fill="rgba(255,255,255,.28)"/></g>`;
+  return `<svg viewBox="0 0 328 404">
+   <g fill="#fff" opacity=".13">${bars}</g>
+   <g class="props" data-s="0">
+     <g class="flt" style="--d:0s"><polygon points="${octagon(62,104,27)}" fill="#C1272D" stroke="#fff" stroke-width="4"/><text x="62" y="109" font-size="13" font-weight="700" fill="#fff" text-anchor="middle" font-family="Rubik,Arial">STOP</text></g>
+     <g class="flt" style="--d:.9s"><path d="M240,78 H298 L269,126 Z" fill="#fff" stroke="#C1272D" stroke-width="7" stroke-linejoin="round"/></g>
+     <g class="flt" style="--d:1.6s"><rect x="244" y="176" width="48" height="60" rx="7" fill="#fff" stroke="#0E1F4D" stroke-width="3"/><text x="268" y="193" font-size="8" font-weight="700" fill="#0E1F4D" text-anchor="middle" font-family="Rubik,Arial">SPEED</text><text x="268" y="203" font-size="8" font-weight="700" fill="#0E1F4D" text-anchor="middle" font-family="Rubik,Arial">LIMIT</text><text x="268" y="227" font-size="21" font-weight="700" fill="#0E1F4D" text-anchor="middle" font-family="Rubik,Arial">55</text></g>
+     <g class="blink" fill="#FFE066"><circle cx="40" cy="200" r="3"/><circle cx="296" cy="146" r="2.5"/><circle cx="120" cy="54" r="2.5"/></g>
+   </g>
+   <g class="props" data-s="1" style="opacity:0">
+     <g fill="rgba(255,255,255,.16)" stroke="rgba(255,255,255,.34)" stroke-width="3" stroke-linejoin="round">
+       <path d="M44,120 L164,64 L284,120 Z"/><rect x="38" y="120" width="252" height="16" rx="3"/>
+       <rect x="58" y="136" width="18" height="150"/><rect x="94" y="136" width="18" height="150"/><rect x="216" y="136" width="18" height="150"/><rect x="252" y="136" width="18" height="150"/>
+     </g>
+     <rect x="136" y="92" width="56" height="22" rx="6" fill="#fff"/><text x="164" y="108" font-size="14" font-weight="700" fill="#0048C3" text-anchor="middle" font-family="Rubik,Arial">DMV</text>
+     <g class="stamp" style="opacity:0"><g transform="translate(236,70) rotate(-12)"><rect x="-58" y="-22" width="116" height="44" rx="12" fill="#E7F6ED" stroke="#0F7A3D" stroke-width="4"/><text x="0" y="8" font-size="20" font-weight="700" fill="#0F7A3D" text-anchor="middle" font-family="Rubik,Arial">${esc(L.passed)}</text></g></g>
+   </g>
+   <g class="props" data-s="2" style="opacity:0">
+     <path d="M20,372 Q164,340 308,372" fill="none" stroke="rgba(255,255,255,.3)" stroke-width="3" stroke-dasharray="3 9" stroke-linecap="round"/>
+     <g class="coach bw" style="transform:translate(470px,352px) scale(.74)">${POSES.coach}</g>
+     <g class="pin" style="opacity:0"><g class="bnc"><path d="M164,150 C164,150 138,122 138,104 A26,26 0 0 1 190,104 C190,122 164,150 164,150 Z" fill="#FF5A5F" stroke="#fff" stroke-width="4"/><circle cx="164" cy="104" r="9" fill="#fff"/></g></g>
+     <g class="chipB" style="opacity:0"><rect x="104" y="30" width="120" height="30" rx="15" fill="#fff"/><text x="164" y="50" font-size="13" font-weight="600" fill="#0E1422" text-anchor="middle" font-family="Rubik,Arial">${esc(L.rating)}</text></g>
+   </g>
+   <g class="props" data-s="3" style="opacity:0">
+     <circle cx="266" cy="72" r="26" fill="#FFE066"/><g class="spin-slow" stroke="#FFE066" stroke-width="4" stroke-linecap="round"><path d="M266,30 v-10 M266,114 v10 M224,72 h-10 M308,72 h10 M236,42 l-7,-7 M296,102 l7,7 M296,42 l7,-7 M236,102 l-7,7"/></g>
+     <g class="drift" fill="rgba(255,255,255,.75)"><path d="M60,92 a14,14 0 0 1 26,-8 a17,17 0 0 1 32,9 a11,11 0 0 1 -2,22 H64 a12,12 0 0 1 -4,-23 z"/></g>
+     <path d="M0,258 Q80,222 170,252 T328,244 V270 H0 Z" fill="rgba(255,255,255,.16)"/>
+     <path d="M146,252 L182,252 L328,404 L0,404 Z" fill="rgba(14,20,34,.42)"/>
+     <path class="road-dash" d="M164,252 V404" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+     ${tree(40)}${tree(292)}
+     <g class="confetti">${conf}</g>
+   </g>
+   <g class="bw beep" style="transform:translate(164px,352px) scale(.95)"><g class="bh"><g class="mv"><g class="idle">
+     ${poseG('study',1)}${poseG('think',0)}${poseG('pass',0)}${poseG('wave',0)}${poseG('drive',0)}
+   </g></g></g></g>
+  </svg>`;
+}
+
+/* ---------- screenshot steps ---------- */
+// Real simulator screenshots (Russian), trial card removed. Rects are in the 360×783 screen space.
+const SHOTS = /*SHOTS*/;
+const TAB_R = {0:[29,686,61,76],1:[94,686,61,76],3:[262,686,61,76]};
+const EL_R = {hero:[18,97,324,150],tiles:[18,258,324,171],mist:[18,488,324,75],mod:[18,63,324,86],rows:[18,261,324,159]};
+function shotHTML(){
+  return ['tests','theory','','profile'].map((k,i)=>k?`<img class="sc${i?' off':''}" data-tab="${i}" alt="" src="${SHOTS[k]}">`:'').join('')
+   +`<div class="sb"><span class="t">9:41</span><i class="isl"></i><span class="r"><i style="width:17px;height:10px;border-radius:2px;opacity:.9"></i><i style="width:24px;height:11px;border-radius:3px"></i></span></div>
+   <div class="scrim"></div><div class="pieces"></div><div class="ring"></div>`;
+}
+
+/* ---------- prototype ---------- */
+class Proto{
+  constructor(host, v){this.host=host;this.v=v;this.gen=0;this.fit();new ResizeObserver(()=>this.fit()).observe(host)}
+  fit(){const w=Math.min(380,this.host.clientWidth||380);this.s=w/380;this.host.style.height=(803*this.s)+'px';const p=this.host.querySelector('.phone');if(p)p.style.transform=`scale(${this.s})`}
+  later(fn,ms){const g=this.gen;setTimeout(()=>{if(g===this.gen)fn()},RM?0:ms)}
+  anim(el,kf,o){if(!el)return null;return el.animate(kf,Object.assign({fill:'both',easing:'cubic-bezier(.2,.8,.2,1)'},o,RM?{duration:1,delay:0}:{}))}
+  $(q){return this.scr.querySelector(q)}
+  $$(q){return [...this.scr.querySelectorAll(q)]}
+  tourSteps(){
+    const L=this.L;
+    if(this.v!=='c'){const tabs=[0,1,3];return L.tour.map((d,i)=>({tab:tabs[i],t:d[0],b:d[1]}))}
+    const c=L.c;return [
+      {tab:0,welcome:1,t:c[0][0],b:c[0][1]},
+      {tab:0,t:c[1][0],b:c[1][1]},
+      {tab:0,el:'hero',t:c[2][0],b:c[2][1]},
+      {tab:0,el:'tiles',t:c[3][0],b:c[3][1]},
+      {tab:0,el:'mist',t:c[4][0],b:c[4][1]},
+      {tab:1,el:'mod',t:c[5][0],b:c[5][1]},
+      {tab:3,el:'rows',t:c[6][0],b:c[6][1]}
+    ];
+  }
+  start(tourOnly){
+    this.gen++;const L=this.L=T[LANG];
+    this.SN=this.v==='c'?0:4;this.TS=this.tourSteps();this.N=this.SN+this.TS.length;
+    const looks=[0,1,2,3].map(i=>`<g class="lk" data-i="${i}" style="opacity:${i?0:1}">${POSES['look'+i]}</g>`).join('');
+    this.host.innerHTML=`<div class="phone" style="transform:scale(${this.s})"><div class="screen v-${this.v}">
+      <div class="sb"><span class="t">9:41</span><i class="isl"></i><span class="r"><i style="width:17px;height:10px;border-radius:2px;opacity:.9"></i><i style="width:24px;height:11px;border-radius:3px"></i></span></div>
+      ${this.v==='c'?'':`<div class="story">
+        ${this.v==='a'?`<div class="a-card"><div class="stage"></div><div class="copy"><h3></h3><p></p></div></div>`:`<div class="b-hero">${bScenes(L)}</div><div class="copy b-copy"><h3></h3><p></p></div>`}
+      </div>`}
+      ${this.v==='b'?`<div class="peekB" hidden><svg viewBox="-100 -200 200 200">${looks}</svg></div>`:''}
+      <div class="shotw" hidden><div class="shot">${shotHTML()}</div></div>
+      <div class="copy tcopy" hidden><h3></h3><p></p></div>
+      <button type="button" class="skip">${L.skip}</button>
+      <div class="nav">${'<i class="dot"></i>'.repeat(this.N)}<button type="button" class="go" aria-label="${L.next}">${ARROW}<span class="lb">${L.start}</span></button></div>
+      <i class="home-ind"></i></div></div>`;
+    this.scr=this.host.querySelector('.screen');this.shot=this.$('.shot');this.cur=0;this.i=-1;this.done=false;
+    this.$('.skip').onclick=()=>this.finish();
+    this.$('.go').onclick=()=>{if(this.done)return;this.i<this.N-1?this.go(this.i+1):this.finish()};
+    this.$('.ring').onclick=()=>this.$('.go').click();
+    this.go(tourOnly?this.SN:0);
+  }
+  navTo(i){
+    const N=this.N,w=(N-1)*16+72,nav=this.$('.nav');nav.style.width=w+'px';nav.style.marginLeft=(-w/2)+'px';
+    const cx=k=>{let x=0;for(let m=0;m<k;m++)x+=(m===i?72:16);return x+(k===i?36:8)};
+    const last=i===N-1;
+    this.$$('.dot').forEach((d,k)=>{d.style.left=(cx(k)-3)+'px';d.classList.toggle('done',k<i);d.style.opacity=(k===i||last)?0:1});
+    const go=this.$('.go');
+    if(last){go.classList.add('wide');go.style.width='176px';go.style.left=(w/2-88)+'px'}else{go.classList.remove('wide');go.style.width='56px';go.style.left=(cx(i)-28)+'px'}
+  }
+  swapCopy(root,t,b,first,delay=0){
+    const h=root.querySelector('h3'),p=root.querySelector('p');
+    const set=()=>{h.textContent=t;p.textContent=b;this.anim(h,[{opacity:0,transform:'translateY(12px)'},{opacity:1,transform:'none'}],{duration:420,delay:delay+(first?250:120)});this.anim(p,[{opacity:0,transform:'translateY(12px)'},{opacity:1,transform:'none'}],{duration:420,delay:delay+(first?320:190)})};
+    if(first)set();else{this.anim(h,[{opacity:1},{opacity:0,transform:'translateY(-8px)'}],{duration:160});this.anim(p,[{opacity:1},{opacity:0,transform:'translateY(-8px)'}],{duration:160});this.later(set,170)}
+  }
+  go(i){
+    const prev=this.i;this.i=i;this.navTo(i);
+    if(i<this.SN){const L=this.L;this.swapCopy(this.$('.story .copy'),L.story[i][0],L.story[i][1],prev<0);this.v==='a'?this.showA(i,prev<0):this.showB(i,prev<0);return}
+    const entering=prev<this.SN;if(entering)this.enterTour(prev>=0);
+    this.tstep(i-this.SN,entering);
+  }
+  /* story */
+  showA(p,first){
+    const st=this.$('.stage');const old=st.querySelector('svg');
+    if(old)this.anim(old,[{transform:'translateX(0)',filter:'blur(0)',opacity:1},{transform:'translateX(-90px)',filter:'blur(7px)',opacity:0}],{duration:280,easing:'cubic-bezier(.55,0,.8,.2)'}).onfinish=()=>old.remove();
+    st.insertAdjacentHTML('beforeend',A_ART[p](this.L));const sv=st.lastElementChild;
+    const base=old?200:first?150:0;
+    sv.querySelectorAll('.d').forEach((el,i)=>{const len=el.getTotalLength();el.style.strokeDasharray=len;el.style.strokeDashoffset=len;
+      const extra=el.classList.contains('late')?650:el.classList.contains('late2')?850:el.classList.contains('late3')?1050:0;
+      this.anim(el,[{strokeDashoffset:len},{strokeDashoffset:0}],{duration:820,delay:base+i*55+extra,easing:'cubic-bezier(.65,0,.35,1)'})});
+    sv.querySelectorAll('.f').forEach(el=>this.anim(el,[{opacity:0},{opacity:1}],{duration:420,delay:base+650}));
+  }
+  showB(p,first){
+    const sv=this.$('.b-hero svg');const beep=sv.querySelector('.beep');const props=[...sv.querySelectorAll('.props')];
+    const prev=props.find(g=>g.style.opacity!=='0'&&+g.dataset.s!==p);
+    const nw=props[p];
+    const setPose=k=>sv.querySelectorAll('.pose').forEach(g=>g.style.opacity=g.dataset.k===k?1:0);
+    if(prev){this.anim(prev,[{transform:'translateX(0)',opacity:1},{transform:'translateX(-340px)',opacity:1}],{duration:560,easing:'cubic-bezier(.6,0,.3,1)'}).onfinish=()=>{prev.style.opacity=0}}
+    nw.style.opacity=1;
+    if(!first)this.anim(nw,[{transform:'translateX(340px)'},{transform:'translateX(0)'}],{duration:560,easing:'cubic-bezier(.6,0,.3,1)'});
+    const hop=(k,d=0)=>{this.later(()=>{this.anim(sv.querySelector('.bh'),[{transform:'translateY(0) scale(1,1)'},{transform:'translateY(0) scale(1.07,.9)',offset:.14},{transform:'translateY(-46px) scale(.95,1.06)',offset:.5},{transform:'translateY(0) scale(1.06,.93)',offset:.84},{transform:'translateY(0) scale(1,1)'}],{duration:640,fill:'none',easing:'ease-in-out'});this.later(()=>setPose(k),300)},d)};
+    sv.querySelector('.mv').classList.toggle('drv',p===3);
+    beep.style.transform=p===2?'translate(96px,352px) scale(.74)':p===3?'translate(164px,356px) scale(.9)':'translate(164px,352px) scale(.95)';
+    if(first)setPose('study');else if(p===0)hop('study');
+    if(p===1){hop('think');const stamp=nw.querySelector('.stamp');stamp.style.opacity=0;this.later(()=>{hop('pass');this.later(()=>{stamp.style.opacity=1;this.anim(stamp,[{transform:'scale(1.8)',opacity:0},{transform:'scale(.94)',opacity:1,offset:.7},{transform:'scale(1)',opacity:1}],{duration:380,easing:'cubic-bezier(.3,0,.2,1)'})},380)},1300)}
+    if(p===2){hop('wave');const c=nw.querySelector('.coach');c.style.transform='translate(470px,352px) scale(.74)';this.later(()=>c.style.transform='translate(238px,352px) scale(.74)',300);
+      const pin=nw.querySelector('.pin'),chip=nw.querySelector('.chipB');pin.style.opacity=0;chip.style.opacity=0;
+      this.later(()=>{pin.style.opacity=1;this.anim(pin,[{transform:'translateY(-120px)'},{transform:'translateY(0)',offset:.6},{transform:'translateY(-14px)',offset:.8},{transform:'translateY(0)'}],{duration:700,easing:'ease-in'})},1000);
+      this.later(()=>{chip.style.opacity=1;this.anim(chip,[{opacity:0,transform:'translateY(8px)'},{opacity:1,transform:'none'}],{duration:350})},1500)}
+    if(p===3){hop('drive');nw.querySelectorAll('.cf').forEach((c,i)=>{this.anim(c,[{transform:'translate(0,0) rotate(0)'},{transform:`translate(${(i%2?1:-1)*(10+i*2)}px,${300+(i%5)*24}px) rotate(${360+i*40}deg)`}],{duration:1900+(i%4)*300,delay:700+(i%6)*90,easing:'cubic-bezier(.3,.1,.6,1)'})})}
+  }
+  /* screenshot steps */
+  enterTour(fromStory){
+    this.gen++;
+    const st=this.$('.story');
+    if(st){if(fromStory)this.anim(st,[{opacity:1,transform:'none'},{opacity:0,transform:'scale(.94)'}],{duration:320}).onfinish=()=>st.hidden=true;else st.hidden=true}
+    const w=this.$('.shotw');w.hidden=false;
+    this.anim(w,[{opacity:0,transform:'translateY(60px) scale(.9)'},{opacity:1,transform:'none'}],{duration:640,delay:fromStory?200:0,easing:'cubic-bezier(.34,1.3,.64,1)',fill:'backwards'});
+    this.$('.tcopy').hidden=false;
+    const pk=this.$('.peekB');if(pk){pk.hidden=false;this.anim(pk,[{transform:'translate(-40px,30px) rotate(-8deg)',opacity:0},{transform:'none',opacity:1}],{duration:560,delay:fromStory?700:450,easing:'cubic-bezier(.34,1.5,.64,1)',fill:'backwards'})}
+  }
+  setTab(i){this.cur=i;this.$$('.sc').forEach(e=>e.classList.toggle('off',+e.dataset.tab!==i))}
+  clearMarks(){this.$('.pieces').innerHTML=''}
+  lift(r,rad,src){
+    const d=document.createElement('div');d.className='piece';
+    Object.assign(d.style,{left:r[0]+'px',top:r[1]+'px',width:r[2]+'px',height:r[3]+'px',borderRadius:rad+'px',backgroundImage:`url(${src})`,backgroundPosition:`${-r[0]}px ${-r[1]}px`});
+    this.$('.pieces').appendChild(d);
+    this.anim(d,[{transform:'scale(1)'},{transform:'scale(1.045)',offset:.45},{transform:'scale(1)'}],{duration:560,delay:80,fill:'none',easing:'cubic-bezier(.34,1.4,.64,1)'});
+    return d;
+  }
+  tstep(j,entering){
+    this.gen++;const st=this.TS[j],ring=this.$('.ring'),scrim=this.$('.scrim'),w=this.$('.shotw');
+    this.swapCopy(this.$('.tcopy'),st.t,st.b,entering,entering?260:0);
+    const swap=st.tab!==this.cur;
+    const place=()=>{
+      this.clearMarks();
+      if(st.welcome){scrim.classList.remove('on');ring.classList.remove('on');return}
+      scrim.classList.add('on');
+      const src=this.$(`.sc[data-tab="${st.tab}"]`).src;
+      this.lift(TAB_R[st.tab],26,src);
+      if(st.el)this.lift(EL_R[st.el],24,src);
+      const r=st.el?EL_R[st.el]:TAB_R[st.tab];const pad=6;
+      Object.assign(ring.style,{left:r[0]-pad+'px',top:r[1]-pad+'px',width:r[2]+pad*2+'px',height:r[3]+pad*2+'px',borderRadius:(st.el?30:30)+'px'});ring.classList.add('on');
+      const pk=this.$('.peekB');if(pk)pk.querySelectorAll('.lk').forEach(e=>e.style.opacity=+e.dataset.i===st.tab?1:0);
+    };
+    if(swap&&!entering){
+      ring.classList.remove('on');this.clearMarks();
+      this.anim(w,[{transform:'none',opacity:1},{transform:'translateX(-80px) rotate(-5deg) scale(.94)',opacity:0}],{duration:260,easing:'cubic-bezier(.5,0,.75,0)',fill:'forwards'});
+      this.later(()=>{this.setTab(st.tab);this.anim(w,[{transform:'translateX(90px) rotate(5deg) scale(.94)',opacity:0},{transform:'none',opacity:1}],{duration:560,easing:'cubic-bezier(.34,1.3,.64,1)'});this.later(place,560)},270);
+    }else{if(swap)this.setTab(st.tab);this.later(place,entering?(this.SN?900:700):0)}
+  }
+  finish(){
+    if(this.done)return;this.done=true;this.gen++;
+    const w=this.$('.shotw');
+    if(w.hidden){this.enterTour(false);const st=this.$('.story');if(st)st.hidden=true}
+    this.clearMarks();this.$('.ring').classList.remove('on');this.$('.scrim').classList.remove('on');
+    if(this.cur!==0)this.setTab(0);
+    ['.nav','.skip','.tcopy','.peekB','.sb'].forEach(q=>{const e=this.$(q);if(e&&!e.hidden)this.anim(e,[{opacity:1},{opacity:0}],{duration:240})});
+    this.anim(w,[{transform:'none'},{transform:'translate(-72px,-92px)'}],{duration:720,delay:200,easing:'cubic-bezier(.65,0,.2,1)'});
+    this.anim(this.shot,[{transform:'scale(.6)',boxShadow:'0 30px 60px -24px rgba(14,31,77,.45)'},{transform:'scale(1)',boxShadow:'0 0 0 0 rgba(0,0,0,0)'}],{duration:720,delay:200,easing:'cubic-bezier(.65,0,.2,1)'});
+  }
+}
+
+const protos={a:new Proto(document.getElementById('p-a'),'a'),b:new Proto(document.getElementById('p-b'),'b'),c:new Proto(document.getElementById('p-c'),'c')};
+const boot=()=>Object.values(protos).forEach(p=>p.start());
+(document.fonts&&document.fonts.ready?document.fonts.ready:Promise.resolve()).then(boot);
+document.querySelectorAll('[data-replay]').forEach(b=>b.onclick=()=>protos[b.dataset.replay].start());
+document.querySelectorAll('[data-tour]').forEach(b=>b.onclick=()=>protos[b.dataset.tour].start(true));
+</script>

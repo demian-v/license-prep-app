@@ -1,0 +1,62 @@
+<meta charset="utf-8">
+<title>Greeting Variants</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&display=swap">
+<style>
+:root{--bg:#EEF1F6;--fg:#0E1422;--muted:#5A6475;--font:'Rubik',system-ui,sans-serif}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);margin:0;padding:24px}
+.row{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:26px}
+.cell{display:flex;flex-direction:column;gap:8px}
+.lbl{font-size:13px;font-weight:600;color:var(--muted)}
+.card{width:328px;height:548px;background:#fff;border-radius:28px;position:relative;overflow:hidden;box-shadow:0 1px 2px rgba(14,31,77,.06),0 12px 32px -12px rgba(14,31,77,.14)}
+.card.sm{width:228px;height:230px}
+.card svg{position:absolute;left:0;right:0;top:34px;width:100%;height:300px;overflow:hidden}
+.card.sm svg{top:0;height:230px}
+.copy{position:absolute;left:28px;right:28px;top:360px;text-align:center}
+.copy h3{margin:0 0 10px;font-size:26px;line-height:1.15;font-weight:600}
+.copy p{margin:0;font-size:15px;line-height:1.45;color:#5A6475}
+.ln{fill:none;stroke:#0048C3;stroke-width:3.4;stroke-linecap:round;stroke-linejoin:round}
+.ln .thin{stroke-width:2.2}
+.ln text{stroke:none;font-family:var(--font)}
+.dash{stroke-dasharray:14 12}
+</style>
+<div class="row" id="big"></div>
+<div class="row" id="langs"></div>
+<script>
+const spark=(x,y,s=1)=>`<path class="thin" d="M${x},${y-7*s} Q${x},${y} ${x+7*s},${y} Q${x},${y} ${x},${y+7*s} Q${x},${y} ${x-7*s},${y} Q${x},${y} ${x},${y-7*s} Z" style="fill:#FFD84D;stroke:#0048C3"/>`;
+const sun=`<circle cx="248" cy="30" r="12"/><path class="thin" d="M248,10 v-6 M248,50 v6 M228,30 h-6 M268,30 h6 M234,16 l-4,-4 M262,44 l4,4 M262,16 l4,-4 M234,44 l-4,4"/>`;
+const car=(x,y,s)=>`<g transform="translate(${x},${y}) scale(${s})">
+  <path d="M68,190 V176 Q68,166 78,164 L98,161 L112,143 Q116,137 124,137 H168 Q176,137 181,143 L196,161 L214,165 Q222,167 222,176 V190 Z" fill="#fff" style="stroke-width:${3.4/s}"/>
+  <path d="M118,159 L127,147 H146 V159 Z M154,159 V147 H170 L180,159 Z" style="stroke-width:${2.4/s}"/><path d="M208,172 h8" style="stroke-width:${2.4/s}"/>
+  <circle cx="102" cy="192" r="13" fill="#fff" style="stroke-width:${3.4/s}"/><circle cx="190" cy="192" r="13" fill="#fff" style="stroke-width:${3.4/s}"/>
+  <path d="M102,184 V200 M94,192 H110 M190,184 V200 M182,192 H198" style="stroke-width:${2.4/s}"/></g>`;
+const hills=`<path class="thin" d="M0,176 Q50,150 104,168 T210,160 T280,170" style="stroke:#ADC7FB"/>`;
+const road=`<path d="M0,208 H280"/><path class="dash" d="M-20,222 H300"/>`;
+
+const V = {
+ // 1. Highway sign: the outline draws, then the panel fills with brand blue and the text turns white.
+ sign:(w)=>`<svg viewBox="0 0 280 230" class="ln">${sun}${hills}
+   <path d="M100,142 V208 M180,142 V208"/>
+   <rect x="36" y="44" width="208" height="100" rx="14" style="fill:#0048C3"/>
+   <rect class="thin" x="45" y="53" width="190" height="82" rx="9" style="stroke:#fff"/>
+   <text x="140" y="100" font-size="34" font-weight="700" text-anchor="middle" fill="#fff" textLength="${w.length>6?150:0}" lengthAdjust="spacingAndGlyphs">${w}</text>
+   <text x="140" y="122" font-size="11" font-weight="600" text-anchor="middle" fill="#ADC7FB" letter-spacing="3">DRIVEUSA</text>
+   ${road}${car(18,105,.5)}${spark(28,70)}${spark(262,108,.8)}${spark(58,30,.7)}</svg>`,
+ // 2. The car says hello: a big line car with a speech bubble.
+ bubble:(w)=>`<svg viewBox="0 0 280 230" class="ln">${sun}${hills}
+   <path d="M86,24 H214 Q228,24 228,38 V84 Q228,98 214,98 H148 L126,118 L130,98 H86 Q72,98 72,84 V38 Q72,24 86,24 Z" style="fill:#0048C3"/>
+   <text x="150" y="72" font-size="30" font-weight="700" text-anchor="middle" fill="#fff">${w}</text>
+   <path class="thin" d="M18,170 H44 M8,182 H40 M22,194 H48"/>
+   ${road}${car(20,20,.95)}${spark(40,44)}${spark(250,120,.8)}</svg>`,
+ // 3. The current outline sign, tidied: sparkles instead of crosses, a DRIVEUSA line, hills behind.
+ outline:(w)=>`<svg viewBox="0 0 280 230" class="ln">${sun}${hills}
+   <rect x="44" y="46" width="192" height="94" rx="12" fill="#fff"/><rect class="thin" x="53" y="55" width="174" height="76" rx="7"/>
+   <text x="140" y="98" font-size="30" font-weight="700" text-anchor="middle" fill="#0048C3">${w}</text>
+   <text x="140" y="118" font-size="10" font-weight="600" text-anchor="middle" fill="#7AA3F8" letter-spacing="3">DRIVEUSA</text>
+   <path d="M92,140 V208 M188,140 V208"/>${road}${car(4,105,.5)}${spark(24,64)}${spark(256,112,.8)}${spark(40,120,.6)}</svg>`
+};
+const copy='<div class="copy"><h3>Добро пожаловать в DriveUSA</h3><p>Подготовим вас к письменному экзамену в DMV. Сначала коротко покажем, где что находится.</p></div>';
+document.getElementById('big').innerHTML=[['1 · Highway sign','sign'],['2 · Car says hello','bubble'],['3 · Outline sign, tidied','outline']]
+  .map(([l,k])=>`<div class="cell"><div class="lbl">${l}</div><div class="card">${V[k]('Привет!')}${copy}</div></div>`).join('');
+document.getElementById('langs').innerHTML=[['en','Hello!'],['es','¡Hola!'],['pl','Cześć!'],['uk','Привіт!'],['ru','Привет!']]
+  .map(([l,w])=>`<div class="cell"><div class="lbl">1 · ${l}</div><div class="card sm">${V.sign(w)}</div></div>`).join('');
+</script>
