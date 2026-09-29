@@ -11,6 +11,15 @@ service firebase.storage {
       allow read: if request.auth != null;
     }
     
+    // Result-page pictures (the DriveUSA "Beep" memes). Read by signed-in,
+    // non-anonymous users — the same bar as the result_memes collection;
+    // written only by an operator (scripts/local/seed-result-memes.js on the
+    // emulators). Risk #3 is why a bare `request.auth != null` is not used.
+    match /result_memes/{allPaths=**} {
+      allow read: if request.auth != null
+                  && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+    
     // Deny all other write access by default
     match /{allPaths=**} {
       allow write: if false;

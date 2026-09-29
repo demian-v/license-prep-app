@@ -12,6 +12,9 @@ import '../theme/app_theme.dart';
 import '../theme/solar_icons.dart';
 import '../widgets/bento_question_parts.dart';
 import '../widgets/bento_result_parts.dart';
+import '../services/result_meme_service.dart';
+import '../widgets/result_meme_picture.dart';
+import '../widgets/result_share_sheet.dart';
 
 class PracticeResultScreen extends StatefulWidget {
   @override
@@ -19,6 +22,9 @@ class PracticeResultScreen extends StatefulWidget {
 }
 
 class _PracticeResultScreenState extends State<PracticeResultScreen> {
+  // Chosen once per result page, not on every rebuild.
+  Future<String?>? _memeUrl;
+
   // Helper method to get custom result icon asset path based on result state
   String? _getResultIconAsset(bool isPassed) {
     return isPassed 
@@ -91,7 +97,18 @@ class _PracticeResultScreenState extends State<PracticeResultScreen> {
     final correctAnswers = practice.correctAnswersCount;
     final incorrectAnswers = practice.incorrectAnswersCount;
     final isPassed = practice.isPassed;
+    // Практика has no timer (timeLimit 0), so it never gets "out of time".
+    final percent = ResultMemeService.percentOf(
+        correctAnswers, practice.questionIds.length);
+    final bucket =
+        ResultMemeService.bucketFor(percent: percent, passed: isPassed);
+    final memeUrl = _memeUrl ??= ResultMemeService.instance.pickUrl(bucket);
     final localizations = AppLocalizations.of(context);
+    final verdict = isPassed
+        ? localizations.translate('practice_passed')
+        : localizations.translate('practice_not_passed');
+    final tone = isPassed ? AppColors.guide : AppColors.stop;
+    final toneSurface = isPassed ? AppColors.guideSurface : AppColors.stopSurface;
     
     return Scaffold(
       backgroundColor: AppColors.field,
@@ -101,14 +118,16 @@ class _PracticeResultScreenState extends State<PracticeResultScreen> {
       ),
       body: BentoResultBody(
         verdict: BentoVerdictCard(
-          pictureAsset: _getResultIconAsset(isPassed)!,
-          fallbackIcon: isPassed ? SolarIcons.cupStarBold : SolarIcons.forbiddenCircleLinear,
-          title: isPassed
-              ? localizations.translate('practice_passed')
-              : localizations.translate('practice_not_passed'),
-          tone: isPassed ? AppColors.guide : AppColors.stop,
-          toneSurface: isPassed ? AppColors.guideSurface : AppColors.stopSurface,
-          titleColor: isPassed ? AppColors.guide : AppColors.stop,
+          picture: ResultMemePicture(
+            url: memeUrl,
+            fallbackAsset: _getResultIconAsset(isPassed)!,
+            toneSurface: toneSurface,
+          ),
+          title: verdict,
+          titleColor: tone,
+          score: '$percent%',
+          tone: tone,
+          toneSurface: toneSurface,
         ),
         stats: BentoStatRow(
           tiles: [
@@ -126,12 +145,38 @@ class _PracticeResultScreenState extends State<PracticeResultScreen> {
             ),
           ],
         ),
-        actions: SizedBox(
-          width: double.infinity,
-          child: BentoActionButton(
-            text: localizations.translate('back_to_tests'),
-            onTap: () => _onBackToTests(practiceProvider),
-          ),
+        // Two actions: back as the white pill, share as the dark one (owner).
+        actions: Row(
+          children: [
+            Expanded(
+              child: BentoActionButton(
+                text: localizations.translate('back_to_tests'),
+                onTap: () => _onBackToTests(practiceProvider),
+                primary: false,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.x4),
+            Expanded(
+              child: BentoInkButton(
+                text: localizations.translate('share'),
+                onTap: () => showResultShareSheet(
+                  context,
+                  ResultShareData(
+                    module: 'practice',
+                    memeUrl: memeUrl,
+                    fallbackAsset: _getResultIconAsset(isPassed)!,
+                    verdict: verdict,
+                    titleColor: tone,
+                    tone: tone,
+                    toneSurface: toneSurface,
+                    percent: percent,
+                    bucket: bucket.id,
+                    passed: isPassed,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

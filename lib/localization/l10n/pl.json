@@ -307,5 +307,12 @@
   "dev_reset_err_all": "Błąd resetowania ustawień: {error}",
   "verify_done_title": "E-mail zweryfikowany",
   "verify_done_message": "Adres potwierdzony. Teraz skonfigurujmy aplikację.",
-  "verify_done_secure": "Zweryfikowano i zabezpieczono"
+  "verify_done_secure": "Zweryfikowano i zabezpieczono",
+  "share": "Udostępnij",
+  "time_is_up": "Czas minął",
+  "share_result_title": "Udostępnij wynik",
+  "share_send": "Wyślij",
+  "share_copy_link": "Kopiuj link",
+  "share_link_copied": "Skopiowano link",
+  "share_result_text": "Mój wynik w DriveUSA to {percent}. Przygotowuję się do egzaminu na prawo jazdy!"
 }

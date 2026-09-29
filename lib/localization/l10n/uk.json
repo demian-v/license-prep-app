@@ -307,5 +307,12 @@
   "dev_reset_err_all": "Помилка скидання налаштувань: {error}",
   "verify_done_title": "Пошту підтверджено",
   "verify_done_message": "Адресу підтверджено. Тепер налаштуймо застосунок.",
-  "verify_done_secure": "Перевірено й захищено"
+  "verify_done_secure": "Перевірено й захищено",
+  "share": "Поділитися",
+  "time_is_up": "Час вийшов",
+  "share_result_title": "Поділитися результатом",
+  "share_send": "Надіслати",
+  "share_copy_link": "Скопіювати посилання",
+  "share_link_copied": "Посилання скопійовано",
+  "share_result_text": "Мій результат у DriveUSA — {percent}. Готуюся до іспиту на права!"
 }

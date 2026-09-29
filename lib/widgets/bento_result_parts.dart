@@ -56,36 +56,43 @@ AppBar bentoHeadingAppBar({
   );
 }
 
-/// The result as the page's one hero card: the 3D picture on a soft disc,
-/// then the verdict. [tone] carries the meaning — green for passed, red for
-/// not passed, blue where there is no verdict (a topic run).
+/// The result as the page's one hero card (variant B, owner 2026-09-28):
+/// the picture inset with rounded corners, the score pill riding its bottom
+/// edge — joined by an amber [timeUpLabel] pill when the Экзамен timer ran
+/// out — and the verdict centred under it on one line. [tone] carries the
+/// meaning: green passed, red not passed.
 class BentoVerdictCard extends StatelessWidget {
   const BentoVerdictCard({
     super.key,
-    required this.pictureAsset,
-    required this.fallbackIcon,
+    required this.picture,
     required this.title,
+    required this.score,
     required this.tone,
     required this.toneSurface,
     this.titleColor = AppColors.ink,
+    this.timeUpLabel,
   });
 
-  final String pictureAsset;
-  final IconData fallbackIcon;
+  /// A 4:3 picture — [ResultMemePicture] on the result pages.
+  final Widget picture;
   final String title;
+
+  /// The score as shown in the pill, e.g. «95%».
+  final String score;
   final Color tone;
   final Color toneSurface;
   final Color titleColor;
+  final String? timeUpLabel;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.x6,
-        AppSpacing.x8,
-        AppSpacing.x6,
-        AppSpacing.x6,
+        AppSpacing.x3,
+        AppSpacing.x3,
+        AppSpacing.x3,
+        AppSpacing.x4 + AppSpacing.x1,
       ),
       decoration: BoxDecoration(
         color: AppColors.paper,
@@ -94,37 +101,153 @@ class BentoVerdictCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Container(
-            width: 148,
-            height: 148,
-            decoration: BoxDecoration(
-              color: toneSurface,
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: Image.asset(
-              pictureAsset,
-              width: 104,
-              height: 104,
-              fit: BoxFit.contain,
-              excludeFromSemantics: true,
-              errorBuilder: (context, error, stackTrace) =>
-                  Icon(fallbackIcon, color: tone, size: 72),
-            ),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                child: AspectRatio(aspectRatio: 4 / 3, child: picture),
+              ),
+              // The pills sit on the picture's bottom edge, ringed in the
+              // card's white so they read as lifted off it.
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: -18,
+                child: Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _RingedPill(text: score, fg: tone, bg: toneSurface),
+                      if (timeUpLabel != null) ...[
+                        const SizedBox(width: AppSpacing.x2),
+                        _RingedPill(
+                          text: timeUpLabel!,
+                          fg: AppColors.warn,
+                          bg: AppColors.warnSurface,
+                          icon: SolarIcons.stopwatchLinear,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.x6),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: AppTypography.title.copyWith(
-              fontSize: 24,
-              height: 30 / 24,
-              letterSpacing: -0.4,
-              color: titleColor,
-              fontVariations: const [FontVariation('wght', 600)],
+          const SizedBox(height: AppSpacing.x8 - 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              title,
+              maxLines: 1,
+              textAlign: TextAlign.center,
+              style: AppTypography.title.copyWith(
+                fontSize: 22,
+                height: 28 / 22,
+                letterSpacing: -0.4,
+                color: titleColor,
+                fontVariations: const [FontVariation('wght', 600)],
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// A fact pill on the verdict picture: coloured by meaning, ringed in white.
+class _RingedPill extends StatelessWidget {
+  const _RingedPill({
+    required this.text,
+    required this.fg,
+    required this.bg,
+    this.icon,
+  });
+
+  final String text;
+  final Color fg;
+  final Color bg;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.x3,
+        vertical: AppSpacing.x1 + 2,
+      ),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(BentoTokens.chip),
+        border: Border.all(color: AppColors.paper, width: 4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 16, color: fg),
+            const SizedBox(width: AppSpacing.x1 + 2),
+          ],
+          Text(
+            text,
+            maxLines: 1,
+            style: AppTypography.label.copyWith(
+              fontSize: 15,
+              color: fg,
+              fontVariations: const [FontVariation('wght', 600)],
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The dark `ink` action pill — «Поделиться» on the result pages, the same
+/// look as «Назад к теории» (`traffic_rule_content_screen.dart`).
+class BentoInkButton extends StatelessWidget {
+  const BentoInkButton({super.key, required this.text, required this.onTap});
+
+  final String text;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(BentoTokens.button);
+    return PressScale(
+      scale: 0.97,
+      duration: BentoTokens.state,
+      child: Container(
+        height: 56,
+        decoration: BoxDecoration(
+          color: AppColors.ink,
+          borderRadius: radius,
+          boxShadow: AppColors.shadowRaised,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: radius,
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x4),
+                child: Text(
+                  text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.label.copyWith(
+                    fontSize: 16,
+                    color: AppColors.onSignal,
+                    fontVariations: const [FontVariation('wght', 500)],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -227,8 +350,10 @@ class BentoStatRow extends StatelessWidget {
   }
 }
 
-/// The result page's body: the hero and the figures, entering once in a
-/// short cascade (instant under Reduce Motion), and the actions pinned below.
+/// The result page's body: the hero and the figures from the top of the
+/// page (owner rule 9 — the meme card fills the page, so centring it only
+/// pushed it down), entering once in a short cascade (instant under Reduce
+/// Motion), and the actions pinned below.
 class BentoResultBody extends StatelessWidget {
   const BentoResultBody({
     super.key,
@@ -246,36 +371,26 @@ class BentoResultBody extends StatelessWidget {
     final blocks = [verdict, stats];
     return Column(
       children: [
-        // Centred in the space above the actions when it fits, so a short
-        // result leaves no empty band; it scrolls when it does not fit.
         Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) => SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.x4,
-                AppSpacing.x2,
-                AppSpacing.x4,
-                AppSpacing.x6,
-              ),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: constraints.maxHeight - AppSpacing.x2 - AppSpacing.x6,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    for (var i = 0; i < blocks.length; i++) ...[
-                      if (i > 0) const SizedBox(height: AppSpacing.x3),
-                      StaggerIn(
-                        index: i,
-                        count: blocks.length,
-                        curve: BentoTokens.curve,
-                        child: blocks[i],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.x4,
+              AppSpacing.x2,
+              AppSpacing.x4,
+              AppSpacing.x6,
+            ),
+            child: Column(
+              children: [
+                for (var i = 0; i < blocks.length; i++) ...[
+                  if (i > 0) const SizedBox(height: AppSpacing.x3),
+                  StaggerIn(
+                    index: i,
+                    count: blocks.length,
+                    curve: BentoTokens.curve,
+                    child: blocks[i],
+                  ),
+                ],
+              ],
             ),
           ),
         ),

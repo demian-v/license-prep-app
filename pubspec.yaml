@@ -50,6 +50,9 @@ dependencies:
   # payment path is its own piece of work, not a side effect of adding crash
   # reporting.
   firebase_crashlytics: 5.0.0
+  # Result-screen Share button (owner-approved 2026-09-28). Added alone: it
+  # brought only cross_file, mime and its platform interface, no version bumps.
+  share_plus: ^12.0.2
 
 # Removing overrides as they may be causing conflicts
 

@@ -224,3 +224,34 @@ describe('Risk #45 — reports ownership', () => {
     );
   });
 });
+
+describe('result_memes — result-page pictures (added 2026-09-28)', () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection('result_memes').doc('90-100-01-success').set({
+        bucket: '90-100',
+        storagePath: 'result_memes/90-100/90-100-01-success.webp',
+        width: 512, height: 384, bytes: 20000, active: true, order: 1,
+      });
+    });
+  });
+
+  it('a signed-in user with no subscription CAN read them (not paid content)', async () => {
+    await assertSucceeds(free().firestore().collection('result_memes')
+      .where('bucket', '==', '90-100').where('active', '==', true).get());
+  });
+
+  it('an anonymous user cannot read them (risk #3)', async () => {
+    await assertFails(anon().firestore().collection('result_memes').doc('90-100-01-success').get());
+  });
+
+  it('an unauthenticated visitor cannot read them', async () => {
+    await assertFails(env.unauthenticatedContext().firestore()
+      .collection('result_memes').doc('90-100-01-success').get());
+  });
+
+  it('no client can write them', async () => {
+    await assertFails(free().firestore().collection('result_memes').doc('x').set({ bucket: 'lt30' }));
+    await assertFails(free().firestore().collection('result_memes').doc('90-100-01-success').update({ active: false }));
+  });
+});

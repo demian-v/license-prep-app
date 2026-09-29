@@ -12,6 +12,9 @@ import '../theme/app_theme.dart';
 import '../theme/solar_icons.dart';
 import '../widgets/bento_question_parts.dart';
 import '../widgets/bento_result_parts.dart';
+import '../services/result_meme_service.dart';
+import '../widgets/result_meme_picture.dart';
+import '../widgets/result_share_sheet.dart';
 
 class ExamResultScreen extends StatefulWidget {
   @override
@@ -19,6 +22,9 @@ class ExamResultScreen extends StatefulWidget {
 }
 
 class _ExamResultScreenState extends State<ExamResultScreen> {
+  // Chosen once per result page, not on every rebuild.
+  Future<String?>? _memeUrl;
+
   // Helper method to get custom result icon asset path based on result state
   String? _getResultIconAsset(bool isPassed) {
     return isPassed 
@@ -89,6 +95,17 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
     final correctAnswers = exam.correctAnswersCount;
     final incorrectAnswers = exam.incorrectAnswersCount;
     final isPassed = exam.isPassed;
+    final percent =
+        ResultMemeService.percentOf(correctAnswers, exam.questionIds.length);
+    // The timer completed the exam (completeExam() at the time limit) and the
+    // pass mark was not reached — a pass always keeps the win picture.
+    final outOfTime = !isPassed && ResultMemeService.ranOutOfTime(exam);
+    final bucket = ResultMemeService.bucketFor(
+      percent: percent,
+      passed: isPassed,
+      outOfTime: outOfTime,
+    );
+    final memeUrl = _memeUrl ??= ResultMemeService.instance.pickUrl(bucket);
     
     // Format elapsed time
     final elapsedTime = exam.elapsedTime;
@@ -96,6 +113,12 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
     final seconds = elapsedTime.inSeconds % 60;
     final timeText = "${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}";
     final localizations = AppLocalizations.of(context);
+    final verdict = isPassed
+        ? localizations.translate('exam_passed')
+        : localizations.translate('exam_not_passed');
+    final tone = isPassed ? AppColors.guide : AppColors.stop;
+    final toneSurface = isPassed ? AppColors.guideSurface : AppColors.stopSurface;
+    final timeUpLabel = outOfTime ? localizations.translate('time_is_up') : null;
     
     return Scaffold(
       backgroundColor: AppColors.field,
@@ -105,14 +128,17 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
       ),
       body: BentoResultBody(
         verdict: BentoVerdictCard(
-          pictureAsset: _getResultIconAsset(isPassed)!,
-          fallbackIcon: isPassed ? SolarIcons.cupStarBold : SolarIcons.forbiddenCircleLinear,
-          title: isPassed
-              ? localizations.translate('exam_passed')
-              : localizations.translate('exam_not_passed'),
-          tone: isPassed ? AppColors.guide : AppColors.stop,
-          toneSurface: isPassed ? AppColors.guideSurface : AppColors.stopSurface,
-          titleColor: isPassed ? AppColors.guide : AppColors.stop,
+          picture: ResultMemePicture(
+            url: memeUrl,
+            fallbackAsset: _getResultIconAsset(isPassed)!,
+            toneSurface: toneSurface,
+          ),
+          title: verdict,
+          titleColor: tone,
+          score: '$percent%',
+          tone: tone,
+          toneSurface: toneSurface,
+          timeUpLabel: timeUpLabel,
         ),
         stats: BentoStatRow(
           tiles: [
@@ -136,12 +162,39 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
             ),
           ],
         ),
-        actions: SizedBox(
-          width: double.infinity,
-          child: BentoActionButton(
-            text: localizations.translate('back_to_tests'),
-            onTap: () => _onBackToTests(examProvider),
-          ),
+        // Two actions: back as the white pill, share as the dark one (owner).
+        actions: Row(
+          children: [
+            Expanded(
+              child: BentoActionButton(
+                text: localizations.translate('back_to_tests'),
+                onTap: () => _onBackToTests(examProvider),
+                primary: false,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.x4),
+            Expanded(
+              child: BentoInkButton(
+                text: localizations.translate('share'),
+                onTap: () => showResultShareSheet(
+                  context,
+                  ResultShareData(
+                    module: 'exam',
+                    memeUrl: memeUrl,
+                    fallbackAsset: _getResultIconAsset(isPassed)!,
+                    verdict: verdict,
+                    titleColor: tone,
+                    tone: tone,
+                    toneSurface: toneSurface,
+                    percent: percent,
+                    bucket: bucket.id,
+                    passed: isPassed,
+                    timeUpLabel: timeUpLabel,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

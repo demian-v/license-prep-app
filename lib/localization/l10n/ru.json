@@ -307,5 +307,12 @@
   "dev_reset_err_all": "Ошибка сброса настроек: {error}",
   "verify_done_title": "Почта подтверждена",
   "verify_done_message": "Адрес подтверждён. Теперь настроим приложение.",
-  "verify_done_secure": "Проверено и защищено"
+  "verify_done_secure": "Проверено и защищено",
+  "share": "Поделиться",
+  "time_is_up": "Время вышло",
+  "share_result_title": "Поделиться результатом",
+  "share_send": "Отправить",
+  "share_copy_link": "Скопировать ссылку",
+  "share_link_copied": "Ссылка скопирована",
+  "share_result_text": "Мой результат в DriveUSA — {percent}. Готовлюсь к экзамену на права!"
 }

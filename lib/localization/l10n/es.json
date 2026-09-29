@@ -307,5 +307,12 @@
   "dev_reset_err_all": "Error al restablecer la configuración: {error}",
   "verify_done_title": "Correo verificado",
   "verify_done_message": "Tu dirección está confirmada. Ahora configuremos la app.",
-  "verify_done_secure": "Verificado y seguro"
+  "verify_done_secure": "Verificado y seguro",
+  "share": "Compartir",
+  "time_is_up": "Se acabó el tiempo",
+  "share_result_title": "Comparte tu resultado",
+  "share_send": "Enviar",
+  "share_copy_link": "Copiar enlace",
+  "share_link_copied": "Enlace copiado",
+  "share_result_text": "Obtuve {percent} en DriveUSA. ¡Me preparo para el examen de manejo!"
 }

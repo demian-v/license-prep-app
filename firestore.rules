@@ -237,6 +237,14 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // result_memes — which picture a result page shows (bucket, Storage path,
+    // size). Not paid content, so no entitlement gate, but not anonymous either
+    // (risk #3). Written only by an operator or the emulator seed script.
+    match /result_memes/{memeId} {
+      allow read: if isNotAnonymous();
+      allow write: if false;
+    }
+
     // contentMeta — the content cache-bust version (risk #47). Served by the
     // getContentVersion callable so there is exactly one path to it, and
     // writable only by an operator through the console or a server-side script.

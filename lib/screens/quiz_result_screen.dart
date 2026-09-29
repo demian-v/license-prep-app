@@ -9,6 +9,9 @@ import '../theme/app_theme.dart';
 import '../theme/solar_icons.dart';
 import '../widgets/bento_question_parts.dart';
 import '../widgets/bento_result_parts.dart';
+import '../services/result_meme_service.dart';
+import '../widgets/result_meme_picture.dart';
+import '../widgets/result_share_sheet.dart';
 
 class QuizResultScreen extends StatefulWidget {
   final QuizTopic topic;
@@ -31,6 +34,9 @@ class QuizResultScreen extends StatefulWidget {
 }
 
 class _QuizResultScreenState extends State<QuizResultScreen> {
+  // Chosen once per result page, not on every rebuild.
+  Future<String?>? _memeUrl;
+
   int get _correctAnswers => widget.answers.values.where((result) => result).length;
   int get _totalQuestions => widget.answers.length;
   // Nothing answered (every question skipped) is 0%, not 0/0 = NaN — which
@@ -88,6 +94,15 @@ class _QuizResultScreenState extends State<QuizResultScreen> {
     int correctAnswers = widget.answers.values.where((v) => v).length;
     int incorrectAnswers = totalAnswered - correctAnswers;
     final localizations = AppLocalizations.of(context);
+    // The topic's full size, not just the answered ones (as in the tile below).
+    final topicSize =
+        widget.topic.questionCount > 0 ? widget.topic.questionCount : totalAnswered;
+    final percent = ResultMemeService.percentOf(correctAnswers, topicSize);
+    final bucket =
+        ResultMemeService.bucketFor(percent: percent, passed: _isPassed);
+    final memeUrl = _memeUrl ??= ResultMemeService.instance.pickUrl(bucket);
+    final tone = _isPassed ? AppColors.guide : AppColors.stop;
+    final toneSurface = _isPassed ? AppColors.guideSurface : AppColors.stopSurface;
     
     return Scaffold(
       backgroundColor: AppColors.field,
@@ -96,14 +111,18 @@ class _QuizResultScreenState extends State<QuizResultScreen> {
         onBack: _onBackToTopics,
       ),
       body: BentoResultBody(
-        // The card names the topic; the picture and its disc carry the
+        // The card names the topic; the picture and the score pill carry the
         // verdict — green passed, red not passed.
         verdict: BentoVerdictCard(
-          pictureAsset: _getLearnByTopicsIconAsset()!,
-          fallbackIcon: _isPassed ? SolarIcons.cupStarBold : SolarIcons.forbiddenCircleLinear,
+          picture: ResultMemePicture(
+            url: memeUrl,
+            fallbackAsset: _getLearnByTopicsIconAsset()!,
+            toneSurface: toneSurface,
+          ),
           title: widget.topic.title,
-          tone: _isPassed ? AppColors.guide : AppColors.stop,
-          toneSurface: _isPassed ? AppColors.guideSurface : AppColors.stopSurface,
+          score: '$percent%',
+          tone: tone,
+          toneSurface: toneSurface,
         ),
         stats: BentoStatRow(
           tiles: [
@@ -123,30 +142,55 @@ class _QuizResultScreenState extends State<QuizResultScreen> {
             // answer and fourteen skips reads «1 / 15», not «1 / 1».
             BentoStatTile(
               icon: SolarIcons.questionSquareBold,
-              value: (widget.topic.questionCount > 0
-                      ? widget.topic.questionCount
-                      : totalAnswered)
-                  .toString(),
+              value: topicSize.toString(),
               label: localizations.translate('questions'),
             ),
           ],
         ),
-        // Another topic is the likely next step, so it is the primary pill.
-        actions: Row(
+        // Three actions (owner): share as the dark pill on its own row; under
+        // it, back to Тесты white and another topic — the likely next step —
+        // as the blue primary.
+        actions: Column(
           children: [
-            Expanded(
-              child: BentoActionButton(
-                text: localizations.translate('back_to_tests'),
-                onTap: _onBackToTests,
-                primary: false,
+            SizedBox(
+              width: double.infinity,
+              child: BentoInkButton(
+                text: localizations.translate('share'),
+                onTap: () => showResultShareSheet(
+                  context,
+                  ResultShareData(
+                    module: 'topic',
+                    memeUrl: memeUrl,
+                    fallbackAsset: _getLearnByTopicsIconAsset()!,
+                    verdict: widget.topic.title,
+                    titleColor: AppColors.ink,
+                    tone: tone,
+                    toneSurface: toneSurface,
+                    percent: percent,
+                    bucket: bucket.id,
+                    passed: _isPassed,
+                  ),
+                ),
               ),
             ),
-            const SizedBox(width: AppSpacing.x4),
-            Expanded(
-              child: BentoActionButton(
-                text: localizations.translate('back_to_topics'),
-                onTap: _onBackToTopics,
-              ),
+            const SizedBox(height: AppSpacing.x3),
+            Row(
+              children: [
+                Expanded(
+                  child: BentoActionButton(
+                    text: localizations.translate('back_to_tests'),
+                    onTap: _onBackToTests,
+                    primary: false,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.x4),
+                Expanded(
+                  child: BentoActionButton(
+                    text: localizations.translate('back_to_topics'),
+                    onTap: _onBackToTopics,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

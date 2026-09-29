@@ -788,7 +788,32 @@ class AnalyticsService {
 
     await logEvent('practice_finished', parameters);
   }
-  
+
+  // MARK: - Result Share Events
+
+  /// Log when a result is shared from a result page's share sheet.
+  /// [module] is exam, practice or topic; [method] is system_share or
+  /// copy_link; [status] is the system sheet's outcome (success, dismissed,
+  /// unavailable) — copy_link is always success.
+  Future<void> logResultShared({
+    required String module,
+    required String method,
+    required String bucket,
+    required int scorePercent,
+    required bool passed,
+    required String status,
+  }) async {
+    await logEvent('result_shared', {
+      'module': module,
+      'method': method,
+      'meme_bucket': bucket,
+      'score_percent': scorePercent,
+      'passed': passed.toString(),
+      'status': status,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
   // MARK: - Learn by Topics Events
   
   /// Log when user starts Learn by Topics flow

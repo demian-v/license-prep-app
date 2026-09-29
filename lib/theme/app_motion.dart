@@ -42,6 +42,12 @@ class AppMotion {
   /// Gap between siblings in a staggered entrance.
   static const Duration stagger = Duration(milliseconds: 24);
 
+  /// The share sheet's spring: critically damped (damping = 2·√stiffness), so
+  /// it settles in about 600 ms with no bounce — measured from the
+  /// motion.dev sheet-modal reference on 2026-09-28.
+  static const SpringDescription sheetSpring =
+      SpringDescription(mass: 1, stiffness: 320, damping: 36);
+
   /// True when the platform or the user has asked for reduced motion.
   ///
   /// Every animated widget in the design system checks this and collapses to
