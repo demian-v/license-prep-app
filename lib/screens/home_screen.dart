@@ -5,6 +5,8 @@ import '../screens/test_screen.dart';
 import '../screens/theory_screen.dart';
 import '../screens/instructors_screen.dart';
 import '../screens/profile_screen.dart';
+import '../screens/onboarding_screen.dart';
+import '../theme/app_colors.dart';
 import '../widgets/super_enhanced_footer.dart';
 import '../services/service_locator_extensions.dart';
 import '../services/session_validation_service.dart';
@@ -26,6 +28,10 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   
   late int _currentIndex;
   bool _isInitializing = true;
+
+  /// First-run onboarding over this screen: null until the flag is read,
+  /// then whether to show it.
+  bool? _showOnboarding;
   
   // Keep the widget alive to preserve state during parent rebuilds
   @override
@@ -46,6 +52,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     _currentIndex = _persistentCurrentIndex;
     
     print('🏠 HomeScreen: Initializing with saved tab index: $_currentIndex');
+
+    _checkOnboarding();
     
     // Initialize content after the screen is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -144,6 +152,32 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     }
   }
 
+  // First-run onboarding (owner, 2026-09-29). It covers this screen while
+  // _initializeContent and the Tests tab load underneath, and warms Theory,
+  // which otherwise loads only when its tab is first opened.
+  Future<void> _checkOnboarding() async {
+    final show = await OnboardingGate.shouldShow();
+    if (!mounted) return;
+    setState(() => _showOnboarding = show);
+    if (show) _prefetchTheoryForOnboarding();
+  }
+
+  void _prefetchTheoryForOnboarding() {
+    final manager = ServiceLocatorExtensions.contentLoadingManager;
+    // Signup already prefetched at state selection; don't fetch twice.
+    if (manager.hasInitializedContent) return;
+    // Same rule as the signup prefetch: skip only when we KNOW there is no
+    // entitlement. A subscription not read back yet still prefetches.
+    final subs = Provider.of<SubscriptionProvider>(context, listen: false);
+    final knownUnentitled = subs.subscription != null && !subs.hasValidSubscription;
+    manager.prefetchInBackground(entitled: !knownUnentitled, reason: 'onboarding');
+  }
+
+  Future<void> _onOnboardingDone() async {
+    await OnboardingGate.markSeen();
+    if (mounted) setState(() => _showOnboarding = false);
+  }
+
   void _onTabTapped(int index) {
     // Validate session before allowing navigation
     if (!SessionValidationService.validateBeforeActionSafely(context)) {
@@ -170,6 +204,23 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     // Call super.build to maintain AutomaticKeepAliveClientMixin functionality
     super.build(context);
     
+    // Always a Stack with the home first: dropping the Stack when the
+    // onboarding ends would re-parent the home and rebuild every tab from
+    // scratch (a blank frame and a second preload).
+    return Stack(children: [
+      _buildHome(),
+      if (_showOnboarding != false)
+        Positioned.fill(
+          // Until the flag is read, a plain field page, so the onboarding
+          // doesn't flash in over a screen that was already showing.
+          child: _showOnboarding == null
+              ? const ColoredBox(color: AppColors.field)
+              : OnboardingScreen(onDone: _onOnboardingDone),
+        ),
+    ]);
+  }
+
+  Widget _buildHome() {
     // Show loading indicator while initializing content
     if (_isInitializing) {
       return Scaffold(

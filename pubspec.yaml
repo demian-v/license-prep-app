@@ -76,6 +76,13 @@ flutter:
     - assets/images/logo/
     - assets/images/quiz/
     - assets/images/states/
+    # First-run onboarding screenshots, one folder per locale
+    # (design/onboarding/_src/export_onboarding_assets.py).
+    - assets/images/onboarding/en/
+    - assets/images/onboarding/es/
+    - assets/images/onboarding/pl/
+    - assets/images/onboarding/ru/
+    - assets/images/onboarding/uk/
     - lib/localization/l10n/
   fonts:
     # Rubik: variable font (wght 300-900) with full Cyrillic + Latin Extended

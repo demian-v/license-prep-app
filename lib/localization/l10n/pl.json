@@ -314,5 +314,22 @@
   "share_send": "Wyślij",
   "share_copy_link": "Kopiuj link",
   "share_link_copied": "Skopiowano link",
-  "share_result_text": "Mój wynik w DriveUSA to {percent}. Przygotowuję się do egzaminu na prawo jazdy!"
+  "share_result_text": "Mój wynik w DriveUSA to {percent}. Przygotowuję się do egzaminu na prawo jazdy!",
+  "onboarding_hello": "Cześć!",
+  "onboarding_welcome_title": "Witaj w DriveUSA",
+  "onboarding_welcome_body": "Przygotujemy Cię do egzaminu pisemnego w DMV. Najpierw krótko pokażemy, gdzie co jest.",
+  "onboarding_lets_go": "Zaczynamy",
+  "onboarding_start": "Start",
+  "onboarding_tests_title": "Testy",
+  "onboarding_tests_body": "Wszystko, czego potrzebujesz, by przygotować się do egzaminu pisemnego.",
+  "onboarding_exam_title": "Zdaj egzamin",
+  "onboarding_exam_body": "Próbny egzamin jak prawdziwy: 40 pytań, 60 minut.",
+  "onboarding_topics_title": "Tematy i bilety",
+  "onboarding_topics_body": "Ucz się pytań według tematów albo rozwiązuj bilety praktyczne.",
+  "onboarding_mistakes_title": "Praca nad błędami",
+  "onboarding_mistakes_body": "Tu zbierają się pytania, na które odpowiedziałeś źle.",
+  "onboarding_theory_title": "Teoria",
+  "onboarding_theory_body": "Podręcznik kierowcy Twojego stanu, podzielony na moduły.",
+  "onboarding_profile_title": "Profil",
+  "onboarding_profile_body": "Zmieniaj język i stan w dowolnym momencie."
 }

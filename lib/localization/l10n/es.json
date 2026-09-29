@@ -314,5 +314,22 @@
   "share_send": "Enviar",
   "share_copy_link": "Copiar enlace",
   "share_link_copied": "Enlace copiado",
-  "share_result_text": "Obtuve {percent} en DriveUSA. ¡Me preparo para el examen de manejo!"
+  "share_result_text": "Obtuve {percent} en DriveUSA. ¡Me preparo para el examen de manejo!",
+  "onboarding_hello": "¡Hola!",
+  "onboarding_welcome_title": "Bienvenido a DriveUSA",
+  "onboarding_welcome_body": "Te prepararemos para el examen escrito del DMV. Primero, un vistazo rápido a dónde está todo.",
+  "onboarding_lets_go": "Vamos",
+  "onboarding_start": "Empezar",
+  "onboarding_tests_title": "Pruebas",
+  "onboarding_tests_body": "Todo lo que necesitas para preparar el examen escrito.",
+  "onboarding_exam_title": "Realizar examen",
+  "onboarding_exam_body": "Un simulacro del examen real: 40 preguntas, 60 minutos.",
+  "onboarding_topics_title": "Temas y boletos",
+  "onboarding_topics_body": "Aprende las preguntas por temas o resuelve boletos de práctica.",
+  "onboarding_mistakes_title": "Trabajando en errores",
+  "onboarding_mistakes_body": "Aquí se guardan las preguntas que respondiste mal.",
+  "onboarding_theory_title": "Teoría",
+  "onboarding_theory_body": "El manual del conductor de tu estado, dividido en módulos.",
+  "onboarding_profile_title": "Perfil",
+  "onboarding_profile_body": "Cambia tu idioma y tu estado cuando quieras."
 }

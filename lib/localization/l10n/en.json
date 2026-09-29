@@ -314,5 +314,22 @@
   "share_send": "Send",
   "share_copy_link": "Copy link",
   "share_link_copied": "Link copied",
-  "share_result_text": "I scored {percent} in DriveUSA. Getting ready for my driving test!"
+  "share_result_text": "I scored {percent} in DriveUSA. Getting ready for my driving test!",
+  "onboarding_hello": "Hello!",
+  "onboarding_welcome_title": "Welcome to DriveUSA",
+  "onboarding_welcome_body": "We’ll get you ready for the DMV written test. First, a quick look at where everything is.",
+  "onboarding_lets_go": "Let’s go",
+  "onboarding_start": "Start",
+  "onboarding_tests_title": "Tests",
+  "onboarding_tests_body": "Everything you need to prepare for the written test.",
+  "onboarding_exam_title": "Take Exam",
+  "onboarding_exam_body": "A mock of the real exam: 40 questions, 60 minutes.",
+  "onboarding_topics_title": "Topics and tickets",
+  "onboarding_topics_body": "Learn questions by topic, or solve practice tickets.",
+  "onboarding_mistakes_title": "Working on Mistakes",
+  "onboarding_mistakes_body": "Questions you got wrong are collected here.",
+  "onboarding_theory_title": "Theory",
+  "onboarding_theory_body": "Your state’s driver handbook, split into modules.",
+  "onboarding_profile_title": "Profile",
+  "onboarding_profile_body": "Change your language and state at any time."
 }

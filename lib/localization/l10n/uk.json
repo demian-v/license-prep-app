@@ -314,5 +314,22 @@
   "share_send": "Надіслати",
   "share_copy_link": "Скопіювати посилання",
   "share_link_copied": "Посилання скопійовано",
-  "share_result_text": "Мій результат у DriveUSA — {percent}. Готуюся до іспиту на права!"
+  "share_result_text": "Мій результат у DriveUSA — {percent}. Готуюся до іспиту на права!",
+  "onboarding_hello": "Привіт!",
+  "onboarding_welcome_title": "Ласкаво просимо до DriveUSA",
+  "onboarding_welcome_body": "Підготуємо вас до письмового іспиту в DMV. Спершу коротко покажемо, де що знаходиться.",
+  "onboarding_lets_go": "Почнімо",
+  "onboarding_start": "Почати",
+  "onboarding_tests_title": "Тести",
+  "onboarding_tests_body": "Тут усе для підготовки до письмового іспиту.",
+  "onboarding_exam_title": "Складай іспит",
+  "onboarding_exam_body": "Симуляція справжнього іспиту: 40 питань, 60 хвилин.",
+  "onboarding_topics_title": "Теми та білети",
+  "onboarding_topics_body": "Вивчайте питання за темами або розв’язуйте практичні білети.",
+  "onboarding_mistakes_title": "Робота над помилками",
+  "onboarding_mistakes_body": "Питання, у яких ви помилилися, збираються тут.",
+  "onboarding_theory_title": "Теорія",
+  "onboarding_theory_body": "Довідник водія вашого штату, поділений на модулі.",
+  "onboarding_profile_title": "Профіль",
+  "onboarding_profile_body": "Змінюйте мову та штат будь-коли."
 }

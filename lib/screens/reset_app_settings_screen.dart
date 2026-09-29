@@ -11,6 +11,7 @@ import '../theme/bento_tokens.dart';
 import '../widgets/bento_question_parts.dart';
 import '../widgets/bento_result_parts.dart';
 import 'login_screen.dart';
+import 'onboarding_screen.dart';
 
 /// A developer/admin screen to reset app settings
 /// This is useful for testing and debugging language and state settings
@@ -296,7 +297,12 @@ class ResetAppSettingsScreen extends StatelessWidget {
       if (prefs.containsKey('selected_state')) {
         await prefs.remove('selected_state');
       }
-      
+
+      // Clear the first-run onboarding flag, so it shows again
+      if (prefs.containsKey(OnboardingGate.prefsKey)) {
+        await prefs.remove(OnboardingGate.prefsKey);
+      }
+
       // Reset providers
       final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
       await languageProvider.resetToEnglish();

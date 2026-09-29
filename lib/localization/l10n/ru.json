@@ -314,5 +314,22 @@
   "share_send": "Отправить",
   "share_copy_link": "Скопировать ссылку",
   "share_link_copied": "Ссылка скопирована",
-  "share_result_text": "Мой результат в DriveUSA — {percent}. Готовлюсь к экзамену на права!"
+  "share_result_text": "Мой результат в DriveUSA — {percent}. Готовлюсь к экзамену на права!",
+  "onboarding_hello": "Привет!",
+  "onboarding_welcome_title": "Добро пожаловать в DriveUSA",
+  "onboarding_welcome_body": "Подготовим вас к письменному экзамену в DMV. Сначала коротко покажем, где что находится.",
+  "onboarding_lets_go": "Начнём",
+  "onboarding_start": "Начать",
+  "onboarding_tests_title": "Тесты",
+  "onboarding_tests_body": "Здесь всё для подготовки к письменному экзамену.",
+  "onboarding_exam_title": "Сдать экзамен",
+  "onboarding_exam_body": "Симуляция настоящего экзамена: 40 вопросов, 60 минут.",
+  "onboarding_topics_title": "Темы и билеты",
+  "onboarding_topics_body": "Учите вопросы по темам или решайте практические билеты.",
+  "onboarding_mistakes_title": "Работа над ошибками",
+  "onboarding_mistakes_body": "Вопросы, в которых вы ошиблись, собираются здесь.",
+  "onboarding_theory_title": "Теория",
+  "onboarding_theory_body": "Справочник водителя вашего штата, разбитый на модули.",
+  "onboarding_profile_title": "Профиль",
+  "onboarding_profile_body": "Меняйте язык и штат в любой момент."
 }
