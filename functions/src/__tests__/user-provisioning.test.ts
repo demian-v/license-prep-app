@@ -60,6 +60,26 @@ describe('Risk #23 — new accounts are provisioned server-side', () => {
     expect(doc.get('language')).toBe('pl');
     expect(doc.get('state')).toBe('NY');
   });
+
+  // The trigger and the app's createOrUpdateUserDocument run at the same
+  // moment on every signup. The trigger used to read, see nothing, and then
+  // write `name: ''` with merge AFTER the app had created the doc — wiping
+  // the name the user typed. Found on the simulator 2026-09-30, where it
+  // failed an instructor registration ("missing field: name").
+  it('never wipes the name when it races the app\'s own write', async () => {
+    const provision = testEnv.wrap(fns.provisionUserDocument as any);
+    const create = testEnv.wrap(fns.createOrUpdateUserDocument as any);
+    const uids = Array.from({ length: 20 }, (_, i) => `race-user-${i}`);
+    await Promise.all(uids.map((u) => db().collection('users').doc(u).delete().catch(() => {})));
+
+    await Promise.all(uids.map((uid) => Promise.all([
+      provision({ uid, email: `${uid}@example.com`, displayName: '', emailVerified: false } as any),
+      create({ name: 'Typed Name', email: `${uid}@example.com`, language: 'en', state: null } as any, ctx(uid) as any),
+    ])));
+
+    const names = await Promise.all(uids.map(async (u) => (await db().collection('users').doc(u).get()).get('name')));
+    expect(names.filter((n) => n !== 'Typed Name')).toEqual([]);
+  });
 });
 
 describe('Risk #23 — an already-orphaned account can recover', () => {

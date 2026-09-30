@@ -1848,21 +1848,19 @@ export { validatePurchaseReceipt };
  * An auth trigger cannot be skipped by a client that dies halfway, so the
  * document now exists before the app asks for it.
  *
- * merge:true and no overwrite of client-owned fields: the client may well have
- * written its own document first with a name, language and state the user
- * actually chose. This fills gaps, it does not win races.
+ * Create-only, never an overwrite of client-owned fields: the client may well
+ * have written its own document first with a name, language and state the
+ * user actually chose. This fills gaps, it does not win races.
  */
 export const provisionUserDocument = functions.auth.user().onCreate(async (user) => {
   const ref = db.collection('users').doc(user.uid);
 
   try {
-    const existing = await ref.get();
-    if (existing.exists) {
-      console.log(`provisionUserDocument: ${user.uid} already has a document, leaving it alone`);
-      return;
-    }
-
-    await ref.set({
+    // create(), not get-then-set: the app's createOrUpdateUserDocument runs
+    // at the same moment on every signup, and a read that saw no document
+    // followed by a merge wrote `name: ''` over the name the user had just
+    // typed (found 2026-09-30). create() fails atomically if the doc exists.
+    await ref.create({
       email: user.email ?? null,
       name: user.displayName ?? '',
       language: 'en',
@@ -1870,10 +1868,14 @@ export const provisionUserDocument = functions.auth.user().onCreate(async (user)
       createdAt: FieldValue.serverTimestamp(),
       lastLoginAt: FieldValue.serverTimestamp(),
       provisionedBy: 'auth-trigger',
-    }, { merge: true });
+    });
 
     console.log(`provisionUserDocument: created users/${user.uid}`);
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.code === 6 /* ALREADY_EXISTS */) {
+      console.log(`provisionUserDocument: ${user.uid} already has a document, leaving it alone`);
+      return;
+    }
     // Never throw: a failure here must not break account creation itself. The
     // set/merge recovery in the updaters below is the second line of defence.
     console.error(`provisionUserDocument: could not provision ${user.uid}:`, error);
