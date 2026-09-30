@@ -25,6 +25,40 @@ import { isWithinStoreGrace } from './billing-grace';
  * risk #15, where a missing composite index silently breaks the purchase path.
  */
 export async function requireEntitledUser(context: any): Promise<string> {
+  const { uid, live } = await liveSubscriptions(context);
+  if (live.length === 0) {
+    throw new functions.https.HttpsError(
+      'permission-denied',
+      'An active subscription or trial is required.',
+    );
+  }
+  return uid;
+}
+
+/**
+ * Paid-subscriber gate — the Instructors marketplace (listing, chat, booking).
+ *
+ * Owner decision 2026-09-30: trial users see only a locked preview; the
+ * marketplace needs a paid plan. Same three gates as requireEntitledUser, but
+ * gate 3 ignores `planType: 'trial'` subscriptions. The trial/paid distinction
+ * lives only on subscriptions docs — nothing mirrors it onto users/{uid} — so
+ * Firestore rules cannot express this gate, and instructor data is served
+ * through callables that call this instead of being client-readable.
+ */
+export async function requirePaidSubscriber(context: any): Promise<string> {
+  const { uid, live } = await liveSubscriptions(context);
+  if (!live.some((doc) => doc.get('planType') !== 'trial')) {
+    throw new functions.https.HttpsError(
+      'permission-denied',
+      'A paid subscription is required.',
+    );
+  }
+  return uid;
+}
+
+async function liveSubscriptions(
+  context: any,
+): Promise<{ uid: string; live: FirebaseFirestore.QueryDocumentSnapshot[] }> {
   if (!context || !context.auth) {
     throw new functions.https.HttpsError(
       'unauthenticated',
@@ -58,20 +92,13 @@ export async function requireEntitledUser(context: any): Promise<string> {
   // therefore extends through the same store grace window the renewal
   // scheduler uses, so the two cannot disagree about who is entitled.
   const nowMs = Date.now();
-  const entitled = snap.docs.some((doc) => {
+  const live = snap.docs.filter((doc) => {
     const nextBillingDate = doc.get('nextBillingDate');
     if (nextBillingDate == null) return false;
     return nextBillingDate.toMillis() > nowMs || isWithinStoreGrace(nextBillingDate, nowMs);
   });
 
-  if (!entitled) {
-    throw new functions.https.HttpsError(
-      'permission-denied',
-      'An active subscription or trial is required.',
-    );
-  }
-
-  return uid;
+  return { uid, live };
 }
 
 /**

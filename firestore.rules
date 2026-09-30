@@ -33,7 +33,11 @@ service cloud.firestore {
     function serverOwnedUserFields() {
       return [
         'isActive', 'subscriptionStatus', 'nextBillingDate', 'lastBillingDate',
-        'packageId', 'planType', 'price', 'trialUsed', 'trialEndsAt'
+        'packageId', 'planType', 'price', 'trialUsed', 'trialEndsAt',
+        // Instructors plan v2: the role is granted only by registerAsInstructor.
+        // `signupRole`/`signupKind` stay client-writable — they are intent
+        // (which signup screens to resume), not privilege.
+        'userType'
       ];
     }
 
@@ -53,6 +57,17 @@ service cloud.firestore {
       // Users can read/write their own session documents
       match /sessions/{sessionDoc} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // FCM registration tokens, one doc per device (plan v2 §12). Written by
+      // the owner directly: no privilege rides on a token.
+      match /fcmTokens/{tokenId} {
+        allow read, delete: if isNotAnonymous() && request.auth.uid == userId;
+        allow create, update: if isNotAnonymous() && request.auth.uid == userId
+          && request.resource.data.keys().hasOnly(['token', 'platform', 'updatedAt'])
+          && request.resource.data.token is string
+          && request.resource.data.token.size() <= 4096
+          && request.resource.data.platform in ['ios', 'android'];
       }
     }
     
@@ -251,6 +266,101 @@ service cloud.firestore {
     // A client that could write this could force every device to refetch.
     match /contentMeta/{docId} {
       allow read, write: if false;
+    }
+
+    // ── Instructors marketplace — plan v2 (vault raw/drive_usa/2026-09-30) ──
+    //
+    // Students never read instructor data directly. The listing, profiles and
+    // reviews are served by callables gated on requirePaidSubscriber
+    // (functions/src/entitlement.ts): trial users are locked out, and the
+    // trial/paid distinction lives only on subscriptions docs, which a rule
+    // cannot query. Here only the owner reads their own doc.
+    match /instructors/{uid} {
+      // An ALLOWLIST, unlike serverOwnedUserFields: the collection is new, so
+      // nothing depends on writing fields outside it. Everything else —
+      // listed, stage, idCheck, licenseCheck, photoUrl, ratings, payouts,
+      // timezone — is written by Cloud Functions only.
+      function ownerEditableFields() {
+        return [
+          'name', 'city', 'cityKey', 'languages', 'schoolName',
+          'schoolAddress', 'fleetSize', 'instructorCount',
+          'carModel', 'carYear', 'hasDualControls', 'bio',
+          'hourlyRateCents', 'lessonDurations', 'availability',
+          'status', 'updatedAt'
+        ];
+      }
+      allow read: if isNotAnonymous() && request.auth.uid == uid;
+      allow update: if isNotAnonymous() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(ownerEditableFields())
+        // `suspended` is admin-only, and a suspended owner cannot leave it.
+        && resource.data.status != 'suspended'
+        && request.resource.data.status in ['active', 'deactivated']
+        && request.resource.data.hourlyRateCents is int
+        && request.resource.data.hourlyRateCents >= 2000
+        && request.resource.data.hourlyRateCents <= 20000
+        && request.resource.data.bio is string
+        && request.resource.data.bio.size() <= 600
+        && request.resource.data.availability is map;
+      allow create, delete: if false;
+
+      // One review per student (doc id = studentUid), written by submitReview.
+      match /reviews/{studentUid} {
+        allow read: if isNotAnonymous() && request.auth.uid == uid;
+        allow write: if false;
+      }
+    }
+
+    // Phone, contact email, Stripe ids, verification and licence data.
+    match /instructorPrivate/{uid} {
+      allow read, write: if false;
+    }
+
+    // One doc per booked 30-minute block; tx.create() is the double-booking lock.
+    match /bookingSlots/{slotId} {
+      allow read, write: if false;
+    }
+
+    // Public count per state for the paywall preview — no instructor data.
+    match /instructorStats/{state} {
+      allow read: if isNotAnonymous();
+      allow write: if false;
+    }
+
+    // Operator-set configuration. Only the instructors doc (launchStates) is
+    // readable; any future config doc stays closed until it is listed here.
+    match /config/{docId} {
+      allow read: if isNotAnonymous() && docId == 'instructors';
+      allow write: if false;
+    }
+
+    match /favorites/{uid} {
+      allow read, delete: if isNotAnonymous() && request.auth.uid == uid;
+      allow create, update: if isNotAnonymous() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['instructorUids', 'updatedAt'])
+        && request.resource.data.instructorUids is list
+        && request.resource.data.instructorUids.size() <= 200;
+    }
+
+    // Written only by sendMessage / the booking webhook (masking and the
+    // pre-booking rate limit live there).
+    match /conversations/{convId} {
+      allow read: if isNotAnonymous()
+        && request.auth.uid in resource.data.participantUids;
+      allow write: if false;
+
+      match /messages/{messageId} {
+        allow read: if isNotAnonymous()
+          && request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.participantUids;
+        allow write: if false;
+      }
+    }
+
+    match /bookings/{bookingId} {
+      allow read: if isNotAnonymous()
+        && (request.auth.uid == resource.data.studentUid
+            || request.auth.uid == resource.data.instructorUid);
+      allow write: if false;
     }
 
     // Default deny all other access
