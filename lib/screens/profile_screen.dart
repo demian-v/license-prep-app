@@ -1376,10 +1376,35 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Flexible(
-                          child: ListView.builder(
+                          // Its own transparent Material: a ListTile paints its
+                          // tileColor on the nearest Material, which was the
+                          // whole dialog, so scrolled rows drew over the title.
+                          child: _PickerScrollbar(
+                            builder: (controller) => Material(
+                            type: MaterialType.transparency,
+                            child: ListView.builder(
+                            controller: controller,
                             shrinkWrap: true,
-                            itemCount: visibleStates.length,
+                            // A slim gutter on the right for the scrollbar,
+                            // so the thumb never sits on a row.
+                            padding: const EdgeInsets.only(right: AppSpacing.x3),
+                            // The last row carries the "more states" note, so it
+                            // scrolls with the list, as at signup.
+                            itemCount: visibleStates.length + 1,
                             itemBuilder: (context, index) {
+                              if (index == visibleStates.length) {
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 16.0),
+                                  child: Text(
+                                    _translate('more_states_coming', languageProvider),
+                                    style: AppTypography.caption.copyWith(
+                                      color: AppColors.inkSecondary,
+                                      fontVariations: const [FontVariation('wght', 400)],
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                );
+                              }
                               final stateInfo = visibleStates[index];
                               final state = stateInfo.name;
                               final stateId = stateInfo.id;
@@ -1415,13 +1440,21 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                                     final timeSpent = _stateDialogStartTime != null 
                                         ? DateTime.now().difference(_stateDialogStartTime!).inSeconds 
                                         : null;
-                                    
+
+                                    // Looked up BEFORE the await, from the screen's own
+                                    // context. `context` in this handler is the tapped
+                                    // row's, and the «Обновление штата…» spinner replaces
+                                    // the list the moment the tap lands, so after the
+                                    // await that row is gone and the lookup threw —
+                                    // every state change ended in "Error changing state"
+                                    // although the server had saved it (2026-09-29).
+                                    final stateProvider = Provider.of<StateProvider>(this.context, listen: false);
+
                                     // Update state in auth provider (use state name)
                                     await authProvider.updateUserState(state);
-                                    
+
                                     // CRITICAL FIX: Also update StateProvider to sync with AuthProvider
                                     // This ensures TheoryScreen gets the updated state immediately
-                                    final stateProvider = Provider.of<StateProvider>(context, listen: false);
                                     await stateProvider.setSelectedState(stateId);
                                     
                                     debugPrint('🔄 ProfileScreen: Updated both AuthProvider and StateProvider with state: $stateId');
@@ -1548,16 +1581,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                               ));
                             },
                           ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 16.0),
-                          child: Text(
-                            _translate('more_states_coming', languageProvider),
-                            style: AppTypography.caption.copyWith(
-                              color: AppColors.inkSecondary,
-                              fontVariations: const [FontVariation('wght', 400)],
-                            ),
-                            textAlign: TextAlign.center,
+                          ),
                           ),
                         ),
                       ],
@@ -1744,4 +1768,39 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     );
   }
 
+}
+
+/// A picker list with an always-visible scrollbar, so a list longer than its
+/// dialog shows that it continues (owner, 2026-09-29, with the 20 release
+/// states). It owns the controller, so the controller lives exactly as long
+/// as the list.
+class _PickerScrollbar extends StatefulWidget {
+  const _PickerScrollbar({required this.builder});
+
+  final Widget Function(ScrollController controller) builder;
+
+  @override
+  State<_PickerScrollbar> createState() => _PickerScrollbarState();
+}
+
+class _PickerScrollbarState extends State<_PickerScrollbar> {
+  final ScrollController _controller = ScrollController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RawScrollbar(
+      controller: _controller,
+      thumbVisibility: true,
+      thickness: 4,
+      radius: const Radius.circular(2),
+      thumbColor: AppColors.inkTertiary.withValues(alpha: 0.5),
+      child: widget.builder(_controller),
+    );
+  }
 }
