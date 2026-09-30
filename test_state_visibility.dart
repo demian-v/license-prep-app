@@ -4,7 +4,7 @@ void main() {
   print('=== Testing State Visibility Implementation ===');
   
   // Test that configuration flag is set correctly
-  print('showOnlyIllinoisAndNewYork flag: ${StateData.showOnlyIllinoisAndNewYork}');
+  print('releasedStateIds: ${StateData.releasedStateIds}');
   
   // Test visible states
   final visibleStates = StateData.getVisibleStates();
