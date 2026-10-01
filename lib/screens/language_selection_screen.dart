@@ -11,6 +11,7 @@ import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
 import '../widgets/bento_auth_parts.dart';
 import '../main.dart' show navigatorKey;
+import 'instructor_registration_screen.dart';
 import 'state_selection_screen.dart';
 
 class LanguageSelectionScreen extends StatefulWidget {
@@ -371,9 +372,14 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
                 settings: RouteSettings(
                   name: 'state_selection_${code}_${DateTime.now().millisecondsSinceEpoch}'
                 ),
-                pageBuilder: (context, animation1, animation2) => StateSelectionScreen(
-                  key: UniqueKey(), // Force complete rebuild
-                ),
+                // An instructor picks their teaching state inside the
+                // registration wizard (instructors plan v2 §4.3), not here.
+                pageBuilder: (context, animation1, animation2) =>
+                    authProvider.user?.isSigningUpAsInstructor == true
+                        ? const InstructorRegistrationScreen()
+                        : StateSelectionScreen(
+                            key: UniqueKey(), // Force complete rebuild
+                          ),
                 transitionDuration: Duration.zero,
               ),
             );

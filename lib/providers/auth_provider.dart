@@ -8,6 +8,7 @@ import '../services/service_locator.dart';
 import '../services/email_sync_service.dart';
 import '../services/session_manager.dart';
 import '../services/subscription_management_service.dart';
+import '../services/instructor_service.dart';
 import '../data/state_data.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'language_provider.dart';
@@ -119,6 +120,9 @@ class AuthProvider extends ChangeNotifier {
             status: loggedInUser.status,
             lastBillingDate: loggedInUser.lastBillingDate,
             nextBillingDate: loggedInUser.nextBillingDate,
+            userType: loggedInUser.userType,
+            signupRole: loggedInUser.signupRole,
+            signupKind: loggedInUser.signupKind,
           );
           
           // Store the updated user
@@ -206,6 +210,9 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// Creates the account only. Who is signing up is asked after the email
+  /// code (owner, 2026-09-30), and the trial starts there — see
+  /// [chooseSignupRole].
   Future<bool> signup(String name, String email, String password, {BuildContext? context}) async {
     try {
       debugPrint('🔍 [AuthProvider] Creating user with name: $name, email: $email');
@@ -232,6 +239,9 @@ class AuthProvider extends ChangeNotifier {
             status: registeredUser.status,
             lastBillingDate: registeredUser.lastBillingDate,
             nextBillingDate: registeredUser.nextBillingDate,
+            userType: registeredUser.userType,
+            signupRole: registeredUser.signupRole,
+            signupKind: registeredUser.signupKind,
           );
           
           // Store the corrected user
@@ -254,41 +264,6 @@ class AuthProvider extends ChangeNotifier {
           // Store the user as is since default values are correct
           user = registeredUser;
           debugPrint('✅ [AuthProvider] User created with correct default values');
-        }
-        
-        // NEW: Initialize 3-day trial for new user (may be rejected if device already used trial)
-        debugPrint('🆓 [AuthProvider] Initializing 3-day trial for new user: ${user!.id}');
-        try {
-          final subscriptionService = SubscriptionManagementService();
-          final trialSubscription = await subscriptionService.initializeTrial(user!.id);
-
-          if (trialSubscription != null) {
-            final now = DateTime.now();
-            user = user!.copyWith(
-              lastBillingDate: now,
-              nextBillingDate: trialSubscription.trialEndsAt,
-              lastLoginAt: now,
-            );
-            debugPrint('✅ [AuthProvider] Trial initialized. Trial ends: ${trialSubscription.trialEndsAt}');
-          } else {
-            debugPrint('ℹ️ [AuthProvider] Trial not granted (device already used trial or ineligible)');
-          }
-
-          // Initialize SubscriptionProvider regardless — it will reflect the actual server state
-          if (context != null) {
-            debugPrint('🔄 [AuthProvider] Initializing SubscriptionProvider for new user');
-            try {
-              final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
-              await subscriptionProvider.initialize(user!.id);
-              debugPrint('✅ [AuthProvider] SubscriptionProvider initialized successfully');
-            } catch (e) {
-              debugPrint('⚠️ [AuthProvider] SubscriptionProvider initialization failed: $e');
-            }
-          } else {
-            debugPrint('⚠️ [AuthProvider] Context not provided, SubscriptionProvider will be initialized later');
-          }
-        } catch (e) {
-          debugPrint('⚠️ [AuthProvider] Trial initialization failed (non-critical): $e');
         }
         
         // Run email sync immediately to ensure consistency and fix any potential issues
@@ -545,6 +520,9 @@ class AuthProvider extends ChangeNotifier {
           status: user!.status,
           lastBillingDate: user!.lastBillingDate,
           nextBillingDate: user!.nextBillingDate,
+          userType: user!.userType,
+          signupRole: user!.signupRole,
+          signupKind: user!.signupKind,
         );
         
         // Update the provider's user object
@@ -714,6 +692,88 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// The wizard's last step succeeded: the server granted the instructor role
+  /// and saved the teaching state (registerAsInstructor). Mirror both locally
+  /// and in the saved copy — the app restores the user from SharedPreferences
+  /// on start and does not re-read the role (instructors plan v2 §4.3).
+  /// The answer on RoleChoiceScreen, after the email code (owner,
+  /// 2026-09-30: Sign Up -> Check email -> Student or Instructor). Saves the
+  /// intent on the server (set once), then starts a student's trial —
+  /// moved here from [signup], because the role was not known there.
+  /// Throws if the server refuses the role; the trial never blocks.
+  Future<void> chooseSignupRole(String role, String? kind, {BuildContext? context}) async {
+    if (user == null) return;
+    await InstructorService().setSignupRole(role, kind);
+    user = user!.copyWith(signupRole: role, signupKind: kind);
+
+    // Initialize the 3-day trial (may be rejected if the device already used
+    // one). Never for an instructor (plan v2 §4.2) — the server refuses too.
+    if (role == 'student') {
+      debugPrint('🆓 [AuthProvider] Initializing 3-day trial for new user: ${user!.id}');
+      try {
+        final subscriptionService = SubscriptionManagementService();
+        final trialSubscription = await subscriptionService.initializeTrial(user!.id);
+
+        if (trialSubscription != null) {
+          final now = DateTime.now();
+          user = user!.copyWith(
+            lastBillingDate: now,
+            nextBillingDate: trialSubscription.trialEndsAt,
+            lastLoginAt: now,
+          );
+          debugPrint('✅ [AuthProvider] Trial initialized. Trial ends: ${trialSubscription.trialEndsAt}');
+        } else {
+          debugPrint('ℹ️ [AuthProvider] Trial not granted (device already used trial or ineligible)');
+        }
+
+        // Initialize SubscriptionProvider regardless — it will reflect the actual server state
+        if (context != null) {
+          debugPrint('🔄 [AuthProvider] Initializing SubscriptionProvider for new user');
+          try {
+            final subscriptionProvider = Provider.of<SubscriptionProvider>(context, listen: false);
+            await subscriptionProvider.initialize(user!.id);
+            debugPrint('✅ [AuthProvider] SubscriptionProvider initialized successfully');
+          } catch (e) {
+            debugPrint('⚠️ [AuthProvider] SubscriptionProvider initialization failed: $e');
+          }
+        } else {
+          debugPrint('⚠️ [AuthProvider] Context not provided, SubscriptionProvider will be initialized later');
+        }
+      } catch (e) {
+        debugPrint('⚠️ [AuthProvider] Trial initialization failed (non-critical): $e');
+      }
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user', jsonEncode(user!.toJson()));
+    notifyListeners();
+  }
+
+  Future<void> applyInstructorRole(String state) async {
+    if (user == null) return;
+    user = user!.copyWith(userType: 'instructor', state: state);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user', jsonEncode(user!.toJson()));
+    notifyListeners();
+  }
+
+  /// A signup that began as an instructor, cached as a student: the role may
+  /// have been granted since (another device, or before this app version
+  /// cached the field). Asks the server once and updates the saved copy.
+  Future<void> refreshRoleIfPending() async {
+    if (user == null || !user!.isSigningUpAsInstructor || user!.isInstructor) return;
+    try {
+      final fresh = await serviceLocator.auth.getCurrentUser();
+      if (fresh == null || !fresh.isInstructor) return;
+      user = user!.copyWith(userType: fresh.userType, state: fresh.state ?? user!.state);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user', jsonEncode(user!.toJson()));
+      notifyListeners();
+    } catch (e) {
+      debugPrint('⚠️ AuthProvider: role refresh failed (non-critical): $e');
+    }
+  }
+
   Future<void> logout() async {
     try {
       debugPrint('🚪 AuthProvider: Logging out user');
@@ -792,17 +852,16 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Risk #50 — this used to call `setLanguage('en')`, wiping the user's chosen
-  // language on every logout. Together with the forceEnglish flag in main(),
-  // that is what put a returning Russian, Ukrainian, Polish or Spanish user in
-  // front of an English login screen no matter what they had picked.
-  //
-  // The interface language is a device preference, not account data: it has to
-  // survive logout, because the login screen is precisely where a signed-out
-  // person needs to read it. The state IS account data and is still cleared
-  // below. Deliberate resets (the reset-settings screen) are untouched.
+  // Signed-out screens are always English (owner, 2026-09-30 — reverses the
+  // risk #50 choice of 2026-09-16). Runs after sign-out, so nothing is
+  // written to the account; login restores the account's language.
   Future<void> _resetLanguageToEnglish() async {
-    debugPrint('🌐 AuthProvider: Keeping the chosen interface language across logout');
+    if (_languageProvider == null) return;
+    try {
+      await _languageProvider!.setLanguage('en');
+    } catch (e) {
+      debugPrint('⚠️ AuthProvider: Error resetting language to English: $e');
+    }
   }
 
   // Private method to reset state to null (for logout)

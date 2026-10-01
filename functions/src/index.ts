@@ -798,6 +798,11 @@ export const getUserData = functions.https.onCall(async (data, context) => {
       email: userData.email || context.auth.token.email || '',
       language: userData.language || 'en',
       state: userData.state || null,
+      // Instructors plan v2: the role drives the app's navigation. userType is
+      // server-owned (granted by registerAsInstructor); missing = student.
+      userType: userData.userType === 'instructor' ? 'instructor' : 'student',
+      signupRole: userData.signupRole ?? null,
+      signupKind: userData.signupKind ?? null,
     };
     
     console.log(`Successfully retrieved user data for user: ${userId}`);
@@ -1848,21 +1853,19 @@ export { validatePurchaseReceipt };
  * An auth trigger cannot be skipped by a client that dies halfway, so the
  * document now exists before the app asks for it.
  *
- * merge:true and no overwrite of client-owned fields: the client may well have
- * written its own document first with a name, language and state the user
- * actually chose. This fills gaps, it does not win races.
+ * Create-only, never an overwrite of client-owned fields: the client may well
+ * have written its own document first with a name, language and state the
+ * user actually chose. This fills gaps, it does not win races.
  */
 export const provisionUserDocument = functions.auth.user().onCreate(async (user) => {
   const ref = db.collection('users').doc(user.uid);
 
   try {
-    const existing = await ref.get();
-    if (existing.exists) {
-      console.log(`provisionUserDocument: ${user.uid} already has a document, leaving it alone`);
-      return;
-    }
-
-    await ref.set({
+    // create(), not get-then-set: the app's createOrUpdateUserDocument runs
+    // at the same moment on every signup, and a read that saw no document
+    // followed by a merge wrote `name: ''` over the name the user had just
+    // typed (found 2026-09-30). create() fails atomically if the doc exists.
+    await ref.create({
       email: user.email ?? null,
       name: user.displayName ?? '',
       language: 'en',
@@ -1870,10 +1873,14 @@ export const provisionUserDocument = functions.auth.user().onCreate(async (user)
       createdAt: FieldValue.serverTimestamp(),
       lastLoginAt: FieldValue.serverTimestamp(),
       provisionedBy: 'auth-trigger',
-    }, { merge: true });
+    });
 
     console.log(`provisionUserDocument: created users/${user.uid}`);
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.code === 6 /* ALREADY_EXISTS */) {
+      console.log(`provisionUserDocument: ${user.uid} already has a document, leaving it alone`);
+      return;
+    }
     // Never throw: a failure here must not break account creation itself. The
     // set/merge recovery in the updaters below is the second line of defence.
     console.error(`provisionUserDocument: could not provision ${user.uid}:`, error);
@@ -1994,6 +2001,15 @@ export const createTrialSubscription = functions.https.onCall(async (data: any, 
   // granted a trial. The reads and the writes now share one transaction, so
   // Firestore retries the loser on contention and it sees the winner's write.
   const subscriptionId = await db.runTransaction(async (tx) => {
+    // No trial for instructors (instructors plan v2 §4.1). Checked here, not
+    // only at signup: SubscriptionProvider's recovery (risk #24) calls this
+    // for any account without a subscription. Refused before the device is
+    // recorded, so a student on the same phone can still have a trial.
+    const userSnap = await tx.get(db.collection('users').doc(userId));
+    if (userSnap.get('userType') === 'instructor' || userSnap.get('signupRole') === 'instructor') {
+      throw new functions.https.HttpsError('failed-precondition', 'no-trial-for-instructors');
+    }
+
     // Dedupe #1 — per userId
     const existing = await tx.get(
       db.collection('subscriptions').where('userId', '==', userId).limit(1),
@@ -2559,3 +2575,8 @@ export {
   verifyEmailCode,
   getEmailVerificationStatus,
 } from './email/verification-callables';
+
+// ============================================================================
+// INSTRUCTORS MARKETPLACE (plan v2, branch `instructors`)
+// ============================================================================
+export { listInstructors, setSignupRole, registerAsInstructor, submitLicenseNumber, onInstructorWrite } from './instructors';

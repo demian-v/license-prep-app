@@ -34,10 +34,11 @@ service cloud.firestore {
       return [
         'isActive', 'subscriptionStatus', 'nextBillingDate', 'lastBillingDate',
         'packageId', 'planType', 'price', 'trialUsed', 'trialEndsAt',
-        // Instructors plan v2: the role is granted only by registerAsInstructor.
-        // `signupRole`/`signupKind` stay client-writable — they are intent
-        // (which signup screens to resume), not privilege.
-        'userType'
+        // Instructors plan v2: the role is granted only by registerAsInstructor,
+        // and the signup intent only by setSignupRole (set once).
+        // createTrialSubscription refuses `signupRole: instructor`, so the
+        // intent gates the trial and a client must not be able to rewrite it.
+        'userType', 'signupRole', 'signupKind'
       ];
     }
 

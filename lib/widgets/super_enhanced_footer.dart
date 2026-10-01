@@ -25,10 +25,14 @@ class SuperEnhancedFooter extends StatelessWidget {
   final int currentIndex;
   final Function(int) onTap;
 
+  /// Instructors get their own three tabs (instructors plan v2 §14.1).
+  final bool forInstructor;
+
   const SuperEnhancedFooter({
     Key? key,
     required this.currentIndex,
     required this.onTap,
+    this.forInstructor = false,
   }) : super(key: key);
 
   static const List<_Tab> _tabs = [
@@ -38,8 +42,15 @@ class SuperEnhancedFooter extends StatelessWidget {
     _Tab('profile', AppIcons.profile, AppIcons.profileFilled),
   ];
 
+  static const List<_Tab> _instructorTabs = [
+    _Tab('calendar', AppIcons.calendar, AppIcons.calendarFilled),
+    _Tab('chat', AppIcons.chat, AppIcons.chatFilled),
+    _Tab('profile', AppIcons.profile, AppIcons.profileFilled),
+  ];
+
   @override
   Widget build(BuildContext context) {
+    final tabs = forInstructor ? _instructorTabs : _tabs;
     return Consumer<LanguageProvider>(
       builder: (context, languageProvider, _) {
         // The bar floats, so it clears the home indicator itself rather
@@ -56,9 +67,9 @@ class SuperEnhancedFooter extends StatelessWidget {
           child: _MeniscusBar(
             currentIndex: currentIndex,
             onTap: onTap,
-            tabs: _tabs,
+            tabs: tabs,
             labels: [
-              for (final tab in _tabs) _translate(tab.key, languageProvider),
+              for (final tab in tabs) _translate(tab.key, languageProvider),
             ],
           ),
         );
@@ -76,6 +87,8 @@ class SuperEnhancedFooter extends StatelessWidget {
                 'theory': 'Teoría',
                 'instructors': 'Instructores',
                 'profile': 'Perfil',
+                'calendar': 'Calendario',
+                'chat': 'Chat',
               }[key] ??
               key;
         case 'uk':
@@ -84,6 +97,8 @@ class SuperEnhancedFooter extends StatelessWidget {
                 'theory': 'Теорія',
                 'instructors': 'Інструктори',
                 'profile': 'Профіль',
+                'calendar': 'Календар',
+                'chat': 'Чат',
               }[key] ??
               key;
         case 'ru':
@@ -92,6 +107,8 @@ class SuperEnhancedFooter extends StatelessWidget {
                 'theory': 'Теория',
                 'instructors': 'Инструкторы',
                 'profile': 'Профиль',
+                'calendar': 'Календарь',
+                'chat': 'Чат',
               }[key] ??
               key;
         case 'pl':
@@ -100,6 +117,8 @@ class SuperEnhancedFooter extends StatelessWidget {
                 'theory': 'Teoria',
                 'instructors': 'Instruktorzy',
                 'profile': 'Profil',
+                'calendar': 'Kalendarz',
+                'chat': 'Czat',
               }[key] ??
               key;
         case 'en':
@@ -109,6 +128,8 @@ class SuperEnhancedFooter extends StatelessWidget {
                 'theory': 'Theory',
                 'instructors': 'Instructors',
                 'profile': 'Profile',
+                'calendar': 'Calendar',
+                'chat': 'Chat',
               }[key] ??
               key;
       }

@@ -8,13 +8,16 @@
  *   instructorPrivate/{uid}     fictional 555-01xx phones, example.com emails
  *   instructors/{uid}/reviews   a few reviews, with ratingSum/Count/Avg kept consistent
  *   instructorStats/{state}     listedCount per state
- *   users/{uid}                 userType:'instructor' (no Auth accounts — added when P2 needs sign-in)
+ *   users/{uid}                 userType:'instructor'
+ *   Auth accounts               seed-instr-NN@example.com / SEED_PASSWORD below, when
+ *                               FIREBASE_AUTH_EMULATOR_HOST is set (sign in as an instructor),
+ *                               plus seed-signup-school@ / seed-signup-instructor@example.com, instructors mid-signup
  * Idempotent: a re-run overwrites the same ids.
  *
  * EMULATORS ONLY. Refuses to run unless FIRESTORE_EMULATOR_HOST is a local address.
  *
- *   FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 GCLOUD_PROJECT=licenseprepapp \
- *   node scripts/local/seed-instructors.js
+ *   FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 \
+ *   GCLOUD_PROJECT=licenseprepapp node scripts/local/seed-instructors.js
  */
 const admin = require('../../functions/node_modules/firebase-admin');
 
@@ -22,6 +25,14 @@ if (!/^(127\.0\.0\.1|localhost|\[::1\]):\d+$/.test(process.env.FIRESTORE_EMULATO
   console.error('REFUSING: FIRESTORE_EMULATOR_HOST is not a local address.');
   process.exit(1);
 }
+
+const AUTH_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST || '';
+if (AUTH_HOST && !/^(127\.0\.0\.1|localhost|\[::1\]):\d+$/.test(AUTH_HOST)) {
+  console.error('REFUSING: FIREBASE_AUTH_EMULATOR_HOST is not a local address.');
+  process.exit(1);
+}
+// Emulator-only test credential for the seeded instructor accounts.
+const SEED_PASSWORD = 'seed-instructor-2026';
 
 admin.initializeApp({ projectId: process.env.GCLOUD_PROJECT || 'licenseprepapp' });
 const db = admin.firestore();
@@ -121,5 +132,33 @@ const COMMENTS = ['Very patient, passed on the first try.', 'Clear explanations 
     batch.set(db.collection('instructorStats').doc(state), { listedCount: stats[state] || 0, updatedAt: now });
   }
   await batch.commit();
+
+  if (AUTH_HOST) {
+    for (let i = 0; i < ROWS.length; i++) {
+      const uid = `seed-instr-${String(i + 1).padStart(2, '0')}`;
+      const account = { email: `${uid}@example.com`, password: SEED_PASSWORD, displayName: ROWS[i][4], emailVerified: true };
+      // Create only: updateUser with a password would revoke the sessions of
+      // an app already signed in as this account.
+      await admin.auth().getUser(uid).catch(() => admin.auth().createUser({ uid, ...account }));
+    }
+    console.log(`Auth accounts: seed-instr-01..${ROWS.length}@example.com`);
+
+    // Instructors mid-signup (P3 wizard), one per kind: email verified, no
+    // profile yet. Re-seeding resets them so the wizard can be replayed.
+    for (const [uid, name, kind] of [
+      ['seed-signup-school', 'Signup School', 'school'],
+      ['seed-signup-instructor', 'Signup Instructor', 'schoolInstructor'],
+    ]) {
+      const account = { email: `${uid}@example.com`, password: SEED_PASSWORD, displayName: name, emailVerified: true };
+      await admin.auth().getUser(uid).catch(() => admin.auth().createUser({ uid, ...account }));
+      await db.collection('instructors').doc(uid).delete();
+      await db.collection('instructorPrivate').doc(uid).delete();
+      await db.collection('users').doc(uid).set({
+        name, email: account.email, language: 'en', state: null,
+        signupRole: 'instructor', signupKind: kind, createdAt: Timestamp.now(),
+      });
+      console.log(`Mid-signup instructor (${kind}): ${account.email}`);
+    }
+  }
   console.log(`Seeded ${ROWS.length} instructors; listed per state:`, stats, '; launchStates: IL, TX');
 })().catch((e) => { console.error(e); process.exit(1); });

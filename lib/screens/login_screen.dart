@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
 import '../widgets/bento_auth_parts.dart';
+import 'signup_resume_gate.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -52,8 +53,17 @@ class _LoginScreenState extends State<LoginScreen> {
       if (success) {
         debugPrint('LoginScreen: Login successful');
         if (mounted) {
-          // Navigate to home screen
-          Navigator.of(context).pushReplacementNamed('/home');
+          final user = authProvider.user;
+          if (user != null && user.state == null) {
+            // Signup was never finished — the same resume gate as a relaunch
+            // (main.dart). An instructor mid-signup goes on from there to the
+            // registration wizard, instead of landing on the student Home.
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => SignupResumeGate(email: user.email)),
+            );
+          } else {
+            Navigator.of(context).pushReplacementNamed('/home');
+          }
         }
       } else if (mounted) {
         setState(() {

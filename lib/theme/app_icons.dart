@@ -30,6 +30,12 @@ class AppIcons {
   static const String profile = '$_base/user-rounded-linear.svg';
   static const String profileFilled = '$_base/user-rounded-bold.svg';
 
+  // Instructor tab bar (instructors plan v2 §14.1).
+  static const String calendar = '$_base/calendar-linear.svg';
+  static const String calendarFilled = '$_base/calendar-bold.svg';
+  static const String chat = '$_base/chat-round-line-linear.svg';
+  static const String chatFilled = '$_base/chat-round-line-bold.svg';
+
   // Content.
   static const String practice = '$_base/layers-minimalistic-linear.svg';
   static const String chevron = '$_base/alt-arrow-right-linear.svg';

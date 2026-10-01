@@ -11,6 +11,16 @@ class User {
   final String status; // 'active', 'inactive', 'deleted'
   final DateTime? lastBillingDate;
   final DateTime? nextBillingDate;
+  // Instructors plan v2. `userType` is granted by the server only
+  // (registerAsInstructor); a missing value means a student. `signupRole` /
+  // `signupKind` are the signup intent — which screens a resumed signup
+  // continues with — and carry no privilege.
+  final String userType; // 'student' | 'instructor'
+  final String? signupRole; // 'student' | 'instructor'
+  final String? signupKind; // 'school' | 'schoolInstructor'
+
+  bool get isInstructor => userType == 'instructor';
+  bool get isSigningUpAsInstructor => signupRole == 'instructor';
 
   User({
     required this.id,
@@ -24,6 +34,9 @@ class User {
     this.status = 'active',
     this.lastBillingDate,
     this.nextBillingDate,
+    this.userType = 'student',
+    this.signupRole,
+    this.signupKind,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -39,6 +52,9 @@ class User {
       status: json['status'] ?? 'active',
       lastBillingDate: json['lastBillingDate'] != null ? DateTime.parse(json['lastBillingDate']) : null,
       nextBillingDate: json['nextBillingDate'] != null ? DateTime.parse(json['nextBillingDate']) : null,
+      userType: json['userType'] ?? 'student',
+      signupRole: json['signupRole'],
+      signupKind: json['signupKind'],
     );
   }
 
@@ -55,6 +71,9 @@ class User {
       'status': status,
       'lastBillingDate': lastBillingDate?.toIso8601String(),
       'nextBillingDate': nextBillingDate?.toIso8601String(),
+      'userType': userType,
+      'signupRole': signupRole,
+      'signupKind': signupKind,
     };
   }
 
@@ -68,6 +87,9 @@ class User {
     String? status,
     DateTime? lastBillingDate,
     DateTime? nextBillingDate,
+    String? userType,
+    String? signupRole,
+    String? signupKind,
     bool clearState = false,
     bool clearSessionId = false,
     bool clearLastLoginAt = false,
@@ -86,6 +108,9 @@ class User {
       status: status ?? this.status,
       lastBillingDate: clearLastBillingDate ? null : (lastBillingDate ?? this.lastBillingDate),
       nextBillingDate: clearNextBillingDate ? null : (nextBillingDate ?? this.nextBillingDate),
+      userType: userType ?? this.userType,
+      signupRole: signupRole ?? this.signupRole,
+      signupKind: signupKind ?? this.signupKind,
     );
   }
 }

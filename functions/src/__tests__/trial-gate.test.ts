@@ -147,3 +147,47 @@ describe('Risk #12 — a trial does NOT require a verified email', () => {
     expect(res.subscriptionId).toBeTruthy();
   });
 });
+
+/**
+ * Instructors plan v2 §4.1 — no trial for instructors (owner, 2026-09-30).
+ * The client skips initializeTrial at an instructor signup, but the trial
+ * recovery in SubscriptionProvider (risk #24) calls it for any account with
+ * no subscription, so the refusal has to live here.
+ */
+describe('No trial for instructors', () => {
+  async function user(uid: string, fields: Record<string, unknown>) {
+    await db().collection('users').doc(uid).set(fields);
+  }
+
+  it('refuses an instructor mid-signup (signupRole) and leaves the device unused', async () => {
+    const h = hash('instr-signup-dev');
+    await reset(h, 'instr-signup');
+    await user('instr-signup', { signupRole: 'instructor', signupKind: 'school' });
+    const wrapped = testEnv.wrap(fns.createTrialSubscription as any);
+    await expect(wrapped({ deviceIdHash: h, isPhysicalDevice: true } as any, ctx('instr-signup') as any))
+      .rejects.toMatchObject({ code: 'failed-precondition' });
+
+    const subs = await db().collection('subscriptions').where('userId', '==', 'instr-signup').get();
+    expect(subs.size).toBe(0);
+    // A student who later signs up on the same phone still gets a trial.
+    expect((await db().collection('trialDevices').doc(h).get()).exists).toBe(false);
+  });
+
+  it('refuses a registered instructor (userType)', async () => {
+    const h = hash('instr-reg-dev');
+    await reset(h, 'instr-reg');
+    await user('instr-reg', { userType: 'instructor' });
+    const wrapped = testEnv.wrap(fns.createTrialSubscription as any);
+    await expect(wrapped({ deviceIdHash: h, isPhysicalDevice: true } as any, ctx('instr-reg') as any))
+      .rejects.toMatchObject({ code: 'failed-precondition' });
+  });
+
+  it('still grants a student signup (positive control)', async () => {
+    const h = hash('student-role-dev');
+    await reset(h, 'student-role');
+    await user('student-role', { signupRole: 'student' });
+    const wrapped = testEnv.wrap(fns.createTrialSubscription as any);
+    const res: any = await wrapped({ deviceIdHash: h, isPhysicalDevice: true } as any, ctx('student-role') as any);
+    expect(res.subscriptionId).toBeTruthy();
+  });
+});

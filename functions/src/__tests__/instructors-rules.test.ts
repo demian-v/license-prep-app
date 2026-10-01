@@ -43,7 +43,7 @@ const instructorDoc = (over: Record<string, unknown> = {}) => ({
   ratingSum: 0, ratingCount: 0, ratingAvg: 0, ...over,
 });
 
-describe('users — the role is server-owned', () => {
+describe('users — the role and the signup intent are server-owned', () => {
   it('a client cannot create its user doc with userType', async () => {
     await assertFails(as('u1').collection('users').doc('u1').set({ name: 'A', userType: 'instructor' }));
   });
@@ -53,10 +53,19 @@ describe('users — the role is server-owned', () => {
     await assertFails(as('u1').collection('users').doc('u1').update({ userType: 'instructor' }));
   });
 
-  it('a client CAN record its signup intent (signupRole / signupKind)', async () => {
-    await assertSucceeds(as('u1').collection('users').doc('u1').set({
+  // The intent gates the trial (createTrialSubscription), so only
+  // setSignupRole writes it — once.
+  it('a client cannot write its signup intent (signupRole / signupKind)', async () => {
+    await assertFails(as('u1').collection('users').doc('u1').set({
       name: 'A', signupRole: 'instructor', signupKind: 'school',
     }));
+    await seed((db) => db.collection('users').doc('u1').set({ name: 'A', signupRole: 'instructor' }));
+    await assertFails(as('u1').collection('users').doc('u1').update({ signupRole: 'student' }));
+  });
+
+  it('a client can still edit its other fields once the intent is set', async () => {
+    await seed((db) => db.collection('users').doc('u1').set({ name: 'A', signupRole: 'instructor', signupKind: 'school' }));
+    await assertSucceeds(as('u1').collection('users').doc('u1').update({ name: 'B', language: 'ru' }));
   });
 });
 

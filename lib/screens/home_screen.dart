@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../screens/test_screen.dart';
 import '../screens/theory_screen.dart';
 import '../screens/instructors_screen.dart';
+import '../screens/instructor_calendar_screen.dart';
+import '../screens/chat_list_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/onboarding_screen.dart';
 import '../theme/app_colors.dart';
@@ -43,6 +45,17 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     const InstructorsScreen(),
     ProfileScreen(),
   ];
+
+  // Instructors plan v2 §14.1. ProfileScreen is the student one for now;
+  // Phase 3 gives instructors their own profile screen.
+  late final List<Widget> _instructorScreens = [
+    const InstructorCalendarScreen(),
+    const ChatListScreen(),
+    ProfileScreen(),
+  ];
+
+  bool get _isInstructor =>
+      Provider.of<AuthProvider>(context, listen: false).user?.isInstructor ?? false;
 
   @override
   void initState() {
@@ -156,6 +169,12 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   // _initializeContent and the Tests tab load underneath, and warms Theory,
   // which otherwise loads only when its tab is first opened.
   Future<void> _checkOnboarding() async {
+    // The tour points at the student tabs; an instructor has none of them.
+    // Runs synchronously inside initState, so a plain assignment, not setState.
+    if (_isInstructor) {
+      _showOnboarding = false;
+      return;
+    }
     final show = await OnboardingGate.shouldShow();
     if (!mounted) return;
     setState(() => _showOnboarding = show);
@@ -193,7 +212,9 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     
     // Breadcrumb: the bottom nav is the app's primary navigation and uses no
     // route at all, so CrashBreadcrumbObserver cannot see it.
-    const tabs = ['tests', 'theory', 'instructors', 'profile'];
+    final tabs = _isInstructor
+        ? const ['calendar', 'chat', 'profile']
+        : const ['tests', 'theory', 'instructors', 'profile'];
     crashReporter.log('nav: tab ${index < tabs.length ? tabs[index] : index}');
 
     print('🏠 HomeScreen: Tab changed to index $index, persisted for future rebuilds');
@@ -237,12 +258,18 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       );
     }
     
-    // Show the regular home screen once content is loaded
+    // Show the regular home screen once content is loaded. Listens, so a
+    // role granted while the app is open switches the tabs.
+    final isInstructor = Provider.of<AuthProvider>(context).user?.isInstructor ?? false;
+    final screens = isInstructor ? _instructorScreens : _screens;
+    // The saved index is shared by both roles; keep it inside this list.
+    final index = _currentIndex < screens.length ? _currentIndex : 0;
     return Scaffold(
-      body: _screens[_currentIndex],
+      body: screens[index],
       bottomNavigationBar: SuperEnhancedFooter(
-        currentIndex: _currentIndex,
+        currentIndex: index,
         onTap: _onTabTapped,
+        forInstructor: isInstructor,
       ),
     );
   }

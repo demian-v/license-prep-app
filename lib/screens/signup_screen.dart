@@ -5,7 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../providers/auth_provider.dart';
 import '../services/analytics_service.dart';
 import '../services/in_app_purchase_service.dart';
-import 'language_selection_screen.dart';
+import 'role_choice_screen.dart';
 import 'verification_code_screen.dart';
 import '../localization/app_localizations.dart';
 import '../theme/app_theme.dart';
@@ -14,6 +14,8 @@ import '../theme/solar_icons.dart';
 import '../widgets/bento_auth_parts.dart';
 
 class SignupScreen extends StatefulWidget {
+  const SignupScreen({Key? key}) : super(key: key);
+
   @override
   _SignupScreenState createState() => _SignupScreenState();
 }
@@ -76,16 +78,6 @@ class _SignupScreenState extends State<SignupScreen> {
       emailVerified: false, // Usually false at signup
     );
     debugPrint('📊 Analytics: user_account_created logged');
-  }
-  
-  void _onTrialStarted(String? userId) {
-    analyticsService.logSignupTrialStarted(
-      userId: userId,
-      signupMethod: 'email',
-      trialType: '3_day_free_trial',
-      trialDays: 3,
-    );
-    debugPrint('📊 Analytics: signup_trial_started logged');
   }
   
   String _getErrorType(String errorMessage) {
@@ -205,8 +197,7 @@ class _SignupScreenState extends State<SignupScreen> {
           // Log account created event
           _onAccountCreated(userId);
           
-          // Log trial started event
-          _onTrialStarted(userId);
+          // The trial starts after the role choice (RoleChoiceScreen logs it).
           
           debugPrint('📊 Analytics: All signup events logged successfully');
         } catch (analyticsError) {
@@ -228,16 +219,16 @@ class _SignupScreenState extends State<SignupScreen> {
         
         if (mounted) {
           debugPrint('🔄 [SignupScreen] Navigating to language selection screen');
-          // Risk #12 — the verification step sits here, between signup and
-          // language selection (owner-confirmed ordering, 2026-09-17). The
-          // 3-day trial has already been granted and is NOT gated on getting
-          // through it; this only confirms the address is real.
+          // Sign Up -> Check email -> Student or Instructor (owner,
+          // 2026-09-30), then language. The trial now starts at the role
+          // choice, after the code — superseding risk #12's "trial before
+          // verification" (2026-09-17): the role must be known first.
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (context) => VerificationCodeScreen(
                 email: email,
                 onVerified: () => Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (context) => LanguageSelectionScreen()),
+                  MaterialPageRoute(builder: (context) => const RoleChoiceScreen()),
                 ),
               ),
             ),
@@ -283,7 +274,6 @@ class _SignupScreenState extends State<SignupScreen> {
           
           await analyticsService.logSignUp('email');
           _onAccountCreated(userId);
-          _onTrialStarted(userId);
         } catch (analyticsError) {
           debugPrint('⚠️ Analytics error (non-critical): $analyticsError');
         }
@@ -295,16 +285,16 @@ class _SignupScreenState extends State<SignupScreen> {
           );
           
           // Still navigate to next screen
-          // Risk #12 — the verification step sits here, between signup and
-          // language selection (owner-confirmed ordering, 2026-09-17). The
-          // 3-day trial has already been granted and is NOT gated on getting
-          // through it; this only confirms the address is real.
+          // Sign Up -> Check email -> Student or Instructor (owner,
+          // 2026-09-30), then language. The trial now starts at the role
+          // choice, after the code — superseding risk #12's "trial before
+          // verification" (2026-09-17): the role must be known first.
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (context) => VerificationCodeScreen(
                 email: email,
                 onVerified: () => Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (context) => LanguageSelectionScreen()),
+                  MaterialPageRoute(builder: (context) => const RoleChoiceScreen()),
                 ),
               ),
             ),

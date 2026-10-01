@@ -1,0 +1,25 @@
+/// Languages an instructor can teach in (instructors plan v2 §4.3 step 1),
+/// each shown in its own name (owner rule 11). The codes must match
+/// TEACHING_LANGUAGES in functions/src/instructors.ts.
+const List<(String, String)> teachingLanguages = [
+  ('en', 'English'),
+  ('es', 'Español'),
+  ('zh', '中文'),
+  ('vi', 'Tiếng Việt'),
+  ('ko', '한국어'),
+  ('tl', 'Tagalog'),
+  ('ar', 'العربية'),
+  ('ru', 'Русский'),
+  ('uk', 'Українська'),
+  ('pl', 'Polski'),
+  ('pt', 'Português'),
+  ('fr', 'Français'),
+  ('ht', 'Kreyòl ayisyen'),
+  ('hi', 'हिन्दी'),
+  ('ur', 'اردو'),
+  ('fa', 'فارسی'),
+  ('so', 'Soomaali'),
+  ('hmn', 'Hmoob'),
+  ('am', 'አማርኛ'),
+  ('de', 'Deutsch'),
+];

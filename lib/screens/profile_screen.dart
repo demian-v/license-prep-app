@@ -23,6 +23,8 @@ import '../main.dart';
 import 'personal_info_screen.dart';
 import 'support_screen.dart';
 import '../widgets/trial_status_widget.dart';
+import '../widgets/instructor_profile_section.dart';
+import '../services/instructor_service.dart';
 import '../theme/solar_icons.dart';
 import '../theme/app_theme.dart';
 import '../theme/bento_tokens.dart';
@@ -667,15 +669,26 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
           );
         }
 
+        // Instructors are free forever (plan v2 §4.4): no trial card, no
+        // subscription card, and no content-state picker — their teaching
+        // state belongs to the instructor profile. Their own section instead.
+        final isInstructor = user.isInstructor;
         final blocks = <Widget>[
           // The trial card sits inside the tab's gutter and scrolls with the
           // page, as on Тесты and Теория.
-          TrialStatusWidget(),
-          const SizedBox(height: AppSpacing.x4),
+          if (!isInstructor) ...[
+            TrialStatusWidget(),
+            const SizedBox(height: AppSpacing.x4),
+          ],
           // The page's one hero, in the Тесты exam card's blue (owner,
           // 2026-09-26: "use such colours for Profile").
           _buildProfileHeader(user, languageProvider),
           const SizedBox(height: AppSpacing.x8),
+          if (isInstructor) ...[
+            _buildSectionHeader(AppLocalizations.of(context).translate('iprof_section')),
+            InstructorProfileSection(uid: user.id),
+            const SizedBox(height: AppSpacing.x8),
+          ],
           _buildSectionHeader(AppLocalizations.of(context).translate('settings')),
           _buildEnhancedMenuCard(
             _translate('select_language', languageProvider),
@@ -687,6 +700,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
             iconAsset: _getProfileIconAsset(1),
             description: _translate('language_desc', languageProvider),
           ),
+          if (!isInstructor) ...[
           const SizedBox(height: AppSpacing.x3),
           _buildEnhancedMenuCard(
             _translate('state', languageProvider),
@@ -719,6 +733,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
             dark: true,
             description: _translate('subscription_desc', languageProvider),
           ),
+          ],
           const SizedBox(height: AppSpacing.x3),
           _buildEnhancedMenuCard(
             _translate('support', languageProvider),
@@ -839,6 +854,12 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
   /// white disc, the name (22/700, the page's largest title), the email, and
   /// «Редактировать профиль» as the solid white pill. The whole card opens the
   /// profile editor, like the exam card; the pill says what it does.
+  // An instructor's header shows their public profile's name — the school's
+  // name for a school, which the account name is not (owner, 2026-09-30).
+  // One stream per uid, not one per build.
+  Stream<Map<String, dynamic>?>? _ownProfile;
+  String? _ownProfileUid;
+
   Widget _buildProfileHeader(User user, LanguageProvider languageProvider) {
     return Semantics(
       button: true,
@@ -918,17 +939,28 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          user.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.title.copyWith(
-                            fontSize: 22,
-                            height: 28 / 22,
-                            color: AppColors.onSignal,
-                            fontVariations: const [FontVariation('wght', 700)],
-                          ),
-                        ),
+                        Builder(builder: (context) {
+                          Widget name(String text) => Text(
+                                text,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTypography.title.copyWith(
+                                  fontSize: 22,
+                                  height: 28 / 22,
+                                  color: AppColors.onSignal,
+                                  fontVariations: const [FontVariation('wght', 700)],
+                                ),
+                              );
+                          if (!user.isInstructor) return name(user.name);
+                          if (_ownProfileUid != user.id) {
+                            _ownProfileUid = user.id;
+                            _ownProfile = InstructorService().ownProfile(user.id);
+                          }
+                          return StreamBuilder<Map<String, dynamic>?>(
+                            stream: _ownProfile,
+                            builder: (context, snap) => name(snap.data?['name'] as String? ?? user.name),
+                          );
+                        }),
                         const SizedBox(height: 2),
                         Text(
                           user.email,

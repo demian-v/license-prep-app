@@ -46,15 +46,22 @@ void main() {
       );
     });
 
-    test('the gate routes to LanguageSelectionScreen on both branches', () {
+    // Since 2026-09-30 the role choice sits between the code and language
+    // (owner: Sign Up -> Check email -> Student or Instructor), and leads on
+    // to language itself.
+    test('the gate resumes at the role choice or language, on both branches', () {
       final source = gate.readAsStringSync();
 
-      expect(
-        RegExp(r'LanguageSelectionScreen\s*\(').allMatches(source).length,
-        2,
-        reason: 'both the fail-open branch (status could not be fetched, or '
-            'already verified) and the post-verification callback',
-      );
+      expect(source.contains('RoleChoiceScreen('), isTrue);
+      expect(RegExp(r'LanguageSelectionScreen\s*\(').allMatches(source).length, 1);
+      expect(source.contains('return next();'), isTrue, reason: 'the fail-open / already-verified branch');
+      expect(source.contains('builder: (_) => next()'), isTrue, reason: 'the post-verification callback');
+    });
+
+    test('positive control — the role choice leads to language selection', () {
+      final role = File('lib/screens/role_choice_screen.dart').readAsStringSync();
+      expect(role.contains('LanguageSelectionScreen('), isTrue,
+          reason: 'without this link the role choice dead-ends before language');
     });
 
     test('positive control — language selection still leads to state', () {
@@ -75,10 +82,10 @@ void main() {
       // the two drift apart again.
       final signup = File('lib/screens/signup_screen.dart').readAsStringSync();
       expect(
-        signup.contains('LanguageSelectionScreen'),
+        signup.contains('RoleChoiceScreen'),
         isTrue,
-        reason: 'fresh signup goes to language selection after verification; '
-            'the resume gate must match it',
+        reason: 'fresh signup goes to the role choice (then language) after '
+            'verification; the resume gate must match it',
       );
     });
   });
