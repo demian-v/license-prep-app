@@ -31,11 +31,17 @@ import 'instructor_kind_screen.dart';
 /// are added in Профиль.
 ///
 /// The draft is saved on the device after every step, so an interrupted
-/// signup resumes with what was typed.
+/// signup resumes with what was typed. It belongs to one account: another
+/// account on the same phone starts empty.
 class InstructorRegistrationScreen extends StatefulWidget {
-  const InstructorRegistrationScreen({super.key, this.service});
+  const InstructorRegistrationScreen({super.key, this.service, this.resumeStep = true});
 
   final InstructorService? service;
+
+  /// Reopen at the saved step (the app was closed mid-wizard). False when
+  /// arriving from «How do you teach?»: start at the first step, answers
+  /// kept (owner, 2026-09-30 — resuming there looked like a skipped step).
+  final bool resumeStep;
 
   static const draftKey = 'instructor_registration_draft_v1';
 
@@ -101,11 +107,14 @@ class _InstructorRegistrationScreenState extends State<InstructorRegistrationScr
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(InstructorRegistrationScreen.draftKey);
     if (!mounted) return;
+    final d = raw == null ? null : jsonDecode(raw) as Map<String, dynamic>;
+    // Another account's draft is never shown (it holds their phone and email).
+    final draft = d != null && d['uid'] == user?.id ? d : null;
     setState(() {
-      if (raw != null) {
-        final d = jsonDecode(raw) as Map<String, dynamic>;
+      if (draft != null) {
+        final d = draft;
         final saved = _Step.values[(d['step'] as int? ?? 0).clamp(0, _Step.values.length - 1)];
-        _step = _steps.contains(saved) ? saved : _Step.languages;
+        _step = widget.resumeStep && _steps.contains(saved) ? saved : _Step.languages;
         _languages.addAll(List<String>.from(d['languages'] ?? const []));
         _state = d['state'] as String?;
         if (_state != null) _stateText.text = stateDisplayName(_state!);
@@ -122,10 +131,12 @@ class _InstructorRegistrationScreenState extends State<InstructorRegistrationScr
   }
 
   Future<void> _saveDraft() async {
+    final uid = Provider.of<AuthProvider>(context, listen: false).user?.id;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
       InstructorRegistrationScreen.draftKey,
       jsonEncode({
+        'uid': uid,
         'step': _step.index,
         'languages': _languages.toList(),
         'state': _state,

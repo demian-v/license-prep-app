@@ -67,12 +67,24 @@ void main() {
     expect(signup.contains("signupRole: _instructor ? 'instructor' : 'student'"), isTrue);
   });
 
+  // Owner, 2026-09-30: picking a kind seemed to skip «Teaching languages» —
+  // the wizard resumed its saved step. From the kind screen it now starts at
+  // step 1; and a draft is only ever shown to the account that wrote it.
+  test('the wizard starts at step 1 from the kind screen; drafts are per account', () {
+    final step = File('lib/screens/signup_role_step.dart').readAsStringSync();
+    expect(step.contains('InstructorRegistrationScreen(resumeStep: false)'), isTrue);
+    final wizard = File('lib/screens/instructor_registration_screen.dart').readAsStringSync();
+    expect(wizard.contains("_step = widget.resumeStep && _steps.contains(saved) ? saved : _Step.languages;"), isTrue);
+    expect(wizard.contains("d != null && d['uid'] == user?.id ? d : null"), isTrue);
+    expect(wizard.contains("'uid': uid,"), isTrue);
+  });
+
   test('language comes before «How do you teach?» for an instructor', () {
     final step = File('lib/screens/signup_role_step.dart').readAsStringSync();
     expect(step.contains("if (_role == 'instructor') return LanguageSelectionScreen();"), isTrue);
     final language = File('lib/screens/language_selection_screen.dart').readAsStringSync();
     expect(language.contains('pendingInstructor\n                    ? const InstructorKindScreen()'), isTrue);
-    expect(step.contains("role == 'instructor' ? const InstructorRegistrationScreen()"), isTrue,
+    expect(step.contains("role == 'instructor' ? const InstructorRegistrationScreen(resumeStep: false)"), isTrue,
         reason: 'after the kind, the wizard — not the language question again');
   });
 

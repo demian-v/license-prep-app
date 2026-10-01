@@ -58,7 +58,8 @@ Future<void> completeSignupRole(BuildContext context, String role, String? kind)
   // Nothing behind this is worth going back to: the account is made.
   navigator.pushAndRemoveUntil(
     ForwardPageRoute(
-      child: role == 'instructor' ? const InstructorRegistrationScreen() : LanguageSelectionScreen(),
+      // From «How do you teach?»: the wizard starts at its first step.
+      child: role == 'instructor' ? const InstructorRegistrationScreen(resumeStep: false) : LanguageSelectionScreen(),
     ),
     (_) => false,
   );
