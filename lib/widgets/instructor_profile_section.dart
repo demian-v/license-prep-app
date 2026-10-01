@@ -170,8 +170,14 @@ class _LicenseSheetState extends State<_LicenseSheet> {
 
   Future<void> _save() async {
     final l = AppLocalizations.of(context);
-    if (_school.text.trim().length < 2) {
-      setState(() => _error = l.translate('iprof_license_required'));
+    // A school gives its school licence; a private instructor either number
+    // (submitLicenseNumber, owner 2026-09-30).
+    final school = _school.text.trim();
+    final own = _own.text.trim();
+    if (widget.isSchool ? school.length < 2 : school.length < 2 && own.length < 2) {
+      setState(() => _error = widget.isSchool
+          ? l.translate('iprof_license_required')
+          : l.translate('iprof_license_required_any'));
       return;
     }
     setState(() {
@@ -180,7 +186,7 @@ class _LicenseSheetState extends State<_LicenseSheet> {
     });
     final navigator = Navigator.of(context);
     try {
-      await widget.service.submitLicenseNumber(school: _school.text.trim(), instructor: _own.text.trim());
+      await widget.service.submitLicenseNumber(school: school, instructor: own);
       navigator.pop();
     } catch (e) {
       debugPrint('InstructorProfileSection: licence save failed: $e');
@@ -220,6 +226,11 @@ class _LicenseSheetState extends State<_LicenseSheet> {
                         label: l.translate('ireg_instructor_license'), icon: SolarIcons.documentTextLinear),
                   ),
                 ],
+                const SizedBox(height: AppSpacing.x3),
+                Text(
+                  widget.isSchool ? l.translate('ireg_license_note_school') : l.translate('ireg_license_note_private'),
+                  style: AppTypography.caption.copyWith(color: AppColors.inkSecondary),
+                ),
               ],
             ),
             const SizedBox(height: AppSpacing.x3),

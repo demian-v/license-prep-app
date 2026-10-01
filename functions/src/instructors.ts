@@ -244,11 +244,22 @@ export const submitLicenseNumber = functions.https.onCall(async (data, context) 
   const snap = await ref.get();
   if (!snap.exists) throw new functions.https.HttpsError('failed-precondition', 'Not an instructor account.');
 
-  const schoolLicenseNumber = str(data?.schoolLicenseNumber, 2, 40) ?? bad('schoolLicenseNumber');
-  const instructorLicenseNumber = snap.get('kind') === 'schoolInstructor' && data?.instructorLicenseNumber
+  // A school must give its school licence. A private instructor may give
+  // either number, or both (owner, 2026-09-30): an Illinois instructor
+  // licence is only issued to someone associated with a licensed school
+  // (92 Ill. Adm. Code 1060.120(a)(8)), so it already implies one.
+  const isPrivate = snap.get('kind') === 'schoolInstructor';
+  const schoolLicenseNumber = data?.schoolLicenseNumber
+    ? (str(data.schoolLicenseNumber, 2, 40) ?? bad('schoolLicenseNumber')) : null;
+  const instructorLicenseNumber = isPrivate && data?.instructorLicenseNumber
     ? (str(data.instructorLicenseNumber, 2, 40) ?? bad('instructorLicenseNumber')) : null;
+  if (!isPrivate && !schoolLicenseNumber) bad('schoolLicenseNumber');
+  if (!schoolLicenseNumber && !instructorLicenseNumber) bad('licenseNumber');
 
-  const changed = snap.get('schoolLicenseNumber') !== schoolLicenseNumber;
+  const ownBefore = isPrivate
+    ? (await db.collection('instructorPrivate').doc(uid).get()).get('licenseNumber') ?? null : null;
+  const changed = (snap.get('schoolLicenseNumber') ?? null) !== schoolLicenseNumber
+    || (instructorLicenseNumber !== null && instructorLicenseNumber !== ownBefore);
   await db.runTransaction(async (tx) => {
     tx.update(ref, {
       schoolLicenseNumber,

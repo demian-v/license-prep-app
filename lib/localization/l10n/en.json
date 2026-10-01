@@ -402,7 +402,7 @@
   "ireg_license_title": "Licence",
   "ireg_license_desc": "You can skip this and add it later in Profile. Until it is checked, your profile is marked «Not verified».",
   "ireg_school_license": "Driving school licence number",
-  "ireg_instructor_license": "Your instructor licence number",
+  "ireg_instructor_license": "Instructor licence number",
   "ireg_error_languages": "Choose at least one language.",
   "ireg_error_state": "Choose your state.",
   "ireg_error_city": "Enter your city.",
@@ -454,5 +454,8 @@
   "sreq_source": "From state DMV rules, September 2026",
   "instr_count_label": "Profiles in your state",
   "ireg_done": "Done",
-  "iprof_price_hidden": "Students see your price once your licence is checked."
+  "iprof_price_hidden": "Students see your price once your licence is checked.",
+  "ireg_license_note_school": "This is your school's state licence, not a driver's licence. Your driver's licence is checked separately, under Identity check in Profile.",
+  "ireg_license_note_private": "These are state teaching licences, not a driver's licence. One of the two is enough. Your driver's licence is checked separately, under Identity check in Profile.",
+  "iprof_license_required_any": "Enter at least one licence number."
 }

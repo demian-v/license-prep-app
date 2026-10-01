@@ -89,7 +89,7 @@ describe('registerAsInstructor', () => {
 });
 
 describe('submitLicenseNumber', () => {
-  beforeEach(() => wipe('lic-a', 'lic-none'));
+  beforeEach(() => wipe('lic-a', 'lic-none', 'lic-p'));
 
   it('adds the number later and puts it up for review', async () => {
     await register(school, 'lic-a');
@@ -99,6 +99,41 @@ describe('submitLicenseNumber', () => {
 
   it('refuses a caller who is not an instructor', async () => {
     await expect(submitLicense({ schoolLicenseNumber: 'IL-DS-9' }, 'lic-none')).rejects.toMatchObject({ code: 'failed-precondition' });
+  });
+
+  // Owner, 2026-09-30: a private instructor may be verified on their own
+  // instructor licence. In Illinois that licence is only issued to someone
+  // "employed or associated with" a licensed school (92 Ill. Adm. Code
+  // 1060.120(a)(8)), so it already implies one.
+  const privateInstructor = () => {
+    const { schoolAddress, fleetSize, instructorCount, ...rest } = school;
+    void schoolAddress; void fleetSize; void instructorCount;
+    return { ...rest, kind: 'schoolInstructor', name: 'Carlos Diaz' };
+  };
+
+  it('accepts a private instructor\'s own licence alone', async () => {
+    await register(privateInstructor(), 'lic-p');
+    await expect(submitLicense({ instructorLicenseNumber: 'IL-INS-77' }, 'lic-p')).resolves.toEqual({ licenseCheck: 'pending' });
+    expect((await db().collection('instructorPrivate').doc('lic-p').get()).get('licenseNumber')).toBe('IL-INS-77');
+    expect((await db().collection('instructors').doc('lic-p').get()).get('schoolLicenseNumber')).toBeNull();
+  });
+
+  it('puts a changed own licence back up for review', async () => {
+    await register(privateInstructor(), 'lic-p');
+    await submitLicense({ instructorLicenseNumber: 'IL-INS-77' }, 'lic-p');
+    await db().collection('instructors').doc('lic-p').update({ licenseCheck: 'passed' });
+    await expect(submitLicense({ instructorLicenseNumber: 'IL-INS-77' }, 'lic-p')).resolves.toEqual({ licenseCheck: 'passed' });
+    await expect(submitLicense({ instructorLicenseNumber: 'IL-INS-78' }, 'lic-p')).resolves.toEqual({ licenseCheck: 'pending' });
+  });
+
+  it('still requires some licence number', async () => {
+    await register(privateInstructor(), 'lic-p');
+    await expect(submitLicense({}, 'lic-p')).rejects.toMatchObject({ code: 'invalid-argument' });
+  });
+
+  it('still requires a school\'s own school licence', async () => {
+    await register(school, 'lic-a');
+    await expect(submitLicense({ instructorLicenseNumber: 'IL-INS-77' }, 'lic-a')).rejects.toMatchObject({ code: 'invalid-argument' });
   });
 });
 

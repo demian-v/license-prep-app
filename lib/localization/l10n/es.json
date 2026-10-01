@@ -402,7 +402,7 @@
   "ireg_license_title": "Licencia",
   "ireg_license_desc": "Puedes saltarlo y añadirlo después en Perfil. Hasta la verificación, tu perfil se marca como «No verificado».",
   "ireg_school_license": "Número de licencia de la autoescuela",
-  "ireg_instructor_license": "Tu número de licencia de instructor",
+  "ireg_instructor_license": "Número de licencia de instructor",
   "ireg_error_languages": "Elige al menos un idioma.",
   "ireg_error_state": "Elige tu estado.",
   "ireg_error_city": "Escribe tu ciudad.",
@@ -454,5 +454,8 @@
   "sreq_source": "Según las normas del DMV estatal, septiembre de 2026",
   "instr_count_label": "Perfiles en tu estado",
   "ireg_done": "Listo",
-  "iprof_price_hidden": "Los estudiantes verán tu precio cuando se compruebe tu licencia."
+  "iprof_price_hidden": "Los estudiantes verán tu precio cuando se compruebe tu licencia.",
+  "ireg_license_note_school": "Es la licencia estatal de tu autoescuela, no una licencia de conducir. Tu licencia de conducir se verifica aparte, en Perfil, «Verificación de identidad».",
+  "ireg_license_note_private": "Son licencias estatales para enseñar a conducir, no una licencia de conducir. Basta con una de las dos. Tu licencia de conducir se verifica aparte, en Perfil, «Verificación de identidad».",
+  "iprof_license_required_any": "Escribe al menos un número de licencia."
 }

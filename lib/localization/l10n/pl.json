@@ -402,7 +402,7 @@
   "ireg_license_title": "Licencja",
   "ireg_license_desc": "Możesz pominąć i dodać później w Profilu. Do czasu weryfikacji profil jest oznaczony jako «Niezweryfikowany».",
   "ireg_school_license": "Numer licencji szkoły jazdy",
-  "ireg_instructor_license": "Twój numer licencji instruktora",
+  "ireg_instructor_license": "Numer licencji instruktora",
   "ireg_error_languages": "Wybierz co najmniej jeden język.",
   "ireg_error_state": "Wybierz stan.",
   "ireg_error_city": "Wpisz miasto.",
@@ -454,5 +454,8 @@
   "sreq_source": "Na podstawie przepisów DMV stanu, wrzesień 2026",
   "instr_count_label": "Profile w Twoim stanie",
   "ireg_done": "Gotowe",
-  "iprof_price_hidden": "Uczniowie zobaczą Twoją cenę po sprawdzeniu licencji."
+  "iprof_price_hidden": "Uczniowie zobaczą Twoją cenę po sprawdzeniu licencji.",
+  "ireg_license_note_school": "To stanowa licencja Twojej szkoły, a nie prawo jazdy. Prawo jazdy sprawdzamy osobno — w Profilu, «Weryfikacja tożsamości».",
+  "ireg_license_note_private": "To stanowe licencje na naukę jazdy, a nie prawo jazdy. Wystarczy jedna z dwóch. Prawo jazdy sprawdzamy osobno — w Profilu, «Weryfikacja tożsamości».",
+  "iprof_license_required_any": "Wpisz co najmniej jeden numer licencji."
 }

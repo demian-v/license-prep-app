@@ -495,6 +495,11 @@ class _InstructorRegistrationScreenState extends State<InstructorRegistrationScr
         return (translate('ireg_license_title'), translate('ireg_license_desc'), [
           _text('schoolLicense', translate('ireg_school_license'), SolarIcons.documentTextLinear),
           if (!_isSchool) _text('instructorLicense', translate('ireg_instructor_license'), SolarIcons.documentTextLinear),
+          // Not a driver's licence: that one is read by the identity check.
+          Text(
+            _isSchool ? translate('ireg_license_note_school') : translate('ireg_license_note_private'),
+            style: AppTypography.caption.copyWith(color: AppColors.inkSecondary),
+          ),
         ]);
     }
   }
