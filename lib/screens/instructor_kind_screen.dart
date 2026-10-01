@@ -28,8 +28,9 @@ class _InstructorKindScreenState extends State<InstructorKindScreen> {
   bool _busy = false;
   String? _error;
 
-  // Reached after the email code, so the account exists: saving the kind
-  // here also saves the role (completeSignupRole), then goes to language.
+  // Reached after the email code and the language question, so the account
+  // exists: saving the kind also saves the role (completeSignupRole), then
+  // goes to the registration wizard.
   Future<void> _signup(BuildContext context, String kind) async {
     final l = AppLocalizations.of(context);
     setState(() {

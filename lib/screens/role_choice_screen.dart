@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../localization/app_localizations.dart';
 import '../theme/app_theme.dart';
@@ -6,7 +7,8 @@ import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
 import '../widgets/bento_auth_parts.dart';
 import '../widgets/bento_choice_card.dart';
-import 'instructor_kind_screen.dart';
+import '../providers/auth_provider.dart';
+import 'language_selection_screen.dart';
 import 'signup_role_step.dart';
 
 /// The role cards — now only a fallback (owner, 2026-09-30). The Sign Up
@@ -44,8 +46,14 @@ class _RoleChoiceScreenState extends State<RoleChoiceScreen> {
     }
   }
 
-  // The kind screen saves the role itself.
-  void _instructor() => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const InstructorKindScreen()));
+  // Like the Sign Up page's instructor version: remember it, then language,
+  // which leads on to «How do you teach?» (that screen saves the role).
+  Future<void> _instructor() async {
+    final navigator = Navigator.of(context);
+    final uid = Provider.of<AuthProvider>(context, listen: false).user?.id;
+    if (uid != null) await SignupIntent.save(uid, 'instructor');
+    navigator.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => LanguageSelectionScreen()), (_) => false);
+  }
 
   @override
   Widget build(BuildContext context) {

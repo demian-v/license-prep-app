@@ -11,7 +11,9 @@ import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
 import '../widgets/bento_auth_parts.dart';
 import '../main.dart' show navigatorKey;
+import 'instructor_kind_screen.dart';
 import 'instructor_registration_screen.dart';
+import 'signup_role_step.dart';
 import 'state_selection_screen.dart';
 
 class LanguageSelectionScreen extends StatefulWidget {
@@ -325,6 +327,13 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
           // Read before any await: the language change below can unmount
           // this screen, and a lookup through its context would then throw.
           final authProvider = Provider.of<AuthProvider>(context, listen: false);
+          // An instructor whose kind is not saved yet answers «How do you
+          // teach?» next (owner, 2026-09-30: language comes right after the
+          // email code for instructors too).
+          final uid = authProvider.user?.id;
+          final pendingInstructor = authProvider.user?.signupRole == null &&
+              uid != null &&
+              await SignupIntent.read(uid) == 'instructor';
           
           // Update language provider
           print('🔄 [LANGUAGE SCREEN] Setting language to: $code');
@@ -374,8 +383,9 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
                 ),
                 // An instructor picks their teaching state inside the
                 // registration wizard (instructors plan v2 §4.3), not here.
-                pageBuilder: (context, animation1, animation2) =>
-                    authProvider.user?.isSigningUpAsInstructor == true
+                pageBuilder: (context, animation1, animation2) => pendingInstructor
+                    ? const InstructorKindScreen()
+                    : authProvider.user?.isSigningUpAsInstructor == true
                         ? const InstructorRegistrationScreen()
                         : StateSelectionScreen(
                             key: UniqueKey(), // Force complete rebuild

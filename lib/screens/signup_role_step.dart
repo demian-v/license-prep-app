@@ -9,7 +9,7 @@ import '../providers/auth_provider.dart';
 import '../services/analytics_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bento_auth_parts.dart';
-import 'instructor_kind_screen.dart';
+import 'instructor_registration_screen.dart';
 import 'language_selection_screen.dart';
 import 'role_choice_screen.dart';
 
@@ -39,8 +39,10 @@ class SignupIntent {
   }
 }
 
-/// Saves the role on the server (set once), starts a student's trial, and
-/// goes on to the language question. Throws if the server refuses.
+/// Saves the role on the server (set once) and starts a student's trial.
+/// Then a student goes to the language question; an instructor, who answered
+/// it already (owner, 2026-09-30: language right after the email code),
+/// goes to the registration wizard. Throws if the server refuses.
 Future<void> completeSignupRole(BuildContext context, String role, String? kind) async {
   final auth = Provider.of<AuthProvider>(context, listen: false);
   final navigator = Navigator.of(context);
@@ -54,13 +56,19 @@ Future<void> completeSignupRole(BuildContext context, String role, String? kind)
     );
   }
   await SignupIntent.clear();
-  // Nothing behind language is worth going back to: the account is made.
-  navigator.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => LanguageSelectionScreen()), (_) => false);
+  // Nothing behind this is worth going back to: the account is made.
+  navigator.pushAndRemoveUntil(
+    MaterialPageRoute(
+      builder: (_) => role == 'instructor' ? const InstructorRegistrationScreen() : LanguageSelectionScreen(),
+    ),
+    (_) => false,
+  );
 }
 
-/// The step after the email code (Sign Up → Check email → this → Language).
-/// A student's role is saved straight away; an instructor picks a kind
-/// first. [role] comes from the Sign Up page; when it is unknown (a resumed
+/// The step after the email code. A student's role is saved straight away
+/// (Sign Up → Check email → this → Language). An instructor goes to the
+/// language question first, then «How do you teach?», which saves the role
+/// (LanguageSelectionScreen routes there). [role] comes from the Sign Up page; when it is unknown (a resumed
 /// signup) the phone's [SignupIntent] is used, and only if this phone never
 /// saw the Sign Up page does the person get the role cards.
 class SignupRoleStep extends StatefulWidget {
@@ -118,7 +126,7 @@ class _SignupRoleStepState extends State<SignupRoleStep> {
   @override
   Widget build(BuildContext context) {
     if (!_resolved) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    if (_role == 'instructor') return const InstructorKindScreen();
+    if (_role == 'instructor') return LanguageSelectionScreen();
     if (_role == null) return const RoleChoiceScreen();
     final l = AppLocalizations.of(context);
     return Scaffold(

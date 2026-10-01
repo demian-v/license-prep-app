@@ -54,17 +54,27 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('the role cards lead to the two instructor kinds', (tester) async {
+  // Owner, 2026-09-30: an instructor answers the language question before
+  // «How do you teach?», so the role cards (now a fallback) no longer open
+  // the kind screen directly — each screen is checked on its own.
+  testWidgets('the role cards and the two instructor kinds', (tester) async {
     await pump(tester, const RoleChoiceScreen());
     expect(find.text('Зарегистрироваться как'), findsOneWidget);
     expect(find.text('Ученик'), findsOneWidget);
     expect(find.text('Инструктор'), findsOneWidget);
 
-    await tester.tap(find.text('Инструктор'));
-    await tester.pumpAndSettle();
-    expect(find.byType(InstructorKindScreen), findsOneWidget);
+    await pump(tester, const InstructorKindScreen());
     expect(find.text('Автошкола'), findsOneWidget);
     expect(find.text('Частный инструктор'), findsOneWidget);
+  });
+
+  test('language comes before «How do you teach?» for an instructor', () {
+    final step = File('lib/screens/signup_role_step.dart').readAsStringSync();
+    expect(step.contains("if (_role == 'instructor') return LanguageSelectionScreen();"), isTrue);
+    final language = File('lib/screens/language_selection_screen.dart').readAsStringSync();
+    expect(language.contains('pendingInstructor\n                    ? const InstructorKindScreen()'), isTrue);
+    expect(step.contains("role == 'instructor' ? const InstructorRegistrationScreen()"), isTrue,
+        reason: 'after the kind, the wizard — not the language question again');
   });
 
   // The longest translations must fit a 375pt phone without overflow.
