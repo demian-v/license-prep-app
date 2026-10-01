@@ -690,7 +690,7 @@ class MyApp extends StatelessWidget {
           routes: {
             '/login': (context) => LoginScreen(),
             // Email and password first, then who is signing up (owner,
-            // 2026-09-30; SignupScreen opens RoleChoiceScreen).
+            // 2026-09-30; SignupScreen has the student / instructor switch).
             '/signup': (context) => const SignupScreen(),
             '/home': (context) => HomeScreen(),
             '/tests': (context) => TestScreen(),

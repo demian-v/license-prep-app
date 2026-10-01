@@ -144,6 +144,15 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
     }
   }
 
+  // «Log out» on the first step after the email code (owner, 2026-09-30).
+  // The account exists, so leaving signup means signing out to Login, as
+  // Профиль's «Выйти» does. Logging in again resumes here (SignupResumeGate).
+  Future<void> _leaveSignup() async {
+    final navigator = Navigator.of(context);
+    await Provider.of<AuthProvider>(context, listen: false).logout();
+    navigator.pushNamedAndRemoveUntil('/login', (route) => false);
+  }
+
   @override
   Widget build(BuildContext context) {
     debugPrint('🏳️‍🌈 [LANGUAGE SCREEN] Building language selection screen');
@@ -174,6 +183,13 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
                     _buildLanguageButton(context, 'Ukrainian', 'uk'),
                     _buildLanguageButton(context, 'Polish', 'pl'),
                     _buildLanguageButton(context, 'Russian', 'ru'),
+                    const SizedBox(height: AppSpacing.x2),
+                    Center(
+                      child: BentoAuthLink(
+                        label: AppLocalizations.of(context).translate('logout'),
+                        onPressed: _isLoading ? null : _leaveSignup,
+                      ),
+                    ),
                   ];
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -330,10 +346,10 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
           // An instructor whose kind is not saved yet answers «How do you
           // teach?» next (owner, 2026-09-30: language comes right after the
           // email code for instructors too).
-          final uid = authProvider.user?.id;
-          final pendingInstructor = authProvider.user?.signupRole == null &&
-              uid != null &&
-              await SignupIntent.read(uid) == 'instructor';
+          final user = authProvider.user;
+          final pendingInstructor = user != null &&
+              user.signupKind == null &&
+              (user.signupRole ?? await SignupIntent.read(user.id)) == 'instructor';
           
           // Update language provider
           print('🔄 [LANGUAGE SCREEN] Setting language to: $code');

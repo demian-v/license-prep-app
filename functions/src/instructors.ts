@@ -115,12 +115,14 @@ function bad(field: string): never {
  * firestore.rules). Photo, licence review and the ID check all come later.
  */
 /**
- * Who is signing up (instructors plan v2 §4.1), asked after the email code
- * (owner, 2026-09-30: Sign Up -> Check email -> Student or Instructor).
- * Set once: a later call with a different answer is refused, so the answer
- * cannot be switched to reach a trial. Only the intent — `userType` stays
- * granted by registerAsInstructor. The client starts a student's trial after
- * this; createTrialSubscription refuses an instructor.
+ * Who is signing up (instructors plan v2 §4.1). Owner, 2026-09-30: the Sign
+ * Up page («Create Student / Instructor Account») knows the role, so it is
+ * saved when the account is made; an instructor's kind follows after the
+ * email code («How do you teach?»). Each is set once: the same answer again
+ * is accepted, a different one is refused, so the answer cannot be switched
+ * to reach a trial. Only the intent — `userType` stays granted by
+ * registerAsInstructor. A student's trial is started by the client after the
+ * code; createTrialSubscription refuses an instructor.
  */
 export const setSignupRole = functions.https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Not logged in');
@@ -128,20 +130,23 @@ export const setSignupRole = functions.https.onCall(async (data, context) => {
   if (role !== 'student' && role !== 'instructor') {
     throw new functions.https.HttpsError('invalid-argument', 'signupRole must be student or instructor');
   }
-  const kind = role === 'instructor' ? data?.signupKind : null;
-  if (role === 'instructor' && kind !== 'school' && kind !== 'schoolInstructor') {
+  const kind = role === 'instructor' && data?.signupKind != null ? data.signupKind : null;
+  if (kind !== null && kind !== 'school' && kind !== 'schoolInstructor') {
     throw new functions.https.HttpsError('invalid-argument', 'signupKind must be school or schoolInstructor');
   }
   const db = admin.firestore();
   const ref = db.collection('users').doc(context.auth.uid);
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
-    const existing = snap.get('signupRole');
-    if (existing != null) {
-      // A retry of the same answer is fine; a different one is not.
-      if (existing === role && (snap.get('signupKind') ?? null) === kind) return;
+    const existingRole = snap.get('signupRole') ?? null;
+    const existingKind = snap.get('signupKind') ?? null;
+    if (existingRole !== null && existingRole !== role) {
       throw new functions.https.HttpsError('failed-precondition', 'signup-role-already-set');
     }
+    if (kind !== null && existingKind !== null && existingKind !== kind) {
+      throw new functions.https.HttpsError('failed-precondition', 'signup-kind-already-set');
+    }
+    if (existingRole === role && (kind === null || existingKind === kind)) return; // a retry
     tx.set(ref, {
       signupRole: role,
       ...(kind ? { signupKind: kind } : {}),

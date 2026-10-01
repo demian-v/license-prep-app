@@ -70,6 +70,22 @@ describe('setSignupRole', () => {
     expect((await db().collection('users').doc('urf-provisioned').get()).get('signupRole')).toBe('instructor');
   });
 
+  // Owner, 2026-09-30: the Sign Up page knows the role, so it is saved when
+  // the account is made; an instructor's kind follows after the email code.
+  it('saves an instructor role without a kind, then the kind once', async () => {
+    await provisioned('urf-provisioned');
+    await setRole({ signupRole: 'instructor' }, 'urf-provisioned');
+    expect((await db().collection('users').doc('urf-provisioned').get()).get('signupKind')).toBeUndefined();
+    await setRole({ signupRole: 'instructor', signupKind: 'schoolInstructor' }, 'urf-provisioned');
+    await setRole({ signupRole: 'instructor', signupKind: 'schoolInstructor' }, 'urf-provisioned');
+    await expect(setRole({ signupRole: 'instructor', signupKind: 'school' }, 'urf-provisioned'))
+      .rejects.toMatchObject({ code: 'failed-precondition' });
+    await expect(setRole({ signupRole: 'student' }, 'urf-provisioned')).rejects.toMatchObject({ code: 'failed-precondition' });
+    const doc = (await db().collection('users').doc('urf-provisioned').get()).data()!;
+    expect(doc.signupRole).toBe('instructor');
+    expect(doc.signupKind).toBe('schoolInstructor');
+  });
+
   it('refuses unknown values', async () => {
     await expect(setRole({ signupRole: 'admin' }, 'urf-bogus')).rejects.toMatchObject({ code: 'invalid-argument' });
     await expect(setRole({ signupRole: 'instructor', signupKind: 'solo' }, 'urf-bogus'))

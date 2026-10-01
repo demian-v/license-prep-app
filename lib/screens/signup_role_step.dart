@@ -11,7 +11,6 @@ import '../theme/app_theme.dart';
 import '../widgets/bento_auth_parts.dart';
 import 'instructor_registration_screen.dart';
 import 'language_selection_screen.dart';
-import 'role_choice_screen.dart';
 
 /// Which Sign Up the person used — «Create Student Account» or «Create
 /// Instructor Account» (owner, 2026-09-30) — kept on the phone until the
@@ -68,9 +67,9 @@ Future<void> completeSignupRole(BuildContext context, String role, String? kind)
 /// The step after the email code. A student's role is saved straight away
 /// (Sign Up → Check email → this → Language). An instructor goes to the
 /// language question first, then «How do you teach?», which saves the role
-/// (LanguageSelectionScreen routes there). [role] comes from the Sign Up page; when it is unknown (a resumed
-/// signup) the phone's [SignupIntent] is used, and only if this phone never
-/// saw the Sign Up page does the person get the role cards.
+/// (LanguageSelectionScreen routes there). [role] comes from the Sign Up
+/// page; when it is unknown (a resumed signup) the role saved at Sign Up is
+/// used.
 class SignupRoleStep extends StatefulWidget {
   const SignupRoleStep({super.key, this.role});
 
@@ -96,11 +95,14 @@ class _SignupRoleStepState extends State<SignupRoleStep> {
 
   Future<void> _start() async {
     if (_role == null) {
-      final uid = Provider.of<AuthProvider>(context, listen: false).user?.id;
-      final saved = uid == null ? null : await SignupIntent.read(uid);
+      // The role is saved on the server at Sign Up; the phone keeps a copy
+      // in case that save failed. With neither (should not happen), the
+      // student path — the «Sign up as» cards are gone (owner, 2026-09-30).
+      final user = Provider.of<AuthProvider>(context, listen: false).user;
+      final saved = user?.signupRole ?? (user == null ? null : await SignupIntent.read(user.id));
       if (!mounted) return;
       setState(() {
-        _role = saved;
+        _role = saved ?? 'student';
         _resolved = true;
       });
     }
@@ -127,7 +129,6 @@ class _SignupRoleStepState extends State<SignupRoleStep> {
   Widget build(BuildContext context) {
     if (!_resolved) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     if (_role == 'instructor') return LanguageSelectionScreen();
-    if (_role == null) return const RoleChoiceScreen();
     final l = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: AppColors.field,

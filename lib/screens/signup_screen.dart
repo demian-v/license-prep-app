@@ -184,7 +184,8 @@ class _SignupScreenState extends State<SignupScreen> {
       debugPrint('🔍 [SignupScreen] Attempting signup with name=$name, email=$email');
       
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final success = await authProvider.signup(name, email, password, context: context);
+      final success = await authProvider.signup(name, email, password,
+          context: context, signupRole: _instructor ? 'instructor' : 'student');
       
       if (success) {
         debugPrint('✅ [SignupScreen] Signup successful');

@@ -5,7 +5,6 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:license_prep_app/localization/app_localizations.dart';
 import 'package:license_prep_app/screens/instructor_kind_screen.dart';
-import 'package:license_prep_app/screens/role_choice_screen.dart';
 
 /// Instructors plan v2 §4.1–4.2, order from the owner (2026-09-30):
 /// Sign Up -> Check email -> Student or Instructor. The account exists before
@@ -54,18 +53,18 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  // Owner, 2026-09-30: an instructor answers the language question before
-  // «How do you teach?», so the role cards (now a fallback) no longer open
-  // the kind screen directly — each screen is checked on its own.
-  testWidgets('the role cards and the two instructor kinds', (tester) async {
-    await pump(tester, const RoleChoiceScreen());
-    expect(find.text('Зарегистрироваться как'), findsOneWidget);
-    expect(find.text('Ученик'), findsOneWidget);
-    expect(find.text('Инструктор'), findsOneWidget);
-
+  // Owner, 2026-09-30: no «Sign up as» screen — the Sign Up page has the
+  // student / instructor switch; the kind screen comes after the language.
+  testWidgets('the two instructor kinds', (tester) async {
     await pump(tester, const InstructorKindScreen());
     expect(find.text('Автошкола'), findsOneWidget);
     expect(find.text('Частный инструктор'), findsOneWidget);
+  });
+
+  test('the Sign Up page saves the role; no role cards remain', () {
+    expect(File('lib/screens/role_choice_screen.dart').existsSync(), isFalse);
+    final signup = File('lib/screens/signup_screen.dart').readAsStringSync();
+    expect(signup.contains("signupRole: _instructor ? 'instructor' : 'student'"), isTrue);
   });
 
   test('language comes before «How do you teach?» for an instructor', () {
@@ -79,9 +78,7 @@ void main() {
 
   // The longest translations must fit a 375pt phone without overflow.
   for (final locale in ['en', 'es', 'pl', 'ru', 'uk']) {
-    testWidgets('role and kind screens lay out in $locale at 375pt', (tester) async {
-      await pump(tester, const RoleChoiceScreen(), locale: locale);
-      expect(tester.takeException(), isNull);
+    testWidgets('the kind screen lays out in $locale at 375pt', (tester) async {
       await pump(tester, const InstructorKindScreen(), locale: locale);
       expect(tester.takeException(), isNull);
     });

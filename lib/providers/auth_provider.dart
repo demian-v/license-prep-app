@@ -213,7 +213,8 @@ class AuthProvider extends ChangeNotifier {
   /// Creates the account only. Who is signing up is asked after the email
   /// code (owner, 2026-09-30), and the trial starts there — see
   /// [chooseSignupRole].
-  Future<bool> signup(String name, String email, String password, {BuildContext? context}) async {
+  Future<bool> signup(String name, String email, String password,
+      {BuildContext? context, String? signupRole}) async {
     try {
       debugPrint('🔍 [AuthProvider] Creating user with name: $name, email: $email');
       
@@ -270,6 +271,19 @@ class AuthProvider extends ChangeNotifier {
         debugPrint('🔄 [AuthProvider] Running email sync to ensure data consistency');
         await emailSyncService.smartSync();
         
+        // The Sign Up page knows the role (owner, 2026-09-30): save it now,
+        // so a signup finished on another phone still knows it. No trial
+        // here — a student's starts after the email code (chooseSignupRole).
+        // Non-fatal: the role step saves it again if this fails.
+        if (signupRole != null) {
+          try {
+            await InstructorService().setSignupRole(signupRole, null);
+            user = user!.copyWith(signupRole: signupRole);
+          } catch (e) {
+            debugPrint('⚠️ [AuthProvider] Saving the signup role failed (retried later): $e');
+          }
+        }
+
         // Save user to local storage
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('user', jsonEncode(user!.toJson()));
@@ -692,15 +706,10 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// The wizard's last step succeeded: the server granted the instructor role
-  /// and saved the teaching state (registerAsInstructor). Mirror both locally
-  /// and in the saved copy — the app restores the user from SharedPreferences
-  /// on start and does not re-read the role (instructors plan v2 §4.3).
-  /// The answer on RoleChoiceScreen, after the email code (owner,
-  /// 2026-09-30: Sign Up -> Check email -> Student or Instructor). Saves the
-  /// intent on the server (set once), then starts a student's trial —
-  /// moved here from [signup], because the role was not known there.
-  /// Throws if the server refuses the role; the trial never blocks.
+  /// After the email code (owner, 2026-09-30): saves the Sign Up page's role
+  /// again (a retry is accepted; it was saved at [signup]) and an
+  /// instructor's kind, then starts a student's trial. Throws if the server
+  /// refuses; the trial never blocks.
   Future<void> chooseSignupRole(String role, String? kind, {BuildContext? context}) async {
     if (user == null) return;
     await InstructorService().setSignupRole(role, kind);
@@ -749,6 +758,10 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The wizard's last step succeeded: the server granted the instructor role
+  /// and saved the teaching state (registerAsInstructor). Mirror both locally
+  /// and in the saved copy — the app restores the user from SharedPreferences
+  /// on start and does not re-read the role (instructors plan v2 §4.3).
   Future<void> applyInstructorRole(String state) async {
     if (user == null) return;
     user = user!.copyWith(userType: 'instructor', state: state);

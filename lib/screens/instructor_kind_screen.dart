@@ -6,6 +6,8 @@ import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
 import '../widgets/bento_choice_card.dart';
 import '../widgets/bento_auth_parts.dart';
+import '../widgets/bento_question_parts.dart' show bentoRoundIconStyle;
+import 'language_selection_screen.dart';
 import 'signup_role_step.dart';
 
 /// «Автошкола» or «Частный инструктор» (instructors plan v2 §4.1; renamed
@@ -103,20 +105,40 @@ class _InstructorKindScreenState extends State<InstructorKindScreen> {
     return Scaffold(
       backgroundColor: AppColors.field,
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.x4 + AppSpacing.x1,
-              vertical: AppSpacing.x6,
+        child: Stack(
+          children: [
+            Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.x4 + AppSpacing.x1,
+                  vertical: AppSpacing.x6,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < blocks.length; i++)
+                      StaggerIn(index: i, count: blocks.length, curve: BentoTokens.curve, child: blocks[i]),
+                  ],
+                ),
+              ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var i = 0; i < blocks.length; i++)
-                  StaggerIn(index: i, count: blocks.length, curve: BentoTokens.curve, child: blocks[i]),
-              ],
+            // Back to the language question: nothing is saved until a kind
+            // is picked (owner, 2026-09-30). It floats over the page — an app
+            // bar would push the centred cards down by its height.
+            Positioned(
+              top: AppSpacing.x2,
+              left: AppSpacing.x2,
+              child: IconButton(
+                style: bentoRoundIconStyle,
+                icon: const Icon(SolarIcons.arrowLeftLinear, color: AppColors.ink, size: 24),
+                onPressed: _busy
+                    ? null
+                    : () => Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(builder: (_) => LanguageSelectionScreen()),
+                        ),
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
