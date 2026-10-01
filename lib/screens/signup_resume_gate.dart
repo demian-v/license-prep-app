@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../services/email_verification_service.dart';
 import '../providers/auth_provider.dart';
 import 'language_selection_screen.dart';
-import 'role_choice_screen.dart';
+import 'signup_role_step.dart';
 import 'verification_code_screen.dart';
 
 /// Risk #12 — resume-on-relaunch for an interrupted signup.
@@ -61,10 +61,11 @@ class _SignupResumeGateState extends State<SignupResumeGate> {
         // the language question and leaving the account on the 'en' default it
         // was created with. Found on a real Android device 2026-09-19.
         //
-        // Who is signing up comes right after the code (owner, 2026-09-30),
-        // so an account without an answer resumes there.
+        // The role step comes right after the code (owner, 2026-09-30), so
+        // an account without a saved role resumes there; it knows which Sign
+        // Up page this phone used (SignupIntent).
         Widget next() => Provider.of<AuthProvider>(context, listen: false).user?.signupRole == null
-            ? const RoleChoiceScreen()
+            ? const SignupRoleStep()
             : LanguageSelectionScreen();
         if (status == null || status.emailVerified) {
           return next();

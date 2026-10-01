@@ -457,5 +457,9 @@
   "iprof_price_hidden": "Uczniowie zobaczą Twoją cenę po sprawdzeniu licencji.",
   "ireg_license_note_school": "To stanowa licencja Twojej szkoły, a nie prawo jazdy. Prawo jazdy sprawdzamy osobno — w Profilu, «Weryfikacja tożsamości».",
   "ireg_license_note_private": "To stanowe licencje na naukę jazdy, a nie prawo jazdy. Wystarczy jedna z dwóch. Prawo jazdy sprawdzamy osobno — w Profilu, «Weryfikacja tożsamości».",
-  "iprof_license_required_any": "Wpisz co najmniej jeden numer licencji."
+  "iprof_license_required_any": "Wpisz co najmniej jeden numer licencji.",
+  "auth_create_student_account": "Utwórz konto ucznia",
+  "auth_create_instructor_account": "Utwórz konto instruktora",
+  "auth_switch_to_instructor": "Utwórz konto instruktora",
+  "auth_switch_to_student": "Utwórz konto ucznia"
 }

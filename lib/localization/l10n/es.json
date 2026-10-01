@@ -457,5 +457,9 @@
   "iprof_price_hidden": "Los estudiantes verán tu precio cuando se compruebe tu licencia.",
   "ireg_license_note_school": "Es la licencia estatal de tu autoescuela, no una licencia de conducir. Tu licencia de conducir se verifica aparte, en Perfil, «Verificación de identidad».",
   "ireg_license_note_private": "Son licencias estatales para enseñar a conducir, no una licencia de conducir. Basta con una de las dos. Tu licencia de conducir se verifica aparte, en Perfil, «Verificación de identidad».",
-  "iprof_license_required_any": "Escribe al menos un número de licencia."
+  "iprof_license_required_any": "Escribe al menos un número de licencia.",
+  "auth_create_student_account": "Crear cuenta de estudiante",
+  "auth_create_instructor_account": "Crear cuenta de instructor",
+  "auth_switch_to_instructor": "Crear cuenta de instructor",
+  "auth_switch_to_student": "Crear cuenta de estudiante"
 }

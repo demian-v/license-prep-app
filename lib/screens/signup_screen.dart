@@ -5,7 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../providers/auth_provider.dart';
 import '../services/analytics_service.dart';
 import '../services/in_app_purchase_service.dart';
-import 'role_choice_screen.dart';
+import 'signup_role_step.dart';
 import 'verification_code_screen.dart';
 import '../localization/app_localizations.dart';
 import '../theme/app_theme.dart';
@@ -22,6 +22,10 @@ class SignupScreen extends StatefulWidget {
 
 class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
+  // «Create Student Account» or «Create Instructor Account» (owner,
+  // 2026-09-30): the same form, a link below switches. The role itself is
+  // saved after the email code, by SignupRoleStep.
+  bool _instructor = false;
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -197,7 +201,7 @@ class _SignupScreenState extends State<SignupScreen> {
           // Log account created event
           _onAccountCreated(userId);
           
-          // The trial starts after the role choice (RoleChoiceScreen logs it).
+          // The trial starts after the email code (SignupRoleStep logs it).
           
           debugPrint('📊 Analytics: All signup events logged successfully');
         } catch (analyticsError) {
@@ -219,16 +223,19 @@ class _SignupScreenState extends State<SignupScreen> {
         
         if (mounted) {
           debugPrint('🔄 [SignupScreen] Navigating to language selection screen');
-          // Sign Up -> Check email -> Student or Instructor (owner,
-          // 2026-09-30), then language. The trial now starts at the role
-          // choice, after the code — superseding risk #12's "trial before
-          // verification" (2026-09-17): the role must be known first.
+          // Sign Up -> Check email -> role step (owner, 2026-09-30), then
+          // language. The trial starts at the role step, after the code —
+          // superseding risk #12's "trial before verification"
+          // (2026-09-17): the role is saved there first.
+          final role = _instructor ? 'instructor' : 'student';
+          if (userId != null) await SignupIntent.save(userId, role);
+          if (!mounted) return;
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (context) => VerificationCodeScreen(
                 email: email,
                 onVerified: () => Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (context) => const RoleChoiceScreen()),
+                  MaterialPageRoute(builder: (context) => SignupRoleStep(role: role)),
                 ),
               ),
             ),
@@ -284,17 +291,17 @@ class _SignupScreenState extends State<SignupScreen> {
             SnackBar(content: Text(AppLocalizations.of(context).translate('auth_warn_partial_save')))
           );
           
-          // Still navigate to next screen
-          // Sign Up -> Check email -> Student or Instructor (owner,
-          // 2026-09-30), then language. The trial now starts at the role
-          // choice, after the code — superseding risk #12's "trial before
-          // verification" (2026-09-17): the role must be known first.
+          // Still navigate to next screen (the same path as below).
+          final role = _instructor ? 'instructor' : 'student';
+          final uid = Provider.of<AuthProvider>(context, listen: false).user?.id;
+          if (uid != null) await SignupIntent.save(uid, role);
+          if (!mounted) return;
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (context) => VerificationCodeScreen(
                 email: email,
                 onVerified: () => Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (context) => const RoleChoiceScreen()),
+                  MaterialPageRoute(builder: (context) => SignupRoleStep(role: role)),
                 ),
               ),
             ),
@@ -438,7 +445,9 @@ class _SignupScreenState extends State<SignupScreen> {
       bentoAuthLogo(l.translate('auth_app_title')),
       const SizedBox(height: AppSpacing.x6),
       BentoAuthCard(
-        title: l.translate('auth_create_account'),
+        title: _instructor
+            ? l.translate('auth_create_instructor_account')
+            : l.translate('auth_create_student_account'),
         children: [
           Form(
             key: _formKey,
@@ -523,6 +532,14 @@ class _SignupScreenState extends State<SignupScreen> {
         ],
       ),
       const SizedBox(height: AppSpacing.x3),
+      Center(
+        child: BentoAuthLink(
+          label: _instructor
+              ? l.translate('auth_switch_to_student')
+              : l.translate('auth_switch_to_instructor'),
+          onPressed: _isLoading ? null : () => setState(() => _instructor = !_instructor),
+        ),
+      ),
       Center(
         child: BentoAuthLink(
           label: l.translate('auth_have_account_login'),

@@ -457,5 +457,9 @@
   "iprof_price_hidden": "Students see your price once your licence is checked.",
   "ireg_license_note_school": "This is your school's state licence, not a driver's licence. Your driver's licence is checked separately, under Identity check in Profile.",
   "ireg_license_note_private": "These are state teaching licences, not a driver's licence. One of the two is enough. Your driver's licence is checked separately, under Identity check in Profile.",
-  "iprof_license_required_any": "Enter at least one licence number."
+  "iprof_license_required_any": "Enter at least one licence number.",
+  "auth_create_student_account": "Create Student Account",
+  "auth_create_instructor_account": "Create Instructor Account",
+  "auth_switch_to_instructor": "Create instructor account",
+  "auth_switch_to_student": "Create student account"
 }

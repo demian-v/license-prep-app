@@ -6,6 +6,7 @@ import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
 import '../widgets/bento_choice_card.dart';
 import '../widgets/bento_auth_parts.dart';
+import 'signup_role_step.dart';
 
 /// «Автошкола» or «Частный инструктор» (instructors plan v2 §4.1; renamed
 /// from «Инструктор автошколы» by the owner, 2026-09-30).
@@ -16,11 +17,34 @@ import '../widgets/bento_auth_parts.dart';
 /// instructor gets a profile and chat, and adds their school later in
 /// Профиль. Two equal white cards — neither is the default — and the
 /// licence rule stated under them.
-class InstructorKindScreen extends StatelessWidget {
+class InstructorKindScreen extends StatefulWidget {
   const InstructorKindScreen({super.key});
 
-  // Back to RoleChoiceScreen, which saves the answer.
-  void _signup(BuildContext context, String kind) => Navigator.of(context).pop(kind);
+  @override
+  State<InstructorKindScreen> createState() => _InstructorKindScreenState();
+}
+
+class _InstructorKindScreenState extends State<InstructorKindScreen> {
+  bool _busy = false;
+  String? _error;
+
+  // Reached after the email code, so the account exists: saving the kind
+  // here also saves the role (completeSignupRole), then goes to language.
+  Future<void> _signup(BuildContext context, String kind) async {
+    final l = AppLocalizations.of(context);
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await completeSignupRole(context, 'instructor', kind);
+    } catch (e) {
+      debugPrint('InstructorKindScreen: saving the role failed: $e');
+      if (mounted) setState(() => _error = l.translate('auth_error_network'));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,12 +68,13 @@ class InstructorKindScreen extends StatelessWidget {
         ),
       ),
       const SizedBox(height: AppSpacing.x4 + AppSpacing.x1),
+      if (_error != null) ...[BentoAuthError(_error!), const SizedBox(height: AppSpacing.x3)],
       BentoChoiceCard(
         icon: SolarIcons.carLinear,
         title: l.translate('kind_school_title'),
         description: l.translate('kind_school_desc'),
         pills: [l.translate('kind_pill_bookings'), l.translate('kind_pill_payments')],
-        onTap: () => _signup(context, 'school'),
+        onTap: _busy ? null : () => _signup(context, 'school'),
       ),
       const SizedBox(height: AppSpacing.x3),
       BentoChoiceCard(
@@ -57,7 +82,7 @@ class InstructorKindScreen extends StatelessWidget {
         title: l.translate('kind_school_instructor_title'),
         description: l.translate('kind_school_instructor_desc'),
         pills: [l.translate('kind_pill_profile'), l.translate('kind_pill_chat')],
-        onTap: () => _signup(context, 'schoolInstructor'),
+        onTap: _busy ? null : () => _signup(context, 'schoolInstructor'),
       ),
       const SizedBox(height: AppSpacing.x4),
       Padding(
@@ -68,6 +93,10 @@ class InstructorKindScreen extends StatelessWidget {
           style: AppTypography.caption.copyWith(color: AppColors.inkSecondary),
         ),
       ),
+      if (_busy) ...[
+        const SizedBox(height: AppSpacing.x4),
+        const Center(child: CircularProgressIndicator()),
+      ],
     ];
 
     return Scaffold(
