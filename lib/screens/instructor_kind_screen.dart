@@ -134,7 +134,7 @@ class _InstructorKindScreenState extends State<InstructorKindScreen> {
                 onPressed: _busy
                     ? null
                     : () => Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(builder: (_) => LanguageSelectionScreen()),
+                          BackPageRoute(child: LanguageSelectionScreen()),
                         ),
               ),
             ),

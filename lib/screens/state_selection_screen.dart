@@ -191,9 +191,7 @@ class _StateSelectionScreenState extends State<StateSelectionScreen> {
             title: title,
             onBack: () {
               Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder: (context) => LanguageSelectionScreen(),
-                ),
+                BackPageRoute(child: LanguageSelectionScreen()),
               );
             },
             // No skip button - state selection is mandatory

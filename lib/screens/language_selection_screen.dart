@@ -392,21 +392,22 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
             print('🔍 [LANGUAGE SCREEN] About to navigate to StateSelectionScreen');
             
             // Use pushReplacement with unique key to force rebuild
+            // The flow's forward slide (owner, 2026-09-30: this step had
+            // no motion — it was Duration.zero).
             navigator.pushReplacement(
-              PageRouteBuilder(
+              ForwardPageRoute(
                 settings: RouteSettings(
                   name: 'state_selection_${code}_${DateTime.now().millisecondsSinceEpoch}'
                 ),
                 // An instructor picks their teaching state inside the
                 // registration wizard (instructors plan v2 §4.3), not here.
-                pageBuilder: (context, animation1, animation2) => pendingInstructor
+                child: pendingInstructor
                     ? const InstructorKindScreen()
                     : authProvider.user?.isSigningUpAsInstructor == true
                         ? const InstructorRegistrationScreen()
                         : StateSelectionScreen(
                             key: UniqueKey(), // Force complete rebuild
                           ),
-                transitionDuration: Duration.zero,
               ),
             );
             print('🔄 [LANGUAGE SCREEN] Navigation completed to StateSelectionScreen');

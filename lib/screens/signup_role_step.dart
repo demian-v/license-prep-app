@@ -57,8 +57,8 @@ Future<void> completeSignupRole(BuildContext context, String role, String? kind)
   await SignupIntent.clear();
   // Nothing behind this is worth going back to: the account is made.
   navigator.pushAndRemoveUntil(
-    MaterialPageRoute(
-      builder: (_) => role == 'instructor' ? const InstructorRegistrationScreen() : LanguageSelectionScreen(),
+    ForwardPageRoute(
+      child: role == 'instructor' ? const InstructorRegistrationScreen() : LanguageSelectionScreen(),
     ),
     (_) => false,
   );

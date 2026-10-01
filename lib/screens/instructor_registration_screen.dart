@@ -19,6 +19,7 @@ import '../widgets/bento_auth_parts.dart';
 import '../widgets/bento_question_parts.dart';
 import '../widgets/bento_result_parts.dart';
 import 'home_screen.dart';
+import 'instructor_kind_screen.dart';
 
 /// The instructor registration wizard (instructors plan v2 §4.3): one
 /// question per page, a progress bar, the fields in one white card, «Далее»
@@ -50,6 +51,8 @@ class _InstructorRegistrationScreenState extends State<InstructorRegistrationScr
   late final InstructorService _service = widget.service ?? InstructorService();
 
   _Step _step = _Step.languages;
+  // Which way the last step change went, for the step slide.
+  bool _forward = true;
   bool _busy = false;
   String? _error;
 
@@ -190,16 +193,23 @@ class _InstructorRegistrationScreenState extends State<InstructorRegistrationScr
       return;
     }
     FocusScope.of(context).unfocus();
-    setState(() => _step = _steps[_steps.indexOf(_step) + 1]);
+    setState(() {
+      _forward = true;
+      _step = _steps[_steps.indexOf(_step) + 1];
+    });
     await _saveDraft();
   }
 
   void _back() {
     if (_step == _Step.languages) {
-      Navigator.of(context).maybePop();
+      // Nothing is under the wizard (the kind screen replaced itself), so
+      // back reopens «How do you teach?» — maybePop did nothing here
+      // (owner, 2026-09-30). The draft is kept.
+      Navigator.of(context).pushReplacement(BackPageRoute(child: const InstructorKindScreen()));
     } else {
       FocusScope.of(context).unfocus();
       setState(() {
+        _forward = false;
         _error = null;
         _step = _steps[_steps.indexOf(_step) - 1];
       });
@@ -538,35 +548,55 @@ class _InstructorRegistrationScreenState extends State<InstructorRegistrationScr
               ),
             ),
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x4 + AppSpacing.x1),
-                children: [
-                  Text(description, style: AppTypography.body.copyWith(color: AppColors.inkSecondary)),
-                  const SizedBox(height: AppSpacing.x3),
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.x4 + AppSpacing.x1),
-                    decoration: BoxDecoration(
-                      color: AppColors.paper,
-                      borderRadius: BorderRadius.circular(BentoTokens.card),
-                      boxShadow: AppColors.shadowCard,
+              // Steps slide in from the side you are heading to, and the
+              // one leaving recedes the other way (owner, 2026-09-30: steps
+              // swapped with no motion).
+              child: AnimatedSwitcher(
+                duration: AppMotion.duration(context, AppMotion.base),
+                switchInCurve: AppMotion.enter,
+                switchOutCurve: AppMotion.exit,
+                transitionBuilder: (child, animation) {
+                  final incoming = child.key == ValueKey(_step);
+                  final dx = (incoming ? 0.06 : 0.03) * (_forward == incoming ? 1 : -1);
+                  return FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(begin: Offset(dx, 0), end: Offset.zero).animate(animation),
+                      child: child,
                     ),
-                    // Keyed by step: without it Flutter reuses the text
-                    // field at the same position on the next step, and its
-                    // focus (the keyboard) carries over untapped.
-                    child: Column(
-                      key: ValueKey(_step),
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (_error != null) ...[
-                          BentoAuthError(_error!),
-                          const SizedBox(height: AppSpacing.x4),
+                  );
+                },
+                child: ListView(
+                  key: ValueKey(_step),
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x4 + AppSpacing.x1),
+                  children: [
+                    Text(description, style: AppTypography.body.copyWith(color: AppColors.inkSecondary)),
+                    const SizedBox(height: AppSpacing.x3),
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.x4 + AppSpacing.x1),
+                      decoration: BoxDecoration(
+                        color: AppColors.paper,
+                        borderRadius: BorderRadius.circular(BentoTokens.card),
+                        boxShadow: AppColors.shadowCard,
+                      ),
+                      // Keyed by step: without it Flutter reuses the text
+                      // field at the same position on the next step, and its
+                      // focus (the keyboard) carries over untapped.
+                      child: Column(
+                        key: ValueKey(_step),
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (_error != null) ...[
+                            BentoAuthError(_error!),
+                            const SizedBox(height: AppSpacing.x4),
+                          ],
+                          ...fields,
                         ],
-                        ...fields,
-                      ],
+                      ),
                     ),
+                    const SizedBox(height: AppSpacing.x4),
+                  ],
                   ),
-                  const SizedBox(height: AppSpacing.x4),
-                ],
               ),
             ),
             Padding(

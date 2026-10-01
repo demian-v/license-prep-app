@@ -118,9 +118,9 @@ function bad(field: string): never {
  * Who is signing up (instructors plan v2 §4.1). Owner, 2026-09-30: the Sign
  * Up page («Create Student / Instructor Account») knows the role, so it is
  * saved when the account is made; an instructor's kind follows after the
- * email code («How do you teach?»). Each is set once: the same answer again
- * is accepted, a different one is refused, so the answer cannot be switched
- * to reach a trial. Only the intent — `userType` stays granted by
+ * email code («How do you teach?»). The role is set once: the same answer
+ * again is accepted, a different one is refused, so it cannot be switched to
+ * reach a trial. The kind may change until registerAsInstructor. Only the intent — `userType` stays granted by
  * registerAsInstructor. A student's trial is started by the client after the
  * code; createTrialSubscription refuses an instructor.
  */
@@ -143,7 +143,10 @@ export const setSignupRole = functions.https.onCall(async (data, context) => {
     if (existingRole !== null && existingRole !== role) {
       throw new functions.https.HttpsError('failed-precondition', 'signup-role-already-set');
     }
-    if (kind !== null && existingKind !== null && existingKind !== kind) {
+    // The kind may still change until the instructor registers — the
+    // wizard's first Back reopens «How do you teach?» (owner, 2026-09-30).
+    // It grants nothing; the role, which gates the trial, never changes.
+    if (kind !== null && existingKind !== null && existingKind !== kind && snap.get('userType') === 'instructor') {
       throw new functions.https.HttpsError('failed-precondition', 'signup-kind-already-set');
     }
     if (existingRole === role && (kind === null || existingKind === kind)) return; // a retry

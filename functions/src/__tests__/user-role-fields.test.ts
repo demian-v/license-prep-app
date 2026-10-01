@@ -78,12 +78,24 @@ describe('setSignupRole', () => {
     expect((await db().collection('users').doc('urf-provisioned').get()).get('signupKind')).toBeUndefined();
     await setRole({ signupRole: 'instructor', signupKind: 'schoolInstructor' }, 'urf-provisioned');
     await setRole({ signupRole: 'instructor', signupKind: 'schoolInstructor' }, 'urf-provisioned');
-    await expect(setRole({ signupRole: 'instructor', signupKind: 'school' }, 'urf-provisioned'))
-      .rejects.toMatchObject({ code: 'failed-precondition' });
     await expect(setRole({ signupRole: 'student' }, 'urf-provisioned')).rejects.toMatchObject({ code: 'failed-precondition' });
     const doc = (await db().collection('users').doc('urf-provisioned').get()).data()!;
     expect(doc.signupRole).toBe('instructor');
     expect(doc.signupKind).toBe('schoolInstructor');
+  });
+
+  // Owner, 2026-09-30: the wizard's first Back reopens «How do you teach?»,
+  // so the kind may change until the instructor registers; then it is fixed.
+  it('lets the kind change before registration, not after', async () => {
+    await provisioned('urf-provisioned');
+    await setRole({ signupRole: 'instructor', signupKind: 'schoolInstructor' }, 'urf-provisioned');
+    await setRole({ signupRole: 'instructor', signupKind: 'school' }, 'urf-provisioned');
+    expect((await db().collection('users').doc('urf-provisioned').get()).get('signupKind')).toBe('school');
+
+    await db().collection('users').doc('urf-provisioned').update({ userType: 'instructor' });
+    await expect(setRole({ signupRole: 'instructor', signupKind: 'schoolInstructor' }, 'urf-provisioned'))
+      .rejects.toMatchObject({ code: 'failed-precondition' });
+    expect((await db().collection('users').doc('urf-provisioned').get()).get('signupKind')).toBe('school');
   });
 
   it('refuses unknown values', async () => {

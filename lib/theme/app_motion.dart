@@ -115,6 +115,57 @@ class ForwardPageRoute<T> extends PageRouteBuilder<T> {
   }
 }
 
+/// [ForwardPageRoute] mirrored, for a step back that is not a pop — the
+/// signup screens replace each other, so going back opens the earlier screen
+/// anew (owner, 2026-09-30: a forward slide there read as "bad visual"). The
+/// incoming page arrives from the leading edge; the outgoing one recedes
+/// toward the trailing edge.
+class BackPageRoute<T> extends PageRouteBuilder<T> {
+  BackPageRoute({required this.child, super.settings})
+      : super(
+          transitionDuration: AppMotion.page,
+          reverseTransitionDuration: AppMotion.base,
+          pageBuilder: (_, __, ___) => child,
+        );
+
+  final Widget child;
+
+  @override
+  bool canTransitionTo(TransitionRoute<dynamic> nextRoute) =>
+      nextRoute is PageRoute && nextRoute.opaque;
+
+  @override
+  Widget buildTransitions(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    if (AppMotion.reduced(context)) return child;
+
+    final incoming = CurvedAnimation(parent: animation, curve: AppMotion.enter);
+    final outgoing =
+        CurvedAnimation(parent: secondaryAnimation, curve: AppMotion.enter);
+
+    return SlideTransition(
+      position: Tween<Offset>(
+        begin: const Offset(-0.06, 0),
+        end: Offset.zero,
+      ).animate(incoming),
+      child: FadeTransition(
+        opacity: incoming,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: Offset.zero,
+            end: const Offset(0.03, 0),
+          ).animate(outgoing),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
 /// A one-shot entrance: fade plus a short rise, delayed by [index] steps of
 /// [AppMotion.stagger]. Runs once on mount and never loops. Under Reduce
 /// Motion the child is shown immediately.
