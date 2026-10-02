@@ -339,7 +339,6 @@
   "kind_school_instructor_desc": "Uczysz samodzielnie lub w szkole jazdy.",
   "instructor_kind_licence_note": "Płatne lekcje wymagają licencji szkoły jazdy w każdym stanie.",
   "instructor_calendar_empty_title": "Godziny pracy",
-  "instructor_calendar_empty_desc": "Wkrótce ustawisz tu swoje godziny w tygodniu. Kursanci zarezerwują tylko w tych godzinach.",
   "chat_empty_title": "Brak wiadomości",
   "chat_empty_desc": "Tutaj pojawią się Twoje rozmowy.",
   "instructors_load_error_title": "Nie udało się wczytać",
@@ -467,5 +466,15 @@
   "iprof_photo_rejected": "To zdjęcie nie zostało przyjęte. Wybierz inne.",
   "iprof_photo_uploading": "Przesyłanie…",
   "iprof_photo_error": "Nie udało się przesłać zdjęcia. Spróbuj ponownie.",
-  "iprof_photo_change": "Zmień"
+  "iprof_photo_change": "Zmień",
+  "day_short_mon": "Pon",
+  "day_short_tue": "Wt",
+  "day_short_wed": "Śr",
+  "day_short_thu": "Czw",
+  "day_short_fri": "Pt",
+  "day_short_sat": "Sob",
+  "day_short_sun": "Nd",
+  "ical_desc": "Kursanci mogą rezerwować tylko w tych godzinach. Dotknij pół godziny, aby ją otworzyć; przytrzymaj i przeciągnij, aby zaznaczyć kilka.",
+  "ical_timezone": "Godziny w Twojej strefie czasowej: {tz}",
+  "ical_saved": "Zapisano"
 }

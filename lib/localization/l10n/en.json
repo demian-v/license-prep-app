@@ -339,7 +339,6 @@
   "kind_school_instructor_desc": "You teach on your own or at a school.",
   "instructor_kind_licence_note": "Paid lessons need a driving school licence in every state.",
   "instructor_calendar_empty_title": "Working hours",
-  "instructor_calendar_empty_desc": "Soon you'll set your weekly hours here. Students can book only inside them.",
   "chat_empty_title": "No messages yet",
   "chat_empty_desc": "Your conversations will appear here.",
   "instructors_load_error_title": "Couldn't load",
@@ -467,5 +466,15 @@
   "iprof_photo_rejected": "This photo wasn't accepted. Please choose another.",
   "iprof_photo_uploading": "Uploading…",
   "iprof_photo_error": "Couldn't upload the photo. Please try again.",
-  "iprof_photo_change": "Change"
+  "iprof_photo_change": "Change",
+  "day_short_mon": "Mon",
+  "day_short_tue": "Tue",
+  "day_short_wed": "Wed",
+  "day_short_thu": "Thu",
+  "day_short_fri": "Fri",
+  "day_short_sat": "Sat",
+  "day_short_sun": "Sun",
+  "ical_desc": "Students can book only inside these hours. Tap a half hour to open it; hold, then drag to mark several.",
+  "ical_timezone": "Times are in your time zone: {tz}",
+  "ical_saved": "Saved"
 }

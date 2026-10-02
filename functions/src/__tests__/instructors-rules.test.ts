@@ -114,11 +114,6 @@ describe('instructors/{uid}', () => {
     await assertFails(as('paid1').collection('instructors').where('listed', '==', true).get());
   });
 
-  it('the owner can edit allowlisted fields', async () => {
-    await assertSucceeds(as('i1').collection('instructors').doc('i1').update({
-      availability: { mon: [{ start: '09:00', end: '12:00' }] },
-    }));
-  });
 
   // P3b: the profile is edited through updateInstructorProfile, which checks
   // types and sizes; a direct write could store any value (2026-10-02).
@@ -127,6 +122,7 @@ describe('instructors/{uid}', () => {
     ['carYear', 'soon'], ['hasDualControls', false], ['schoolName', 'Other School'], ['name', ''],
     ['city', 'Springfield'], ['cityKey', 'springfield'], ['languages', ['en']],
     ['schoolAddress', '1 Elm St'], ['fleetSize', 9], ['instructorCount', 9],
+    ['availability', { mon: [{ start: '09:00', end: '12:00' }] }], ['availability', { mon: 'any' }],
   ])('the owner cannot write the profile field %s directly', async (field, value) => {
     await assertFails(as('i1').collection('instructors').doc('i1').update({ [field]: value }));
   });

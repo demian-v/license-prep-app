@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../services/service_locator_extensions.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -860,6 +861,107 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
   Stream<Map<String, dynamic>?>? _ownProfile;
   String? _ownProfileUid;
 
+  // The approved photo's download URL, looked up once per photo.
+  String? _photoUrlPath;
+  Future<String>? _photoUrl;
+
+  Widget _defaultAvatar(User user) {
+    return Image.asset(
+      'assets/images/profile/1_user_avatar.png',
+      width: 58,
+      height: 58,
+      fit: BoxFit.cover,
+      excludeFromSemantics: true,
+      errorBuilder: (context, error, stackTrace) {
+        debugPrint('❌ ProfileScreen: Failed to load avatar asset: $error');
+        // Show CircleAvatar with text only as fallback
+        return CircleAvatar(
+          radius: 29,
+          backgroundColor: AppColors.signal50,
+          child: Text(
+            user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
+            style: AppTypography.title.copyWith(
+              color: AppColors.signal,
+              fontVariations: const [FontVariation('wght', 600)],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Avatar, name and email. [profile] is the instructor's public doc (null
+  /// for a student): its name replaces the account name, and an approved
+  /// photo replaces the generic avatar.
+  Widget _headerRow(User user, Map<String, dynamic>? profile) {
+    final photoPath = profile?['photoApproved'] == true ? profile!['photoPath'] as String? : null;
+    if (photoPath != _photoUrlPath) {
+      _photoUrlPath = photoPath;
+      _photoUrl = photoPath == null ? null : InstructorService().photoUrl(photoPath);
+    }
+    final fallback = _defaultAvatar(user);
+    return Row(
+      children: [
+        Container(
+          width: 64,
+          height: 64,
+          decoration: const BoxDecoration(
+            color: AppColors.paper,
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: ClipOval(
+            child: _photoUrl == null
+                ? fallback
+                : FutureBuilder<String>(
+                    future: _photoUrl,
+                    builder: (context, snap) => snap.hasData
+                        ? CachedNetworkImage(
+                            imageUrl: snap.data!,
+                            width: 58,
+                            height: 58,
+                            fit: BoxFit.cover,
+                            fadeInDuration: AppMotion.duration(context, AppMotion.fast),
+                            placeholder: (_, __) => fallback,
+                            errorWidget: (_, __, ___) => fallback,
+                          )
+                        : fallback,
+                  ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.x4),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                profile?['name'] as String? ?? user.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.title.copyWith(
+                  fontSize: 22,
+                  height: 28 / 22,
+                  color: AppColors.onSignal,
+                  fontVariations: const [FontVariation('wght', 700)],
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                user.email,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.label.copyWith(
+                  color: AppColors.signal100,
+                  fontVariations: const [FontVariation('wght', 400)],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildProfileHeader(User user, LanguageProvider languageProvider) {
     return Semantics(
       button: true,
@@ -899,83 +1001,19 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                 child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: const BoxDecoration(
-                      color: AppColors.paper,
-                      shape: BoxShape.circle,
-                    ),
-                    alignment: Alignment.center,
-                    child: ClipOval(
-                      child: Image.asset(
-                        'assets/images/profile/1_user_avatar.png',
-                        width: 58,
-                        height: 58,
-                        fit: BoxFit.cover,
-                        excludeFromSemantics: true,
-                        errorBuilder: (context, error, stackTrace) {
-                          debugPrint('❌ ProfileScreen: Failed to load avatar asset: $error');
-                          // Show CircleAvatar with text only as fallback
-                          return CircleAvatar(
-                            radius: 29,
-                            backgroundColor: AppColors.signal50,
-                            child: Text(
-                              user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
-                              style: AppTypography.title.copyWith(
-                                color: AppColors.signal,
-                                fontVariations: const [FontVariation('wght', 600)],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.x4),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Builder(builder: (context) {
-                          Widget name(String text) => Text(
-                                text,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: AppTypography.title.copyWith(
-                                  fontSize: 22,
-                                  height: 28 / 22,
-                                  color: AppColors.onSignal,
-                                  fontVariations: const [FontVariation('wght', 700)],
-                                ),
-                              );
-                          if (!user.isInstructor) return name(user.name);
-                          if (_ownProfileUid != user.id) {
-                            _ownProfileUid = user.id;
-                            _ownProfile = InstructorService().ownProfile(user.id);
-                          }
-                          return StreamBuilder<Map<String, dynamic>?>(
-                            stream: _ownProfile,
-                            builder: (context, snap) => name(snap.data?['name'] as String? ?? user.name),
-                          );
-                        }),
-                        const SizedBox(height: 2),
-                        Text(
-                          user.email,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.label.copyWith(
-                            color: AppColors.signal100,
-                            fontVariations: const [FontVariation('wght', 400)],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+              Builder(builder: (context) {
+                // An instructor's public doc gives the header its name and,
+                // once approved, its photo (P3b). One stream per uid.
+                if (!user.isInstructor) return _headerRow(user, null);
+                if (_ownProfileUid != user.id) {
+                  _ownProfileUid = user.id;
+                  _ownProfile = InstructorService().ownProfile(user.id);
+                }
+                return StreamBuilder<Map<String, dynamic>?>(
+                  stream: _ownProfile,
+                  builder: (context, snap) => _headerRow(user, snap.data),
+                );
+              }),
               const SizedBox(height: AppSpacing.x4),
               // The solid white pill, as «60 минут» on the exam card.
               Container(

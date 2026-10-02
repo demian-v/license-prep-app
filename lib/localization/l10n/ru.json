@@ -339,7 +339,6 @@
   "kind_school_instructor_desc": "Преподаёте сами или в автошколе.",
   "instructor_kind_licence_note": "Для платных уроков в любом штате нужна лицензия автошколы.",
   "instructor_calendar_empty_title": "Часы работы",
-  "instructor_calendar_empty_desc": "Скоро здесь можно будет указать часы на неделю. Ученики бронируют только в эти часы.",
   "chat_empty_title": "Сообщений пока нет",
   "chat_empty_desc": "Здесь появятся ваши переписки.",
   "instructors_load_error_title": "Не удалось загрузить",
@@ -467,5 +466,15 @@
   "iprof_photo_rejected": "Это фото не принято. Выберите другое.",
   "iprof_photo_uploading": "Загрузка…",
   "iprof_photo_error": "Не удалось загрузить фото. Попробуйте ещё раз.",
-  "iprof_photo_change": "Изменить"
+  "iprof_photo_change": "Изменить",
+  "day_short_mon": "Пн",
+  "day_short_tue": "Вт",
+  "day_short_wed": "Ср",
+  "day_short_thu": "Чт",
+  "day_short_fri": "Пт",
+  "day_short_sat": "Сб",
+  "day_short_sun": "Вс",
+  "ical_desc": "Ученики могут записаться только в эти часы. Нажмите на полчаса, чтобы открыть его; удерживайте и ведите, чтобы отметить несколько.",
+  "ical_timezone": "Время указано в вашем часовом поясе: {tz}",
+  "ical_saved": "Сохранено"
 }

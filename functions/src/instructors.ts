@@ -286,7 +286,7 @@ export const submitLicenseNumber = functions.https.onCall(async (data, context) 
 /**
  * Profile editing from Профиль (plan v2 §14.2, P3b): what the wizard skipped
  * or the instructor wants to change, one section per call. The same checks
- * as registerAsInstructor. Every edit comes through here, not a direct
+ * as registerAsInstructor, plus the weekly hours from Календарь. Every edit comes through here, not a direct
  * write: the contacts live in instructorPrivate, which no client can touch,
  * and the rules allowlist no longer carries these fields (it checked the
  * rate and bio but not their neighbours' types or sizes). Kind, role,
@@ -329,6 +329,9 @@ export const updateInstructorProfile = functions.https.onCall(async (data, conte
         hasDualControls: typeof d.hasDualControls === 'boolean' ? d.hasDualControls : bad('hasDualControls'),
       };
       break;
+    case 'availability':
+      fields = { availability: cleanAvailability(d.availability) ?? bad('availability') };
+      break;
     case 'contacts': {
       const phoneDigits = typeof d.phone === 'string' ? d.phone.replace(/\D/g, '') : '';
       if (phoneDigits.length < 10 || phoneDigits.length > 15) bad('phone');
@@ -346,6 +349,53 @@ export const updateInstructorProfile = functions.https.onCall(async (data, conte
   await ref.update({ ...fields, updatedAt: Timestamp.now() });
   return { section: d.section };
 });
+
+// ── Weekly hours (plan v2 §14.2 Календарь) ──────────────────────────────────
+
+export const WEEK_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
+const DAY_START = 6 * 60;
+const DAY_END = 22 * 60;
+const SLOT = 30;
+
+function minutes(v: unknown): number | null {
+  if (typeof v !== 'string' || !/^\d{2}:\d{2}$/.test(v)) return null;
+  const m = Number(v.slice(0, 2)) * 60 + Number(v.slice(3));
+  return Number(v.slice(3)) < 60 && m % SLOT === 0 && m >= DAY_START && m <= DAY_END ? m : null;
+}
+const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+
+/**
+ * Wall-clock hours in the instructor's timezone, `{mon: [{start, end}], …}`.
+ * Each interval sits on the 30-minute grid between 06:00 and 22:00 (the
+ * Календарь grid). The result is canonical — sorted and merged, so
+ * overlapping or touching intervals become one — and empty days are dropped.
+ * Null when anything is malformed.
+ */
+export function cleanAvailability(v: unknown): Record<string, { start: string; end: string }[]> | null {
+  if (v == null || typeof v !== 'object' || Array.isArray(v)) return null;
+  const out: Record<string, { start: string; end: string }[]> = {};
+  for (const [day, list] of Object.entries(v as Record<string, unknown>)) {
+    if (!(WEEK_DAYS as readonly string[]).includes(day) || !Array.isArray(list) || list.length > 32) return null;
+    const slots = new Set<number>();
+    for (const item of list) {
+      if (item == null || typeof item !== 'object') return null;
+      const keys = Object.keys(item);
+      if (keys.length !== 2 || !keys.includes('start') || !keys.includes('end')) return null;
+      const start = minutes((item as any).start);
+      const end = minutes((item as any).end);
+      if (start === null || end === null || start >= end) return null;
+      for (let m = start; m < end; m += SLOT) slots.add(m);
+    }
+    const intervals: { start: string; end: string }[] = [];
+    for (const m of [...slots].sort((a, b) => a - b)) {
+      const last = intervals[intervals.length - 1];
+      if (last && minutes(last.end) === m) last.end = hhmm(m + SLOT);
+      else intervals.push({ start: hhmm(m), end: hhmm(m + SLOT) });
+    }
+    if (intervals.length > 0) out[day] = intervals;
+  }
+  return out;
+}
 
 /** The owner's own phone and contact email, for the Профиль edit sheet. */
 export const getInstructorContacts = functions.https.onCall(async (_data, context) => {

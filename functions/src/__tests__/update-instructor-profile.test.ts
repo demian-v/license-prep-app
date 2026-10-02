@@ -135,6 +135,43 @@ describe('updateInstructorProfile', () => {
     expect(out.hourlyRateCents).toBeUndefined();
   });
 
+  it('saves weekly hours, merged and sorted, and drops empty days', async () => {
+    await update({ section: 'availability', availability: {
+      tue: [{ start: '14:00', end: '18:00' }, { start: '09:00', end: '12:00' }],
+      mon: [{ start: '09:00', end: '10:30' }, { start: '10:00', end: '12:00' }, { start: '12:00', end: '13:00' }],
+      sun: [],
+    } }, 'edit-s');
+    expect((await pub('edit-s')).availability).toEqual({
+      mon: [{ start: '09:00', end: '13:00' }],
+      tue: [{ start: '09:00', end: '12:00' }, { start: '14:00', end: '18:00' }],
+    });
+    await update({ section: 'availability', availability: {} }, 'edit-s');
+    expect((await pub('edit-s')).availability).toEqual({});
+  });
+
+  it.each([
+    ['an unknown day', { holiday: [{ start: '09:00', end: '10:00' }] }],
+    ['off the 30-minute grid', { mon: [{ start: '09:15', end: '10:00' }] }],
+    ['before 06:00', { mon: [{ start: '05:30', end: '07:00' }] }],
+    ['after 22:00', { mon: [{ start: '21:00', end: '22:30' }] }],
+    ['an empty interval', { mon: [{ start: '10:00', end: '10:00' }] }],
+    ['a backwards interval', { mon: [{ start: '12:00', end: '10:00' }] }],
+    ['a bad time', { mon: [{ start: '9:00', end: '10:00' }] }],
+    ['extra keys', { mon: [{ start: '09:00', end: '10:00', note: 'x' }] }],
+    ['a list', [{ start: '09:00', end: '10:00' }]],
+    ['not a map', 'mon 9-5'],
+  ])('refuses hours with %s', async (_name, availability) => {
+    await expect(update({ section: 'availability', availability }, 'edit-s'))
+      .rejects.toMatchObject({ code: 'invalid-argument' });
+  });
+
+  it('weekly hours count towards stage 2 (computeListing)', async () => {
+    const { computeListing } = await import('../instructors');
+    await update({ section: 'availability', availability: { sat: [{ start: '08:00', end: '14:00' }] } }, 'edit-s');
+    const p = await pub('edit-s');
+    expect(computeListing({ ...p, idCheck: 'passed', licenseCheck: 'passed', payoutsEnabled: true }).stage).toBe(2);
+  });
+
   it('refuses an unknown section, a non-instructor, a suspended profile and no sign-in', async () => {
     await expect(update({ section: 'name', name: 'X' }, 'edit-s')).rejects.toMatchObject({ code: 'invalid-argument' });
     await expect(update({ section: 'bio', bio: 'Hi' }, 'edit-x')).rejects.toMatchObject({ code: 'failed-precondition' });

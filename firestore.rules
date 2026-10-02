@@ -284,8 +284,10 @@ service cloud.firestore {
       // every field the way registerAsInstructor does (P3b, 2026-10-02: the
       // old list let the owner write car, lesson lengths, school name or
       // cityKey here with no type or size check).
+      // The weekly hours moved behind the callable too (P3b calendar,
+      // 2026-10-02): the rule could only check `availability is map`.
       function ownerEditableFields() {
-        return ['availability', 'status', 'updatedAt'];
+        return ['status', 'updatedAt'];
       }
       allow read: if isNotAnonymous() && request.auth.uid == uid;
       allow update: if isNotAnonymous() && request.auth.uid == uid

@@ -339,7 +339,6 @@
   "kind_school_instructor_desc": "Enseñas por tu cuenta o en una autoescuela.",
   "instructor_kind_licence_note": "Las clases pagadas requieren una licencia de autoescuela en todos los estados.",
   "instructor_calendar_empty_title": "Horario de trabajo",
-  "instructor_calendar_empty_desc": "Pronto definirás aquí tu horario semanal. Los alumnos solo podrán reservar dentro de él.",
   "chat_empty_title": "Aún no hay mensajes",
   "chat_empty_desc": "Tus conversaciones aparecerán aquí.",
   "instructors_load_error_title": "No se pudo cargar",
@@ -467,5 +466,15 @@
   "iprof_photo_rejected": "Esta foto no fue aceptada. Elige otra.",
   "iprof_photo_uploading": "Subiendo…",
   "iprof_photo_error": "No se pudo subir la foto. Inténtalo de nuevo.",
-  "iprof_photo_change": "Cambiar"
+  "iprof_photo_change": "Cambiar",
+  "day_short_mon": "Lun",
+  "day_short_tue": "Mar",
+  "day_short_wed": "Mié",
+  "day_short_thu": "Jue",
+  "day_short_fri": "Vie",
+  "day_short_sat": "Sáb",
+  "day_short_sun": "Dom",
+  "ical_desc": "Los alumnos solo pueden reservar dentro de este horario. Toca media hora para abrirla; mantén pulsado y arrastra para marcar varias.",
+  "ical_timezone": "Las horas están en tu zona horaria: {tz}",
+  "ical_saved": "Guardado"
 }

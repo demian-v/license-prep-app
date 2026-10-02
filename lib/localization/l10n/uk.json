@@ -339,7 +339,6 @@
   "kind_school_instructor_desc": "Викладаєте самі або в автошколі.",
   "instructor_kind_licence_note": "Для платних уроків у будь-якому штаті потрібна ліцензія автошколи.",
   "instructor_calendar_empty_title": "Години роботи",
-  "instructor_calendar_empty_desc": "Незабаром тут можна буде вказати години на тиждень. Учні бронюють лише в ці години.",
   "chat_empty_title": "Повідомлень поки немає",
   "chat_empty_desc": "Тут з'являться ваші листування.",
   "instructors_load_error_title": "Не вдалося завантажити",
@@ -467,5 +466,15 @@
   "iprof_photo_rejected": "Це фото не прийнято. Виберіть інше.",
   "iprof_photo_uploading": "Завантаження…",
   "iprof_photo_error": "Не вдалося завантажити фото. Спробуйте ще раз.",
-  "iprof_photo_change": "Змінити"
+  "iprof_photo_change": "Змінити",
+  "day_short_mon": "Пн",
+  "day_short_tue": "Вт",
+  "day_short_wed": "Ср",
+  "day_short_thu": "Чт",
+  "day_short_fri": "Пт",
+  "day_short_sat": "Сб",
+  "day_short_sun": "Нд",
+  "ical_desc": "Учні можуть записатися лише в ці години. Торкніться пів години, щоб відкрити її; утримуйте й ведіть, щоб позначити кілька.",
+  "ical_timezone": "Час указано у вашому часовому поясі: {tz}",
+  "ical_saved": "Збережено"
 }

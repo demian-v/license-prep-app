@@ -10,6 +10,7 @@ import '../screens/profile_screen.dart';
 import '../screens/onboarding_screen.dart';
 import '../theme/app_colors.dart';
 import '../widgets/super_enhanced_footer.dart';
+import '../widgets/lazy_indexed_stack.dart';
 import '../services/service_locator_extensions.dart';
 import '../services/session_validation_service.dart';
 import '../providers/language_provider.dart';
@@ -265,7 +266,12 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     // The saved index is shared by both roles; keep it inside this list.
     final index = _currentIndex < screens.length ? _currentIndex : 0;
     return Scaffold(
-      body: screens[index],
+      // Instructor tabs stay alive once opened, so unsaved Календарь hours
+      // survive a tab switch (2026-10-02). Student tabs are still rebuilt on
+      // every switch: Теория pushes the language and state into
+      // ContentProvider from initState, and its analytics count one view per
+      // visit, so keeping them alive needs its own check.
+      body: isInstructor ? LazyIndexedStack(index: index, children: screens) : screens[index],
       bottomNavigationBar: SuperEnhancedFooter(
         currentIndex: index,
         onTap: _onTabTapped,
