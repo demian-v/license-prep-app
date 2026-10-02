@@ -459,5 +459,13 @@
   "iprof_bio": "Опис",
   "iprof_school_optional": "Необов'язково. Залиште порожнім, якщо викладаєте самостійно.",
   "iprof_price_summary": "{rate} за годину · {durations}",
-  "iprof_load_error": "Не вдалося завантажити. Спробуйте ще раз."
+  "iprof_load_error": "Не вдалося завантажити. Спробуйте ще раз.",
+  "iprof_photo_title": "Фото профілю",
+  "iprof_photo_none": "Додайте фото, щоб учні вас впізнавали.",
+  "iprof_photo_pending": "На перевірці. Учні побачать його після перевірки.",
+  "iprof_photo_approved": "Учні бачать це фото.",
+  "iprof_photo_rejected": "Це фото не прийнято. Виберіть інше.",
+  "iprof_photo_uploading": "Завантаження…",
+  "iprof_photo_error": "Не вдалося завантажити фото. Спробуйте ще раз.",
+  "iprof_photo_change": "Змінити"
 }

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:license_prep_app/localization/app_localizations.dart';
 import 'package:license_prep_app/services/instructor_service.dart';
 import 'package:license_prep_app/widgets/instructor_profile_section.dart';
@@ -25,6 +26,10 @@ class _FakeService extends InstructorService {
 
   @override
   Future<({String phone, String email})> contacts() async => (phone: '+1 312 555 0100', email: 'me@example.com');
+
+  // The photo card is tapped by the all-rows test; cancel the picker.
+  @override
+  Future<XFile?> pickPhoto() async => null;
 }
 
 Map<String, dynamic> _doc({String kind = 'school', String status = 'active', String bio = '', String? schoolName}) => {

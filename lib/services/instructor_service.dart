@@ -1,5 +1,9 @@
+import 'dart:math';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 
 /// What the Инструкторы tab needs before it can show anything: whether the
 /// student's state has launched (`config/instructors.launchStates`, set from
@@ -14,17 +18,20 @@ class InstructorTabInfo {
 }
 
 class InstructorService {
-  InstructorService({FirebaseFirestore? firestore, FirebaseFunctions? functions})
+  InstructorService({FirebaseFirestore? firestore, FirebaseFunctions? functions, FirebaseStorage? storage})
       : _firestoreOverride = firestore,
-        _functions = functions;
+        _functions = functions,
+        _storageOverride = storage;
 
   // Resolved on first use, so a test fake that overrides the calls never
   // touches Firebase.
   final FirebaseFirestore? _firestoreOverride;
   final FirebaseFunctions? _functions;
+  final FirebaseStorage? _storageOverride;
 
   FirebaseFirestore get _firestore => _firestoreOverride ?? FirebaseFirestore.instance;
   FirebaseFunctions get _fns => _functions ?? FirebaseFunctions.instance;
+  FirebaseStorage get _storage => _storageOverride ?? FirebaseStorage.instance;
 
   /// Who is signing up, after the email code (functions/src/instructors.ts).
   /// Set once on the server; the same answer again is accepted.
@@ -66,6 +73,28 @@ class InstructorService {
     final data = result.data as Map;
     return (phone: data['phone'] as String? ?? '', email: data['contactEmail'] as String? ?? '');
   }
+
+  /// A profile photo from the gallery, resized on the device to about
+  /// 1024 px, JPEG 85 (plan v2 §8). Null when the instructor cancels.
+  Future<XFile?> pickPhoto() => ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+        requestFullMetadata: false,
+      );
+
+  /// Uploads to the private pending path under a new name; onInstructorUpload
+  /// (functions/src/instructors.ts) checks it and sets `photoPath` itself.
+  Future<void> uploadPhoto(String uid, XFile photo) async {
+    final id = '${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(1 << 32).toRadixString(16)}';
+    await _storage
+        .ref('instructorUploads/$uid/photo/$id.jpg')
+        .putData(await photo.readAsBytes(), SettableMetadata(contentType: 'image/jpeg'));
+  }
+
+  /// A download URL for an approved photo's Storage path (storage.rules).
+  Future<String> photoUrl(String path) => _storage.ref(path).getDownloadURL();
 
   /// The instructor's own public profile (owner-readable in firestore.rules).
   Stream<Map<String, dynamic>?> ownProfile(String uid) =>

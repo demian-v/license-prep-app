@@ -88,6 +88,8 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Instructors choose a profile photo from Photos to show students.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>DriveUSA saves your result picture to Photos when you choose Save Image.</string>
 </dict>

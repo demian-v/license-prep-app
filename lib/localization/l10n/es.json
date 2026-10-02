@@ -459,5 +459,13 @@
   "iprof_bio": "Descripción",
   "iprof_school_optional": "Opcional. Déjalo vacío si enseñas por tu cuenta.",
   "iprof_price_summary": "{rate} por hora · {durations}",
-  "iprof_load_error": "No se pudo cargar. Inténtalo de nuevo."
+  "iprof_load_error": "No se pudo cargar. Inténtalo de nuevo.",
+  "iprof_photo_title": "Foto de perfil",
+  "iprof_photo_none": "Añade una foto para que los alumnos te reconozcan.",
+  "iprof_photo_pending": "En revisión. Los alumnos la verán cuando se compruebe.",
+  "iprof_photo_approved": "Los alumnos ven esta foto.",
+  "iprof_photo_rejected": "Esta foto no fue aceptada. Elige otra.",
+  "iprof_photo_uploading": "Subiendo…",
+  "iprof_photo_error": "No se pudo subir la foto. Inténtalo de nuevo.",
+  "iprof_photo_change": "Cambiar"
 }

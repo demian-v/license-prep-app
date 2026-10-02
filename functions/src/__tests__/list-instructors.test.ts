@@ -21,7 +21,7 @@ const base = {
   hourlyRateCents: 6000, stage: 2, ratingAvg: 4.5, ratingCount: 2, status: 'active',
   // Server bookkeeping and private-ish fields that must NOT be returned:
   listed: true, ratingSum: 9, idCheck: 'passed', licenseCheck: 'passed', timezone: 'America/Chicago',
-  photoUrl: 'https://example.com/p.jpg', photoApproved: true,
+  photoPath: 'instructorPhotos/li-1/a1.jpg', photoApproved: true, photoStatus: 'approved',
 };
 
 beforeAll(async () => {
@@ -63,7 +63,7 @@ describe('listInstructors', () => {
   it('strips every field outside the public projection', async () => {
     const res = await call({ state: 'ZI' }, 'li-paid-user');
     for (const i of res.instructors) {
-      for (const hidden of ['listed', 'ratingSum', 'idCheck', 'licenseCheck', 'timezone', 'photoApproved', 'status']) {
+      for (const hidden of ['listed', 'ratingSum', 'idCheck', 'licenseCheck', 'timezone', 'photoApproved', 'photoStatus', 'status']) {
         expect(i).not.toHaveProperty(hidden);
       }
     }
@@ -72,8 +72,8 @@ describe('listInstructors', () => {
   it('returns a photo only once moderation approved it', async () => {
     const res = await call({ state: 'ZI' }, 'li-paid-user');
     const byId = Object.fromEntries(res.instructors.map((i: any) => [i.id, i]));
-    expect(byId['li-1'].photoUrl).toBe('https://example.com/p.jpg');
-    expect(byId['li-2'].photoUrl).toBeNull();
+    expect(byId['li-1'].photoPath).toBe('instructorPhotos/li-1/a1.jpg');
+    expect(byId['li-2'].photoPath).toBeNull();
   });
 });
 

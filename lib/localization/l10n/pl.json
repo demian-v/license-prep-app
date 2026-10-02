@@ -459,5 +459,13 @@
   "iprof_bio": "Opis",
   "iprof_school_optional": "Opcjonalnie. Zostaw puste, jeśli uczysz samodzielnie.",
   "iprof_price_summary": "{rate} za godzinę · {durations}",
-  "iprof_load_error": "Nie udało się wczytać. Spróbuj ponownie."
+  "iprof_load_error": "Nie udało się wczytać. Spróbuj ponownie.",
+  "iprof_photo_title": "Zdjęcie profilowe",
+  "iprof_photo_none": "Dodaj zdjęcie, aby kursanci Cię rozpoznali.",
+  "iprof_photo_pending": "W weryfikacji. Kursanci zobaczą je po sprawdzeniu.",
+  "iprof_photo_approved": "Kursanci widzą to zdjęcie.",
+  "iprof_photo_rejected": "To zdjęcie nie zostało przyjęte. Wybierz inne.",
+  "iprof_photo_uploading": "Przesyłanie…",
+  "iprof_photo_error": "Nie udało się przesłać zdjęcia. Spróbuj ponownie.",
+  "iprof_photo_change": "Zmień"
 }

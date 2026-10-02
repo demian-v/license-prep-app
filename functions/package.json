@@ -9,8 +9,8 @@
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "test": "firebase emulators:exec --project demo-driveusa --only firestore,auth,pubsub \"jest\"",
-    "test:watch": "firebase emulators:exec --project demo-driveusa --only firestore,auth,pubsub \"jest --watch\"",
+    "test": "firebase emulators:exec --project demo-driveusa --only firestore,auth,pubsub,storage \"jest\"",
+    "test:watch": "firebase emulators:exec --project demo-driveusa --only firestore,auth,pubsub,storage \"jest --watch\"",
     "lint": "eslint src"
   },
   "engines": {

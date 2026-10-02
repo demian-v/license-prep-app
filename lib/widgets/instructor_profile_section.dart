@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -13,8 +14,9 @@ import 'instructor_stage_badge.dart';
 
 /// The instructor's own part of Профиль (instructors plan v2 §14.2): what
 /// has been checked, the licence numbers — which can be added here after a
-/// signup that skipped them (owner, 2026-09-30) — the profile students see
-/// (description, school, price, car, contacts; P3b) and «Показывать в поиске».
+/// signup that skipped them (owner, 2026-09-30) — the photo and the profile
+/// students see (description, school, price, car, contacts; P3b) and
+/// «Показывать в поиске».
 ///
 /// Reads the instructor's own public doc live (owner-readable in
 /// firestore.rules), so a change made on the server (the listing trigger,
@@ -55,6 +57,8 @@ class InstructorProfileSection extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            _PhotoCard(uid: uid, profile: p, service: svc),
+            const SizedBox(height: AppSpacing.x3),
             _Card(
               children: [
                 Text(
@@ -306,6 +310,185 @@ class _Row extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// «Фото профиля» (plan v2 §8). The photo goes to a private pending path;
+/// the server checks it and sets `photoPath` / `photoStatus` — on the
+/// emulators at once, in production after P10's moderation. Until then the
+/// instructor sees what they picked, and students the placeholder avatar.
+class _PhotoCard extends StatefulWidget {
+  const _PhotoCard({required this.uid, required this.profile, required this.service});
+
+  final String uid;
+  final Map<String, dynamic> profile;
+  final InstructorService service;
+
+  @override
+  State<_PhotoCard> createState() => _PhotoCardState();
+}
+
+class _PhotoCardState extends State<_PhotoCard> {
+  bool _uploading = false;
+  bool _failed = false;
+  Uint8List? _picked;
+  String? _urlPath;
+  Future<String>? _url;
+
+  Future<void> _choose() async {
+    final photo = await widget.service.pickPhoto();
+    if (photo == null || !mounted) return;
+    final bytes = await photo.readAsBytes();
+    setState(() {
+      _picked = bytes;
+      _uploading = true;
+      _failed = false;
+    });
+    try {
+      await widget.service.uploadPhoto(widget.uid, photo);
+    } catch (e) {
+      debugPrint('InstructorProfileSection: photo upload failed: $e');
+      if (mounted) setState(() => _failed = true);
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final path = widget.profile['photoPath'] as String?;
+    final status = widget.profile['photoStatus'] as String? ?? 'none';
+    final editable = widget.profile['status'] != 'suspended' && !_uploading;
+    // One URL lookup per photo, not one per rebuild of the live doc.
+    if (path != _urlPath) {
+      _urlPath = path;
+      _url = path == null ? null : widget.service.photoUrl(path);
+    }
+    // What the instructor just picked stays on screen until a newer approved
+    // photo replaces it.
+    final showPicked = _picked != null && (status != 'approved' || _uploading);
+
+    final hasPhoto = path != null || _picked != null;
+    final message = _failed
+        ? l.translate('iprof_photo_error')
+        : _uploading
+            ? l.translate('iprof_photo_uploading')
+            : switch (status) {
+                'pending' => l.translate('iprof_photo_pending'),
+                'approved' => l.translate('iprof_photo_approved'),
+                'rejected' => l.translate('iprof_photo_rejected'),
+                _ => l.translate('iprof_photo_none'),
+              };
+
+    return InkWell(
+      onTap: editable ? _choose : null,
+      borderRadius: BorderRadius.circular(BentoTokens.card),
+      child: _Card(
+        children: [
+          Row(
+            children: [
+              _Avatar(
+                picked: showPicked ? _picked : null,
+                url: showPicked ? null : _url,
+                busy: _uploading,
+              ),
+              const SizedBox(width: AppSpacing.x4),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l.translate('iprof_photo_title'),
+                      style: AppTypography.heading.copyWith(
+                        fontSize: 18,
+                        height: 24 / 18,
+                        color: AppColors.ink,
+                        fontVariations: const [FontVariation('wght', 600)],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.x1),
+                    Text(
+                      message,
+                      style: AppTypography.caption.copyWith(
+                        color: _failed || status == 'rejected' ? AppColors.stop : AppColors.inkSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (editable) ...[
+                const SizedBox(width: AppSpacing.x2),
+                Text(
+                  hasPhoto ? l.translate('iprof_photo_change') : l.translate('status_add'),
+                  style: AppTypography.label.copyWith(
+                    color: AppColors.signal,
+                    fontVariations: const [FontVariation('wght', 600)],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.x1),
+                const Icon(SolarIcons.altArrowRightLinear, size: 18, color: AppColors.signal),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A 64 pt round photo: what was just picked, the approved photo, or the
+/// placeholder avatar (also what students see while a photo waits).
+class _Avatar extends StatelessWidget {
+  const _Avatar({this.picked, this.url, required this.busy});
+
+  final Uint8List? picked;
+  final Future<String>? url;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    const placeholder = ColoredBox(
+      color: AppColors.field,
+      child: Center(child: Icon(SolarIcons.userRoundedLinear, size: 30, color: AppColors.inkSecondary)),
+    );
+    final Widget image = picked != null
+        ? Image.memory(picked!, fit: BoxFit.cover)
+        : url == null
+            ? placeholder
+            : FutureBuilder<String>(
+                future: url,
+                builder: (context, snap) => snap.hasData
+                    ? CachedNetworkImage(
+                        imageUrl: snap.data!,
+                        fit: BoxFit.cover,
+                        fadeInDuration: AppMotion.duration(context, AppMotion.fast),
+                        placeholder: (_, __) => placeholder,
+                        errorWidget: (_, __, ___) => placeholder,
+                      )
+                    : placeholder,
+              );
+    return SizedBox(
+      width: 64,
+      height: 64,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ClipOval(child: image),
+          if (busy)
+            const DecoratedBox(
+              decoration: BoxDecoration(color: Color(0x66000000), shape: BoxShape.circle),
+              child: Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.onSignal),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

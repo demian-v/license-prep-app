@@ -53,6 +53,10 @@ dependencies:
   # Result-screen Share button (owner-approved 2026-09-28). Added alone: it
   # brought only cross_file, mime and its platform interface, no version bumps.
   share_plus: ^12.0.2
+  # Instructor profile photo (instructors P3b, 2026-10-02): gallery pick,
+  # resized on the device. Added alone: only its own platform packages and
+  # file_selector, no version bumps.
+  image_picker: ^1.2.3
 
 # Removing overrides as they may be causing conflicts
 

@@ -137,7 +137,7 @@ describe('instructors/{uid}', () => {
     await assertSucceeds(ref.update({ status: 'active' }));
   });
 
-  it.each(['listed', 'stage', 'idCheck', 'licenseCheck', 'photoUrl', 'photoApproved',
+  it.each(['listed', 'stage', 'idCheck', 'licenseCheck', 'photoPath', 'photoApproved', 'photoStatus',
     'ratingSum', 'ratingAvg', 'payoutsEnabled', 'timezone', 'kind', 'state', 'schoolLicenseNumber'])(
     'the owner cannot write server-owned field %s', async (field) => {
       await assertFails(as('i1').collection('instructors').doc('i1').update({ [field]: 'x' }));

@@ -3,6 +3,7 @@ import * as admin from 'firebase-admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { requirePaidSubscriber } from './entitlement';
 import { RELEASED_STATES, timezoneForZip } from './zip-timezone';
+import { stripJpegMetadata } from './jpeg-metadata';
 
 /**
  * Instructors marketplace — the student-side read path (plan v2 §3, §13).
@@ -27,7 +28,8 @@ export function publicInstructor(id: string, data: FirebaseFirestore.DocumentDat
   }
   // A photo is shown only once moderation approved it; until then the app
   // draws the placeholder avatar (plan v2 §5 — nobody is hidden for it).
-  out.photoUrl = data.photoApproved === true ? data.photoUrl ?? null : null;
+  // A Storage path, which the app resolves under storage.rules.
+  out.photoPath = data.photoApproved === true ? data.photoPath ?? null : null;
   // A private instructor's price only after a licence number is checked
   // (owner, 2026-09-30): until then the listing is "message me", not an
   // advertised paid lesson (625 ILCS 5/6-401 covers instruction "for hire").
@@ -210,7 +212,7 @@ export const registerAsInstructor = functions.https.onCall(async (data, context)
   const now = Timestamp.now();
   const publicDoc: FirebaseFirestore.DocumentData = {
     kind, name, schoolName, schoolLicenseNumber, ...school,
-    photoUrl: null, photoApproved: false,
+    photoPath: null, photoApproved: false, photoStatus: 'none',
     state, city, cityKey: city.toLowerCase(), zipCode, timezone,
     languages, carModel, carYear, hasDualControls, bio, hourlyRateCents, lessonDurations,
     idCheck: 'none',
@@ -351,6 +353,72 @@ export const getInstructorContacts = functions.https.onCall(async (_data, contex
   const snap = await admin.firestore().collection('instructorPrivate').doc(context.auth.uid).get();
   if (!snap.exists) throw new functions.https.HttpsError('failed-precondition', 'Not an instructor account.');
   return { phone: snap.get('phone') ?? '', contactEmail: snap.get('contactEmail') ?? '' };
+});
+
+// ── Profile photo (plan v2 §8) ───────────────────────────────────────────────
+
+const PHOTO_UPLOAD = /^instructorUploads\/([^/]+)\/photo\/([A-Za-z0-9_-]{1,64})\.jpg$/;
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+
+/**
+ * A finished upload to the private pending path. The client never writes
+ * photoPath: this trigger decides what students see. Until P10's SafeSearch
+ * check exists, production keeps the photo `pending` (fail-closed — nothing
+ * unmoderated is shown, and an approved older photo stays); only the
+ * emulator auto-approves, so the flow can be built and tested end to end.
+ * Approving writes the file, stripped of its metadata (the phone's GPS
+ * position travels in EXIF), to a versioned public name (no stale cache)
+ * and removes the upload and the previous photo. A file that is not a JPEG
+ * the stripper can read is refused. One pending upload is kept per
+ * instructor, so repeated tries don't pile up.
+ */
+export const onInstructorUpload = functions.storage.object().onFinalize(async (object) => {
+  const match = PHOTO_UPLOAD.exec(object.name ?? '');
+  if (!match) return;
+  const [, uid, uploadId] = match;
+  const bucket = admin.storage().bucket(object.bucket);
+  const upload = bucket.file(object.name!);
+  // A redelivered event after the upload was already handled.
+  if (!(await upload.exists())[0]) return;
+
+  const db = admin.firestore();
+  const ref = db.collection('instructors').doc(uid);
+  const privateRef = db.collection('instructorPrivate').doc(uid);
+  const snap = await ref.get();
+  // storage.rules checks the same; this is the server's own word.
+  if (!snap.exists || object.contentType !== 'image/jpeg' || Number(object.size) >= MAX_PHOTO_BYTES) {
+    await upload.delete({ ignoreNotFound: true });
+    return;
+  }
+
+  const now = Timestamp.now();
+  if (process.env.FUNCTIONS_EMULATOR !== 'true') {
+    const before = (await privateRef.get()).get('moderation.photo');
+    if (before?.status === 'pending' && before.uploadId && before.uploadId !== uploadId) {
+      await bucket.file(`instructorUploads/${uid}/photo/${before.uploadId}.jpg`).delete({ ignoreNotFound: true });
+    }
+    await privateRef.set({ moderation: { photo: { status: 'pending', uploadId, updatedAt: now } } }, { merge: true });
+    await ref.update({ photoStatus: 'pending', updatedAt: now });
+    return;
+  }
+
+  // Published without the phone's metadata (GPS position, device, time).
+  const [original] = await upload.download();
+  const clean = stripJpegMetadata(original);
+  if (!clean) {
+    await upload.delete({ ignoreNotFound: true });
+    await ref.update({ photoStatus: 'rejected', updatedAt: now });
+    return;
+  }
+  const photoPath = `instructorPhotos/${uid}/${uploadId}.jpg`;
+  const previous = snap.get('photoPath');
+  await bucket.file(photoPath).save(clean, { contentType: 'image/jpeg', resumable: false });
+  await ref.update({ photoPath, photoApproved: true, photoStatus: 'approved', updatedAt: now });
+  await privateRef.set({ moderation: { photo: { status: 'approved', uploadId, updatedAt: now } } }, { merge: true });
+  await upload.delete({ ignoreNotFound: true });
+  if (typeof previous === 'string' && previous !== photoPath) {
+    await bucket.file(previous).delete({ ignoreNotFound: true });
+  }
 });
 
 /**

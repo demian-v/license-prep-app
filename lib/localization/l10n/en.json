@@ -459,5 +459,13 @@
   "iprof_bio": "Description",
   "iprof_school_optional": "Optional. Leave it empty if you teach on your own.",
   "iprof_price_summary": "{rate} per hour · {durations}",
-  "iprof_load_error": "Couldn't load. Please try again."
+  "iprof_load_error": "Couldn't load. Please try again.",
+  "iprof_photo_title": "Profile photo",
+  "iprof_photo_none": "Add a photo so students recognise you.",
+  "iprof_photo_pending": "Under review. Students see it once it's checked.",
+  "iprof_photo_approved": "Students see this photo.",
+  "iprof_photo_rejected": "This photo wasn't accepted. Please choose another.",
+  "iprof_photo_uploading": "Uploading…",
+  "iprof_photo_error": "Couldn't upload the photo. Please try again.",
+  "iprof_photo_change": "Change"
 }

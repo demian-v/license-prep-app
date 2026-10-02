@@ -92,7 +92,7 @@ const COMMENTS = ['Very patient, passed on the first try.', 'Clear explanations 
       kind, name, schoolName: kind === 'school' ? name : schoolName,
       schoolLicenseNumber: `${state}-DS-${1000 + i}`,
       ...(kind === 'school' ? { schoolAddress: `${100 + i} Main St, ${city}, ${state}`, fleetSize: 3 + (i % 5), instructorCount: 2 + (i % 4) } : {}),
-      photoUrl: null, photoApproved: false,
+      photoPath: null, photoApproved: false, photoStatus: 'none',
       state, city, cityKey: city.toLowerCase(), zipCode: null, timezone,
       languages, carModel: ['Toyota Corolla', 'Honda Civic', 'Hyundai Elantra'][i % 3],
       carYear: 2019 + (i % 6), hasDualControls: true,

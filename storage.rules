@@ -20,6 +20,41 @@ service firebase.storage {
                   && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
     
+    // ── Instructor photos — plan v2 §8 (vault raw/drive_usa/2026-09-30) ──
+    //
+    // The app uploads to a private pending path; onInstructorUpload checks
+    // the file and copies it to a versioned public path, then writes
+    // photoPath itself — the client never chooses what students see. Only an
+    // instructor (a registered instructors/{uid}) may upload: a resized JPEG
+    // under 5 MB, a new name each time, never overwritten or deleted here.
+    match /instructorUploads/{uid}/photo/{file} {
+      allow read: if request.auth != null
+                  && request.auth.token.firebase.sign_in_provider != 'anonymous'
+                  && request.auth.uid == uid;
+      allow create: if request.auth != null
+                    && request.auth.token.firebase.sign_in_provider != 'anonymous'
+                    && request.auth.uid == uid
+                    // A new object only: `create` alone let a same-name
+                    // upload replace an existing one (tested on the emulator).
+                    && resource == null
+                    && file.matches('[A-Za-z0-9_-]{1,64}[.]jpg')
+                    && request.resource.size < 5 * 1024 * 1024
+                    && request.resource.contentType == 'image/jpeg'
+                    && firestore.exists(/databases/(default)/documents/instructors/$(uid));
+    }
+
+    // Approved photos, written by the server only. Signed-in, non-anonymous
+    // users read them (the listing that names them is paid-gated).
+    match /instructorPhotos/{uid}/{file} {
+      allow read: if request.auth != null
+                  && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    // Licence images: the admin reviews them in the Console (plan v2 §8).
+    match /instructorLicenses/{allPaths=**} {
+      allow read, write: if false;
+    }
+
     // Deny all other write access by default
     match /{allPaths=**} {
       allow write: if false;
