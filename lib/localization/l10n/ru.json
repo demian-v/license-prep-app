@@ -453,5 +453,11 @@
   "auth_create_student_account": "Аккаунт ученика",
   "auth_create_instructor_account": "Аккаунт инструктора",
   "auth_switch_to_instructor": "Создать аккаунт инструктора",
-  "auth_switch_to_student": "Создать аккаунт ученика"
+  "auth_switch_to_student": "Создать аккаунт ученика",
+  "iprof_public_title": "Профиль для учеников",
+  "iprof_public_desc": "Что ученики видят в поиске.",
+  "iprof_bio": "Описание",
+  "iprof_school_optional": "Необязательно. Оставьте пустым, если преподаёте самостоятельно.",
+  "iprof_price_summary": "{rate} в час · {durations}",
+  "iprof_load_error": "Не удалось загрузить. Попробуйте ещё раз."
 }

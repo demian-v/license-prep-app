@@ -278,17 +278,14 @@ service cloud.firestore {
     // cannot query. Here only the owner reads their own doc.
     match /instructors/{uid} {
       // An ALLOWLIST, unlike serverOwnedUserFields: the collection is new, so
-      // nothing depends on writing fields outside it. Everything else —
-      // listed, stage, idCheck, licenseCheck, photoUrl, ratings, payouts,
-      // timezone — is written by Cloud Functions only.
+      // nothing depends on writing fields outside it. Everything else is
+      // written by Cloud Functions only — the profile itself (bio, school,
+      // price, car, contacts) through updateInstructorProfile, which checks
+      // every field the way registerAsInstructor does (P3b, 2026-10-02: the
+      // old list let the owner write car, lesson lengths, school name or
+      // cityKey here with no type or size check).
       function ownerEditableFields() {
-        return [
-          'name', 'city', 'cityKey', 'languages', 'schoolName',
-          'schoolAddress', 'fleetSize', 'instructorCount',
-          'carModel', 'carYear', 'hasDualControls', 'bio',
-          'hourlyRateCents', 'lessonDurations', 'availability',
-          'status', 'updatedAt'
-        ];
+        return ['availability', 'status', 'updatedAt'];
       }
       allow read: if isNotAnonymous() && request.auth.uid == uid;
       allow update: if isNotAnonymous() && request.auth.uid == uid

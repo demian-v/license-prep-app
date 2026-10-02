@@ -18,6 +18,7 @@ import '../utils/state_display.dart';
 import '../widgets/bento_auth_parts.dart';
 import '../widgets/bento_question_parts.dart';
 import '../widgets/bento_result_parts.dart';
+import '../widgets/instructor_form_fields.dart';
 import 'home_screen.dart';
 import 'instructor_kind_screen.dart';
 
@@ -304,31 +305,8 @@ class _InstructorRegistrationScreenState extends State<InstructorRegistrationScr
     );
   }
 
-  /// A pill that is the dark `ink` row when chosen (owner rule 10).
-  Widget _choice(String label, bool selected, VoidCallback onTap) {
-    return Semantics(
-      button: true,
-      selected: selected,
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: AppMotion.duration(context, BentoTokens.state),
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x4, vertical: AppSpacing.x2 + 2),
-          decoration: BoxDecoration(
-            color: selected ? AppColors.ink : AppColors.field,
-            borderRadius: BorderRadius.circular(BentoTokens.chip),
-          ),
-          child: Text(
-            label,
-            style: AppTypography.label.copyWith(
-              color: selected ? AppColors.onSignal : AppColors.ink,
-              fontVariations: const [FontVariation('wght', 600)],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  Widget _choice(String label, bool selected, VoidCallback onTap) =>
+      InstructorChoicePill(label: label, selected: selected, onTap: onTap);
 
   /// State: type to filter, then pick from the list that opens under the
   /// field (owner, 2026-09-30). Only a picked state counts; editing the text
@@ -480,19 +458,7 @@ class _InstructorRegistrationScreenState extends State<InstructorRegistrationScr
       case _Step.price:
         return (translate('ireg_price_title'), translate('ireg_price_desc'), [
           _text('rate', translate('ireg_hourly_rate'), SolarIcons.medalRibbonsStarBold,
-              // The font subset has no money glyph; a "$" in the icon slot
-              // says "price" better than the old medal.
-              prefix: SizedBox(
-                width: 48,
-                child: Center(
-                  child: Text('\$',
-                      style: AppTypography.body.copyWith(
-                        fontSize: 20,
-                        color: AppColors.inkSecondary,
-                        fontVariations: const [FontVariation('wght', 600)],
-                      )),
-                ),
-              ),
+              prefix: const InstructorDollarPrefix(),
               type: TextInputType.number,
               formatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(3)]),
           Text(translate('ireg_durations'), style: AppTypography.label.copyWith(color: AppColors.inkSecondary)),
@@ -500,7 +466,7 @@ class _InstructorRegistrationScreenState extends State<InstructorRegistrationScr
           Wrap(
             spacing: AppSpacing.x2,
             children: [
-              for (final m in const [60, 90, 120])
+              for (final m in instructorLessonDurations)
                 _choice(translate('ireg_minutes').replaceAll('{n}', '$m'), _durations.contains(m), () => setState(() {
                       _durations.contains(m) ? _durations.remove(m) : _durations.add(m);
                     })),

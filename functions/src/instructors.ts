@@ -282,6 +282,78 @@ export const submitLicenseNumber = functions.https.onCall(async (data, context) 
 });
 
 /**
+ * Profile editing from Профиль (plan v2 §14.2, P3b): what the wizard skipped
+ * or the instructor wants to change, one section per call. The same checks
+ * as registerAsInstructor. Every edit comes through here, not a direct
+ * write: the contacts live in instructorPrivate, which no client can touch,
+ * and the rules allowlist no longer carries these fields (it checked the
+ * rate and bio but not their neighbours' types or sizes). Kind, role,
+ * location and licence data are not editable here.
+ */
+export const updateInstructorProfile = functions.https.onCall(async (data, context) => {
+  if (!context?.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in first.');
+  const uid: string = context.auth.uid;
+  const d = data ?? {};
+  const db = admin.firestore();
+  const ref = db.collection('instructors').doc(uid);
+  const snap = await ref.get();
+  if (!snap.exists) throw new functions.https.HttpsError('failed-precondition', 'Not an instructor account.');
+  // Suspension is an admin decision (plan v2 §7); the profile stays as it was.
+  if (snap.get('status') === 'suspended') throw new functions.https.HttpsError('failed-precondition', 'suspended');
+
+  let fields: FirebaseFirestore.DocumentData;
+  switch (d.section) {
+    case 'bio':
+      fields = { bio: d.bio == null || d.bio === '' ? '' : (str(d.bio, 0, 600) ?? bad('bio')) };
+      break;
+    case 'school':
+      // A school's name IS its profile name; only a private instructor names
+      // the school they teach at, and may clear it (owner, 2026-09-30).
+      if (snap.get('kind') !== 'schoolInstructor') bad('section');
+      fields = { schoolName: d.schoolName == null || d.schoolName === '' ? null : (str(d.schoolName, 2, 80) ?? bad('schoolName')) };
+      break;
+    case 'price':
+      fields = {
+        hourlyRateCents: int(d.hourlyRateCents, 2000, 20000) ?? bad('hourlyRateCents'),
+        lessonDurations: Array.isArray(d.lessonDurations) && d.lessonDurations.length > 0
+          && d.lessonDurations.every((m: unknown) => LESSON_DURATIONS.includes(m as number))
+          ? Array.from(new Set(d.lessonDurations as number[])).sort((a, b) => a - b) : bad('lessonDurations'),
+      };
+      break;
+    case 'car':
+      fields = {
+        carModel: str(d.carModel, 2, 60) ?? bad('carModel'),
+        carYear: int(d.carYear, 1995, new Date().getFullYear() + 1) ?? bad('carYear'),
+        hasDualControls: typeof d.hasDualControls === 'boolean' ? d.hasDualControls : bad('hasDualControls'),
+      };
+      break;
+    case 'contacts': {
+      const phoneDigits = typeof d.phone === 'string' ? d.phone.replace(/\D/g, '') : '';
+      if (phoneDigits.length < 10 || phoneDigits.length > 15) bad('phone');
+      const contactEmail = typeof d.contactEmail === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.contactEmail.trim())
+        ? d.contactEmail.trim() : bad('contactEmail');
+      await db.runTransaction(async (tx) => {
+        tx.set(db.collection('instructorPrivate').doc(uid), { phone: d.phone.trim(), contactEmail }, { merge: true });
+        tx.update(ref, { updatedAt: Timestamp.now() });
+      });
+      return { section: 'contacts' };
+    }
+    default:
+      bad('section');
+  }
+  await ref.update({ ...fields, updatedAt: Timestamp.now() });
+  return { section: d.section };
+});
+
+/** The owner's own phone and contact email, for the Профиль edit sheet. */
+export const getInstructorContacts = functions.https.onCall(async (_data, context) => {
+  if (!context?.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in first.');
+  const snap = await admin.firestore().collection('instructorPrivate').doc(context.auth.uid).get();
+  if (!snap.exists) throw new functions.https.HttpsError('failed-precondition', 'Not an instructor account.');
+  return { phone: snap.get('phone') ?? '', contactEmail: snap.get('contactEmail') ?? '' };
+});
+
+/**
  * Keeps `listed` / `stage` true to computeListing whatever wrote the doc
  * (owner edits, admin actions, webhooks), and the public per-state count in
  * step. The count is RECOUNTED, not incremented: triggers can be delivered

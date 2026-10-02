@@ -453,5 +453,11 @@
   "auth_create_student_account": "Акаунт учня",
   "auth_create_instructor_account": "Акаунт інструктора",
   "auth_switch_to_instructor": "Створити акаунт інструктора",
-  "auth_switch_to_student": "Створити акаунт учня"
+  "auth_switch_to_student": "Створити акаунт учня",
+  "iprof_public_title": "Профіль для учнів",
+  "iprof_public_desc": "Що учні бачать у пошуку.",
+  "iprof_bio": "Опис",
+  "iprof_school_optional": "Необов'язково. Залиште порожнім, якщо викладаєте самостійно.",
+  "iprof_price_summary": "{rate} за годину · {durations}",
+  "iprof_load_error": "Не вдалося завантажити. Спробуйте ще раз."
 }

@@ -15,12 +15,15 @@ class InstructorTabInfo {
 
 class InstructorService {
   InstructorService({FirebaseFirestore? firestore, FirebaseFunctions? functions})
-      : _firestore = firestore ?? FirebaseFirestore.instance,
+      : _firestoreOverride = firestore,
         _functions = functions;
 
-  final FirebaseFirestore _firestore;
+  // Resolved on first use, so a test fake that overrides the calls never
+  // touches Firebase.
+  final FirebaseFirestore? _firestoreOverride;
   final FirebaseFunctions? _functions;
 
+  FirebaseFirestore get _firestore => _firestoreOverride ?? FirebaseFirestore.instance;
   FirebaseFunctions get _fns => _functions ?? FirebaseFunctions.instance;
 
   /// Who is signing up, after the email code (functions/src/instructors.ts).
@@ -47,6 +50,21 @@ class InstructorService {
       'schoolLicenseNumber': school,
       if (instructor != null && instructor.isNotEmpty) 'instructorLicenseNumber': instructor,
     });
+  }
+
+  /// One Профиль section — `bio`, `school`, `price`, `car` or `contacts` —
+  /// through updateInstructorProfile, which checks it the way
+  /// registerAsInstructor does (functions/src/instructors.ts).
+  Future<void> updateProfile(String section, Map<String, dynamic> fields) async {
+    await _fns.httpsCallable('updateInstructorProfile').call({'section': section, ...fields});
+  }
+
+  /// The owner's phone and contact email: they live in instructorPrivate,
+  /// which no client reads, so they come from a callable.
+  Future<({String phone, String email})> contacts() async {
+    final result = await _fns.httpsCallable('getInstructorContacts').call();
+    final data = result.data as Map;
+    return (phone: data['phone'] as String? ?? '', email: data['contactEmail'] as String? ?? '');
   }
 
   /// The instructor's own public profile (owner-readable in firestore.rules).

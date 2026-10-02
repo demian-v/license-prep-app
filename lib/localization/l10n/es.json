@@ -453,5 +453,11 @@
   "auth_create_student_account": "Crear cuenta de estudiante",
   "auth_create_instructor_account": "Crear cuenta de instructor",
   "auth_switch_to_instructor": "Crear cuenta de instructor",
-  "auth_switch_to_student": "Crear cuenta de estudiante"
+  "auth_switch_to_student": "Crear cuenta de estudiante",
+  "iprof_public_title": "Perfil para alumnos",
+  "iprof_public_desc": "Lo que ven los alumnos en la búsqueda.",
+  "iprof_bio": "Descripción",
+  "iprof_school_optional": "Opcional. Déjalo vacío si enseñas por tu cuenta.",
+  "iprof_price_summary": "{rate} por hora · {durations}",
+  "iprof_load_error": "No se pudo cargar. Inténtalo de nuevo."
 }

@@ -116,8 +116,19 @@ describe('instructors/{uid}', () => {
 
   it('the owner can edit allowlisted fields', async () => {
     await assertSucceeds(as('i1').collection('instructors').doc('i1').update({
-      bio: 'New bio', hourlyRateCents: 7000, availability: { mon: [{ start: '09:00', end: '12:00' }] },
+      availability: { mon: [{ start: '09:00', end: '12:00' }] },
     }));
+  });
+
+  // P3b: the profile is edited through updateInstructorProfile, which checks
+  // types and sizes; a direct write could store any value (2026-10-02).
+  it.each([
+    ['bio', 'New bio'], ['hourlyRateCents', 7000], ['lessonDurations', [5]], ['carModel', 'x'.repeat(5000)],
+    ['carYear', 'soon'], ['hasDualControls', false], ['schoolName', 'Other School'], ['name', ''],
+    ['city', 'Springfield'], ['cityKey', 'springfield'], ['languages', ['en']],
+    ['schoolAddress', '1 Elm St'], ['fleetSize', 9], ['instructorCount', 9],
+  ])('the owner cannot write the profile field %s directly', async (field, value) => {
+    await assertFails(as('i1').collection('instructors').doc('i1').update({ [field]: value }));
   });
 
   it('the owner can deactivate and reactivate', async () => {
@@ -141,19 +152,8 @@ describe('instructors/{uid}', () => {
     await assertFails(as('i1').collection('instructors').doc('i1').update({ status: 'active' }));
   });
 
-  it('rejects an hourly rate outside $20–$200 or a non-integer rate', async () => {
-    const ref = as('i1').collection('instructors').doc('i1');
-    await assertFails(ref.update({ hourlyRateCents: 1999 }));
-    await assertFails(ref.update({ hourlyRateCents: 20001 }));
-    await assertFails(ref.update({ hourlyRateCents: 6000.5 }));
-  });
-
-  it('rejects a bio over 600 characters', async () => {
-    await assertFails(as('i1').collection('instructors').doc('i1').update({ bio: 'x'.repeat(601) }));
-  });
-
   it('another user cannot edit it', async () => {
-    await assertFails(as('i2').collection('instructors').doc('i1').update({ bio: 'hijack' }));
+    await assertFails(as('i2').collection('instructors').doc('i1').update({ status: 'deactivated' }));
   });
 
   it('nobody can create or delete from the client', async () => {

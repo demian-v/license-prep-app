@@ -453,5 +453,11 @@
   "auth_create_student_account": "Utwórz konto ucznia",
   "auth_create_instructor_account": "Utwórz konto instruktora",
   "auth_switch_to_instructor": "Utwórz konto instruktora",
-  "auth_switch_to_student": "Utwórz konto ucznia"
+  "auth_switch_to_student": "Utwórz konto ucznia",
+  "iprof_public_title": "Profil dla kursantów",
+  "iprof_public_desc": "To, co kursanci widzą w wyszukiwaniu.",
+  "iprof_bio": "Opis",
+  "iprof_school_optional": "Opcjonalnie. Zostaw puste, jeśli uczysz samodzielnie.",
+  "iprof_price_summary": "{rate} za godzinę · {durations}",
+  "iprof_load_error": "Nie udało się wczytać. Spróbuj ponownie."
 }
