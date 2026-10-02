@@ -195,6 +195,23 @@ describe('onInstructorWrite', () => {
   });
 });
 
+describe('onInstructorWrite — account deletion', () => {
+  const wrapped = () => testEnv.wrap(fns.onInstructorWrite as any);
+  const snap = (data: unknown, id: string) => testEnv.firestore.makeDocumentSnapshot(data as any, `instructors/${id}`);
+  const doc = { name: 'A', state: 'ZD', city: 'X', languages: ['en'], hourlyRateCents: 6000, lessonDurations: [60], status: 'active', listed: true, stage: 0 };
+
+  it('a deleted listed profile leaves the state count (plan v2 §17)', async () => {
+    await db().collection('instructors').doc('del-a').set(doc);
+    await db().collection('instructors').doc('del-b').set(doc);
+    await db().collection('instructorStats').doc('ZD').set({ listedCount: 2 });
+    await db().collection('instructors').doc('del-a').delete();
+    await wrapped()(testEnv.makeChange(snap(doc, 'del-a'), testEnv.firestore.makeDocumentSnapshot(null as any, 'instructors/del-a')));
+    expect((await db().collection('instructorStats').doc('ZD').get()).get('listedCount')).toBe(1);
+    await db().collection('instructors').doc('del-b').delete();
+    await db().collection('instructorStats').doc('ZD').delete();
+  });
+});
+
 describe('timezoneForZip', () => {
   it('uses the state zone and the split-state exceptions', () => {
     expect(timezoneForZip('IL', '60614')).toBe('America/Chicago');

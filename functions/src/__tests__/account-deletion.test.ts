@@ -20,6 +20,7 @@ import functionsTest from 'firebase-functions-test';
 const testEnv = functionsTest();
 import * as fns from '../index';
 import { collectUserDataForDeletion } from '../account-deletion';
+import { phonePhoto } from './helpers/jpeg';
 
 const db = () => admin.firestore();
 const UID = 'delete-me';
@@ -122,3 +123,81 @@ describe('collectUserDataForDeletion — the enumeration itself', () => {
     ]));
   });
 });
+
+describe('Instructors plan v2 §17 — an instructor account', () => {
+  const IUID = 'delete-instructor';
+  const OTHER = 'keep-instructor';
+  const bucket = () => admin.storage().bucket();
+  const file = (p: string) => bucket().file(p).save(phonePhoto(), { contentType: 'image/jpeg' });
+  const exists = async (p: string) => (await bucket().file(p).exists())[0];
+
+  beforeAll(async () => {
+    await seedEverything(IUID);
+    const b = db().batch();
+    for (const uid of [IUID, OTHER]) {
+      b.set(db().collection('instructors').doc(uid), { kind: 'school', state: 'ZX', listed: false, photoPath: `instructorPhotos/${uid}/p2.jpg` });
+      b.set(db().collection('instructorPrivate').doc(uid), { phone: '+1 312 555 0100', contactEmail: `${uid}@example.com` });
+      b.set(db().collection('instructors').doc(uid).collection('reviews').doc('student-1'), { rating: 5, comment: 'Great' });
+    }
+    b.set(db().collection('favorites').doc(IUID), { instructorUids: [OTHER] });
+    b.set(db().collection('users').doc(IUID).collection('fcmTokens').doc('t1'), { token: 'x', platform: 'ios' });
+    await b.commit();
+    for (const uid of [IUID, OTHER]) {
+      await file(`instructorPhotos/${uid}/p1.jpg`);
+      await file(`instructorPhotos/${uid}/p2.jpg`);
+      await file(`instructorUploads/${uid}/photo/u1.jpg`);
+      await file(`instructorLicenses/${uid}/l1.jpg`);
+    }
+    await testEnv.wrap(fns.deleteUserAccount as any)({} as any, ctx(IUID) as any);
+  }, 60000);
+
+  afterAll(async () => {
+    for (const prefix of ['instructorPhotos/', 'instructorUploads/', 'instructorLicenses/']) {
+      await bucket().deleteFiles({ prefix: `${prefix}${OTHER}/`, force: true }).catch(() => {});
+    }
+    await db().recursiveDelete(db().collection('instructors').doc(OTHER));
+    await db().collection('instructorPrivate').doc(OTHER).delete();
+  });
+
+  it.each([['instructors'], ['instructorPrivate'], ['favorites']])('deletes %s/{uid}', async (coll) => {
+    expect((await db().collection(coll).doc(IUID).get()).exists).toBe(false);
+  });
+
+  it('deletes the reviews ON the profile and the push tokens (subcollections)', async () => {
+    expect((await db().collection('instructors').doc(IUID).collection('reviews').get()).size).toBe(0);
+    expect((await db().collection('users').doc(IUID).collection('fcmTokens').get()).size).toBe(0);
+  });
+
+  it('deletes every photo version, pending upload and licence image in Storage', async () => {
+    for (const p of [`instructorPhotos/${IUID}/p1.jpg`, `instructorPhotos/${IUID}/p2.jpg`,
+      `instructorUploads/${IUID}/photo/u1.jpg`, `instructorLicenses/${IUID}/l1.jpg`]) {
+      expect(await exists(p)).toBe(false);
+    }
+  });
+
+  it("leaves another instructor's data alone", async () => {
+    expect((await db().collection('instructors').doc(OTHER).get()).exists).toBe(true);
+    expect((await db().collection('instructorPrivate').doc(OTHER).get()).exists).toBe(true);
+    expect((await db().collection('instructors').doc(OTHER).collection('reviews').get()).size).toBe(1);
+    for (const p of [`instructorPhotos/${OTHER}/p1.jpg`, `instructorUploads/${OTHER}/photo/u1.jpg`, `instructorLicenses/${OTHER}/l1.jpg`]) {
+      expect(await exists(p)).toBe(true);
+    }
+  });
+
+  it('the enumeration lists the instructor locations too', async () => {
+    await db().collection('instructors').doc('enum-i').set({ kind: 'school' });
+    await db().collection('instructorPrivate').doc('enum-i').set({ phone: 'x' });
+    await db().collection('favorites').doc('enum-i').set({ instructorUids: [] });
+    await db().collection('users').doc('enum-i').collection('fcmTokens').doc('t').set({ token: 'x' });
+    await db().collection('instructors').doc('enum-i').collection('reviews').doc('s').set({ rating: 4 });
+    const kinds = (await collectUserDataForDeletion(db(), 'enum-i')).map((p) => p.collection);
+    expect(kinds).toEqual(expect.arrayContaining([
+      'instructors', 'instructorPrivate', 'favorites', 'users/fcmTokens', 'instructors/reviews',
+    ]));
+    await db().recursiveDelete(db().collection('instructors').doc('enum-i'));
+    await db().recursiveDelete(db().collection('users').doc('enum-i'));
+    await db().collection('instructorPrivate').doc('enum-i').delete();
+    await db().collection('favorites').doc('enum-i').delete();
+  });
+});
+

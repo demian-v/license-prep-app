@@ -13,7 +13,7 @@ import { applyToAllMatches } from './webhook-fanout';
 import { mapPlayNotification, PLAY_NOTIFICATION, playDedupKey } from './play-notifications';
 import { recordWebhookFailure } from './webhook-dead-letter';
 import { anonymizeTrialDevicesForUser } from './trial-devices';
-import { collectUserDataForDeletion, applyDeletionPlan, assertRecentLogin } from './account-deletion';
+import { collectUserDataForDeletion, applyDeletionPlan, assertRecentLogin, deleteUserStorage } from './account-deletion';
 import { readContentVersion } from './content-version';
 import { sweepPaginated, SWEEP_TIME_BUDGET_MS } from './sweep';
 import {
@@ -1408,6 +1408,16 @@ export const deleteUserAccount = functions.https.onCall(async (data, context) =>
       `deleteUserAccount: ${targets.length} target(s) for ${userId}: ` +
       targets.map((t) => `${t.collection}:${t.action}`).join(', '),
     );
+
+    // Instructor photos and uploads in Storage (plan v2 §17). First, so a
+    // failure stops here with nothing deleted yet and the user can retry;
+    // a profile pointing at a removed photo only shows the placeholder.
+    try {
+      await deleteUserStorage(admin.storage().bucket(), userId);
+    } catch (storageError) {
+      console.error(`Failed to delete Storage files for user ${userId}:`, storageError);
+      throw new functions.https.HttpsError('internal', 'Failed to delete user files');
+    }
 
     // Risk #26 — trialDevices is anonymised rather than deleted; removing it
     // would make account deletion a way to farm unlimited free trials.

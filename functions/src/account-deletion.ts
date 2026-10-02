@@ -38,8 +38,11 @@ export async function collectUserDataForDeletion(
 ): Promise<DeletionTarget[]> {
   const targets: DeletionTarget[] = [];
 
-  // Documents keyed directly by uid.
-  for (const collection of ['users', 'savedQuestions', 'progress']) {
+  // Documents keyed directly by uid. The instructor profile and its private
+  // companion (phone, contact email, licence numbers) go with the account
+  // (instructors plan v2 §17); onInstructorWrite recounts the state's listing
+  // count when instructors/{uid} disappears.
+  for (const collection of ['users', 'savedQuestions', 'progress', 'instructors', 'instructorPrivate', 'favorites']) {
     const ref = db.collection(collection).doc(userId);
     if ((await ref.get()).exists) targets.push({ collection, ref, action: 'delete' });
   }
@@ -49,6 +52,15 @@ export async function collectUserDataForDeletion(
   const sessions = await db.collection('users').doc(userId).collection('sessions').get();
   for (const doc of sessions.docs) {
     targets.push({ collection: 'users/sessions', ref: doc.ref, action: 'delete' });
+  }
+
+  // Push tokens, and the reviews students left ON this instructor (one doc
+  // per student, under the profile being deleted).
+  for (const [collection, sub] of [
+    ['users/fcmTokens', db.collection('users').doc(userId).collection('fcmTokens')],
+    ['instructors/reviews', db.collection('instructors').doc(userId).collection('reviews')],
+  ] as const) {
+    for (const doc of (await sub.get()).docs) targets.push({ collection, ref: doc.ref, action: 'delete' });
   }
 
   // The user's personal report counter (counters/user_{uid}_reports).
@@ -134,5 +146,25 @@ export function assertRecentLogin(authTimeSeconds: unknown): void {
   const ageSeconds = Math.floor(Date.now() / 1000) - authTimeSeconds;
   if (ageSeconds > REAUTH_MAX_AGE_SECONDS) {
     throw new Error('recent-login-required');
+  }
+}
+
+/**
+ * Storage an instructor leaves behind (instructors plan v2 §17): the pending
+ * uploads, the published photos and any licence images. Deleted by prefix, so
+ * every version goes, not only the one photoPath names.
+ */
+export const USER_STORAGE_PREFIXES = (userId: string) => [
+  `instructorUploads/${userId}/`,
+  `instructorPhotos/${userId}/`,
+  `instructorLicenses/${userId}/`,
+];
+
+export async function deleteUserStorage(
+  bucket: { deleteFiles(options: { prefix: string; force?: boolean }): Promise<unknown> },
+  userId: string,
+): Promise<void> {
+  for (const prefix of USER_STORAGE_PREFIXES(userId)) {
+    await bucket.deleteFiles({ prefix, force: true });
   }
 }

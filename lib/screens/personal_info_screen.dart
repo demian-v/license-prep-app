@@ -496,6 +496,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
 
   // Delete account confirmation
   void _showDeleteConfirmation(BuildContext context, LanguageProvider languageProvider) {
+    // Instructors never subscribe (instructors plan v2 §4.4), so the store
+    // warning would only confuse them (2026-10-02).
+    final isInstructor = Provider.of<AuthProvider>(context, listen: false).user?.isInstructor ?? false;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -541,6 +544,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(_translate('delete_confirmation_message', languageProvider)),
+            if (!isInstructor) ...[
             SizedBox(height: 12),
             Container(
               padding: EdgeInsets.all(10),
@@ -569,6 +573,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 ],
               ),
             ),
+            ],
           ],
         ),
         actions: [
