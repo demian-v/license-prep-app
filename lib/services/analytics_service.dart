@@ -792,6 +792,15 @@ class AnalyticsService {
   // MARK: - Result Share Events
 
   /// Log when a result is shared from a result page's share sheet.
+  /// A student opened an instructor's detail page (instructors plan v2
+  /// §14.3). No instructor id or name: only what kind and stage they were.
+  Future<void> logInstructorProfileViewed({required String kind, required int stage}) async {
+    await logEvent('instructor_profile_viewed', {
+      'instructor_kind': kind,
+      'stage': stage,
+    });
+  }
+
   /// [module] is exam, practice or topic; [method] is system_share or
   /// copy_link; [status] is the system sheet's outcome (success, dismissed,
   /// unavailable) — copy_link is always success.

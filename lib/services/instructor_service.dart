@@ -5,6 +5,8 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../models/instructor_listing.dart';
+
 /// What the Инструкторы tab needs before it can show anything: whether the
 /// student's state has launched (`config/instructors.launchStates`, set from
 /// the console — plan v2 §14.4) and how many listings it holds
@@ -106,6 +108,52 @@ class InstructorService {
       .collection('instructors')
       .doc(uid)
       .update({'status': visible ? 'active' : 'deactivated', 'updatedAt': FieldValue.serverTimestamp()});
+
+  /// One fetch of the state's listing per app session (plan v2 §13): the
+  /// student tabs are rebuilt on every switch, so the answer is kept here,
+  /// not in the screen. Pull-to-refresh passes [refresh]; a failure is not
+  /// kept.
+  static final Map<String, Future<List<InstructorListing>>> _listings = {};
+
+  Future<List<InstructorListing>> listings(String state, {bool refresh = false}) {
+    if (refresh) _listings.remove(state);
+    return _listings.putIfAbsent(state, () async {
+      try {
+        final result = await _fns.httpsCallable('listInstructors').call({'state': state});
+        final list = (result.data as Map)['instructors'] as List? ?? const [];
+        return [for (final m in list) InstructorListing.fromMap(m as Map)];
+      } catch (_) {
+        _listings.remove(state);
+        rethrow;
+      }
+    });
+  }
+
+  /// The detail page: the listing plus the weekly hours. `not-found` when
+  /// the profile was unlisted or deleted since the list was loaded.
+  Future<InstructorListing> detail(String id) async {
+    final result = await _fns.httpsCallable('getInstructorProfile').call({'id': id});
+    return InstructorListing.fromMap(result.data as Map);
+  }
+
+  /// The newest reviews (up to 50), with no reviewer uid.
+  Future<List<InstructorReview>> reviews(String id) async {
+    final result = await _fns.httpsCallable('getInstructorReviews').call({'id': id});
+    final list = (result.data as Map)['reviews'] as List? ?? const [];
+    return [for (final m in list) InstructorReview.fromMap(m as Map)];
+  }
+
+  /// The student's saved instructors, `favorites/{uid}` (owner-only in
+  /// firestore.rules, at most 200). Missing doc = none saved yet.
+  Stream<Set<String>> favorites(String uid) => _firestore.collection('favorites').doc(uid).snapshots().map(
+      (s) => {for (final id in (s.data()?['instructorUids'] as List? ?? const [])) '$id'});
+
+  /// Saves or removes one; the doc is created on the first save.
+  Future<void> setFavorite(String uid, String instructorId, bool saved) =>
+      _firestore.collection('favorites').doc(uid).set({
+        'instructorUids': saved ? FieldValue.arrayUnion([instructorId]) : FieldValue.arrayRemove([instructorId]),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
   Future<InstructorTabInfo> tabInfo(String state) async {
     final results = await Future.wait([

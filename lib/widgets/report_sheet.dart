@@ -8,13 +8,12 @@ import '../services/service_locator.dart';
 import '../theme/app_theme.dart';
 import '../theme/bento_tokens.dart';
 
-enum ReportReason { image, translation, other }
-
 class ReportSheet extends StatefulWidget {
-  final String contentType; // 'quiz_question' | 'theory_section'
+  final String contentType; // 'quiz_question' | 'theory_section' | 'instructor'
   final Map<String, dynamic> contextData; 
   // For quiz: {questionId, language, state, topicId?, ruleReference?}
   // For theory: {topicDocId, sectionIndex, sectionTitle, language, state}
+  // For instructor: {instructorUid, language, state}
 
   const ReportSheet({
     super.key,
@@ -27,13 +26,31 @@ class ReportSheet extends StatefulWidget {
 }
 
 class _ReportSheetState extends State<ReportSheet> {
-  ReportReason? _reason;
+  String? _reason;
+
+  bool get _isInstructor => widget.contentType == 'instructor';
+
+  /// Reason ids (stored as `reason`, checked by firestore.rules) and their
+  /// labels. A profile has its own reasons (instructors plan v2 §7).
+  List<(String, String)> get _reasons => _isInstructor
+      ? const [
+          ('fake_profile', 'report_reason_fake_profile'),
+          ('harassment', 'report_reason_harassment'),
+          ('inappropriate', 'report_reason_inappropriate'),
+          ('spam', 'report_reason_spam'),
+          ('other', 'other_issue'),
+        ]
+      : const [
+          ('image', 'issue_with_image'),
+          ('translation', 'issue_with_text_translation'),
+          ('other', 'other_issue'),
+        ];
   final _ctrl = TextEditingController();
   bool _submitting = false;
 
   bool get _canSubmit {
     if (_reason == null) return false;
-    if (_reason == ReportReason.other) {
+    if (_reason == 'other') {
       return _ctrl.text.trim().length >= 10;
     }
     return true;
@@ -51,14 +68,23 @@ class _ReportSheetState extends State<ReportSheet> {
     setState(() => _submitting = true);
 
     final reportService = serviceLocator.report;
-    final reason = _reason!.name; // 'image' | 'translation' | 'other'
+    final reason = _reason!;
+    final message = reason == 'other' ? _ctrl.text.trim() : null;
 
     try {
-      if (widget.contentType == 'quiz_question') {
+      if (_isInstructor) {
+        await reportService.submitInstructorReport(
+          instructorUid: widget.contextData['instructorUid'],
+          reason: reason,
+          message: message,
+          language: widget.contextData['language'],
+          state: widget.contextData['state'],
+        );
+      } else if (widget.contentType == 'quiz_question') {
         await reportService.submitQuizReport(
           questionId: widget.contextData['questionId'],
           reason: reason,
-          message: _reason == ReportReason.other ? _ctrl.text.trim() : null,
+          message: message,
           language: widget.contextData['language'],
           state: widget.contextData['state'],
           topicId: widget.contextData['topicId'],
@@ -70,7 +96,7 @@ class _ReportSheetState extends State<ReportSheet> {
           sectionIndex: widget.contextData['sectionIndex'],
           sectionTitle: widget.contextData['sectionTitle'],
           reason: reason,
-          message: _reason == ReportReason.other ? _ctrl.text.trim() : null,
+          message: message,
           language: widget.contextData['language'],
           state: widget.contextData['state'],
         );
@@ -106,7 +132,7 @@ class _ReportSheetState extends State<ReportSheet> {
   /// rounded row on the field sheet; the chosen one the dark `ink` row, no
   /// radio (2026-09-26). Tapping sets the reason exactly as the radio did.
   Widget _buildRadioOption({
-    required ReportReason value,
+    required String value,
     required String title,
     required bool isLast,
   }) {
@@ -194,7 +220,7 @@ class _ReportSheetState extends State<ReportSheet> {
               const SizedBox(height: AppSpacing.x4 + AppSpacing.x1),
 
               Text(
-                l.translate('report_issue'),
+                l.translate(_isInstructor ? 'report_instructor_title' : 'report_issue'),
                 style: AppTypography.title.copyWith(
                   fontSize: 22,
                   height: 28 / 22,
@@ -204,25 +230,16 @@ class _ReportSheetState extends State<ReportSheet> {
               ),
               const SizedBox(height: AppSpacing.x4),
 
-              _buildRadioOption(
-                value: ReportReason.image,
-                title: l.translate('issue_with_image'),
-                isLast: false,
-              ),
-              _buildRadioOption(
-                value: ReportReason.translation,
-                title: l.translate('issue_with_text_translation'),
-                isLast: false,
-              ),
-              _buildRadioOption(
-                value: ReportReason.other,
-                title: l.translate('other_issue'),
-                isLast: true,
-              ),
+              for (final (id, key) in _reasons)
+                _buildRadioOption(
+                  value: id,
+                  title: l.translate(key),
+                  isLast: id == _reasons.last.$1,
+                ),
 
               // Text field for "Other": a white card with the character count
               // as a pill in its corner, as on Поддержка.
-              if (_reason == ReportReason.other) ...[
+              if (_reason == 'other') ...[
                 const SizedBox(height: AppSpacing.x3),
                 Container(
                   padding: const EdgeInsets.fromLTRB(

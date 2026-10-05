@@ -11,7 +11,8 @@
  *   users/{uid}                 userType:'instructor'
  *   Auth accounts               seed-instr-NN@example.com / SEED_PASSWORD below, when
  *                               FIREBASE_AUTH_EMULATOR_HOST is set (sign in as an instructor),
- *                               plus seed-signup-school@ / seed-signup-instructor@example.com, instructors mid-signup
+ *                               plus seed-signup-school@ / seed-signup-instructor@example.com, instructors mid-signup,
+ *                               and students seed-student-paid@ (IL) / -trial@ (IL) / -md@ (MD, paid)
  * Idempotent: a re-run overwrites the same ids.
  *
  * EMULATORS ONLY. Refuses to run unless FIRESTORE_EMULATOR_HOST is a local address.
@@ -158,6 +159,33 @@ const COMMENTS = ['Very patient, passed on the first try.', 'Clear explanations 
         signupRole: 'instructor', signupKind: kind, createdAt: Timestamp.now(),
       });
       console.log(`Mid-signup instructor (${kind}): ${account.email}`);
+    }
+
+    // Students who open Инструкторы (P4). The simulator can't buy a plan, so
+    // the subscription is written the way validatePurchaseReceipt /
+    // createTrialSubscription would. Paid IL sees the listing, trial IL the
+    // locked preview, paid MD «Скоро в Maryland». Dates are renewed on every
+    // seed, so the plans never run out.
+    for (const [uid, name, state, planType] of [
+      ['seed-student-paid', 'Paid Student', 'IL', 'monthly'],
+      ['seed-student-trial', 'Trial Student', 'IL', 'trial'],
+      ['seed-student-md', 'Maryland Student', 'MD', 'monthly'],
+    ]) {
+      const account = { email: `${uid}@example.com`, password: SEED_PASSWORD, displayName: name, emailVerified: true };
+      await admin.auth().getUser(uid).catch(() => admin.auth().createUser({ uid, ...account }));
+      const trial = planType === 'trial';
+      const ends = Timestamp.fromMillis(Date.now() + (trial ? 3 : 30) * 864e5);
+      await db.collection('users').doc(uid).set({
+        name, email: account.email, language: 'ru', state, signupRole: 'student',
+        isActive: true, nextBillingDate: ends, createdAt: Timestamp.now(),
+      }, { merge: true });
+      await db.collection('subscriptions').doc(`${uid}-sub`).set({
+        id: `${uid}-sub`, userId: uid, status: 'active', isActive: true, planType,
+        packageId: trial ? 3 : 1, duration: trial ? 3 : 30, price: trial ? 0 : 9.99,
+        ...(trial ? { trialUsed: 0, trialEndsAt: ends } : { platform: 'ios', environment: 'sandbox' }),
+        nextBillingDate: ends, createdAt: Timestamp.now(), updatedAt: Timestamp.now(),
+      });
+      console.log(`Student (${state}, ${planType}): ${account.email}`);
     }
   }
   console.log(`Seeded ${ROWS.length} instructors; listed per state:`, stats, '; launchStates: IL, TX');

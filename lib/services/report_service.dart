@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../models/issue_report.dart';
 import 'counter_service.dart';
@@ -171,6 +172,49 @@ class ReportService {
     } catch (e) {
       // Risk #45 — see the note above: an auto-ID is denied by the rules.
       print('ReportService: Counter unavailable, using fallback report ID: $e');
+      await _db.collection('reports')
+          .doc(_counterService.generateFallbackReportId(user.uid))
+          .set(report.toMap());
+    }
+  }
+
+  /// A student reports an instructor profile from its detail page (plan v2
+  /// §7). Reasons: fake_profile, harassment, inappropriate, spam, other.
+  Future<void> submitInstructorReport({
+    required String instructorUid,
+    required String reason,
+    String? message,
+    required String language,
+    required String state,
+  }) async {
+    final pkg = await PackageInfo.fromPlatform();
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      throw Exception('User must be authenticated to submit a report');
+    }
+
+    final report = IssueReport(
+      reason: reason,
+      contentType: 'instructor',
+      // Only the uid: firestore.rules allows no other entity key here.
+      entity: {'instructorUid': instructorUid},
+      message: message,
+      userId: user.uid,
+      language: language,
+      state: state,
+      appVersion: pkg.version,
+      buildNumber: pkg.buildNumber,
+      device: Platform.isAndroid ? 'android' : 'ios',
+      platform: Platform.isAndroid ? 'android' : 'ios',
+    );
+
+    try {
+      final reportId = await _counterService.getNextReportId();
+      await _db.collection('reports').doc(reportId).set(report.toMap());
+    } catch (e) {
+      // Risk #45 — see the note above: an auto-ID is denied by the rules.
+      debugPrint('ReportService: Counter unavailable, using fallback report ID: $e');
       await _db.collection('reports')
           .doc(_counterService.generateFallbackReportId(user.uid))
           .set(report.toMap());

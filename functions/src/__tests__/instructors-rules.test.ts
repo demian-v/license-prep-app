@@ -286,3 +286,52 @@ describe('bookings/{bookingId}', () => {
     await assertFails(as('s1').collection('bookings').doc('b2').set({ studentUid: 's1', instructorUid: 'i1' }));
   });
 });
+
+// P4: a student reports an instructor profile from its detail page.
+describe('reports — contentType instructor', () => {
+  const report = (over: Record<string, unknown> = {}) => ({
+    userId: 's1', createdAt: new Date(), status: 'open', reason: 'fake_profile',
+    contentType: 'instructor', entity: { instructorUid: 'i1' }, ...over,
+  });
+  const id = '1_user_s1_report_1';
+  beforeEach(() => seed((db) => db.collection('instructors').doc('i1').set(instructorDoc())));
+
+  it('a student can report an existing instructor', async () => {
+    await assertSucceeds(as('s1').collection('reports').doc(id).set(report()));
+  });
+
+  it.each([['harassment'], ['inappropriate'], ['spam']])('accepts the reason %s', async (reason) => {
+    await assertSucceeds(as('s1').collection('reports').doc(id).set(report({ reason })));
+  });
+
+  it('«other» needs a message of at least 10 characters', async () => {
+    await assertFails(as('s1').collection('reports').doc(id).set(report({ reason: 'other' })));
+    await assertSucceeds(as('s1').collection('reports').doc(id).set(report({ reason: 'other', message: 'Asked to pay in cash' })));
+  });
+
+  it('refuses a content reason that belongs to quiz reports', async () => {
+    await assertFails(as('s1').collection('reports').doc(id).set(report({ reason: 'translation' })));
+  });
+
+  it('refuses an instructor reason on a quiz report', async () => {
+    await assertFails(as('s1').collection('reports').doc(id).set(report({
+      contentType: 'quiz_question', entity: { questionId: 'q1', path: 'quizQuestions/q1' },
+    })));
+  });
+
+  it('refuses a report about an instructor who does not exist', async () => {
+    await assertFails(as('s1').collection('reports').doc(id).set(report({ entity: { instructorUid: 'nobody' } })));
+  });
+
+  it('refuses extra entity keys', async () => {
+    await assertFails(as('s1').collection('reports').doc(id).set(report({ entity: { instructorUid: 'i1', path: 'x' } })));
+  });
+
+  it('refuses an anonymous session', async () => {
+    await assertFails(as('s1', 'anonymous').collection('reports').doc(id).set(report()));
+  });
+
+  it('refuses a report filed in someone else\'s name', async () => {
+    await assertFails(as('s1').collection('reports').doc(id).set(report({ userId: 's2' })));
+  });
+});

@@ -2589,4 +2589,4 @@ export {
 // ============================================================================
 // INSTRUCTORS MARKETPLACE (plan v2, branch `instructors`)
 // ============================================================================
-export { listInstructors, setSignupRole, registerAsInstructor, submitLicenseNumber, updateInstructorProfile, getInstructorContacts, onInstructorUpload, onInstructorWrite } from './instructors';
+export { listInstructors, getInstructorProfile, getInstructorReviews, setSignupRole, registerAsInstructor, submitLicenseNumber, updateInstructorProfile, getInstructorContacts, onInstructorUpload, onInstructorWrite } from './instructors';

@@ -65,6 +65,64 @@ export const listInstructors = functions.https.onCall(async (data, context) => {
   return { launched: true, instructors: snap.docs.map((doc) => publicInstructor(doc.id, doc.data())) };
 });
 
+/**
+ * One instructor a student may open: the same gates as listInstructors, and
+ * the same `not-found` for an instructor who is unlisted, suspended, deleted
+ * or in a state that has not launched — so a saved favourite or an old link
+ * reaches nobody the listing would not show.
+ */
+async function listedInstructor(data: any, context: any) {
+  await requirePaidSubscriber(context);
+  const id = typeof data?.id === 'string' ? data.id : '';
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(id)) {
+    throw new functions.https.HttpsError('invalid-argument', 'An instructor id is required.');
+  }
+  const db = admin.firestore();
+  const [doc, config] = await Promise.all([
+    db.collection('instructors').doc(id).get(),
+    db.collection('config').doc('instructors').get(),
+  ]);
+  const launchStates: unknown = config.get('launchStates');
+  if (!doc.exists || doc.get('listed') !== true
+    || !Array.isArray(launchStates) || !launchStates.includes(doc.get('state'))) {
+    throw new functions.https.HttpsError('not-found', 'This profile is not available.');
+  }
+  return doc;
+}
+
+/**
+ * The detail page (plan v2 §13): the listing's projection plus the weekly
+ * hours and the timezone they are written in.
+ */
+export const getInstructorProfile = functions.https.onCall(async (data, context) => {
+  const doc = await listedInstructor(data, context);
+  return {
+    ...publicInstructor(doc.id, doc.data()!),
+    availability: doc.get('availability') ?? {},
+    timezone: doc.get('timezone') ?? null,
+  };
+});
+
+const REVIEW_LIMIT = 50;
+
+/**
+ * The newest reviews, for the detail page and «Все отзывы». A review's doc
+ * id is the student's uid (plan v2 §5), so it never leaves the server, and
+ * neither does the booking it came from.
+ */
+export const getInstructorReviews = functions.https.onCall(async (data, context) => {
+  const doc = await listedInstructor(data, context);
+  const snap = await doc.ref.collection('reviews').orderBy('createdAt', 'desc').limit(REVIEW_LIMIT).get();
+  return {
+    reviews: snap.docs.map((r) => ({
+      name: r.get('studentDisplayName') ?? '',
+      rating: r.get('rating'),
+      comment: r.get('comment') ?? '',
+      createdAtMs: r.get('createdAt')?.toMillis() ?? null,
+    })),
+  };
+});
+
 // ── Registration and listing (plan v2 §4.3, §5, §6.4) ────────────────────────
 
 /** Languages an instructor can teach in (plan v2 §4.3 step 1). */
