@@ -1,20 +1,20 @@
-# Next session: finish P4 (onboarding step), then P5 Push
+# Next session: P5 Push notifications
 
 Paste everything below the line into a fresh Claude Code session opened in
 `/Users/demianvyrozub/projects/license-prep-app`.
 
 ---
 
-Resume the DriveUSA Instructors feature: close P4 with the onboarding
-Инструкторы step, then start **P5 Push notifications**.
+Resume the DriveUSA Instructors feature: **P4 is complete**, start **P5 Push
+notifications**.
 
 ## Read first
 
 1. `~/.claude/CLAUDE.md`. State a 1–3 step plan and name the guidelines that
    apply before writing anything.
 2. The vault TODO `raw/drive_usa/2026-09-30-Instructors TODO.md`: "State",
-   "How to resume", "Decisions", then the P4 section (only the onboarding
-   item is open) and "Later phases".
+   "How to resume", "Decisions", then "Later phases" (the P5 line has a
+   "Start here" note).
 3. Plan v2 `raw/drive_usa/2026-09-30-Instructors Plan v2.md` §12 (push) and
    §15 (P5 row). P6 chat, P7 bookings and P9 payments all send pushes, which
    is why P5 comes first.
@@ -23,22 +23,15 @@ Resume the DriveUSA Instructors feature: close P4 with the onboarding
 
 ## State (2026-10-05)
 
-- Branch `instructors`, last commit **`1b33b5b`** (P4: `783afe1` listing,
-  filters, detail page, favourites, reports; `1b33b5b` detail-card polish,
-  star/filter icons, no hero for paid students). Run `git status` first.
+- Branch `instructors`, last commit **`3fe855f`**. P4 commits: `783afe1`
+  listing, filters, detail page, favourites, instructor reports; `1b33b5b`
+  detail cards as tiles, hours as a day list, star/filter icons, no hero for
+  paid students; `3fe855f` onboarding Инструкторы step (first card + tab).
+  Run `git status` first.
 - Tests: Flutter 304, functions 574, all passing; no new analyzer lines.
 - Nothing deployed. Never deploy from this branch.
 
-## Part 1 — onboarding Инструкторы step (closes P4)
-
-Follow `design/prompts/next-session-onboarding-instructors.md`, with two
-overrides: work on branch **`instructors`** (not `security-plus-design`), and
-the owner already chose the element: **the first instructor card** on Поиск
-(2026-10-05), so skip its "ask me which element" step. Capture as
-`seed-student-paid@example.com` so the tab shows the real listing, in all 5
-locales, without the trial card.
-
-## Part 2 — P5 Push (plan §12)
+## P5 Push (plan §12)
 
 Give me a short P5 plan first (packages, token flow, the server sender,
 permission moment, tests, what needs me in the Apple / Firebase consoles),
@@ -67,6 +60,13 @@ then build. Facts already checked:
 - Tokens: refreshed on `onTokenRefresh`, deleted on logout, pruned when a send
   returns `registration-token-not-registered`. Account deletion already
   removes `users/{uid}/fcmTokens/*` (P3b).
+- **Nothing sends a push yet:** chat (P6) and bookings (P7) don't exist. So P5
+  is the plumbing (permission, tokens, the server sender, tap → route) plus
+  one real sender to prove it end to end. A good first one from §12:
+  **moderation result**, e.g. `onInstructorUpload` telling the instructor
+  their photo was approved or rejected → route `profile`. The student's
+  permission moment (first message) arrives with P6: build the call now and
+  wire it there.
 - The functions emulator cannot deliver real FCM: put the sender behind a
   small interface and mock it in jest; on the simulator, check delivery with
   `xcrun simctl push` and a local payload.
