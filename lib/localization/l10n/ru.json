@@ -343,6 +343,7 @@
   "instructor_calendar_empty_title": "Часы работы",
   "chat_empty_title": "Сообщений пока нет",
   "chat_empty_desc": "Здесь появятся ваши переписки.",
+  "chat_tab_desc": "Переписки с учениками. Телефоны и ссылки скрыты до первой брони.",
   "chat_masked_note": "Контакты откроются после первой брони",
   "chat_input_hint": "Сообщение",
   "chat_send": "Отправить",

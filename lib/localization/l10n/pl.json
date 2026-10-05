@@ -343,6 +343,7 @@
   "instructor_calendar_empty_title": "Godziny pracy",
   "chat_empty_title": "Brak wiadomości",
   "chat_empty_desc": "Tutaj pojawią się Twoje rozmowy.",
+  "chat_tab_desc": "Rozmowy z kursantami. Numery telefonów i linki są ukryte do pierwszej rezerwacji.",
   "chat_masked_note": "Kontakty pojawią się po pierwszej rezerwacji",
   "chat_input_hint": "Wiadomość",
   "chat_send": "Wyślij",

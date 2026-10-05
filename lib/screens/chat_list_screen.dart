@@ -55,14 +55,16 @@ class _ChatListScreenState extends State<ChatListScreen> {
       stream: _stream,
       builder: (context, snap) {
         final list = snap.data ?? const <ChatConversation>[];
+        final tab = !widget.embedded && !widget.pushed;
         if (uid == null || (snap.hasData && list.isEmpty) || snap.hasError) {
-          return widget.embedded || widget.pushed ? empty : _centred(empty);
+          return tab ? _tabPage(l, [empty]) : empty;
         }
         if (!snap.hasData) {
-          return const Padding(
+          const spinner = Padding(
             padding: EdgeInsets.only(top: AppSpacing.x6),
             child: Center(child: CircularProgressIndicator()),
           );
+          return tab ? _tabPage(l, const [spinner]) : spinner;
         }
         final rows = [
           for (final c in list) ...[
@@ -71,6 +73,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
           ],
         ];
         if (widget.embedded) return Column(children: rows);
+        if (tab) return _tabPage(l, rows);
         return ListView(
           padding: const EdgeInsets.fromLTRB(AppSpacing.x4 + AppSpacing.x1,
               AppSpacing.x2, AppSpacing.x4 + AppSpacing.x1, AppSpacing.x6),
@@ -102,13 +105,31 @@ class _ChatListScreenState extends State<ChatListScreen> {
         backgroundColor: AppColors.field, body: SafeArea(child: content));
   }
 
-  /// The empty tab, centred on the page like Календарь (owner, 2026-09-30).
-  Widget _centred(Widget card) => Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.x4 + AppSpacing.x1),
-          child: card,
-        ),
+  /// The instructor's tab: a heading and one grey line, as on Календарь,
+  /// then the threads or the empty card, top-aligned (owner, 2026-10-05: the
+  /// page looked empty with one thread). Not a title bar — the heading
+  /// scrolls with the list.
+  Widget _tabPage(AppLocalizations l, List<Widget> children) => ListView(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.x4 + AppSpacing.x1,
+            AppSpacing.x4, AppSpacing.x4 + AppSpacing.x1, AppSpacing.x6),
+        children: [
+          Text(
+            l.translate('instructors_tab_messages'),
+            style: AppTypography.title.copyWith(
+              fontSize: 22,
+              height: 28 / 22,
+              color: AppColors.ink,
+              fontVariations: const [FontVariation('wght', 700)],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.x1),
+          Text(
+            l.translate('chat_tab_desc'),
+            style: AppTypography.body.copyWith(color: AppColors.inkSecondary),
+          ),
+          const SizedBox(height: AppSpacing.x3),
+          ...children,
+        ],
       );
 
   void _open(ChatConversation c) {

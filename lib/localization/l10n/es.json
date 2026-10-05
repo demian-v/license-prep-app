@@ -343,6 +343,7 @@
   "instructor_calendar_empty_title": "Horario de trabajo",
   "chat_empty_title": "Aún no hay mensajes",
   "chat_empty_desc": "Tus conversaciones aparecerán aquí.",
+  "chat_tab_desc": "Conversaciones con alumnos. Los teléfonos y enlaces quedan ocultos hasta la primera reserva.",
   "chat_masked_note": "Los contactos se verán tras la primera reserva",
   "chat_input_hint": "Mensaje",
   "chat_send": "Enviar",
