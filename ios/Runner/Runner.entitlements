@@ -11,5 +11,10 @@
 		<string>applinks:licenseprepapp.web.app</string>
 		<string>applinks:licenseprepapp.firebaseapp.com</string>
 	</array>
+	<!-- Push (instructors P5). Xcode rewrites it to `production` when an archive
+	     is exported for the App Store. The App ID must carry the Push
+	     Notifications capability, or a device/archive build fails to provision. -->
+	<key>aps-environment</key>
+	<string>development</string>
 </dict>
 </plist>

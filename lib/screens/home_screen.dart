@@ -19,6 +19,7 @@ import '../providers/state_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/subscription_provider.dart';
 import '../services/in_app_purchase_service.dart';
+import '../services/push_service.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -72,6 +73,30 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     // Initialize content after the screen is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeContent();
+      _openPushRoute(); // a push tapped before Home existed (cold start)
+    });
+    PushService.pendingRoute.addListener(_openPushRoute);
+  }
+
+  @override
+  void dispose() {
+    PushService.pendingRoute.removeListener(_openPushRoute);
+    super.dispose();
+  }
+
+  /// A tapped push (plan v2 §12). `profile` is the last tab for both roles.
+  /// `chat/<id>` and `booking/<id>` have no screen until P6 / P7, so they are
+  /// taken and dropped rather than left to fire later.
+  void _openPushRoute() {
+    final route = PushService.pendingRoute.value;
+    if (route == null || !mounted) return;
+    PushService.pendingRoute.value = null;
+    if (route.name != 'profile') return;
+    Navigator.of(context).popUntil((r) => r.isFirst);
+    final last = (_isInstructor ? _instructorScreens : _screens).length - 1;
+    setState(() {
+      _currentIndex = last;
+      _persistentCurrentIndex = last;
     });
   }
   

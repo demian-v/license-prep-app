@@ -10,6 +10,7 @@ import functionsTest from 'firebase-functions-test';
 const testEnv = functionsTest();
 import * as fns from '../index';
 import { phonePhoto } from './helpers/jpeg';
+import { setPushTransport } from '../push';
 
 const BUCKET = 'demo-driveusa.appspot.com';
 const db = () => admin.firestore();
@@ -27,6 +28,8 @@ async function wipe() {
   await bucket().deleteFiles({ prefix: 'instructorUploads/ph-' }).catch(() => {});
   await bucket().deleteFiles({ prefix: 'instructorPhotos/ph-' }).catch(() => {});
   for (const uid of ['ph-1', 'ph-2']) {
+    await db().collection('users').doc(uid).collection('fcmTokens').doc('t1').delete().catch(() => {});
+    await db().collection('users').doc(uid).delete().catch(() => {});
     await db().collection('instructors').doc(uid).delete().catch(() => {});
     await db().collection('instructorPrivate').doc(uid).delete().catch(() => {});
   }
@@ -42,7 +45,23 @@ beforeEach(async () => {
   });
 });
 afterEach(() => { delete process.env.FUNCTIONS_EMULATOR; });
-afterAll(async () => { await wipe(); testEnv.cleanup(); });
+afterAll(async () => { setPushTransport(null); await wipe(); testEnv.cleanup(); });
+
+// What the instructor's device would receive (plan v2 §12, P5).
+let pushes: { token: string; title?: string; route?: string; kind?: string }[] = [];
+beforeEach(async () => {
+  pushes = [];
+  setPushTransport({
+    async send(messages) {
+      pushes.push(...messages.map((m) => ({
+        token: m.token, title: m.notification?.title, route: m.data?.route, kind: m.data?.kind,
+      })));
+      return messages.map(() => null);
+    },
+  });
+  await db().collection('users').doc('ph-1').set({ language: 'en' });
+  await db().collection('users').doc('ph-1').collection('fcmTokens').doc('t1').set({ token: 'tok-1', platform: 'ios' });
+});
 
 describe('onInstructorUpload — production (no moderation yet)', () => {
   it('keeps a new photo pending and shows nothing unmoderated', async () => {
@@ -54,6 +73,7 @@ describe('onInstructorUpload — production (no moderation yet)', () => {
     });
     expect(await exists('instructorUploads/ph-1/photo/u1.jpg')).toBe(true);
     expect(await exists('instructorPhotos/ph-1/u1.jpg')).toBe(false);
+    expect(pushes).toHaveLength(0); // nothing decided yet, nothing to tell
   });
 
   it('an approved photo stays while a new one waits', async () => {
@@ -120,6 +140,25 @@ describe('onInstructorUpload — emulator auto-approve', () => {
     expect((await pub('ph-1')).photoPath).toBe('instructorPhotos/ph-1/u2.jpg');
     expect(await exists('instructorPhotos/ph-1/u1.jpg')).toBe(false);
     expect(await exists('instructorPhotos/ph-1/u2.jpg')).toBe(true);
+  });
+
+  it('tells the instructor the photo is published, opening Профиль', async () => {
+    await upload('instructorUploads/ph-1/photo/u1.jpg');
+    await finalize('instructorUploads/ph-1/photo/u1.jpg');
+    expect(pushes).toEqual([{ token: 'tok-1', title: 'Photo published', route: 'profile', kind: 'photo_approved' }]);
+  });
+
+  it('tells the instructor a refused photo was not accepted', async () => {
+    await upload('instructorUploads/ph-1/photo/u1.jpg', Buffer.alloc(2048));
+    await finalize('instructorUploads/ph-1/photo/u1.jpg');
+    expect(pushes).toEqual([{ token: 'tok-1', title: "Photo wasn't accepted", route: 'profile', kind: 'photo_rejected' }]);
+  });
+
+  it('a redelivered event does not notify twice', async () => {
+    await upload('instructorUploads/ph-1/photo/u1.jpg');
+    await finalize('instructorUploads/ph-1/photo/u1.jpg');
+    await finalize('instructorUploads/ph-1/photo/u1.jpg');
+    expect(pushes).toHaveLength(1);
   });
 
   it('a redelivered event changes nothing', async () => {

@@ -4,6 +4,7 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { requirePaidSubscriber } from './entitlement';
 import { RELEASED_STATES, timezoneForZip } from './zip-timezone';
 import { stripJpegMetadata } from './jpeg-metadata';
+import { sendPushToUser } from './push';
 
 /**
  * Instructors marketplace — the student-side read path (plan v2 §3, §13).
@@ -516,6 +517,7 @@ export const onInstructorUpload = functions.storage.object().onFinalize(async (o
   if (!clean) {
     await upload.delete({ ignoreNotFound: true });
     await ref.update({ photoStatus: 'rejected', updatedAt: now });
+    await sendPushToUser(uid, 'photo_rejected', 'profile');
     return;
   }
   const photoPath = `instructorPhotos/${uid}/${uploadId}.jpg`;
@@ -527,6 +529,9 @@ export const onInstructorUpload = functions.storage.object().onFinalize(async (o
   if (typeof previous === 'string' && previous !== photoPath) {
     await bucket.file(previous).delete({ ignoreNotFound: true });
   }
+  // Last, after the upload is gone: a redelivered event returns early above
+  // (upload missing), so it doesn't notify twice.
+  await sendPushToUser(uid, 'photo_approved', 'profile');
 });
 
 /**

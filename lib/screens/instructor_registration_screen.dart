@@ -11,6 +11,7 @@ import '../data/teaching_languages.dart';
 import '../localization/app_localizations.dart';
 import '../providers/auth_provider.dart';
 import '../services/instructor_service.dart';
+import '../services/push_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
@@ -272,6 +273,9 @@ class _InstructorRegistrationScreenState extends State<InstructorRegistrationScr
       await auth.applyInstructorRole(state);
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(InstructorRegistrationScreen.draftKey);
+      // The moment pushes make sense for an instructor (plan v2 §12): their
+      // profile is live and students can now write. Never throws.
+      await PushService.instance.requestPermissionAndRegister();
       navigator.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => HomeScreen()), (_) => false);
     } catch (e) {
       debugPrint('InstructorRegistration: register failed: $e');

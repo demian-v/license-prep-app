@@ -9,6 +9,7 @@ import '../services/email_sync_service.dart';
 import '../services/session_manager.dart';
 import '../services/subscription_management_service.dart';
 import '../services/instructor_service.dart';
+import '../services/push_service.dart';
 import '../data/state_data.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'language_provider.dart';
@@ -944,6 +945,13 @@ class AuthProvider extends ChangeNotifier {
       
       // Stop session monitoring
       sessionManager.stopSessionMonitoring();
+
+      // The account is on another device now; this one stops getting its
+      // pushes (plan v2 §12). Best-effort, not awaited.
+      PushService.instance
+          .unregister()
+          .timeout(const Duration(seconds: 3))
+          .catchError((Object e) => debugPrint('⚠️ AuthProvider: push cleanup skipped: $e'));
       
       // Reset language to English when user logs out
       await _resetLanguageToEnglish();

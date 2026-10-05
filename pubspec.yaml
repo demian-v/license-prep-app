@@ -50,6 +50,11 @@ dependencies:
   # payment path is its own piece of work, not a side effect of adding crash
   # reporting.
   firebase_crashlytics: 5.0.0
+  # Push (instructors P5, 2026-10-05). Pinned exactly for the same reason as
+  # crashlytics: 16.0.0 is the release that requires firebase_core ^4.0.0
+  # (16.0.1+ needs 4.1+). No flutter_local_notifications: a foreground message
+  # is shown as an in-app banner (owner, 2026-10-05).
+  firebase_messaging: 16.0.0
   # Result-screen Share button (owner-approved 2026-09-28). Added alone: it
   # brought only cross_file, mime and its platform interface, no version bumps.
   share_plus: ^12.0.2

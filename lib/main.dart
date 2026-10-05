@@ -58,6 +58,8 @@ import 'providers/state_provider.dart';
 import 'localization/app_localizations.dart';
 import 'services/email_verification_handler.dart';
 import 'services/action_code_router.dart';
+import 'services/push_service.dart';
+import 'widgets/push_banner.dart';
 import 'services/session_notification_service.dart';
 
 // Global navigator key for session-based navigation
@@ -95,6 +97,19 @@ void handleGlobalSessionConflict(AuthProvider authProvider) {
       );
     });
   }
+}
+
+/// A push that arrives while the app is open: the in-app banner; a tap opens
+/// its route the same way a tapped system notification does.
+void _showPushBanner(String title, String body, PushRoute? route) {
+  final overlay = navigatorKey.currentState?.overlay;
+  if (overlay == null) return;
+  PushBanner.show(
+    overlay,
+    title: title,
+    body: body,
+    onTap: route == null ? null : () => PushService.pendingRoute.value = route,
+  );
 }
 
 // Validate existing user sessions on app startup
@@ -371,6 +386,12 @@ Future<void> _startApp() async {
   
   // Set up auth listener to detect email changes
   setupAuthListener();
+
+  // Push (instructors plan v2 §12): listeners only. The permission prompt
+  // comes later, at the moment it makes sense — never at app start.
+  PushService.instance
+      .start(onForeground: _showPushBanner)
+      .catchError((Object e) => debugPrint('Push: start failed: $e'));
   
   // Handle email sync on startup
   final currentAuthUser = firebase_auth.FirebaseAuth.instance.currentUser;

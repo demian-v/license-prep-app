@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseFirestore, Fi
 import 'package:cloud_functions/cloud_functions.dart' show FirebaseFunctionsException;
 import '../../data/state_data.dart';
 import '../session_manager.dart';
+import '../push_service.dart';
 
 class FirebaseAuthApi implements AuthApiInterface {
   final FirebaseFunctionsClient _functionsClient;
@@ -679,6 +680,16 @@ class FirebaseAuthApi implements AuthApiInterface {
         }
       }
       
+      // This device stops getting the user's pushes (plan v2 §12). Needs the
+      // signed-in user for the token doc, so before signOut, and bounded for
+      // the same reason as the session write above: never gate logout on a
+      // network round trip.
+      try {
+        await PushService.instance.unregister().timeout(const Duration(seconds: 3));
+      } catch (pushError) {
+        debugPrint('⚠️ FirebaseAuthApi: Push token cleanup skipped ($pushError)');
+      }
+
       // Sign out from Firebase Auth first
       await FirebaseAuth.instance.signOut();
       
