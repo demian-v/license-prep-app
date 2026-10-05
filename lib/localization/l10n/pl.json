@@ -515,7 +515,6 @@
   "instructor_languages": "Języki",
   "instructor_hours": "Godziny w tygodniu",
   "instructor_hours_none": "Godziny nie zostały jeszcze ustalone.",
-  "instructor_hours_tz": "Czas lokalny: {tz}",
   "instructor_reviews": "Opinie",
   "instructor_reviews_none": "Brak opinii.",
   "instructor_reviews_count": "Opinie: {n}",
@@ -526,5 +525,18 @@
   "report_reason_inappropriate": "Nieodpowiednie treści",
   "report_reason_spam": "Spam lub oszustwo",
   "instructor_filter_any_price": "Dowolna",
-  "instructor_price_hidden_short": "Cena po weryfikacji"
+  "instructor_price_hidden_short": "Cena po weryfikacji",
+  "instructor_dual_yes": "Tak",
+  "instructor_day_off": "Wolne",
+  "day_full_mon": "Poniedziałek",
+  "day_full_tue": "Wtorek",
+  "day_full_wed": "Środa",
+  "day_full_thu": "Czwartek",
+  "day_full_fri": "Piątek",
+  "day_full_sat": "Sobota",
+  "day_full_sun": "Niedziela",
+  "instructor_tz_eastern": "Czas wschodni",
+  "instructor_tz_central": "Czas centralny",
+  "instructor_tz_mountain": "Czas górski",
+  "instructor_tz_pacific": "Czas pacyficzny"
 }

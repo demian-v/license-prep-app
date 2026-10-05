@@ -515,7 +515,6 @@
   "instructor_languages": "Языки",
   "instructor_hours": "Часы занятий",
   "instructor_hours_none": "Часы ещё не указаны.",
-  "instructor_hours_tz": "Местное время: {tz}",
   "instructor_reviews": "Отзывы",
   "instructor_reviews_none": "Отзывов пока нет.",
   "instructor_reviews_count": "Отзывов: {n}",
@@ -526,5 +525,18 @@
   "report_reason_inappropriate": "Неприемлемое содержание",
   "report_reason_spam": "Спам или мошенничество",
   "instructor_filter_any_price": "Любая",
-  "instructor_price_hidden_short": "Цена после проверки"
+  "instructor_price_hidden_short": "Цена после проверки",
+  "instructor_dual_yes": "Есть",
+  "instructor_day_off": "Выходной",
+  "day_full_mon": "Понедельник",
+  "day_full_tue": "Вторник",
+  "day_full_wed": "Среда",
+  "day_full_thu": "Четверг",
+  "day_full_fri": "Пятница",
+  "day_full_sat": "Суббота",
+  "day_full_sun": "Воскресенье",
+  "instructor_tz_eastern": "Восточное время",
+  "instructor_tz_central": "Центральное время",
+  "instructor_tz_mountain": "Горное время",
+  "instructor_tz_pacific": "Тихоокеанское время"
 }

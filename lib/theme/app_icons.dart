@@ -56,6 +56,11 @@ class AppIcons {
   static const String report = '$_base/danger-triangle-linear.svg';
   static const String reportFilled = '$_base/danger-triangle-bold.svg';
 
+  /// An instructor's rating, and the Поиск filters button (instructors P4;
+  /// downloaded from Iconify with the owner's OK, 2026-10-05).
+  static const String rating = '$_base/star-bold.svg';
+  static const String filters = '$_base/tuning-2-linear.svg';
+
   /// Draws one icon at [size], tinted [color].
   ///
   /// Solar's SVGs paint with `currentColor`, so a [ColorFilter] recolours

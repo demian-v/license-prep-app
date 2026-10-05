@@ -10,6 +10,7 @@ import '../providers/auth_provider.dart';
 import '../providers/state_provider.dart';
 import '../providers/subscription_provider.dart';
 import '../services/instructor_service.dart';
+import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
 import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
@@ -129,7 +130,7 @@ class _InstructorsScreenState extends State<InstructorsScreen> {
                     blocks = _lockedPreview(
                         l, stateName, snapshot.data!.listedCount);
                   } else {
-                    return _paidTab(l, stateName, snapshot.data!.listedCount);
+                    return _paidTab(l);
                   }
                   return _page(blocks);
                 },
@@ -202,7 +203,7 @@ class _InstructorsScreenState extends State<InstructorsScreen> {
   /// A paid student's tab: the state's listing is loaded once per session
   /// (InstructorService.listings) and the saved ids stream from
   /// `favorites/{uid}`.
-  Widget _paidTab(AppLocalizations l, String stateName, int count) {
+  Widget _paidTab(AppLocalizations l) {
     final uid = Provider.of<AuthProvider>(context, listen: false).user?.id;
     _listings ??= _service.listings(_infoState!);
     if (uid != null) _favorites ??= _service.favorites(uid);
@@ -238,7 +239,7 @@ class _InstructorsScreenState extends State<InstructorsScreen> {
           }
           return RefreshIndicator(
             onRefresh: _refresh,
-            child: _page(_header(l, stateName, count), tail: tail),
+            child: _page(_header(l), tail: tail),
           );
         },
       ),
@@ -326,14 +327,12 @@ class _InstructorsScreenState extends State<InstructorsScreen> {
     return _cards(list, saved, uid);
   }
 
-  List<Widget> _header(AppLocalizations l, String stateName, int count) {
+  /// The segments at the top: no hero for a paid student (owner,
+  /// 2026-10-05: it took a third of the screen and only repeated what the
+  /// list says — «Найдено: N», and the state in «Что требует ваш штат»).
+  /// The locked preview keeps it: there the count is the pitch.
+  List<Widget> _header(AppLocalizations l) {
     return [
-      _Hero(
-        title: l.translate('instructors_hero_title'),
-        description: stateName,
-        count: count,
-      ),
-      const SizedBox(height: AppSpacing.x3),
       _SegmentPills(
         labels: [
           l.translate('instructors_tab_search'),
@@ -591,8 +590,7 @@ class _FilterBar extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(SolarIcons.checklistMinimalisticLinear,
-                        size: 18, color: on ? AppColors.onSignal : AppColors.ink),
+                    AppIcons.icon(AppIcons.filters, size: 18, color: on ? AppColors.onSignal : AppColors.ink),
                     const SizedBox(width: AppSpacing.x2),
                     Text(
                       on ? '${l.translate('instructor_filters')} · $active' : l.translate('instructor_filters'),

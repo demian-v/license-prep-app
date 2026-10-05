@@ -214,8 +214,11 @@ void main() {
       expect(find.text('Licence and identity not checked yet'), findsOneWidget);
       expect(find.text('Booking opens once the licence is checked.'), findsOneWidget);
       expect(find.text('Messages open once the ID is checked.'), findsOneWidget);
-      expect(find.text('09:00–12:00\n14:00–18:00'), findsOneWidget);
-      expect(find.text('Local time: America/Chicago'), findsOneWidget);
+      expect(find.text('Monday'), findsOneWidget);
+      expect(find.text('09:00–12:00'), findsOneWidget);
+      expect(find.text('14:00–18:00'), findsOneWidget);
+      expect(find.text('Day off'), findsNWidgets(6));
+      expect(find.text('Central Time · Chicago'), findsOneWidget);
       expect(find.text('Comment 3'), findsOneWidget);
       expect(find.text('Comment 4'), findsNothing);
       await tester.tap(find.text('All reviews'));

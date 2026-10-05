@@ -515,7 +515,6 @@
   "instructor_languages": "Мови",
   "instructor_hours": "Години занять",
   "instructor_hours_none": "Години ще не вказано.",
-  "instructor_hours_tz": "Місцевий час: {tz}",
   "instructor_reviews": "Відгуки",
   "instructor_reviews_none": "Відгуків поки немає.",
   "instructor_reviews_count": "Відгуків: {n}",
@@ -526,5 +525,18 @@
   "report_reason_inappropriate": "Неприйнятний вміст",
   "report_reason_spam": "Спам або шахрайство",
   "instructor_filter_any_price": "Будь-яка",
-  "instructor_price_hidden_short": "Ціна після перевірки"
+  "instructor_price_hidden_short": "Ціна після перевірки",
+  "instructor_dual_yes": "Є",
+  "instructor_day_off": "Вихідний",
+  "day_full_mon": "Понеділок",
+  "day_full_tue": "Вівторок",
+  "day_full_wed": "Середа",
+  "day_full_thu": "Четвер",
+  "day_full_fri": "Пʼятниця",
+  "day_full_sat": "Субота",
+  "day_full_sun": "Неділя",
+  "instructor_tz_eastern": "Східний час",
+  "instructor_tz_central": "Центральний час",
+  "instructor_tz_mountain": "Гірський час",
+  "instructor_tz_pacific": "Тихоокеанський час"
 }

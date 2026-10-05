@@ -39,17 +39,6 @@ class InstructorDetailScreen extends StatefulWidget {
 /// Reviews shown on the page before «Все отзывы» (plan v2 §13).
 const int _reviewsOnPage = 3;
 
-/// Weekdays with their label keys, as literals (localization_coverage_test).
-const List<(String, String)> _days = [
-  ('mon', 'day_short_mon'),
-  ('tue', 'day_short_tue'),
-  ('wed', 'day_short_wed'),
-  ('thu', 'day_short_thu'),
-  ('fri', 'day_short_fri'),
-  ('sat', 'day_short_sat'),
-  ('sun', 'day_short_sun'),
-];
-
 class _InstructorDetailScreenState extends State<InstructorDetailScreen> {
   late final InstructorService _service = widget.service ?? InstructorService();
   late final Future<InstructorListing> _profile = _service.detail(widget.instructor.id);
@@ -134,14 +123,14 @@ class _InstructorDetailScreenState extends State<InstructorDetailScreen> {
                     ),
                   ],
                   const SizedBox(height: AppSpacing.x3),
-                  _Section(title: l.translate('instructor_lessons'), children: _lessonFacts(l, i)),
+                  _Section(title: l.translate('instructor_lessons'), children: [_LessonTiles(instructor: i)]),
                   if (i.schoolName != null) ...[
                     const SizedBox(height: AppSpacing.x3),
-                    _Section(title: l.translate('ireg_school_title'), children: _schoolFacts(l, i)),
+                    _Section(title: l.translate('ireg_school_title'), children: [_School(instructor: i)]),
                   ],
                   if (snapshot.hasData) ...[
                     const SizedBox(height: AppSpacing.x3),
-                    _Section(title: l.translate('instructor_hours'), children: _hours(l, i)),
+                    _Section(title: l.translate('instructor_hours'), children: [_WeekHours(instructor: i)]),
                   ],
                   const SizedBox(height: AppSpacing.x3),
                   _Reviews(instructor: i, reviews: _reviews),
@@ -153,49 +142,6 @@ class _InstructorDetailScreenState extends State<InstructorDetailScreen> {
       },
     );
   }
-
-  List<Widget> _lessonFacts(AppLocalizations l, InstructorListing i) => [
-        _Fact(l.translate('instructor_languages'), i.languages.map(teachingLanguageName).join(', ')),
-        if (i.lessonDurations.isNotEmpty)
-          _Fact(l.translate('ireg_durations'),
-              l.translate('ireg_minutes').replaceAll('{n}', i.lessonDurations.join(' · '))),
-        if (i.carModel != null)
-          _Fact(l.translate('ireg_car_title'), [i.carModel!, if (i.carYear != null) '${i.carYear}'].join(', ')),
-        if (i.hasDualControls) _Fact(l.translate('ireg_dual_controls'), '✓'),
-      ];
-
-  List<Widget> _schoolFacts(AppLocalizations l, InstructorListing i) => [
-        _Fact(l.translate('ireg_school_name'), i.schoolName!),
-        // Public on purpose: a student can check it with the state (plan v2 §5).
-        if (i.schoolLicenseNumber != null) _Fact(l.translate('ireg_school_license'), i.schoolLicenseNumber!),
-        if (i.schoolAddress != null) _Fact(l.translate('ireg_school_address'), i.schoolAddress!),
-        if (i.fleetSize != null) _Fact(l.translate('ireg_fleet_size'), '${i.fleetSize}'),
-        if (i.instructorCount != null) _Fact(l.translate('ireg_instructor_count'), '${i.instructorCount}'),
-      ];
-
-  List<Widget> _hours(AppLocalizations l, InstructorListing i) {
-    if (i.availability.values.every((day) => day.isEmpty)) {
-      return [Text(l.translate('instructor_hours_none'), style: AppTypography.body.copyWith(color: AppColors.inkSecondary))];
-    }
-    return [
-      for (final (day, label) in _days)
-        _Fact(
-          l.translate(label),
-          (i.availability[day] ?? const []).map((h) => '${h.$1}–${h.$2}').join('\n').ifEmpty('—'),
-        ),
-      if (i.timezone != null) ...[
-        const SizedBox(height: AppSpacing.x2),
-        Text(
-          l.translate('instructor_hours_tz').replaceAll('{tz}', i.timezone!),
-          style: AppTypography.caption.copyWith(color: AppColors.inkSecondary),
-        ),
-      ],
-    ];
-  }
-}
-
-extension on String {
-  String ifEmpty(String other) => isEmpty ? other : this;
 }
 
 const EdgeInsets _pagePadding = EdgeInsets.fromLTRB(
@@ -266,7 +212,7 @@ class _Hero extends StatelessWidget {
             runSpacing: AppSpacing.x2,
             children: [
               InstructorFactPill(
-                icon: i.isNew ? null : SolarIcons.medalRibbonsStarBold,
+                star: !i.isNew,
                 text: instructorRating(l, i),
               ),
               InstructorStageBadge(stage: i.stage),
@@ -403,34 +349,325 @@ class _Section extends StatelessWidget {
   }
 }
 
-/// A label on the left, its value on the right.
-class _Fact extends StatelessWidget {
-  const _Fact(this.label, this.value);
+/// One fact as a soft tile: an icon disc, a small label, the value in bold.
+class _Tile extends StatelessWidget {
+  const _Tile({required this.icon, required this.label, required this.value, this.wide = false});
 
+  final IconData icon;
   final String label;
   final String value;
 
+  /// A whole-row tile: the icon beside the text instead of above it.
+  final bool wide;
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.x1),
+    final disc = Container(
+      width: 32,
+      height: 32,
+      decoration: const BoxDecoration(color: AppColors.paper, shape: BoxShape.circle),
+      child: Icon(icon, size: 18, color: AppColors.signal),
+    );
+    final text = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: AppTypography.caption.copyWith(color: AppColors.inkSecondary)),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: AppTypography.label.copyWith(
+            color: AppColors.ink,
+            fontVariations: const [FontVariation('wght', 600)],
+          ),
+        ),
+      ],
+    );
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.x3),
+      decoration: BoxDecoration(
+        color: AppColors.field,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      child: wide
+          ? Row(children: [disc, const SizedBox(width: AppSpacing.x3), Expanded(child: text)])
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [disc, const SizedBox(height: AppSpacing.x2), text],
+            ),
+    );
+  }
+}
+
+/// [tiles] two to a row, each pair as tall as its taller tile; a lone last
+/// tile takes the whole row.
+class _TileGrid extends StatelessWidget {
+  const _TileGrid({required this.tiles});
+
+  final List<Widget> tiles;
+
+  @override
+  Widget build(BuildContext context) {
+    const gap = AppSpacing.x2;
+    return Column(
+      children: [
+        for (var n = 0; n < tiles.length; n += 2) ...[
+          if (n > 0) const SizedBox(height: gap),
+          if (n + 1 < tiles.length)
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: tiles[n]),
+                  const SizedBox(width: gap),
+                  Expanded(child: tiles[n + 1]),
+                ],
+              ),
+            )
+          else
+            tiles[n],
+        ],
+      ],
+    );
+  }
+}
+
+/// Уроки: languages, lesson lengths, car, dual pedals.
+class _LessonTiles extends StatelessWidget {
+  const _LessonTiles({required this.instructor});
+
+  final InstructorListing instructor;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final i = instructor;
+    return _TileGrid(tiles: [
+      _Tile(
+        icon: SolarIcons.globalLinear,
+        label: l.translate('instructor_languages'),
+        value: i.languages.map(teachingLanguageName).join(', '),
+      ),
+      if (i.lessonDurations.isNotEmpty)
+        _Tile(
+          icon: SolarIcons.clockCircleLinear,
+          label: l.translate('ireg_durations'),
+          value: l.translate('ireg_minutes').replaceAll('{n}', i.lessonDurations.join(' · ')),
+        ),
+      if (i.carModel != null)
+        _Tile(
+          icon: SolarIcons.carLinear,
+          label: l.translate('ireg_car_title'),
+          value: [i.carModel!, if (i.carYear != null) '${i.carYear}'].join(', '),
+        ),
+      if (i.hasDualControls)
+        _Tile(
+          icon: SolarIcons.checkCircleBold,
+          label: l.translate('ireg_dual_controls'),
+          value: l.translate('instructor_dual_yes'),
+        ),
+    ]);
+  }
+}
+
+/// Автошкола: the school with its address, then its licence number (public
+/// on purpose — a student can check it with the state, plan v2 §5) and size.
+class _School extends StatelessWidget {
+  const _School({required this.instructor});
+
+  final InstructorListing instructor;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final i = instructor;
+    final tiles = [
+      if (i.schoolLicenseNumber != null)
+        _Tile(
+          icon: SolarIcons.documentTextLinear,
+          label: l.translate('ireg_school_license'),
+          value: i.schoolLicenseNumber!,
+          wide: true,
+        ),
+      if (i.fleetSize != null)
+        _Tile(icon: SolarIcons.carLinear, label: l.translate('ireg_fleet_size'), value: '${i.fleetSize}'),
+      if (i.instructorCount != null)
+        _Tile(
+          icon: SolarIcons.userRoundedLinear,
+          label: l.translate('ireg_instructor_count'),
+          value: '${i.instructorCount}',
+        ),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: const BoxDecoration(color: AppColors.signal50, shape: BoxShape.circle),
+              child: const Icon(SolarIcons.squareAcademicCapBold, size: 22, color: AppColors.signal),
+            ),
+            const SizedBox(width: AppSpacing.x3),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    i.schoolName!,
+                    style: AppTypography.body.copyWith(
+                      color: AppColors.ink,
+                      fontVariations: const [FontVariation('wght', 600)],
+                    ),
+                  ),
+                  if (i.schoolAddress != null)
+                    Text(i.schoolAddress!, style: AppTypography.caption.copyWith(color: AppColors.inkSecondary)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        if (tiles.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.x3),
+          // The licence on its own row, the two numbers side by side.
+          if (i.schoolLicenseNumber != null) ...[
+            tiles.first,
+            if (tiles.length > 1) const SizedBox(height: AppSpacing.x2),
+            if (tiles.length > 1) _TileGrid(tiles: tiles.sublist(1)),
+          ] else
+            _TileGrid(tiles: tiles),
+        ],
+      ],
+    );
+  }
+}
+
+/// The weekly hours as a list a student reads at a glance (owner,
+/// 2026-10-05: the timeline was hard to read): each day by its full name,
+/// each open range as a chip, days off in grey, and today's row tinted
+/// (the phone's day — the student is in the instructor's state).
+class _WeekHours extends StatelessWidget {
+  const _WeekHours({required this.instructor});
+
+  final InstructorListing instructor;
+
+  /// Weekday id, full-name key, `DateTime.weekday`.
+  static const List<(String, String, int)> _week = [
+    ('mon', 'day_full_mon', DateTime.monday),
+    ('tue', 'day_full_tue', DateTime.tuesday),
+    ('wed', 'day_full_wed', DateTime.wednesday),
+    ('thu', 'day_full_thu', DateTime.thursday),
+    ('fri', 'day_full_fri', DateTime.friday),
+    ('sat', 'day_full_sat', DateTime.saturday),
+    ('sun', 'day_full_sun', DateTime.sunday),
+  ];
+
+  /// The zones zip-timezone.ts can assign, by name instead of IANA id.
+  static const Map<String, String> _zoneKeys = {
+    'America/New_York': 'instructor_tz_eastern',
+    'America/Detroit': 'instructor_tz_eastern',
+    'America/Chicago': 'instructor_tz_central',
+    'America/Denver': 'instructor_tz_mountain',
+    'America/Boise': 'instructor_tz_mountain',
+    'America/Phoenix': 'instructor_tz_mountain',
+    'America/Los_Angeles': 'instructor_tz_pacific',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final i = instructor;
+    if (i.availability.values.every((day) => day.isEmpty)) {
+      return Text(l.translate('instructor_hours_none'),
+          style: AppTypography.body.copyWith(color: AppColors.inkSecondary));
+    }
+    final today = DateTime.now().weekday;
+    final zoneKey = _zoneKeys[i.timezone];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final (day, nameKey, weekday) in _week)
+          _row(l, l.translate(nameKey), i.availability[day] ?? const [], weekday == today),
+        if (i.timezone != null) ...[
+          const SizedBox(height: AppSpacing.x3),
+          Row(
+            children: [
+              const Icon(SolarIcons.clockCircleLinear, size: 16, color: AppColors.inkSecondary),
+              const SizedBox(width: AppSpacing.x1 + 2),
+              Expanded(
+                child: Text(
+                  zoneKey == null ? i.timezone! : '${l.translate(zoneKey)} · ${i.city}',
+                  style: AppTypography.caption.copyWith(color: AppColors.inkSecondary),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// One day: the name on the left, the ranges as a right-aligned column
+  /// so the times line up down the card. Every row is the same height; a
+  /// day with two ranges stacks them. Only today is blue (its tinted row,
+  /// white chips; no «сегодня» pill — owner, 2026-10-05: it could break a
+  /// small screen) — the other chips are quiet `field`
+  /// pills, so blue keeps meaning one thing on a page that also has a blue
+  /// button.
+  Widget _row(AppLocalizations l, String name, List<(String, String)> hours, bool isToday) {
+    final open = hours.isNotEmpty;
+    return Container(
+      constraints: const BoxConstraints(minHeight: 44),
+      margin: const EdgeInsets.only(bottom: 2),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x3, vertical: AppSpacing.x1 + 2),
+      decoration: BoxDecoration(
+        color: isToday ? AppColors.signal50 : Colors.transparent,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: Text(label, style: AppTypography.label.copyWith(color: AppColors.inkSecondary)),
-          ),
-          const SizedBox(width: AppSpacing.x3),
-          Expanded(
             child: Text(
-              value,
-              textAlign: TextAlign.end,
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: AppTypography.label.copyWith(
-                color: AppColors.ink,
-                fontVariations: const [FontVariation('wght', 600)],
+                color: open ? AppColors.ink : AppColors.inkTertiary,
+                fontVariations: [FontVariation('wght', open ? 600 : 500)],
               ),
             ),
           ),
+          const SizedBox(width: AppSpacing.x2),
+          if (!open)
+            Text(
+              l.translate('instructor_day_off'),
+              style: AppTypography.label.copyWith(color: AppColors.inkTertiary),
+            )
+          else
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                for (var n = 0; n < hours.length; n++) ...[
+                  if (n > 0) const SizedBox(height: AppSpacing.x1),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x3, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: isToday ? AppColors.paper : AppColors.field,
+                      borderRadius: BorderRadius.circular(BentoTokens.chip),
+                    ),
+                    child: Text(
+                      '${hours[n].$1}–${hours[n].$2}',
+                      style: AppTypography.label.copyWith(
+                        color: isToday ? AppColors.signal : AppColors.ink,
+                        fontVariations: const [FontVariation('wght', 600)],
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
         ],
       ),
     );
@@ -547,7 +784,7 @@ class _ReviewTile extends StatelessWidget {
                   ),
                 ),
               ),
-              InstructorFactPill(icon: SolarIcons.medalRibbonsStarBold, text: '${review.rating}/5'),
+              InstructorFactPill(star: true, text: '${review.rating}/5'),
             ],
           ),
           if (review.comment.isNotEmpty) ...[

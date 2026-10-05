@@ -58,10 +58,12 @@ class InstructorAvatar extends StatelessWidget {
 
 /// A small grey fact pill: rating, price, languages (plan v2 §13).
 class InstructorFactPill extends StatelessWidget {
-  const InstructorFactPill({super.key, required this.text, this.icon});
+  const InstructorFactPill({super.key, required this.text, this.star = false});
 
   final String text;
-  final IconData? icon;
+
+  /// A rating: the amber star before the number.
+  final bool star;
 
   @override
   Widget build(BuildContext context) {
@@ -75,8 +77,8 @@ class InstructorFactPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (icon != null) ...[
-            Icon(icon, size: 14, color: AppColors.inkSecondary),
+          if (star) ...[
+            AppIcons.icon(AppIcons.rating, size: 14, color: AppColors.warn),
             const SizedBox(width: AppSpacing.x1),
           ],
           Flexible(
@@ -197,9 +199,7 @@ class InstructorCard extends StatelessWidget {
                           runSpacing: AppSpacing.x1 + 2,
                           children: [
                             InstructorFactPill(
-                              icon: i.isNew
-                                  ? null
-                                  : SolarIcons.medalRibbonsStarBold,
+                              star: !i.isNew,
                               text: instructorRating(l, i),
                             ),
                             InstructorFactPill(
