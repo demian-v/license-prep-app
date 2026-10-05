@@ -1,7 +1,7 @@
 """Export the onboarding screenshots and their highlight rects for the Flutter app.
 
 Usage:
-    python3 design/onboarding/_src/export_onboarding_assets.py RAW_DIR
+    python3 design/onboarding/_src/export_onboarding_assets.py RAW_DIR [--only SCREEN[,SCREEN]]
 
 RAW_DIR holds one folder per locale (en, es, pl, ru, uk), each with six iPhone 16 Pro
 simulator captures (1206×2622, status bar overridden to 9:41):
@@ -13,7 +13,13 @@ simulator captures (1206×2622, status bar overridden to 9:41):
   4. regenerates lib/widgets/onboarding_shots.dart with the rects, in a
      360×783 space (the screenshot's width scaled to 360).
 It also writes RAW_DIR/<locale>/check_<screen>.png with the rects drawn on, to eyeball.
+
+`instructors.png` / `instructors_s.png` (added 2026-10-05) are captured as a PAID
+student, so the page has no trial card and nothing is cut. `--only instructors`
+exports just that screen and keeps every other screen's rects from the current
+onboarding_shots.dart, so approved screenshots don't have to be re-shot.
 """
+import re
 import os
 import sys
 
@@ -81,11 +87,18 @@ def trial_cut(top_img):
     return 200, runs[1][0] - 10
 
 
-def bead_rect(img):
+def bead_rect(img, wide_label=False):
     zone = img[2310:2460, :]
     mask = np.abs(zone - SIGNAL).max(axis=2) < 40
     xs = np.nonzero(mask.any(axis=0))[0]
     cx = (xs[0] + xs[-1]) / 2 * SCALE
+    if wide_label:
+        # «Инструкторы» / «Instructors» is wider than the 62-pt bead: take the
+        # blue label's own width too, or the ring cuts the word.
+        label = np.abs(img[2470:2540, :] - SIGNAL).max(axis=2) < 60
+        lx = np.nonzero(label.any(axis=0))[0]
+        half = max(31, (cx - lx[0] * SCALE) + 6, ((lx[-1] + 1) * SCALE - cx) + 6)
+        return (cx - half, 686, 2 * half, 76)
     return (cx - 31, 686, 62, 76)
 
 
@@ -109,6 +122,10 @@ def pick(screen, cs):
         return {'hero': rect(hero), 'tiles': union(rect(tiles[0]), rect(tiles[-1])), 'mistakes': rect(mist)}
     if screen == 'theory':
         return {'module': rect(whites[0])}
+    if screen == 'instructors':
+        # The first instructor card under the segments and «Фильтры» (both
+        # are shorter than a card, so cards() skips them).
+        return {'card': rect(whites[0])}
     if screen == 'profile':
         hero = next(c for c in cs if c['kind'] == 'blue')
         rows = [c for c in whites if c['y0'] >= hero['y1']][:2]
@@ -116,22 +133,40 @@ def pick(screen, cs):
     raise ValueError(screen)
 
 
-def export(raw_dir):
-    found = {}
+SCREENS = ['tests', 'theory', 'instructors', 'profile']
+NO_TRIAL_CARD = {'instructors'}
+
+
+def existing_rects():
+    """The rects in the current onboarding_shots.dart, as {locale: {screen: {key: rect}}}."""
+    found, loc = {}, None
+    for line in open(DART):
+        m = re.match(r"  '(\w+)': \{", line)
+        if m:
+            loc = found.setdefault(m.group(1), {})
+            continue
+        m = re.match(r"    '(\w+)\.(\w+)': Rect\.fromLTWH\(([^)]*)\),", line)
+        if m and loc is not None:
+            loc.setdefault(m.group(1), {})[m.group(2)] = tuple(float(v) for v in m.group(3).split(','))
+    return found
+
+
+def export(raw_dir, only=None):
+    found = existing_rects() if only else {}
     for loc in LOCALES:
         src = os.path.join(raw_dir, loc)
         if not os.path.isdir(src):
             continue
-        found[loc] = {}
+        found.setdefault(loc, {})
         os.makedirs(os.path.join(ASSETS, loc), exist_ok=True)
-        for screen in ['tests', 'theory', 'profile']:
+        for screen in only or ['tests', 'theory', 'profile']:
             top = os.path.join(src, f'{screen}.png')
             scrolled = os.path.join(src, f'{screen}_s.png')
             top_img = np.asarray(Image.open(top).convert('RGB')).astype(np.float32)
-            cut = trial_cut(top_img)
+            cut = (200, 200) if screen in NO_TRIAL_CARD else trial_cut(top_img)
             page = compose_array(top, scrolled, *cut)
             rects = pick(screen, cards(page))
-            rects['tab'] = bead_rect(page)
+            rects['tab'] = bead_rect(page, wide_label=screen == 'instructors')
             found[loc][screen] = rects
             im = Image.fromarray(page.astype(np.uint8))
             im.resize((720, 1565), Image.LANCZOS).save(os.path.join(ASSETS, loc, f'{screen}.webp'), quality=82, method=6)
@@ -151,7 +186,8 @@ def write_dart(found):
         '//',
         '// Highlight rects for the onboarding screenshots, in a 360×783 space (the',
         '// screenshot scaled to 360 wide). Keys: <screen>.<element>, screens tests /',
-        '// theory / profile, element tab plus hero, tiles, mistakes, module, settings.',
+        '// theory / instructors / profile, element tab plus hero, tiles, mistakes,',
+        '// module, card, settings.',
         "import 'dart:ui';",
         '',
         'const Size onboardingShotSize = Size(360, 783);',
@@ -163,7 +199,8 @@ def write_dart(found):
     ]
     for loc, screens in found.items():
         lines.append(f"  '{loc}': {{")
-        for screen, rects in screens.items():
+        for screen in sorted(screens, key=SCREENS.index):
+            rects = screens[screen]
             for key, (x, y, w, h) in rects.items():
                 lines.append(f"    '{screen}.{key}': Rect.fromLTWH({x:.1f}, {y:.1f}, {w:.1f}, {h:.1f}),")
         lines.append('  },')
@@ -173,4 +210,5 @@ def write_dart(found):
 
 
 if __name__ == '__main__':
-    export(sys.argv[1])
+    only = sys.argv[sys.argv.index('--only') + 1].split(',') if '--only' in sys.argv else None
+    export(sys.argv[1], only)

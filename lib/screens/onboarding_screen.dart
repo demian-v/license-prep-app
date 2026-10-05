@@ -122,7 +122,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    for (final screen in const ['tests', 'theory', 'profile']) {
+    for (final screen in const ['tests', 'theory', 'instructors', 'profile']) {
       precacheImage(AssetImage(_asset(screen)), context);
     }
   }
@@ -148,6 +148,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             screen: 'tests', element: 'mistakes'),
         _Step(l.translate('onboarding_theory_title'), l.translate('onboarding_theory_body'),
             screen: 'theory', element: 'module'),
+        // Инструкторы (2026-10-05): its tab and the first instructor card,
+        // captured as a paid student — a pointer to the tab, not a tour.
+        _Step(l.translate('onboarding_instructors_title'), l.translate('onboarding_instructors_body'),
+            screen: 'instructors', element: 'card'),
         _Step(l.translate('onboarding_profile_title'), l.translate('onboarding_profile_body'),
             screen: 'profile', element: 'settings'),
       ];

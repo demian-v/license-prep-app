@@ -88,6 +88,7 @@ void main() {
         'Учите вопросы по темам или решайте практические билеты.',
         'Вопросы, в которых вы ошиблись, собираются здесь.',
         'Справочник водителя вашего штата, разбитый на модули.',
+        'Найдите автошколу или инструктора рядом. Входит в платную подписку.',
         'Меняйте язык и штат в любой момент.',
       ]) {
         await tester.tap(find.byTooltip('Далее').first);
@@ -127,7 +128,7 @@ void main() {
       await settle(tester, 2000);
       await tester.tap(find.text('Начнём'));
       await settle(tester, 1500);
-      for (var i = 0; i < 5; i++) {
+      for (var i = 0; i < 6; i++) {
         await tester.tap(find.byTooltip('Далее').first);
         await settle(tester, 1200);
       }
@@ -171,7 +172,8 @@ void main() {
   group('onboarding screenshots', () {
     const keys = [
       'tests.tab', 'tests.hero', 'tests.tiles', 'tests.mistakes',
-      'theory.tab', 'theory.module', 'profile.tab', 'profile.settings',
+      'theory.tab', 'theory.module', 'instructors.tab', 'instructors.card',
+      'profile.tab', 'profile.settings',
     ];
 
     test('every screenshot locale has every rect, inside the screenshot', () {
@@ -190,7 +192,7 @@ void main() {
       for (final loc in onboardingShotLocales) {
         expect(pubspec, contains('- assets/images/onboarding/$loc/'),
             reason: 'Flutter does not bundle subfolders on its own');
-        for (final screen in ['tests', 'theory', 'profile']) {
+        for (final screen in ['tests', 'theory', 'instructors', 'profile']) {
           expect(File('assets/images/onboarding/$loc/$screen.webp').existsSync(), isTrue,
               reason: '$loc/$screen.webp is missing');
         }

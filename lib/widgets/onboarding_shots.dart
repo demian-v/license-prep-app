@@ -3,7 +3,8 @@
 //
 // Highlight rects for the onboarding screenshots, in a 360×783 space (the
 // screenshot scaled to 360 wide). Keys: <screen>.<element>, screens tests /
-// theory / profile, element tab plus hero, tiles, mistakes, module, settings.
+// theory / instructors / profile, element tab plus hero, tiles, mistakes,
+// module, card, settings.
 import 'dart:ui';
 
 const Size onboardingShotSize = Size(360, 783);
@@ -19,6 +20,8 @@ const Map<String, Map<String, Rect>> onboardingShotRects = {
     'tests.tab': Rect.fromLTWH(33.2, 686.0, 62.0, 76.0),
     'theory.module': Rect.fromLTWH(17.9, 62.7, 324.2, 85.1),
     'theory.tab': Rect.fromLTWH(99.9, 686.0, 62.0, 76.0),
+    'instructors.card': Rect.fromLTWH(17.9, 177.3, 324.2, 159.4),
+    'instructors.tab': Rect.fromLTWH(177.9, 686.0, 68.7, 76.0),
     'profile.settings': Rect.fromLTWH(17.9, 260.6, 324.2, 149.9),
     'profile.tab': Rect.fromLTWH(261.5, 686.0, 62.0, 76.0),
   },
@@ -29,6 +32,8 @@ const Map<String, Map<String, Rect>> onboardingShotRects = {
     'tests.tab': Rect.fromLTWH(38.3, 686.0, 62.0, 76.0),
     'theory.module': Rect.fromLTWH(17.9, 62.7, 324.2, 104.8),
     'theory.tab': Rect.fromLTWH(108.0, 686.0, 62.0, 76.0),
+    'instructors.card': Rect.fromLTWH(17.9, 177.3, 324.2, 159.4),
+    'instructors.tab': Rect.fromLTWH(181.8, 686.0, 74.7, 76.0),
     'profile.settings': Rect.fromLTWH(17.9, 260.6, 324.2, 149.9),
     'profile.tab': Rect.fromLTWH(266.5, 686.0, 62.0, 76.0),
   },
@@ -39,6 +44,8 @@ const Map<String, Map<String, Rect>> onboardingShotRects = {
     'tests.tab': Rect.fromLTWH(34.2, 686.0, 62.0, 76.0),
     'theory.module': Rect.fromLTWH(17.9, 62.7, 324.2, 104.8),
     'theory.tab': Rect.fromLTWH(99.9, 686.0, 62.0, 76.0),
+    'instructors.card': Rect.fromLTWH(17.9, 177.3, 324.2, 159.4),
+    'instructors.tab': Rect.fromLTWH(176.1, 686.0, 75.0, 76.0),
     'profile.settings': Rect.fromLTWH(17.9, 260.6, 324.2, 149.9),
     'profile.tab': Rect.fromLTWH(263.6, 686.0, 62.0, 76.0),
   },
@@ -49,6 +56,8 @@ const Map<String, Map<String, Rect>> onboardingShotRects = {
     'tests.tab': Rect.fromLTWH(29.1, 686.0, 62.0, 76.0),
     'theory.module': Rect.fromLTWH(17.9, 62.7, 324.2, 85.1),
     'theory.tab': Rect.fromLTWH(92.9, 686.0, 62.0, 76.0),
+    'instructors.card': Rect.fromLTWH(17.9, 177.3, 324.2, 159.4),
+    'instructors.tab': Rect.fromLTWH(165.9, 686.0, 80.4, 76.0),
     'profile.settings': Rect.fromLTWH(17.9, 260.6, 324.2, 149.9),
     'profile.tab': Rect.fromLTWH(261.7, 686.0, 62.0, 76.0),
   },
@@ -59,6 +68,8 @@ const Map<String, Map<String, Rect>> onboardingShotRects = {
     'tests.tab': Rect.fromLTWH(31.2, 686.0, 62.0, 76.0),
     'theory.module': Rect.fromLTWH(17.9, 62.7, 324.2, 104.8),
     'theory.tab': Rect.fromLTWH(95.6, 686.0, 62.0, 76.0),
+    'instructors.card': Rect.fromLTWH(17.9, 177.3, 324.2, 159.4),
+    'instructors.tab': Rect.fromLTWH(169.8, 686.0, 74.1, 76.0),
     'profile.settings': Rect.fromLTWH(17.9, 260.6, 324.2, 149.9),
     'profile.tab': Rect.fromLTWH(260.5, 686.0, 62.0, 76.0),
   },

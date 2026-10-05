@@ -151,13 +151,13 @@ const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const ARROW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>';
 const BACK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12H4m0 0l6-6m-6 6l6 6"/></svg>';
 
-// Screens in tab order. Instructors (tab 2) has no screenshot yet; add SHOTS.instructors + TAB_R[2] to include it.
+// Screens in tab order. Instructors (tab 2) added 2026-10-05, captured as a paid student.
 const SCREENS = ['tests','theory','instructors','profile'];
 const SCREEN_RU = ['Тесты','Теория','Инструкторы','Профиль'];
 // Rects in the 360×783 screen space of the composited screenshots.
-const TAB_R = {0:[29,686,61,76],1:[94,686,61,76],3:[262,686,61,76]};
-const EL_R = {hero:[18,97,324,150],tiles:[18,258,324,171],mist:[18,488,324,75],mod:[18,63,324,86],rows:[18,261,324,159]};
-const EL_RU = {hero:'«Сдать экзамен»',tiles:'«Обучение по темам» + «Практические билеты»',mist:'«Сохраненные»',mod:'первый модуль',rows:'«Выбрать язык» + «Штат»'};
+const TAB_R = {0:[29,686,61,76],1:[94,686,61,76],2:[166,686,80,76],3:[262,686,61,76]};
+const EL_R = {hero:[18,97,324,150],tiles:[18,258,324,171],mist:[18,488,324,75],mod:[18,63,324,86],rows:[18,261,324,159],card:[18,177,324,159]};
+const EL_RU = {hero:'«Сдать экзамен»',tiles:'«Обучение по темам» + «Практические билеты»',mist:'«Сохраненные»',mod:'первый модуль',rows:'«Выбрать язык» + «Штат»',card:'первая карточка инструктора'};
 
 const L = {skip:'Пропустить', back:'Назад', next:'Далее', hello:'Начнём', start:'Начать', sign:'Привет!'};
 const STEPS = [
@@ -167,6 +167,7 @@ const STEPS = [
   {tab:0, el:'tiles', t:'Темы и билеты', b:'Учите вопросы по темам или решайте практические билеты.'},
   {tab:0, el:'mist', t:'Работа над ошибками', b:'Вопросы, в которых вы ошиблись, собираются здесь.'},
   {tab:1, el:'mod', t:'Теория', b:'Справочник водителя вашего штата, разбитый на модули.'},
+  {tab:2, el:'card', t:'Инструкторы', b:'Найдите автошколу или инструктора рядом. Входит в платную подписку.'},
   {tab:3, el:'rows', t:'Профиль', b:'Меняйте язык и штат в любой момент.'}
 ];
 
@@ -312,7 +313,7 @@ document.getElementById('rows').innerHTML=STEPS.map((s,i)=>{
   const scr=s.greet?'Приветствие':SCREEN_RU[s.tab];
   const hl=s.greet?'Line-рисунок: машина говорит «Привет!»':(s.el?EL_RU[s.el]+' + таб':'таб «'+SCREEN_RU[s.tab]+'»');
   const row=`<tr data-i="${i}"><td class="n">${i+1}</td><td>${scr}</td><td>${hl}</td><td><b>${s.t}</b><br>${s.b}</td></tr>`;
-  return i===5?row+`<tr class="todo"><td class="n">·</td><td>Инструкторы</td><td>таб + ключевой элемент</td><td>Добавим, когда будет экран (промпт в design/prompts)</td></tr>`:row;
+  return row;
 }).join('');
 
 const flow=new Flow(document.getElementById('phone'));
