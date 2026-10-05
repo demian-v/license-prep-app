@@ -2590,3 +2590,4 @@ export {
 // INSTRUCTORS MARKETPLACE (plan v2, branch `instructors`)
 // ============================================================================
 export { listInstructors, getInstructorProfile, getInstructorReviews, setSignupRole, registerAsInstructor, submitLicenseNumber, updateInstructorProfile, getInstructorContacts, onInstructorUpload, onInstructorWrite } from './instructors';
+export { sendMessage, markConversationRead, getInstructorContactInfo } from './chat';

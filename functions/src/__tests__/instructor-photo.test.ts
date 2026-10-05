@@ -142,6 +142,18 @@ describe('onInstructorUpload — emulator auto-approve', () => {
     expect(await exists('instructorPhotos/ph-1/u2.jpg')).toBe(true);
   });
 
+  it('moves the instructor\'s chat threads to the new photo (P6)', async () => {
+    const thread = admin.firestore().collection('conversations').doc('ph-s_ph-1');
+    await thread.set({ studentUid: 'ph-s', instructorUid: 'ph-1', participantUids: ['ph-s', 'ph-1'], instructorPhotoPath: null });
+    try {
+      await upload('instructorUploads/ph-1/photo/u1.jpg');
+      await finalize('instructorUploads/ph-1/photo/u1.jpg');
+      expect((await thread.get()).get('instructorPhotoPath')).toBe('instructorPhotos/ph-1/u1.jpg');
+    } finally {
+      await thread.delete();
+    }
+  });
+
   it('tells the instructor the photo is published, opening Профиль', async () => {
     await upload('instructorUploads/ph-1/photo/u1.jpg');
     await finalize('instructorUploads/ph-1/photo/u1.jpg');

@@ -201,3 +201,60 @@ describe('Instructors plan v2 §17 — an instructor account', () => {
   });
 });
 
+
+describe('Instructors plan v2 §17 — conversations are anonymised, not deleted (P6)', () => {
+  const wrapped = () => testEnv.wrap(fns.deleteUserAccount as any);
+  const conv = (id: string) => db().collection('conversations').doc(id);
+
+  beforeAll(async () => {
+    const b = db().batch();
+    // The student deletes; the instructor keeps the thread.
+    b.set(conv('del-s_del-i1'), {
+      studentUid: 'del-s', instructorUid: 'del-i1', participantUids: ['del-s', 'del-i1'],
+      studentDisplayName: 'Anna K.', instructorName: 'Maria', studentUnread: 2, instructorUnread: 1,
+    });
+    b.set(conv('del-s_del-i1').collection('messages').doc('m1'), { senderUid: 'del-s', text: 'Hi', masked: false });
+    // The instructor deletes; the student keeps the thread.
+    b.set(conv('del-s2_del-i2'), {
+      studentUid: 'del-s2', instructorUid: 'del-i2', participantUids: ['del-s2', 'del-i2'],
+      studentDisplayName: 'Bo L.', instructorName: 'Lakeview', instructorPhotoPath: 'instructorPhotos/del-i2/p.jpg',
+      instructorUnread: 3,
+    });
+    // The other side is already gone: nobody can read it any more.
+    b.set(conv('del-s_del-i3'), {
+      studentUid: 'del-s', instructorUid: 'del-i3', participantUids: ['del-s'], instructorDeleted: true,
+    });
+    b.set(conv('del-s_del-i3').collection('messages').doc('m1'), { senderUid: 'del-i3', text: 'Bye', masked: false });
+    b.set(db().collection('users').doc('del-s'), { name: 'Anna' });
+    b.set(db().collection('users').doc('del-i2'), { name: 'Lakeview' });
+    await b.commit();
+    await wrapped()({} as any, ctx('del-s') as any);
+    await wrapped()({} as any, ctx('del-i2') as any);
+  }, 60000);
+
+  it('a deleted student: the instructor keeps the thread, without the name', async () => {
+    const c = (await conv('del-s_del-i1').get()).data()!;
+    expect(c).toMatchObject({
+      participantUids: ['del-i1'], studentDeleted: true, studentDisplayName: null, studentUnread: 0,
+      instructorName: 'Maria', instructorUnread: 1,
+    });
+    expect((await conv('del-s_del-i1').collection('messages').doc('m1').get()).exists).toBe(true);
+  });
+
+  it('a deleted instructor: the student keeps the thread, without name or photo', async () => {
+    const c = (await conv('del-s2_del-i2').get()).data()!;
+    expect(c).toMatchObject({
+      participantUids: ['del-s2'], instructorDeleted: true, instructorName: null, instructorPhotoPath: null,
+      studentDisplayName: 'Bo L.',
+    });
+  });
+
+  it('a thread with nobody left is deleted with its messages', async () => {
+    expect((await conv('del-s_del-i3').get()).exists).toBe(false);
+    expect((await conv('del-s_del-i3').collection('messages').get()).size).toBe(0);
+  });
+
+  afterAll(async () => {
+    for (const id of ['del-s_del-i1', 'del-s2_del-i2']) await db().recursiveDelete(conv(id));
+  });
+});

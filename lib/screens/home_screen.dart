@@ -6,6 +6,7 @@ import '../screens/theory_screen.dart';
 import '../screens/instructors_screen.dart';
 import '../screens/instructor_calendar_screen.dart';
 import '../screens/chat_list_screen.dart';
+import '../screens/chat_thread_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/onboarding_screen.dart';
 import '../theme/app_colors.dart';
@@ -20,6 +21,8 @@ import '../providers/auth_provider.dart';
 import '../providers/subscription_provider.dart';
 import '../services/in_app_purchase_service.dart';
 import '../services/push_service.dart';
+import '../services/chat_service.dart';
+import '../theme/app_motion.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -84,21 +87,34 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     super.dispose();
   }
 
-  /// A tapped push (plan v2 §12). `profile` is the last tab for both roles.
-  /// `chat/<id>` and `booking/<id>` have no screen until P6 / P7, so they are
-  /// taken and dropped rather than left to fire later.
+  /// A tapped push (plan v2 §12). `profile` is the last tab for both roles;
+  /// `chat/<id>` opens the thread over the tab that holds the chat (Чат,
+  /// or Инструкторы for a student). `booking/<id>` has no screen until P7,
+  /// so it is taken and dropped rather than left to fire later.
   void _openPushRoute() {
     final route = PushService.pendingRoute.value;
     if (route == null || !mounted) return;
     PushService.pendingRoute.value = null;
-    if (route.name != 'profile') return;
+    if (route.name != 'profile' && route.name != 'chat') return;
     Navigator.of(context).popUntil((r) => r.isFirst);
-    final last = (_isInstructor ? _instructorScreens : _screens).length - 1;
+    final tab = route.name == 'chat'
+        ? _chatTab
+        : (_isInstructor ? _instructorScreens : _screens).length - 1;
     setState(() {
-      _currentIndex = last;
-      _persistentCurrentIndex = last;
+      _currentIndex = tab;
+      _persistentCurrentIndex = tab;
     });
+    if (route.name == 'chat') {
+      Navigator.of(context).push(ForwardPageRoute(child: ChatThreadScreen(conversationId: route.id!)));
+    }
   }
+
+  /// The tab that carries the chat and its unread badge (plan v2 §14.1).
+  int get _chatTab => _isInstructor ? 1 : 2;
+
+  /// The badge's count, one listener per signed-in user.
+  Stream<int>? _unread;
+  String? _unreadUid;
   
   // Sync content language AND state with providers
   Future<void> _syncContentLanguageAndState() async {
@@ -297,11 +313,28 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       // ContentProvider from initState, and its analytics count one view per
       // visit, so keeping them alive needs its own check.
       body: isInstructor ? LazyIndexedStack(index: index, children: screens) : screens[index],
-      bottomNavigationBar: SuperEnhancedFooter(
-        currentIndex: index,
-        onTap: _onTabTapped,
-        forInstructor: isInstructor,
+      bottomNavigationBar: StreamBuilder<int>(
+        stream: _unreadFor(Provider.of<AuthProvider>(context).user?.id),
+        builder: (context, unread) {
+          final badges = List.filled(screens.length, 0);
+          badges[isInstructor ? 1 : 2] = unread.data ?? 0;
+          return SuperEnhancedFooter(
+            currentIndex: index,
+            onTap: _onTabTapped,
+            forInstructor: isInstructor,
+            badges: badges,
+          );
+        },
       ),
     );
+  }
+
+  Stream<int>? _unreadFor(String? uid) {
+    if (uid != _unreadUid) {
+      _unreadUid = uid;
+      // A failed listener (signed out mid-stream) just shows no badge.
+      _unread = uid == null ? null : ChatService().unreadCount(uid).handleError((_) {});
+    }
+    return _unread;
   }
 }

@@ -72,7 +72,7 @@ export const listInstructors = functions.https.onCall(async (data, context) => {
  * or in a state that has not launched — so a saved favourite or an old link
  * reaches nobody the listing would not show.
  */
-async function listedInstructor(data: any, context: any) {
+export async function listedInstructor(data: any, context: any) {
   await requirePaidSubscriber(context);
   const id = typeof data?.id === 'string' ? data.id : '';
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(id)) {
@@ -524,6 +524,10 @@ export const onInstructorUpload = functions.storage.object().onFinalize(async (o
   const previous = snap.get('photoPath');
   await bucket.file(photoPath).save(clean, { contentType: 'image/jpeg', resumable: false });
   await ref.update({ photoPath, photoApproved: true, photoStatus: 'approved', updatedAt: now });
+  // Threads carry the photo path (plan v2 §5) and the previous file goes
+  // below, so they move to the new one first.
+  const threads = await db.collection('conversations').where('instructorUid', '==', uid).get();
+  await Promise.all(threads.docs.map((t) => t.ref.update({ instructorPhotoPath: photoPath })));
   await privateRef.set({ moderation: { photo: { status: 'approved', uploadId, updatedAt: now } } }, { merge: true });
   await upload.delete({ ignoreNotFound: true });
   if (typeof previous === 'string' && previous !== photoPath) {

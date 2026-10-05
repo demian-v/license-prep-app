@@ -335,3 +335,64 @@ describe('reports — contentType instructor', () => {
     await assertFails(as('s1').collection('reports').doc(id).set(report({ userId: 's2' })));
   });
 });
+
+// P6: a participant reports the other person's chat message (long-press).
+describe('reports — contentType message', () => {
+  const report = (uid = 's1', over: Record<string, unknown> = {}) => ({
+    userId: uid, createdAt: new Date(), status: 'open', reason: 'harassment',
+    contentType: 'message', entity: { conversationId: 's1_i1', messageId: 'from-i1' }, ...over,
+  });
+  const id = (uid = 's1') => `1_user_${uid}_report_1`;
+  beforeEach(() => seed(async (db) => {
+    const conv = db.collection('conversations').doc('s1_i1');
+    await conv.set({ studentUid: 's1', instructorUid: 'i1', participantUids: ['s1', 'i1'] });
+    await conv.collection('messages').doc('from-i1').set({ senderUid: 'i1', text: 'Hi', masked: false });
+    await conv.collection('messages').doc('from-s1').set({ senderUid: 's1', text: 'Hello', masked: false });
+  }));
+
+  it('a participant can report the other side\'s message', async () => {
+    await assertSucceeds(as('s1').collection('reports').doc(id()).set(report()));
+    await assertSucceeds(as('i1').collection('reports').doc(id('i1')).set(report('i1', {
+      entity: { conversationId: 's1_i1', messageId: 'from-s1' },
+    })));
+  });
+
+  it.each([['spam'], ['inappropriate']])('accepts the reason %s', async (reason) => {
+    await assertSucceeds(as('s1').collection('reports').doc(id()).set(report('s1', { reason })));
+  });
+
+  it('«other» needs a message of at least 10 characters', async () => {
+    await assertFails(as('s1').collection('reports').doc(id()).set(report('s1', { reason: 'other' })));
+    await assertSucceeds(as('s1').collection('reports').doc(id()).set(report('s1', { reason: 'other', message: 'Asked to pay outside the app' })));
+  });
+
+  it('refuses a profile-only reason', async () => {
+    await assertFails(as('s1').collection('reports').doc(id()).set(report('s1', { reason: 'fake_profile' })));
+  });
+
+  it('refuses an outsider', async () => {
+    await assertFails(as('x1').collection('reports').doc(id('x1')).set(report('x1')));
+  });
+
+  it('refuses reporting your own message', async () => {
+    await assertFails(as('s1').collection('reports').doc(id()).set(report('s1', {
+      entity: { conversationId: 's1_i1', messageId: 'from-s1' },
+    })));
+  });
+
+  it('refuses a message or conversation that does not exist', async () => {
+    await assertFails(as('s1').collection('reports').doc(id()).set(report('s1', {
+      entity: { conversationId: 's1_i1', messageId: 'nope' },
+    })));
+    await assertFails(as('s1').collection('reports').doc(id()).set(report('s1', {
+      entity: { conversationId: 'nope_nope', messageId: 'from-i1' },
+    })));
+  });
+
+  it('refuses extra entity keys and anonymous sessions', async () => {
+    await assertFails(as('s1').collection('reports').doc(id()).set(report('s1', {
+      entity: { conversationId: 's1_i1', messageId: 'from-i1', text: 'Hi' },
+    })));
+    await assertFails(as('s1', 'anonymous').collection('reports').doc(id()).set(report()));
+  });
+});

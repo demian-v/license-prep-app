@@ -5,10 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../localization/app_localizations.dart';
+import '../models/chat.dart';
 import '../models/instructor_listing.dart';
 import '../providers/auth_provider.dart';
 import '../providers/state_provider.dart';
 import '../providers/subscription_provider.dart';
+import '../services/chat_service.dart';
 import '../services/instructor_service.dart';
 import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
@@ -22,6 +24,7 @@ import '../widgets/instructor_card.dart';
 import '../widgets/instructor_filters_sheet.dart';
 import '../widgets/state_requirements_card.dart';
 import '../widgets/trial_status_widget.dart';
+import '../widgets/unread_badge.dart';
 import 'chat_list_screen.dart';
 import 'instructor_detail_screen.dart';
 
@@ -35,7 +38,11 @@ import 'instructor_detail_screen.dart';
 ///     top carries the subscribe action;
 ///  3. paid → the tab itself: Поиск · Избранное · Сообщения. Поиск lists
 ///     every listed instructor in the state (filters and order in the
-///     app, plan v2 §13), Избранное the saved ones; Сообщения is Phase 6.
+///     app, plan v2 §13), Избранное the saved ones, Сообщения the chats
+///     (P6) with the unread count on the segment.
+///
+/// A student whose plan lapsed keeps reading their chats (owner,
+/// 2026-10-05): the locked preview then carries a «Ваши сообщения» card.
 ///
 /// The server enforces the paywall too (listInstructors →
 /// requirePaidSubscriber); this screen only decides what to draw.
@@ -59,6 +66,17 @@ class _InstructorsScreenState extends State<InstructorsScreen> {
   Future<List<InstructorListing>>? _listings;
   Stream<Set<String>>? _favorites;
   InstructorFilters _filters = const InstructorFilters();
+  Stream<List<ChatConversation>>? _threads;
+  String? _threadsUid;
+
+  /// The student's chats, for the segment count and the lapsed entry.
+  Stream<List<ChatConversation>>? _threadsFor(String? uid) {
+    if (uid != _threadsUid) {
+      _threadsUid = uid;
+      _threads = uid == null ? null : ChatService().conversations(uid).handleError((_) {});
+    }
+    return _threads;
+  }
 
   /// Seeds the listing's shuffle once per app session (plan v2 §13): the
   /// order holds while the student scrolls and changes next launch.
@@ -169,7 +187,9 @@ class _InstructorsScreenState extends State<InstructorsScreen> {
   }
 
   List<Widget> _lockedPreview(AppLocalizations l, String stateName, int count) {
+    final uid = Provider.of<AuthProvider>(context, listen: false).user?.id;
     return [
+      _LapsedMessages(threads: _threadsFor(uid), uid: uid),
       _Hero(
         title: l.translate('instructors_hero_title'),
         description: l
@@ -332,15 +352,24 @@ class _InstructorsScreenState extends State<InstructorsScreen> {
   /// list says — «Найдено: N», and the state in «Что требует ваш штат»).
   /// The locked preview keeps it: there the count is the pitch.
   List<Widget> _header(AppLocalizations l) {
+    final uid = Provider.of<AuthProvider>(context, listen: false).user?.id;
     return [
-      _SegmentPills(
-        labels: [
-          l.translate('instructors_tab_search'),
-          l.translate('instructors_tab_favorites'),
-          l.translate('instructors_tab_messages'),
-        ],
-        selected: _segment.index,
-        onSelect: (i) => setState(() => _segment = _Segment.values[i]),
+      StreamBuilder<List<ChatConversation>>(
+        stream: _threadsFor(uid),
+        builder: (context, threads) => _SegmentPills(
+          labels: [
+            l.translate('instructors_tab_search'),
+            l.translate('instructors_tab_favorites'),
+            l.translate('instructors_tab_messages'),
+          ],
+          badges: [
+            0,
+            0,
+            if (uid != null) (threads.data ?? const []).fold(0, (n, c) => n + c.unreadFor(uid)),
+          ],
+          selected: _segment.index,
+          onSelect: (i) => setState(() => _segment = _Segment.values[i]),
+        ),
       ),
       const SizedBox(height: AppSpacing.x3),
     ];
@@ -502,9 +531,12 @@ class _PlaceholderCard extends StatelessWidget {
 /// (rule 5).
 class _SegmentPills extends StatelessWidget {
   const _SegmentPills(
-      {required this.labels, required this.selected, required this.onSelect});
+      {required this.labels, required this.selected, required this.onSelect, this.badges = const []});
 
   final List<String> labels;
+
+  /// An unread count beside a label (Сообщения, P6); zero draws nothing.
+  final List<int> badges;
   final int selected;
   final ValueChanged<int> onSelect;
 
@@ -540,15 +572,24 @@ class _SegmentPills extends StatelessWidget {
                     ),
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
-                      child: Text(
-                        labels[i],
-                        maxLines: 1,
-                        style: AppTypography.label.copyWith(
-                          color: i == selected
-                              ? AppColors.onSignal
-                              : AppColors.inkSecondary,
-                          fontVariations: const [FontVariation('wght', 600)],
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            labels[i],
+                            maxLines: 1,
+                            style: AppTypography.label.copyWith(
+                              color: i == selected
+                                  ? AppColors.onSignal
+                                  : AppColors.inkSecondary,
+                              fontVariations: const [FontVariation('wght', 600)],
+                            ),
+                          ),
+                          if (i < badges.length && badges[i] > 0) ...[
+                            const SizedBox(width: 6),
+                            UnreadBadge(count: badges[i], ring: false),
+                          ],
+                        ],
                       ),
                     ),
                   ),
@@ -611,6 +652,79 @@ class _FilterBar extends StatelessWidget {
           style: AppTypography.label.copyWith(color: AppColors.inkSecondary),
         ),
       ],
+    );
+  }
+}
+
+/// A lapsed student's way back to their chats (owner, 2026-10-05: they keep
+/// reading, sending needs the plan again). Only when there is a thread; one
+/// white row with the unread count, opening the list as a page.
+class _LapsedMessages extends StatelessWidget {
+  const _LapsedMessages({required this.threads, required this.uid});
+
+  final Stream<List<ChatConversation>>? threads;
+  final String? uid;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return StreamBuilder<List<ChatConversation>>(
+      stream: threads,
+      builder: (context, snap) {
+        final list = snap.data ?? const <ChatConversation>[];
+        if (uid == null || list.isEmpty) return const SizedBox.shrink();
+        final unread = list.fold(0, (n, c) => n + c.unreadFor(uid!));
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.x3),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.paper,
+              borderRadius: BorderRadius.circular(BentoTokens.card),
+              boxShadow: AppColors.shadowCard,
+            ),
+            child: Material(
+              type: MaterialType.transparency,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(BentoTokens.card),
+                onTap: () => Navigator.of(context).push(ForwardPageRoute(
+                  child: const ChatListScreen(pushed: true),
+                )),
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.x4),
+                  child: Row(
+                    children: [
+                      const Icon(SolarIcons.chatRoundLineLinear, size: 22, color: AppColors.signal),
+                      const SizedBox(width: AppSpacing.x3),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l.translate('chat_locked_entry_title'),
+                              style: AppTypography.title.copyWith(
+                                fontSize: 17,
+                                height: 22 / 17,
+                                color: AppColors.ink,
+                                fontVariations: const [FontVariation('wght', 600)],
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              l.translate('chat_locked_entry_desc'),
+                              style: AppTypography.label.copyWith(color: AppColors.inkSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      UnreadBadge(count: unread, ring: false),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

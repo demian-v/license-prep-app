@@ -794,6 +794,11 @@ class AnalyticsService {
   /// Log when a result is shared from a result page's share sheet.
   /// A student opened an instructor's detail page (instructors plan v2
   /// §14.3). No instructor id or name: only what kind and stage they were.
+  /// A student's first message to an instructor (plan v2 §14.3). No ids.
+  Future<void> logChatStarted() async {
+    await logEvent('chat_started');
+  }
+
   Future<void> logInstructorProfileViewed({required String kind, required int stage}) async {
     await logEvent('instructor_profile_viewed', {
       'instructor_kind': kind,

@@ -104,6 +104,7 @@ void handleGlobalSessionConflict(AuthProvider authProvider) {
 void _showPushBanner(String title, String body, PushRoute? route) {
   final overlay = navigatorKey.currentState?.overlay;
   if (overlay == null) return;
+  if (route?.name == 'chat' && route?.id == PushService.openConversation.value) return;
   PushBanner.show(
     overlay,
     title: title,

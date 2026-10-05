@@ -14,10 +14,18 @@ import 'instructor_stage_badge.dart';
 /// An instructor's approved photo, round, or the placeholder avatar when
 /// there is none yet (plan v2 §5: nobody is hidden for a pending photo).
 class InstructorAvatar extends StatelessWidget {
-  const InstructorAvatar({super.key, required this.photoPath, this.size = 64});
+  const InstructorAvatar(
+      {super.key,
+      required this.photoPath,
+      this.size = 64,
+      this.background = AppColors.field});
 
   final String? photoPath;
   final double size;
+
+  /// The placeholder disc: `field` on a white card, `paper` on the field page
+  /// (the chat thread's header).
+  final Color background;
 
   /// One download-URL lookup per photo for the app session: the list
   /// rebuilds often, and a new `photoPath` (a new upload) is a new key.
@@ -28,8 +36,7 @@ class InstructorAvatar extends StatelessWidget {
     final placeholder = Container(
       width: size,
       height: size,
-      decoration:
-          const BoxDecoration(color: AppColors.field, shape: BoxShape.circle),
+      decoration: BoxDecoration(color: background, shape: BoxShape.circle),
       child: Icon(SolarIcons.userRoundedBold,
           size: size * 0.45, color: AppColors.inkTertiary),
     );

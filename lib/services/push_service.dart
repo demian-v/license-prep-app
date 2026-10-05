@@ -52,6 +52,10 @@ class PushService {
   /// cold start, so Home reads it when it builds.
   static final ValueNotifier<PushRoute?> pendingRoute = ValueNotifier(null);
 
+  /// The chat thread on screen, if any (P6): a push for it shows no in-app
+  /// banner — the message is already appearing in front of the user.
+  static final ValueNotifier<String?> openConversation = ValueNotifier(null);
+
   // Resolved on first use, so a test fake that overrides the calls never
   // touches Firebase.
   final FirebaseMessaging? _messagingOverride;

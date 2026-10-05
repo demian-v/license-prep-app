@@ -13,6 +13,9 @@
  *                               FIREBASE_AUTH_EMULATOR_HOST is set (sign in as an instructor),
  *                               plus seed-signup-school@ / seed-signup-instructor@example.com, instructors mid-signup,
  *                               and students seed-student-paid@ (IL) / -trial@ (IL) / -md@ (MD, paid)
+ *   conversations/{id}          P6 chat: seed-student-paid with Lakeview (unlocked, as if
+ *                               booked: contacts in the header) and Olena (one unread reply,
+ *                               one masked message); reset on every run
  * Idempotent: a re-run overwrites the same ids.
  *
  * EMULATORS ONLY. Refuses to run unless FIRESTORE_EMULATOR_HOST is a local address.
@@ -188,5 +191,36 @@ const COMMENTS = ['Very patient, passed on the first try.', 'Clear explanations 
       console.log(`Student (${state}, ${planType}): ${account.email}`);
     }
   }
+  // Chat threads (P6), written the way sendMessage would. Two days old, so
+  // they don't count against the student's 5 new threads a day.
+  const ago = (min) => Timestamp.fromMillis(Date.now() - min * 60e3);
+  for (const [instructorUid, instructorName, kind, unlocked, messages] of [
+    ['seed-instr-01', 'Lakeview Driving School', 'school', true, [
+      ['seed-student-paid', 'Hello! Do you have a lesson on Saturday morning?', false, 2900],
+      ['seed-instr-01', 'Yes, 9:00 works. Booked you in.', false, 2890],
+      ['seed-instr-01', 'Call us any time: +1 312 555 0101', false, 2880],
+    ]],
+    ['seed-instr-03', 'Olena Kovalenko', 'schoolInstructor', false, [
+      ['seed-student-paid', 'Здравствуйте! Можно урок на этой неделе?', false, 2950],
+      ['seed-student-paid', 'Мой номер •••', true, 2949],
+      ['seed-instr-03', 'Добрый день! Да, в четверг после 14:00.', false, 30],
+    ]],
+  ]) {
+    const id = `seed-student-paid_${instructorUid}`;
+    const ref = db.collection('conversations').doc(id);
+    await db.recursiveDelete(ref);
+    const last = messages[messages.length - 1];
+    await ref.set({
+      studentUid: 'seed-student-paid', instructorUid, participantUids: ['seed-student-paid', instructorUid],
+      instructorName, instructorPhotoPath: null, instructorKind: kind, studentDisplayName: 'Paid S.',
+      contactUnlocked: unlocked, lastMessageText: last[1], lastMessageAt: ago(last[3]), lastMessageSender: last[0],
+      studentUnread: last[0] === instructorUid ? 1 : 0, instructorUnread: 0, createdAt: ago(2 * 1440),
+    });
+    for (const [senderUid, text, masked, min] of messages) {
+      await ref.collection('messages').add({ senderUid, text, masked, createdAt: ago(min) });
+    }
+  }
+  console.log('Chat threads: seed-student-paid with seed-instr-01 (unlocked) and seed-instr-03 (1 unread)');
+
   console.log(`Seeded ${ROWS.length} instructors; listed per state:`, stats, '; launchStates: IL, TX');
 })().catch((e) => { console.error(e); process.exit(1); });

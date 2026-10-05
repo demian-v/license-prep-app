@@ -64,3 +64,5 @@ user-rounded-linear
 walking-linear
 wi-fi-off-linear
 alt-arrow-left-linear
+plain-bold
+phone-linear

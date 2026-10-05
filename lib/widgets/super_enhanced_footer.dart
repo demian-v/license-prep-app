@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../providers/language_provider.dart';
 import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
+import 'unread_badge.dart';
 
 /// The tab bar — the app's most persistent piece of chrome.
 ///
@@ -28,11 +29,16 @@ class SuperEnhancedFooter extends StatelessWidget {
   /// Instructors get their own three tabs (instructors plan v2 §14.1).
   final bool forInstructor;
 
+  /// An unread count per tab, by index (plan v2 §14.1: Инструкторы for
+  /// students, Чат for instructors). Missing or zero draws nothing.
+  final List<int> badges;
+
   const SuperEnhancedFooter({
     Key? key,
     required this.currentIndex,
     required this.onTap,
     this.forInstructor = false,
+    this.badges = const [],
   }) : super(key: key);
 
   static const List<_Tab> _tabs = [
@@ -68,6 +74,7 @@ class SuperEnhancedFooter extends StatelessWidget {
             currentIndex: currentIndex,
             onTap: onTap,
             tabs: tabs,
+            badges: badges,
             labels: [
               for (final tab in tabs) _translate(tab.key, languageProvider),
             ],
@@ -163,12 +170,16 @@ class _MeniscusBar extends StatefulWidget {
     required this.onTap,
     required this.tabs,
     required this.labels,
+    this.badges = const [],
   });
 
   final int currentIndex;
   final Function(int) onTap;
   final List<_Tab> tabs;
   final List<String> labels;
+  final List<int> badges;
+
+  int badgeAt(int i) => i < badges.length ? badges[i] : 0;
 
   @override
   State<_MeniscusBar> createState() => _MeniscusBarState();
@@ -422,6 +433,7 @@ class _MeniscusBarState extends State<_MeniscusBar>
                         button: true,
                         selected: selected,
                         label: widget.labels[i],
+                        value: widget.badgeAt(i) > 0 ? '${widget.badgeAt(i)}' : null,
                         onTap: () => widget.onTap(i),
                         child: ExcludeSemantics(
                           child: Column(
@@ -495,6 +507,25 @@ class _MeniscusBarState extends State<_MeniscusBar>
                     ),
                   ),
                 ),
+                // Unread counts (P6), over the bead so a count on the
+                // current tab stays visible: each rides its icon's top-right
+                // corner, following the icon into the bead and back out.
+                for (var i = 0; i < _count; i++)
+                  if (widget.badgeAt(i) > 0)
+                    Builder(builder: (context) {
+                      final visible = ((_pos - i).abs() / 0.5).clamp(0.0, 1.0);
+                      final x = cx + (centers[i] - cx) * visible;
+                      final y = _beadRadius + (_top + 24 - _beadRadius) * visible;
+                      return Positioned(
+                        left: x + 6,
+                        top: y - 20,
+                        child: IgnorePointer(
+                          child: ExcludeSemantics(
+                            child: UnreadBadge(count: widget.badgeAt(i)),
+                          ),
+                        ),
+                      );
+                    }),
               ],
             ),
           ),

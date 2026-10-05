@@ -115,32 +115,36 @@ class SolarIcons {
   static const IconData menuDotsBold = IconData(0xe030, fontFamily: _family);
   /// solar:pen-linear
   static const IconData penLinear = IconData(0xe031, fontFamily: _family);
+  /// solar:phone-linear
+  static const IconData phoneLinear = IconData(0xe032, fontFamily: _family);
+  /// solar:plain-bold
+  static const IconData plainBold = IconData(0xe033, fontFamily: _family);
   /// solar:question-circle-linear
-  static const IconData questionCircleLinear = IconData(0xe032, fontFamily: _family);
+  static const IconData questionCircleLinear = IconData(0xe034, fontFamily: _family);
   /// solar:question-square-bold
-  static const IconData questionSquareBold = IconData(0xe033, fontFamily: _family);
+  static const IconData questionSquareBold = IconData(0xe035, fontFamily: _family);
   /// solar:record-linear
-  static const IconData recordLinear = IconData(0xe034, fontFamily: _family);
+  static const IconData recordLinear = IconData(0xe036, fontFamily: _family);
   /// solar:refresh-linear
-  static const IconData refreshLinear = IconData(0xe035, fontFamily: _family);
+  static const IconData refreshLinear = IconData(0xe037, fontFamily: _family);
   /// solar:settings-bold
-  static const IconData settingsBold = IconData(0xe036, fontFamily: _family);
+  static const IconData settingsBold = IconData(0xe038, fontFamily: _family);
   /// solar:shield-check-bold
-  static const IconData shieldCheckBold = IconData(0xe037, fontFamily: _family);
+  static const IconData shieldCheckBold = IconData(0xe039, fontFamily: _family);
   /// solar:square-academic-cap-bold
-  static const IconData squareAcademicCapBold = IconData(0xe038, fontFamily: _family);
+  static const IconData squareAcademicCapBold = IconData(0xe03a, fontFamily: _family);
   /// solar:stopwatch-linear
-  static const IconData stopwatchLinear = IconData(0xe039, fontFamily: _family);
+  static const IconData stopwatchLinear = IconData(0xe03b, fontFamily: _family);
   /// solar:text-square-bold
-  static const IconData textSquareBold = IconData(0xe03a, fontFamily: _family);
+  static const IconData textSquareBold = IconData(0xe03c, fontFamily: _family);
   /// solar:text-square-linear
-  static const IconData textSquareLinear = IconData(0xe03b, fontFamily: _family);
+  static const IconData textSquareLinear = IconData(0xe03d, fontFamily: _family);
   /// solar:user-rounded-bold
-  static const IconData userRoundedBold = IconData(0xe03c, fontFamily: _family);
+  static const IconData userRoundedBold = IconData(0xe03e, fontFamily: _family);
   /// solar:user-rounded-linear
-  static const IconData userRoundedLinear = IconData(0xe03d, fontFamily: _family);
+  static const IconData userRoundedLinear = IconData(0xe03f, fontFamily: _family);
   /// solar:walking-linear
-  static const IconData walkingLinear = IconData(0xe03e, fontFamily: _family);
+  static const IconData walkingLinear = IconData(0xe040, fontFamily: _family);
   /// solar:wi-fi-off-linear
-  static const IconData wiFiOffLinear = IconData(0xe03f, fontFamily: _family);
+  static const IconData wiFiOffLinear = IconData(0xe041, fontFamily: _family);
 }

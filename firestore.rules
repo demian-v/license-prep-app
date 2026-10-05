@@ -196,7 +196,20 @@ service cloud.firestore {
             && request.resource.data.reason in ['fake_profile','harassment','inappropriate','spam','other']
             && request.resource.data.entity.keys().hasOnly(['instructorUid'])
             && request.resource.data.entity.instructorUid is string
-            && exists(/databases/$(database)/documents/instructors/$(request.resource.data.entity.instructorUid)))
+            && exists(/databases/$(database)/documents/instructors/$(request.resource.data.entity.instructorUid))) ||
+          // Plan v2 §7/§10 (P6): a chat message, from a long-press in the
+          // thread. The reporter must be in the conversation, and the
+          // message must exist and be the other person's — triage never gets
+          // a report about a thread the reporter can't see, or about
+          // themselves.
+          (request.resource.data.contentType == 'message'
+            && isNotAnonymous()
+            && request.resource.data.reason in ['harassment','spam','inappropriate','other']
+            && request.resource.data.entity.keys().hasOnly(['conversationId','messageId'])
+            && request.resource.data.entity.conversationId is string
+            && request.resource.data.entity.messageId is string
+            && request.auth.uid in get(/databases/$(database)/documents/conversations/$(request.resource.data.entity.conversationId)).data.participantUids
+            && get(/databases/$(database)/documents/conversations/$(request.resource.data.entity.conversationId)/messages/$(request.resource.data.entity.messageId)).data.senderUid != request.auth.uid)
         )
         && (request.resource.data.reason != 'other' ||
             (request.resource.data.message is string &&

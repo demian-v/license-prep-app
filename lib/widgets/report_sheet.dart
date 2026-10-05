@@ -9,11 +9,12 @@ import '../theme/app_theme.dart';
 import '../theme/bento_tokens.dart';
 
 class ReportSheet extends StatefulWidget {
-  final String contentType; // 'quiz_question' | 'theory_section' | 'instructor'
+  final String contentType; // 'quiz_question' | 'theory_section' | 'instructor' | 'message'
   final Map<String, dynamic> contextData; 
   // For quiz: {questionId, language, state, topicId?, ruleReference?}
   // For theory: {topicDocId, sectionIndex, sectionTitle, language, state}
   // For instructor: {instructorUid, language, state}
+  // For message: {conversationId, messageId, language, state}
 
   const ReportSheet({
     super.key,
@@ -29,10 +30,19 @@ class _ReportSheetState extends State<ReportSheet> {
   String? _reason;
 
   bool get _isInstructor => widget.contentType == 'instructor';
+  bool get _isMessage => widget.contentType == 'message';
 
   /// Reason ids (stored as `reason`, checked by firestore.rules) and their
-  /// labels. A profile has its own reasons (instructors plan v2 §7).
-  List<(String, String)> get _reasons => _isInstructor
+  /// labels. A profile and a chat message have their own reasons
+  /// (instructors plan v2 §7).
+  List<(String, String)> get _reasons => _isMessage
+      ? const [
+          ('harassment', 'report_reason_harassment'),
+          ('inappropriate', 'report_reason_inappropriate'),
+          ('spam', 'report_reason_spam'),
+          ('other', 'other_issue'),
+        ]
+      : _isInstructor
       ? const [
           ('fake_profile', 'report_reason_fake_profile'),
           ('harassment', 'report_reason_harassment'),
@@ -72,7 +82,16 @@ class _ReportSheetState extends State<ReportSheet> {
     final message = reason == 'other' ? _ctrl.text.trim() : null;
 
     try {
-      if (_isInstructor) {
+      if (_isMessage) {
+        await reportService.submitMessageReport(
+          conversationId: widget.contextData['conversationId'],
+          messageId: widget.contextData['messageId'],
+          reason: reason,
+          message: message,
+          language: widget.contextData['language'],
+          state: widget.contextData['state'],
+        );
+      } else if (_isInstructor) {
         await reportService.submitInstructorReport(
           instructorUid: widget.contextData['instructorUid'],
           reason: reason,
@@ -220,7 +239,9 @@ class _ReportSheetState extends State<ReportSheet> {
               const SizedBox(height: AppSpacing.x4 + AppSpacing.x1),
 
               Text(
-                l.translate(_isInstructor ? 'report_instructor_title' : 'report_issue'),
+                l.translate(_isMessage
+                    ? 'report_message_title'
+                    : _isInstructor ? 'report_instructor_title' : 'report_issue'),
                 style: AppTypography.title.copyWith(
                   fontSize: 22,
                   height: 28 / 22,

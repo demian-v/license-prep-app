@@ -84,11 +84,32 @@ const DEAD_TOKEN = new Set([
 ]);
 
 export async function sendPushToUser(uid: string, kind: PushKind, route: string): Promise<void> {
+  await deliver(uid, kind, route, async (userRef) => pushText(kind, (await userRef.get()).get('language')));
+}
+
+/**
+ * A push whose words come from the sender, not from TEXTS: a chat message
+ * («Anna: …», plan v2 §12). The caller has already masked the body.
+ */
+export async function sendTextPushToUser(
+  uid: string,
+  kind: 'chat_message',
+  { title, body, route }: { title: string; body: string; route: string },
+): Promise<void> {
+  await deliver(uid, kind, route, async () => ({ title, body }));
+}
+
+async function deliver(
+  uid: string,
+  kind: string,
+  route: string,
+  text: (userRef: FirebaseFirestore.DocumentReference) => Promise<{ title: string; body: string }>,
+): Promise<void> {
   try {
     const userRef = admin.firestore().collection('users').doc(uid);
     const tokens = await userRef.collection('fcmTokens').get();
     if (tokens.empty) return;
-    const { title, body } = pushText(kind, (await userRef.get()).get('language'));
+    const { title, body } = await text(userRef);
     const messages: admin.messaging.TokenMessage[] = tokens.docs.map((doc) => ({
       token: doc.get('token'),
       notification: { title, body },

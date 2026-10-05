@@ -220,4 +220,49 @@ class ReportService {
           .set(report.toMap());
     }
   }
+
+  /// A participant reports the other side's chat message (plan v2 §10).
+  /// firestore.rules checks the reporter is in the conversation and the
+  /// message is not their own. Reasons: harassment, inappropriate, spam, other.
+  Future<void> submitMessageReport({
+    required String conversationId,
+    required String messageId,
+    required String reason,
+    String? message,
+    required String language,
+    required String state,
+  }) async {
+    final pkg = await PackageInfo.fromPlatform();
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      throw Exception('User must be authenticated to submit a report');
+    }
+
+    final report = IssueReport(
+      reason: reason,
+      contentType: 'message',
+      // Only these two keys: firestore.rules allows no other entity key here.
+      entity: {'conversationId': conversationId, 'messageId': messageId},
+      message: message,
+      userId: user.uid,
+      language: language,
+      state: state,
+      appVersion: pkg.version,
+      buildNumber: pkg.buildNumber,
+      device: Platform.isAndroid ? 'android' : 'ios',
+      platform: Platform.isAndroid ? 'android' : 'ios',
+    );
+
+    try {
+      final reportId = await _counterService.getNextReportId();
+      await _db.collection('reports').doc(reportId).set(report.toMap());
+    } catch (e) {
+      // Risk #45: an auto-ID is denied by the rules.
+      debugPrint('ReportService: Counter unavailable, using fallback report ID: $e');
+      await _db.collection('reports')
+          .doc(_counterService.generateFallbackReportId(user.uid))
+          .set(report.toMap());
+    }
+  }
 }

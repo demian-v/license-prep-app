@@ -6,6 +6,7 @@ import '../localization/app_localizations.dart';
 import '../models/instructor_listing.dart';
 import '../providers/language_provider.dart';
 import '../services/analytics_service.dart';
+import '../services/chat_service.dart';
 import '../services/instructor_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/bento_tokens.dart';
@@ -16,6 +17,7 @@ import '../widgets/bento_result_parts.dart' show bentoHeadingAppBar;
 import '../widgets/instructor_card.dart';
 import '../widgets/instructor_stage_badge.dart';
 import '../widgets/report_sheet.dart';
+import 'chat_thread_screen.dart';
 
 /// One instructor, for a paid student (instructors plan v2 §13). Pushed from
 /// Поиск / Избранное with the card's data, so it draws at once; the weekly
@@ -114,7 +116,7 @@ class _InstructorDetailScreenState extends State<InstructorDetailScreen> {
                     _Notice(stage: i.stage),
                   ],
                   const SizedBox(height: AppSpacing.x3),
-                  _Actions(instructor: i),
+                  _Actions(instructor: i, uid: widget.uid),
                   if (i.bio != null) ...[
                     const SizedBox(height: AppSpacing.x3),
                     _Section(
@@ -275,12 +277,16 @@ class _Notice extends StatelessWidget {
   }
 }
 
-/// «Забронировать» (driving schools only) and «Написать», disabled until
-/// P7 / P6, each with the reason under it.
+/// «Забронировать» (driving schools only, disabled until P7) and «Написать»
+/// — open from stage 1 (ID checked, plan v2 §10); below it, disabled with
+/// the reason under it.
 class _Actions extends StatelessWidget {
-  const _Actions({required this.instructor});
+  const _Actions({required this.instructor, required this.uid});
 
   final InstructorListing instructor;
+
+  /// The student, whose thread with this instructor «Написать» opens.
+  final String uid;
 
   @override
   Widget build(BuildContext context) {
@@ -288,7 +294,7 @@ class _Actions extends StatelessWidget {
     final i = instructor;
     final reasons = [
       if (i.isSchool) l.translate(i.stage >= 2 ? 'instructor_book_soon' : 'instructor_book_after_check'),
-      l.translate(i.stage >= 1 ? 'instructor_chat_soon' : 'instructor_chat_after_id'),
+      if (i.stage < 1) l.translate('instructor_chat_after_id'),
     ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -299,10 +305,23 @@ class _Actions extends StatelessWidget {
               Expanded(child: BentoActionButton(text: l.translate('instructor_book'), onTap: null)),
               const SizedBox(width: AppSpacing.x3),
             ],
-            Expanded(child: BentoActionButton(text: l.translate('instructor_message'), ink: true, onTap: null)),
+            Expanded(
+              child: BentoActionButton(
+                text: l.translate('instructor_message'),
+                ink: true,
+                onTap: i.stage < 1
+                    ? null
+                    : () => Navigator.of(context).push(ForwardPageRoute(
+                          child: ChatThreadScreen(
+                            conversationId: ChatService.conversationIdFor(uid, i.id),
+                            partner: ChatPartner(instructorUid: i.id, name: i.name, photoPath: i.photoPath),
+                          ),
+                        )),
+              ),
+            ),
           ],
         ),
-        const SizedBox(height: AppSpacing.x2),
+        if (reasons.isNotEmpty) const SizedBox(height: AppSpacing.x2),
         for (final reason in reasons)
           Padding(
             padding: const EdgeInsets.only(top: 2),

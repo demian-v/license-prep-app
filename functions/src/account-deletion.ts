@@ -15,12 +15,14 @@ import { FieldValue } from 'firebase-admin/firestore';
  * honours both promises instead of choosing between them.
  */
 
-export type DeletionAction = 'delete' | 'anonymize';
+export type DeletionAction = 'delete' | 'anonymize' | 'redact';
 
 export interface DeletionTarget {
   collection: string;
   ref: FirebaseFirestore.DocumentReference;
   action: DeletionAction;
+  /** For 'redact': the fields to write, merged into the document. */
+  fields?: Record<string, unknown>;
 }
 
 /** Fields that tie a retained billing record to a person. */
@@ -76,6 +78,33 @@ export async function collectUserDataForDeletion(
     targets.push({ collection: 'reports', ref: doc.ref, action: 'delete' });
   }
 
+  // Conversations (plan v2 §17): anonymised, not deleted — the other side
+  // keeps the thread and sees «Удалённый пользователь». The deleted side's
+  // name and photo go, and so does its uid from participantUids, so nobody
+  // reads the thread as them again. Messages stay: they are the other
+  // person's record too. Once both sides are gone, nobody can read it, so
+  // the thread and its messages are deleted.
+  const threads = await db.collection('conversations').where('participantUids', 'array-contains', userId).get();
+  for (const doc of threads.docs) {
+    const others = (doc.get('participantUids') as string[]).filter((u) => u !== userId);
+    if (others.length === 0) {
+      for (const m of (await doc.ref.collection('messages').get()).docs) {
+        targets.push({ collection: 'conversations/messages', ref: m.ref, action: 'delete' });
+      }
+      targets.push({ collection: 'conversations', ref: doc.ref, action: 'delete' });
+      continue;
+    }
+    const side = doc.get('studentUid') === userId ? 'student' : 'instructor';
+    targets.push({
+      collection: 'conversations',
+      ref: doc.ref,
+      action: 'redact',
+      fields: side === 'student'
+        ? { participantUids: others, studentDeleted: true, studentDisplayName: null, studentUnread: 0 }
+        : { participantUids: others, instructorDeleted: true, instructorName: null, instructorPhotoPath: null, instructorUnread: 0 },
+    });
+  }
+
   // Billing records: retained, de-linked.
   for (const collection of ['subscriptions', 'subscriptionLogs']) {
     const snap = await db.collection(collection).where('userId', '==', userId).get();
@@ -108,6 +137,9 @@ export async function applyDeletionPlan(
       if (target.action === 'delete') {
         batch.delete(target.ref);
         deleted++;
+      } else if (target.action === 'redact') {
+        batch.set(target.ref, { ...target.fields, anonymizedAt: FieldValue.serverTimestamp() }, { merge: true });
+        anonymized++;
       } else {
         const update: Record<string, unknown> = {
           anonymizedAt: FieldValue.serverTimestamp(),
