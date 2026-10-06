@@ -17,9 +17,10 @@ import * as admin from 'firebase-admin';
  * A push is never worth failing the caller for: errors are logged, not thrown.
  */
 
-export type PushKind = 'photo_approved' | 'photo_rejected';
+export type PushKind = 'photo_approved' | 'photo_rejected'
+  | 'booking_new' | 'booking_cancelled_student' | 'booking_cancelled_instructor';
 
-type Lang = 'en' | 'es' | 'uk' | 'ru' | 'pl';
+export type Lang = 'en' | 'es' | 'uk' | 'ru' | 'pl';
 const LANGS: readonly Lang[] = ['en', 'es', 'uk', 'ru', 'pl'];
 
 // Worded like the app's own Профиль strings (iprof_photo_*), so the push and
@@ -39,11 +40,39 @@ const TEXTS: Record<PushKind, Record<Lang, { title: string; body: string }>> = {
     ru: { title: 'Фото не принято', body: 'Выберите другое в Профиле.' },
     pl: { title: 'Zdjęcie nie zostało przyjęte', body: 'Wybierz inne w Profilu.' },
   },
+  // Bookings (P7): {name} is the other side (a student's «Anna K.», a
+  // school's name), {time} the lesson in the instructor's timezone.
+  booking_new: {
+    en: { title: 'New booking', body: '{name} · {time}' },
+    es: { title: 'Nueva reserva', body: '{name} · {time}' },
+    uk: { title: 'Нове бронювання', body: '{name} · {time}' },
+    ru: { title: 'Новая бронь', body: '{name} · {time}' },
+    pl: { title: 'Nowa rezerwacja', body: '{name} · {time}' },
+  },
+  booking_cancelled_student: {
+    en: { title: 'A student cancelled a lesson', body: '{name} · {time}' },
+    es: { title: 'Un alumno canceló una clase', body: '{name} · {time}' },
+    uk: { title: 'Учень скасував урок', body: '{name} · {time}' },
+    ru: { title: 'Ученик отменил урок', body: '{name} · {time}' },
+    pl: { title: 'Kursant odwołał lekcję', body: '{name} · {time}' },
+  },
+  booking_cancelled_instructor: {
+    en: { title: 'Your lesson was cancelled', body: '{name} · {time}' },
+    es: { title: 'Tu clase fue cancelada', body: '{name} · {time}' },
+    uk: { title: 'Ваш урок скасовано', body: '{name} · {time}' },
+    ru: { title: 'Ваш урок отменён', body: '{name} · {time}' },
+    pl: { title: 'Twoja lekcja została odwołana', body: '{name} · {time}' },
+  },
 };
 
-export function pushText(kind: PushKind, language: unknown) {
-  const lang = LANGS.includes(language as Lang) ? (language as Lang) : 'en';
-  return TEXTS[kind][lang];
+/** The user's app language, English when unknown. */
+export function pushLang(language: unknown): Lang {
+  return LANGS.includes(language as Lang) ? (language as Lang) : 'en';
+}
+
+export function pushText(kind: PushKind, language: unknown, vars: Record<string, string> = {}) {
+  const { title, body } = TEXTS[kind][pushLang(language)];
+  return { title, body: body.replace(/\{(\w+)\}/g, (whole, key: string) => vars[key] ?? whole) };
 }
 
 /**
@@ -83,8 +112,20 @@ const DEAD_TOKEN = new Set([
   'messaging/invalid-registration-token',
 ]);
 
-export async function sendPushToUser(uid: string, kind: PushKind, route: string): Promise<void> {
-  await deliver(uid, kind, route, async (userRef) => pushText(kind, (await userRef.get()).get('language')));
+/**
+ * `vars` fills the text's placeholders; it is given the reader's language,
+ * so a date can be written the way they read it.
+ */
+export async function sendPushToUser(
+  uid: string,
+  kind: PushKind,
+  route: string,
+  vars?: (lang: Lang) => Record<string, string>,
+): Promise<void> {
+  await deliver(uid, kind, route, async (userRef) => {
+    const lang = pushLang((await userRef.get()).get('language'));
+    return pushText(kind, lang, vars?.(lang));
+  });
 }
 
 /**

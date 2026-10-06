@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -15,12 +16,14 @@ import '../services/analytics_service.dart';
 import '../services/chat_service.dart';
 import '../services/instructor_service.dart';
 import '../services/push_service.dart';
+import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
 import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
 import '../widgets/bento_question_parts.dart';
 import '../widgets/instructor_card.dart';
 import '../widgets/report_sheet.dart';
+import 'booking_screen.dart';
 import 'instructor_detail_screen.dart';
 
 /// Who the thread is with, before the conversation exists: a student opening
@@ -210,6 +213,25 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     }
   }
 
+  /// «Забронировать» in a school's thread (plan v2 §10): the profile is
+  /// fetched first, so a school that can't take bookings yet says why.
+  Future<void> _book(String instructorUid) async {
+    final l = AppLocalizations.of(context);
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final listing = await InstructorService().detail(instructorUid);
+      if (listing.bookable) {
+        navigator.push(ForwardPageRoute(child: BookingScreen(instructor: listing)));
+      } else {
+        messenger.showSnackBar(SnackBar(content: Text(l.translate('instructor_book_after_check'))));
+      }
+    } catch (_) {
+      messenger.showSnackBar(
+          SnackBar(content: Text(l.translate('instructor_unavailable_title'))));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -303,6 +325,20 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
         top: false,
         child: Column(
           children: [
+            // «Забронировать урок» as a full-width pill under the header
+            // (owner, 2026-10-05: an icon alone was unclear, and a pill in
+            // the app bar cut the school's name).
+            if (asStudent && !otherDeleted && instructorUid != null && c?.instructorKind == 'school')
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.x4 + AppSpacing.x1, 0, AppSpacing.x4 + AppSpacing.x1, AppSpacing.x2),
+                child: BentoActionButton(
+                  text: l.translate('chat_book_lesson'),
+                  // Black, not blue (owner, 2026-10-05): blue is the bubbles'.
+                  ink: true,
+                  onTap: () => _book(instructorUid),
+                ),
+              ),
             if (_contacts != null) _ContactsCard(contacts: _contacts!),
             Expanded(child: _messageList(l, uid)),
             _composer(l, c, asStudent: asStudent, paid: paid),
@@ -638,6 +674,29 @@ class _ContactsCard extends StatelessWidget {
                       child: SelectableText(value,
                           style: AppTypography.body
                               .copyWith(color: AppColors.ink))),
+                  // One tap copies it (owner, 2026-10-05).
+                  IconButton(
+                    tooltip: l.translate('chat_copy'),
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.field,
+                      minimumSize: const Size(36, 36),
+                      fixedSize: const Size(36, 36),
+                      padding: EdgeInsets.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    icon: AppIcons.icon(AppIcons.copy, size: 18, color: AppColors.signal),
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: value));
+                      HapticFeedback.selectionClick();
+                      ScaffoldMessenger.of(context)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(SnackBar(
+                          content: Text(l.translate('chat_copied')),
+                          backgroundColor: AppColors.guide,
+                          duration: const Duration(seconds: 2),
+                        ));
+                    },
+                  ),
                 ],
               ),
             );

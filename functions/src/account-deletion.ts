@@ -25,6 +25,9 @@ export interface DeletionTarget {
   fields?: Record<string, unknown>;
 }
 
+/** What a deleted user's uid becomes in the records that are kept. */
+export const anonymousIdFor = (userId: string) => `deleted_${userId.slice(0, 8)}`;
+
 /** Fields that tie a retained billing record to a person. */
 const PERSONAL_LINK_FIELDS = ['userId', 'email', 'deviceIdHash'];
 
@@ -103,6 +106,25 @@ export async function collectUserDataForDeletion(
         ? { participantUids: others, studentDeleted: true, studentDisplayName: null, studentUnread: 0 }
         : { participantUids: others, instructorDeleted: true, instructorName: null, instructorPhotoPath: null, instructorUnread: 0 },
     });
+  }
+
+  // Bookings (plan v2 §17): financial records, so anonymised, never deleted —
+  // the amounts and ids stay, the deleted side's uid becomes the same
+  // `deleted_…` id the billing records get and its name goes. The other side
+  // still reads the booking. deleteUserAccount has already refused while a
+  // lesson is upcoming (§9.4).
+  for (const side of ['student', 'instructor'] as const) {
+    const snap = await db.collection('bookings').where(`${side}Uid`, '==', userId).get();
+    for (const doc of snap.docs) {
+      targets.push({
+        collection: 'bookings',
+        ref: doc.ref,
+        action: 'redact',
+        fields: side === 'student'
+          ? { studentUid: anonymousIdFor(userId), studentDeleted: true, studentDisplayName: null }
+          : { instructorUid: anonymousIdFor(userId), instructorDeleted: true, instructorName: null },
+      });
+    }
   }
 
   // Billing records: retained, de-linked.

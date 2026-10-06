@@ -799,6 +799,17 @@ class AnalyticsService {
     await logEvent('chat_started');
   }
 
+  /// A student booked a lesson (plan v2 §14.3). No ids: only the length and
+  /// whether it was a first lesson with that school.
+  Future<void> logBookingCreated({required int durationMinutes, required String feeKind}) async {
+    await logEvent('booking_created', {'duration_minutes': durationMinutes, 'fee_kind': feeKind});
+  }
+
+  /// The booking was paid and confirmed (on the emulator, at once). No ids.
+  Future<void> logBookingConfirmed({required int durationMinutes}) async {
+    await logEvent('booking_confirmed', {'duration_minutes': durationMinutes});
+  }
+
   Future<void> logInstructorProfileViewed({required String kind, required int stage}) async {
     await logEvent('instructor_profile_viewed', {
       'instructor_kind': kind,

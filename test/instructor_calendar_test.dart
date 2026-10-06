@@ -6,7 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:license_prep_app/localization/app_localizations.dart';
+import 'package:license_prep_app/models/booking.dart';
 import 'package:license_prep_app/screens/instructor_calendar_screen.dart';
+import 'package:license_prep_app/services/booking_service.dart';
 import 'package:license_prep_app/services/instructor_service.dart';
 
 /// Instructors P3b — the weekly hours on Календарь (plan v2 §14.2): half
@@ -30,6 +32,12 @@ class _FakeService extends InstructorService {
   }
 }
 
+/// No lessons: the lists under the grid have their own tests (booking_test).
+class _NoBookings extends BookingService {
+  @override
+  Stream<List<Booking>> bookings(String uid, {required bool asInstructor}) => Stream.value(const []);
+}
+
 Map<String, dynamic> _doc({Map<String, dynamic>? availability, String status = 'active'}) => {
       'status': status,
       'timezone': 'America/Chicago',
@@ -49,7 +57,7 @@ Future<void> _pump(WidgetTester tester, _FakeService svc, {String locale = 'en'}
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: [Locale(locale)],
-      home: InstructorCalendarScreen(service: svc, uid: 'u1'),
+      home: InstructorCalendarScreen(service: svc, bookings: _NoBookings(), uid: 'u1'),
     ));
     await Future<void>.delayed(const Duration(milliseconds: 100));
   });

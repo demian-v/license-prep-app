@@ -163,9 +163,14 @@ class _ConversationRow extends StatelessWidget {
                 ? l.translate('chat_student_fallback')
                 : c.studentDisplayName);
     final unread = c.unreadFor(uid);
-    final text = c.lastMessageSender == uid
-        ? l.translate('chat_you_prefix').replaceAll('{text}', c.lastMessageText)
-        : c.lastMessageText;
+    // A thread the first booking created has no message yet (P7,
+    // confirmBooking): «Урок забронирован» instead of an empty line (owner,
+    // 2026-10-05).
+    final text = c.lastMessageSender == null && c.lastMessageText.isEmpty
+        ? l.translate('chat_lesson_booked')
+        : c.lastMessageSender == uid
+            ? l.translate('chat_you_prefix').replaceAll('{text}', c.lastMessageText)
+            : c.lastMessageText;
 
     return PressScale(
       scale: 0.98,

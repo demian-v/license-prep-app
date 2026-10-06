@@ -17,14 +17,15 @@ import '../widgets/bento_result_parts.dart' show bentoHeadingAppBar;
 import '../widgets/instructor_card.dart';
 import '../widgets/instructor_stage_badge.dart';
 import '../widgets/report_sheet.dart';
+import 'booking_screen.dart';
 import 'chat_thread_screen.dart';
 
 /// One instructor, for a paid student (instructors plan v2 §13). Pushed from
 /// Поиск / Избранное with the card's data, so it draws at once; the weekly
 /// hours (getInstructorProfile) and reviews (getInstructorReviews) follow.
 ///
-/// Booking (P7) and messages (P6) don't exist yet: their buttons are shown
-/// disabled with the reason, so the page already says what each needs.
+/// «Забронировать» and «Написать» are shown disabled with the reason until
+/// the instructor's stage allows them, so the page says what each needs.
 class InstructorDetailScreen extends StatefulWidget {
   const InstructorDetailScreen({super.key, required this.instructor, required this.uid, this.service});
 
@@ -277,9 +278,9 @@ class _Notice extends StatelessWidget {
   }
 }
 
-/// «Забронировать» (driving schools only, disabled until P7) and «Написать»
-/// — open from stage 1 (ID checked, plan v2 §10); below it, disabled with
-/// the reason under it.
+/// «Забронировать» (driving schools only — open at stage 2, plan v2 §9;
+/// below it, disabled with the licence reason) and «Написать» — open from
+/// stage 1 (ID checked, plan v2 §10), disabled with the reason below it.
 class _Actions extends StatelessWidget {
   const _Actions({required this.instructor, required this.uid});
 
@@ -293,7 +294,7 @@ class _Actions extends StatelessWidget {
     final l = AppLocalizations.of(context);
     final i = instructor;
     final reasons = [
-      if (i.isSchool) l.translate(i.stage >= 2 ? 'instructor_book_soon' : 'instructor_book_after_check'),
+      if (i.isSchool && !i.bookable) l.translate('instructor_book_after_check'),
       if (i.stage < 1) l.translate('instructor_chat_after_id'),
     ];
     return Column(
@@ -302,7 +303,14 @@ class _Actions extends StatelessWidget {
         Row(
           children: [
             if (i.isSchool) ...[
-              Expanded(child: BentoActionButton(text: l.translate('instructor_book'), onTap: null)),
+              Expanded(
+                child: BentoActionButton(
+                  text: l.translate('instructor_book'),
+                  onTap: i.bookable
+                      ? () => Navigator.of(context).push(ForwardPageRoute(child: BookingScreen(instructor: i)))
+                      : null,
+                ),
+              ),
               const SizedBox(width: AppSpacing.x3),
             ],
             Expanded(
@@ -582,17 +590,6 @@ class _WeekHours extends StatelessWidget {
     ('sun', 'day_full_sun', DateTime.sunday),
   ];
 
-  /// The zones zip-timezone.ts can assign, by name instead of IANA id.
-  static const Map<String, String> _zoneKeys = {
-    'America/New_York': 'instructor_tz_eastern',
-    'America/Detroit': 'instructor_tz_eastern',
-    'America/Chicago': 'instructor_tz_central',
-    'America/Denver': 'instructor_tz_mountain',
-    'America/Boise': 'instructor_tz_mountain',
-    'America/Phoenix': 'instructor_tz_mountain',
-    'America/Los_Angeles': 'instructor_tz_pacific',
-  };
-
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -602,7 +599,6 @@ class _WeekHours extends StatelessWidget {
           style: AppTypography.body.copyWith(color: AppColors.inkSecondary));
     }
     final today = DateTime.now().weekday;
-    final zoneKey = _zoneKeys[i.timezone];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -616,7 +612,7 @@ class _WeekHours extends StatelessWidget {
               const SizedBox(width: AppSpacing.x1 + 2),
               Expanded(
                 child: Text(
-                  zoneKey == null ? i.timezone! : '${l.translate(zoneKey)} · ${i.city}',
+                  timezoneLabel(l, i.timezone!, city: i.city),
                   style: AppTypography.caption.copyWith(color: AppColors.inkSecondary),
                 ),
               ),

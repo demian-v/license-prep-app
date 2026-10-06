@@ -3,24 +3,30 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../localization/app_localizations.dart';
+import '../models/booking.dart';
 import '../providers/auth_provider.dart';
+import '../services/booking_service.dart';
 import '../services/instructor_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/bento_tokens.dart';
 import '../widgets/bento_auth_parts.dart';
 import '../widgets/bento_question_parts.dart';
+import '../widgets/booking_tile.dart';
+import 'booking_detail_screen.dart';
 
 /// «Календарь» — the instructor's first tab (instructors plan v2 §14.2): the
 /// weekly hours students can book inside, as a grid of half hours from 06:00
 /// to 22:00, in the instructor's own timezone. Tap opens or closes one half
 /// hour; hold, then drag, marks a range (a plain drag scrolls the page).
 /// Saved through updateInstructorProfile, which merges the cells into
-/// intervals. Upcoming and past lessons come with bookings (P7). A tab page,
-/// so no title (owner rule 1).
+/// intervals. Under the grid, «Предстоящие уроки» and «Прошедшие» (P7; the
+/// income part of «Прошедшие и доход» is P9). A tab page, so no title
+/// (owner rule 1).
 class InstructorCalendarScreen extends StatefulWidget {
-  const InstructorCalendarScreen({super.key, this.service, this.uid});
+  const InstructorCalendarScreen({super.key, this.service, this.bookings, this.uid});
 
   final InstructorService? service;
+  final BookingService? bookings;
 
   /// For tests; the signed-in user otherwise.
   final String? uid;
@@ -86,6 +92,7 @@ class InstructorCalendarScreen extends StatefulWidget {
 class _InstructorCalendarScreenState extends State<InstructorCalendarScreen> {
   late final InstructorService _service = widget.service ?? InstructorService();
   Stream<Map<String, dynamic>?>? _profile;
+  Stream<List<Booking>>? _lessons;
 
   /// What the server has, and what the instructor is editing.
   Map<String, Set<int>> _saved = InstructorCalendarScreen.cellsFrom(null);
@@ -110,6 +117,7 @@ class _InstructorCalendarScreenState extends State<InstructorCalendarScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _profile ??= _service.ownProfile(_uid);
+    _lessons ??= (widget.bookings ?? BookingService()).bookings(_uid, asInstructor: true);
   }
 
   bool get _dirty {
@@ -206,59 +214,75 @@ class _InstructorCalendarScreenState extends State<InstructorCalendarScreen> {
             return Column(
               children: [
                 Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.x4 + AppSpacing.x1, AppSpacing.x4, AppSpacing.x4 + AppSpacing.x1, AppSpacing.x4),
-                    children: [
-                      Text(
-                        translate('instructor_calendar_empty_title'),
-                        style: AppTypography.title.copyWith(
-                          fontSize: 22,
-                          height: 28 / 22,
-                          color: AppColors.ink,
-                          fontVariations: const [FontVariation('wght', 700)],
+                  // Listened to here, above the list: a ListView rebuilds
+                  // its children as they scroll, and a Firestore stream
+                  // can't be listened to twice.
+                  child: StreamBuilder<List<Booking>>(
+                    stream: _lessons,
+                    builder: (context, lessons) => ListView(
+                      padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.x4 + AppSpacing.x1, AppSpacing.x4, AppSpacing.x4 + AppSpacing.x1, AppSpacing.x4),
+                      children: [
+                        Text(
+                          translate('instructor_calendar_empty_title'),
+                          style: AppTypography.title.copyWith(
+                            fontSize: 22,
+                            height: 28 / 22,
+                            color: AppColors.ink,
+                            fontVariations: const [FontVariation('wght', 700)],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: AppSpacing.x1),
-                      Text(
-                        editable ? translate('ical_desc') : translate('iprof_suspended'),
-                        style: AppTypography.body.copyWith(color: AppColors.inkSecondary),
-                      ),
-                      if (timezone != null) ...[
                         const SizedBox(height: AppSpacing.x1),
                         Text(
-                          translate('ical_timezone').replaceAll('{tz}', timezone.replaceAll('_', ' ')),
-                          style: AppTypography.caption.copyWith(color: AppColors.inkSecondary),
+                          editable ? translate('ical_desc') : translate('iprof_suspended'),
+                          style: AppTypography.body.copyWith(color: AppColors.inkSecondary),
+                        ),
+                        if (timezone != null) ...[
+                          const SizedBox(height: AppSpacing.x1),
+                          Text(
+                            translate('ical_timezone').replaceAll('{tz}', timezone.replaceAll('_', ' ')),
+                            style: AppTypography.caption.copyWith(color: AppColors.inkSecondary),
+                          ),
+                        ],
+                        const SizedBox(height: AppSpacing.x3),
+                        if (_error != null) ...[BentoAuthError(_error!), const SizedBox(height: AppSpacing.x3)],
+                        Container(
+                          padding:
+                              const EdgeInsets.fromLTRB(AppSpacing.x2, AppSpacing.x3, AppSpacing.x3, AppSpacing.x3),
+                          decoration: BoxDecoration(
+                            color: AppColors.paper,
+                            borderRadius: BorderRadius.circular(BentoTokens.card),
+                            boxShadow: AppColors.shadowCard,
+                          ),
+                          child: _Grid(
+                            cells: _cells,
+                            dayLabels: _dayLabels(),
+                            enabled: editable && !_busy,
+                            onToggle: (d, i) => _set(d, i, !_cells[d]!.contains(i)),
+                            onPaintStart: (d, i) {
+                              HapticFeedback.selectionClick();
+                              _paint = !_cells[d]!.contains(i);
+                              _lastPaint = (InstructorCalendarScreen.days.indexOf(d), i);
+                              _set(d, i, _paint!);
+                            },
+                            onPaint: _paintTo,
+                            onPaintEnd: () {
+                              _paint = null;
+                              _lastPaint = null;
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.x6),
+                        ...bookingSections(
+                          context,
+                          lessons.data ?? const [],
+                          asInstructor: true,
+                          onOpen: (b) => Navigator.of(context).push(
+                            ForwardPageRoute(child: BookingDetailScreen(bookingId: b.id, asInstructor: true)),
+                          ),
                         ),
                       ],
-                      const SizedBox(height: AppSpacing.x3),
-                      if (_error != null) ...[BentoAuthError(_error!), const SizedBox(height: AppSpacing.x3)],
-                      Container(
-                        padding: const EdgeInsets.fromLTRB(AppSpacing.x2, AppSpacing.x3, AppSpacing.x3, AppSpacing.x3),
-                        decoration: BoxDecoration(
-                          color: AppColors.paper,
-                          borderRadius: BorderRadius.circular(BentoTokens.card),
-                          boxShadow: AppColors.shadowCard,
-                        ),
-                        child: _Grid(
-                          cells: _cells,
-                          dayLabels: _dayLabels(),
-                          enabled: editable && !_busy,
-                          onToggle: (d, i) => _set(d, i, !_cells[d]!.contains(i)),
-                          onPaintStart: (d, i) {
-                            HapticFeedback.selectionClick();
-                            _paint = !_cells[d]!.contains(i);
-                            _lastPaint = (InstructorCalendarScreen.days.indexOf(d), i);
-                            _set(d, i, _paint!);
-                          },
-                          onPaint: _paintTo,
-                          onPaintEnd: () {
-                            _paint = null;
-                            _lastPaint = null;
-                          },
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
                 if (editable)

@@ -61,6 +61,9 @@ class AppIcons {
   static const String rating = '$_base/star-bold.svg';
   static const String filters = '$_base/tuning-2-linear.svg';
 
+  /// Copy a contact in a chat thread (instructors P7, owner 2026-10-05).
+  static const String copy = '$_base/copy-linear.svg';
+
   /// Draws one icon at [size], tinted [color].
   ///
   /// Solar's SVGs paint with `currentColor`, so a [ColorFilter] recolours

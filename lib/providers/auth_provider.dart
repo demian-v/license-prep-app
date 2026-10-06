@@ -12,6 +12,7 @@ import '../services/instructor_service.dart';
 import '../services/push_service.dart';
 import '../data/state_data.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'language_provider.dart';
 import 'subscription_provider.dart';
 import 'state_provider.dart';
@@ -670,6 +671,10 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// The codes deleteUserAccount refuses with before it deletes anything;
+  /// firebase_auth_api.dart rethrows exactly these instead of falling back.
+  static const _deletionRefused = {'failed-precondition', 'permission-denied', 'unauthenticated'};
+
   Future<void> deleteAccount() async {
     if (user != null) {
       try {
@@ -686,6 +691,14 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
         debugPrint('✅ AuthProvider: User account deleted successfully');
       } catch (e) {
+        // The server said no on purpose — sign in again first (risk #14) or
+        // cancel upcoming lessons first (plan v2 §9.4). Nothing was deleted,
+        // so the user stays signed in (found 2026-10-05: this used to sign
+        // them out locally like any other failure).
+        if (e is FirebaseFunctionsException && _deletionRefused.contains(e.code)) {
+          debugPrint('🚫 AuthProvider: Account deletion refused (${e.code}: ${e.message}); still signed in');
+          rethrow;
+        }
         debugPrint('! AuthProvider: Account deletion error: $e');
         
         // Still clear local data even if API deletion fails

@@ -13,7 +13,8 @@ import { applyToAllMatches } from './webhook-fanout';
 import { mapPlayNotification, PLAY_NOTIFICATION, playDedupKey } from './play-notifications';
 import { recordWebhookFailure } from './webhook-dead-letter';
 import { anonymizeTrialDevicesForUser } from './trial-devices';
-import { collectUserDataForDeletion, applyDeletionPlan, assertRecentLogin, deleteUserStorage } from './account-deletion';
+import { collectUserDataForDeletion, applyDeletionPlan, assertRecentLogin, deleteUserStorage, anonymousIdFor } from './account-deletion';
+import { upcomingBookingCount } from './bookings';
 import { readContentVersion } from './content-version';
 import { sweepPaginated, SWEEP_TIME_BUDGET_MS } from './sweep';
 import {
@@ -1383,6 +1384,14 @@ export const deleteUserAccount = functions.https.onCall(async (data, context) =>
       );
     }
     
+    // Instructors plan v2 §9.4 — upcoming lessons are cancelled first, by the
+    // user, so the other side is told. Checked before the recent-login gate
+    // so nobody signs in again only to be refused for this.
+    const upcoming = await upcomingBookingCount(db, userId);
+    if (upcoming > 0) {
+      throw new functions.https.HttpsError('failed-precondition', 'upcoming-bookings', { count: upcoming });
+    }
+
     // Risk #14 — require a recent login. admin.auth().deleteUser() bypasses
     // Firebase's own requires-recent-login entirely, so nothing enforced this:
     // a borrowed or stolen unlocked phone could destroy an account hours after
@@ -1433,7 +1442,7 @@ export const deleteUserAccount = functions.https.onCall(async (data, context) =>
     // 500-write batch limit, which the previous single batch would have hit.
     let applied;
     try {
-      applied = await applyDeletionPlan(db, targets, `deleted_${userId.slice(0, 8)}`);
+      applied = await applyDeletionPlan(db, targets, anonymousIdFor(userId));
       if (anonymizedDevices > 0) await trialDeviceBatch.commit();
       console.log(
         `deleteUserAccount: deleted ${applied.deleted}, anonymised ` +
@@ -2591,3 +2600,4 @@ export {
 // ============================================================================
 export { listInstructors, getInstructorProfile, getInstructorReviews, setSignupRole, registerAsInstructor, submitLicenseNumber, updateInstructorProfile, getInstructorContacts, onInstructorUpload, onInstructorWrite } from './instructors';
 export { sendMessage, markConversationRead, getInstructorContactInfo } from './chat';
+export { getBookingOptions, createBooking, cancelBooking, expirePendingBookings, markBookingsCompleted } from './bookings';

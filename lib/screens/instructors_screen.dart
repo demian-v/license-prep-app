@@ -5,11 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../localization/app_localizations.dart';
+import '../models/booking.dart';
 import '../models/chat.dart';
 import '../models/instructor_listing.dart';
 import '../providers/auth_provider.dart';
 import '../providers/state_provider.dart';
 import '../providers/subscription_provider.dart';
+import '../services/booking_service.dart';
 import '../services/chat_service.dart';
 import '../services/instructor_service.dart';
 import '../theme/app_icons.dart';
@@ -20,6 +22,7 @@ import '../utils/state_display.dart';
 import '../widgets/bento_empty_card.dart';
 import '../widgets/bento_hero_bars.dart';
 import '../widgets/bento_question_parts.dart';
+import '../widgets/booking_tile.dart' show bookingWhen;
 import '../widgets/instructor_card.dart';
 import '../widgets/instructor_filters_sheet.dart';
 import '../widgets/state_requirements_card.dart';
@@ -27,6 +30,7 @@ import '../widgets/trial_status_widget.dart';
 import '../widgets/unread_badge.dart';
 import 'chat_list_screen.dart';
 import 'instructor_detail_screen.dart';
+import 'my_lessons_screen.dart';
 
 /// «Инструкторы» — the marketplace tab for students (instructors plan v2 §3,
 /// §13). Three states, decided in this order:
@@ -76,6 +80,18 @@ class _InstructorsScreenState extends State<InstructorsScreen> {
       _threads = uid == null ? null : ChatService().conversations(uid).handleError((_) {});
     }
     return _threads;
+  }
+
+  Stream<List<Booking>>? _bookings;
+  String? _bookingsUid;
+
+  /// The student's lessons, for the «Мои уроки» card on Поиск (P7).
+  Stream<List<Booking>>? _bookingsFor(String? uid) {
+    if (uid != _bookingsUid) {
+      _bookingsUid = uid;
+      _bookings = uid == null ? null : BookingService().bookings(uid, asInstructor: false).handleError((_) {});
+    }
+    return _bookings;
   }
 
   /// Seeds the listing's shuffle once per app session (plan v2 §13): the
@@ -299,6 +315,39 @@ class _InstructorsScreenState extends State<InstructorsScreen> {
   List<Widget> _search(AppLocalizations l, List<InstructorListing> all, Set<String> saved, String? uid) {
     final found = orderInstructors(all.where(_filters.matches), _sessionSeed);
     return [
+      // «Мои уроки» first, once the student has booked (owner, 2026-10-05:
+      // a card on Поиск rather than a fourth segment).
+      if (uid != null)
+        StreamBuilder<List<Booking>>(
+          stream: _bookingsFor(uid),
+          builder: (context, snap) {
+            final now = DateTime.now();
+            final lessons = (snap.data ?? const <Booking>[])
+                .where((b) => b.upcoming(now) || b.past(now) || b.cancelled)
+                .toList();
+            if (lessons.isEmpty) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.x3),
+              child: _MyLessonsCard(
+                next: lessons.where((b) => b.upcoming(now)).firstOrNull,
+                onTap: () => Navigator.of(context).push(ForwardPageRoute(child: MyLessonsScreen(uid: uid))),
+              ),
+            );
+          },
+        ),
+      // What the list below is (owner, 2026-10-05), so it doesn't read as
+      // part of «Мои уроки» above it. Section header style (15/700).
+      Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.x3),
+        child: Text(
+          l.translate('instructors_find_lesson'),
+          style: AppTypography.label.copyWith(
+            fontSize: 15,
+            color: AppColors.ink,
+            fontVariations: const [FontVariation('wght', 700)],
+          ),
+        ),
+      ),
       _FilterBar(
         active: _filters.activeCount,
         found: found.length,
@@ -529,6 +578,60 @@ class _PlaceholderCard extends StatelessWidget {
 /// Поиск · Избранное · Сообщения as pills in a white tray; the selected one
 /// is the dark `ink` pill (owner rule 10). Labels shrink rather than wrap
 /// (rule 5).
+/// «Мои уроки» as the dark card (the secondary destination, design-patterns):
+/// the title, then the next lesson — or that none is ahead. The whole card
+/// is the button (owner rule 7).
+class _MyLessonsCard extends StatelessWidget {
+  const _MyLessonsCard({required this.next, required this.onTap});
+
+  final Booking? next;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final b = next;
+    final line = b == null ? l.translate('my_lessons_none_upcoming') : '${b.instructorName} · ${bookingWhen(context, b)}';
+    return Semantics(
+      button: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(AppSpacing.x4 + AppSpacing.x1),
+          decoration: BoxDecoration(
+            color: AppColors.ink,
+            borderRadius: BorderRadius.circular(BentoTokens.card),
+            boxShadow: const [BoxShadow(color: Color(0x290E1422), blurRadius: 24, offset: Offset(0, 10))],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l.translate('my_lessons_title'),
+                style: AppTypography.heading.copyWith(
+                  fontSize: 18,
+                  height: 24 / 18,
+                  color: AppColors.onSignal,
+                  fontVariations: const [FontVariation('wght', 600)],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.x1),
+              Text(
+                line,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.caption.copyWith(color: AppColors.onSignal.withValues(alpha: 0.64)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _SegmentPills extends StatelessWidget {
   const _SegmentPills(
       {required this.labels, required this.selected, required this.onSelect, this.badges = const []});

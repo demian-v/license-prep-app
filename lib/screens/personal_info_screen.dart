@@ -1,8 +1,10 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../localization/app_localizations.dart';
 import '../providers/language_provider.dart';
+import '../services/booking_service.dart';
 import '../services/email_sync_service.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'dart:async';
@@ -494,6 +496,33 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     }
   }
 
+  /// Instructors plan v2 §9.4: upcoming lessons are cancelled first, by the
+  /// user, so the other side hears about it. Checked here before the dialog;
+  /// deleteUserAccount refuses on its own too (`upcoming-bookings`).
+  Future<void> _deleteIfNoLessons(BuildContext context, LanguageProvider languageProvider) async {
+    final uid = Provider.of<AuthProvider>(context, listen: false).user?.id;
+    final l = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    var upcoming = 0;
+    if (uid != null) {
+      try {
+        upcoming = await BookingService().upcomingCount(uid);
+      } catch (_) {
+        // Offline or no bookings to read: the server still checks.
+      }
+    }
+    if (!context.mounted) return;
+    if (upcoming > 0) {
+      messenger.showSnackBar(SnackBar(
+        content: Text(l.translate('delete_upcoming_bookings').replaceAll('{n}', '$upcoming')),
+        backgroundColor: AppColors.stop,
+        duration: const Duration(seconds: 5),
+      ));
+      return;
+    }
+    _showDeleteConfirmation(context, languageProvider);
+  }
+
   // Delete account confirmation
   void _showDeleteConfirmation(BuildContext context, LanguageProvider languageProvider) {
     // Instructors never subscribe (instructors plan v2 §4.4), so the store
@@ -592,6 +621,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
               ),
             ),
             onPressed: () async {
+              // Read before any await: the refusal message below needs it.
+              final l10n = AppLocalizations.of(context);
               Navigator.pop(context); // Close dialog
               
               setState(() {
@@ -627,9 +658,20 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                     _isLoading = false;
                   });
                   
+                  // A refusal keeps the user signed in (AuthProvider): say
+                  // why, in the app's language for the lessons case.
+                  final refusal = e is FirebaseFunctionsException ? e : null;
+                  final details = refusal?.details;
+                  final message = refusal?.message == 'upcoming-bookings'
+                      ? l10n
+                          .translate('delete_upcoming_bookings')
+                          .replaceAll('{n}', '${details is Map ? details['count'] : ''}')
+                      : refusal != null
+                          ? (refusal.message ?? refusal.code)
+                          : 'Error: $e';
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Error: $e'),
+                      content: Text(message),
                       backgroundColor: AppColors.stop,
                       duration: Duration(seconds: 5),
                     ),
@@ -846,7 +888,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
               const SizedBox(height: AppSpacing.x3),
               _buildDeleteButton(
                 _translate('delete_account', languageProvider),
-                () => _showDeleteConfirmation(context, languageProvider),
+                () => _deleteIfNoLessons(context, languageProvider),
               ),
             ],
           ),

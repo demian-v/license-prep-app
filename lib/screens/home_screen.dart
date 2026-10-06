@@ -6,6 +6,7 @@ import '../screens/theory_screen.dart';
 import '../screens/instructors_screen.dart';
 import '../screens/instructor_calendar_screen.dart';
 import '../screens/chat_list_screen.dart';
+import '../screens/booking_detail_screen.dart';
 import '../screens/chat_thread_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/onboarding_screen.dart';
@@ -89,23 +90,28 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
 
   /// A tapped push (plan v2 §12). `profile` is the last tab for both roles;
   /// `chat/<id>` opens the thread over the tab that holds the chat (Чат,
-  /// or Инструкторы for a student). `booking/<id>` has no screen until P7,
-  /// so it is taken and dropped rather than left to fire later.
+  /// or Инструкторы for a student); `booking/<id>` opens the lesson over the
+  /// tab that lists lessons (Календарь, or Инструкторы for a student).
   void _openPushRoute() {
     final route = PushService.pendingRoute.value;
     if (route == null || !mounted) return;
     PushService.pendingRoute.value = null;
-    if (route.name != 'profile' && route.name != 'chat') return;
+    if (route.name != 'profile' && route.name != 'chat' && route.name != 'booking') return;
     Navigator.of(context).popUntil((r) => r.isFirst);
-    final tab = route.name == 'chat'
-        ? _chatTab
-        : (_isInstructor ? _instructorScreens : _screens).length - 1;
+    final tab = switch (route.name) {
+      'chat' => _chatTab,
+      'booking' => _isInstructor ? 0 : 2,
+      _ => (_isInstructor ? _instructorScreens : _screens).length - 1,
+    };
     setState(() {
       _currentIndex = tab;
       _persistentCurrentIndex = tab;
     });
     if (route.name == 'chat') {
       Navigator.of(context).push(ForwardPageRoute(child: ChatThreadScreen(conversationId: route.id!)));
+    } else if (route.name == 'booking') {
+      Navigator.of(context).push(ForwardPageRoute(
+          child: BookingDetailScreen(bookingId: route.id!, asInstructor: _isInstructor)));
     }
   }
 

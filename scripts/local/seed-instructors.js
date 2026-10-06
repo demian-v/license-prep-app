@@ -16,6 +16,10 @@
  *   conversations/{id}          P6 chat: seed-student-paid with Lakeview (unlocked, as if
  *                               booked: contacts in the header) and Olena (one unread reply,
  *                               one masked message); reset on every run
+ *   bookings/{id}, bookingSlots P7: seed-student-paid's lessons with Lakeview (completed, late-cancelled,
+ *                               refunded by the school, two upcoming) and Northside (one upcoming,
+ *                               contacts unlocked, no messages yet), plus a pending hold past its
+ *                               15 minutes for the expiry sweep; reset on every run
  * Idempotent: a re-run overwrites the same ids.
  *
  * EMULATORS ONLY. Refuses to run unless FIRESTORE_EMULATOR_HOST is a local address.
@@ -24,6 +28,8 @@
  *   GCLOUD_PROJECT=licenseprepapp node scripts/local/seed-instructors.js
  */
 const admin = require('../../functions/node_modules/firebase-admin');
+// Built by `npm run build` in functions/ — the same wall-clock maths as the server.
+const { wallClock, wallToUtc, weekDay, addDays, minutesOf } = require('../../functions/lib/zone');
 
 if (!/^(127\.0\.0\.1|localhost|\[::1\]):\d+$/.test(process.env.FIRESTORE_EMULATOR_HOST || '')) {
   console.error('REFUSING: FIRESTORE_EMULATOR_HOST is not a local address.');
@@ -221,6 +227,79 @@ const COMMENTS = ['Very patient, passed on the first try.', 'Clear explanations 
     }
   }
   console.log('Chat threads: seed-student-paid with seed-instr-01 (unlocked) and seed-instr-03 (1 unread)');
+
+  // Bookings (P7), written the way createBooking / confirmBooking /
+  // cancelBooking would. Each starts at the first open half hour of its day
+  // in the school's hours, Chicago time; fees as in plan v2 §9.1 (the first
+  // fee-bearing lesson with a school is 'first', later ones 5%, min $1.50).
+  // Only the seed's own bookings and their slots; lessons booked in the app stay.
+  for (const [coll, field] of [['bookings', admin.firestore.FieldPath.documentId()], ['bookingSlots', 'bookingId']]) {
+    const old = await db.collection(coll).where(field, '>=', 'seed-booking-').where(field, '<', 'seed-booking.').get();
+    await Promise.all(old.docs.map((d) => d.ref.delete()));
+  }
+  const tz = 'America/Chicago';
+  const today = wallClock(Date.now(), tz).date;
+  const availabilityOf = (i) => (i % 3 === 0 ? { ...WEEKDAYS, ...WEEKENDS } : i % 3 === 1 ? WEEKDAYS : {});
+  // The first local day `days` from today (or later) that has hours.
+  const lessonStart = (row, days) => {
+    for (let d = days; ; d += Math.sign(days) || 1) {
+      const date = addDays(today, d);
+      const first = (availabilityOf(row)[weekDay(date)] || [])[0];
+      if (first) return wallToUtc(date, minutesOf(first.start), tz);
+    }
+  };
+  const fees = (rateUsd, minutes, feeKind) => {
+    const lessonCents = Math.round((rateUsd * 100 * minutes) / 60);
+    const platformFeeCents = feeKind === 'first' ? Math.round(lessonCents * 0.25) : Math.max(Math.round(lessonCents * 0.05), 150);
+    return { lessonCents, platformFeeCents, totalCents: lessonCents + platformFeeCents, feeKind };
+  };
+  const SCHOOLS = { 'seed-instr-01': 0, 'seed-instr-04': 3 }; // ROWS index
+  for (const [id, instructorUid, days, minutes, feeKind, status, extra] of [
+    ['seed-booking-lv-1', 'seed-instr-01', -12, 60, 'first', 'completed', {}],
+    ['seed-booking-lv-2', 'seed-instr-01', -5, 60, 'later', 'late_cancelled', { cancelledBy: 'student' }],
+    ['seed-booking-lv-3', 'seed-instr-01', -3, 90, 'later', 'refunded', { cancelledBy: 'instructor' }],
+    ['seed-booking-lv-4', 'seed-instr-01', 2, 90, 'later', 'confirmed', {}],
+    ['seed-booking-lv-5', 'seed-instr-01', 6, 60, 'later', 'confirmed', {}],
+    ['seed-booking-ns-1', 'seed-instr-04', 3, 60, 'first', 'confirmed', {}],
+    ['seed-booking-ns-2', 'seed-instr-04', 4, 60, 'later', 'pending_payment', {}],
+  ]) {
+    const row = ROWS[SCHOOLS[instructorUid]];
+    const startMs = lessonStart(SCHOOLS[instructorUid], days);
+    const endMs = startMs + minutes * 60e3;
+    const at = Timestamp.fromMillis(Math.min(Date.now(), startMs) - 2 * 864e5);
+    await db.collection('bookings').doc(id).set({
+      studentUid: 'seed-student-paid', instructorUid, studentDisplayName: 'Paid S.', instructorName: row[4],
+      schoolAddress: `${100 + SCHOOLS[instructorUid]} Main St, ${row[1]}, ${row[0]}`,
+      startAt: Timestamp.fromMillis(startMs), durationMinutes: minutes, timezone: tz,
+      localDate: wallClock(startMs, tz).date,
+      localTime: new Date(Date.UTC(2000, 0, 1, 0, wallClock(startMs, tz).minutes)).toISOString().slice(11, 16),
+      ...fees(row[7], minutes, feeKind), status,
+      ...(status === 'confirmed' ? { completeAfter: Timestamp.fromMillis(endMs), confirmedAt: at } : {}),
+      ...(status === 'completed' ? { confirmedAt: at, completedAt: Timestamp.fromMillis(endMs) } : {}),
+      // A hold that ran out a minute ago: the 5-minute sweep expires it.
+      ...(status === 'pending_payment' ? { expiresAt: Timestamp.fromMillis(Date.now() - 60e3) } : {}),
+      ...(extra.cancelledBy ? { cancelledBy: extra.cancelledBy, cancelledAt: Timestamp.fromMillis(startMs - (extra.cancelledBy === 'student' ? 5 : 30) * 3600e3) } : {}),
+      createdAt: at, updatedAt: at,
+    });
+    // Locked half hours: upcoming and pending lessons, and a late cancel (kept).
+    if (['confirmed', 'pending_payment', 'late_cancelled'].includes(status)) {
+      for (let ms = startMs; ms < endMs; ms += 30 * 60e3) {
+        const key = new Date(ms).toISOString().slice(0, 16).replace(/[-:]/g, '');
+        await db.collection('bookingSlots').doc(`${instructorUid}_${key}`).set({ instructorUid, bookingId: id, startAt: Timestamp.fromMillis(ms) });
+      }
+    }
+  }
+  // Northside was booked without a message first: confirmBooking made the
+  // thread, unlocked, with nothing in it yet.
+  const ns = db.collection('conversations').doc('seed-student-paid_seed-instr-04');
+  await db.recursiveDelete(ns);
+  await ns.set({
+    studentUid: 'seed-student-paid', instructorUid: 'seed-instr-04', participantUids: ['seed-student-paid', 'seed-instr-04'],
+    instructorName: 'Northside Auto Academy', instructorPhotoPath: null, instructorKind: 'school', studentDisplayName: 'Paid S.',
+    contactUnlocked: true, lastMessageText: '', lastMessageAt: ago(3 * 1440), lastMessageSender: null,
+    studentUnread: 0, instructorUnread: 0, createdAt: ago(3 * 1440),
+  });
+  console.log('Bookings: seed-student-paid with seed-instr-01 (5) and seed-instr-04 (1 upcoming + 1 expiring hold)');
 
   console.log(`Seeded ${ROWS.length} instructors; listed per state:`, stats, '; launchStates: IL, TX');
 })().catch((e) => { console.error(e); process.exit(1); });

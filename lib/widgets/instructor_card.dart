@@ -110,6 +110,26 @@ String teachingLanguageName(String code) => teachingLanguages
     .firstWhere((l) => l.$1 == code, orElse: () => (code, code))
     .$2;
 
+/// The zones zip-timezone.ts can assign, by name instead of IANA id.
+const Map<String, String> _zoneKeys = {
+  'America/New_York': 'instructor_tz_eastern',
+  'America/Detroit': 'instructor_tz_eastern',
+  'America/Chicago': 'instructor_tz_central',
+  'America/Denver': 'instructor_tz_mountain',
+  'America/Boise': 'instructor_tz_mountain',
+  'America/Phoenix': 'instructor_tz_mountain',
+  'America/Los_Angeles': 'instructor_tz_pacific',
+};
+
+/// «Центральное время · Chicago» — an instructor's timezone by name (the raw
+/// IANA id for a zone outside the list). Lesson times are shown in it
+/// (owner, 2026-10-05).
+String timezoneLabel(AppLocalizations l, String timezone, {String? city}) {
+  final key = _zoneKeys[timezone];
+  if (key == null) return timezone;
+  return city == null ? l.translate(key) : '${l.translate(key)} · $city';
+}
+
 /// «$65/ч», or the hidden-price text for a private instructor whose licence
 /// hasn't been checked (owner, 2026-09-30) — [short] for the card's pill,
 /// where the full sentence would be cut off.
