@@ -1,4 +1,5 @@
 import { FieldValue } from 'firebase-admin/firestore';
+import { removeReview } from './reviews';
 
 /**
  * Account deletion (risks #13 and #14).
@@ -15,7 +16,7 @@ import { FieldValue } from 'firebase-admin/firestore';
  * honours both promises instead of choosing between them.
  */
 
-export type DeletionAction = 'delete' | 'anonymize' | 'redact';
+export type DeletionAction = 'delete' | 'anonymize' | 'redact' | 'unreview';
 
 export interface DeletionTarget {
   collection: string;
@@ -113,9 +114,11 @@ export async function collectUserDataForDeletion(
   // `deleted_…` id the billing records get and its name goes. The other side
   // still reads the booking. deleteUserAccount has already refused while a
   // lesson is upcoming (§9.4).
+  const hadLessonsWith = new Set<string>();
   for (const side of ['student', 'instructor'] as const) {
     const snap = await db.collection('bookings').where(`${side}Uid`, '==', userId).get();
     for (const doc of snap.docs) {
+      if (side === 'student') hadLessonsWith.add(doc.get('instructorUid'));
       targets.push({
         collection: 'bookings',
         ref: doc.ref,
@@ -125,6 +128,16 @@ export async function collectUserDataForDeletion(
           : { instructorUid: anonymousIdFor(userId), instructorDeleted: true, instructorName: null },
       });
     }
+  }
+
+  // Reviews the user wrote (plan v2 §17): deleted, and taken out of that
+  // instructor's numbers. A review needs a completed lesson, so the user's
+  // own bookings name every instructor they can have reviewed — no
+  // collection-group index needed (risk #15). Read here, before the bookings
+  // above are anonymised.
+  for (const instructorUid of hadLessonsWith) {
+    const ref = db.collection('instructors').doc(instructorUid).collection('reviews').doc(userId);
+    if ((await ref.get()).exists) targets.push({ collection: 'instructors/reviews (written)', ref, action: 'unreview' });
   }
 
   // Billing records: retained, de-linked.
@@ -153,9 +166,17 @@ export async function applyDeletionPlan(
   let deleted = 0;
   let anonymized = 0;
 
-  for (let i = 0; i < targets.length; i += CHUNK) {
+  // A written review changes its instructor's numbers, so each one is its
+  // own transaction rather than a batched delete. Done first: a rerun after
+  // a failure finds only the ones still left.
+  for (const target of targets.filter((t) => t.action === 'unreview')) {
+    if (await removeReview(db, target.ref.parent.parent!.id, target.ref.id)) deleted++;
+  }
+
+  const batched = targets.filter((t) => t.action !== 'unreview');
+  for (let i = 0; i < batched.length; i += CHUNK) {
     const batch = db.batch();
-    for (const target of targets.slice(i, i + CHUNK)) {
+    for (const target of batched.slice(i, i + CHUNK)) {
       if (target.action === 'delete') {
         batch.delete(target.ref);
         deleted++;

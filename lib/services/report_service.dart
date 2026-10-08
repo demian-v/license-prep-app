@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -264,5 +265,32 @@ class ReportService {
           .doc(_counterService.generateFallbackReportId(user.uid))
           .set(report.toMap());
     }
+  }
+
+  /// A paid student, or the instructor it is about, reports a review (plan
+  /// v2 §7, P8). Not a direct write: the review is named by its opaque id,
+  /// which only the reportReview callable can resolve — the doc id is the
+  /// author's uid, and it never reaches other users. Reasons: harassment,
+  /// inappropriate, spam, other.
+  Future<void> submitReviewReport({
+    required String instructorUid,
+    required String reviewId,
+    required String reason,
+    String? message,
+    required String language,
+    required String state,
+  }) async {
+    final pkg = await PackageInfo.fromPlatform();
+    await FirebaseFunctions.instance.httpsCallable('reportReview').call({
+      'instructorUid': instructorUid,
+      'reviewId': reviewId,
+      'reason': reason,
+      if (message != null) 'message': message,
+      'language': language,
+      'state': state,
+      'appVersion': pkg.version,
+      'buildNumber': pkg.buildNumber,
+      'platform': Platform.isAndroid ? 'android' : 'ios',
+    });
   }
 }

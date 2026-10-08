@@ -17,6 +17,7 @@ import '../widgets/bento_result_parts.dart' show bentoHeadingAppBar;
 import '../widgets/instructor_card.dart';
 import '../widgets/instructor_stage_badge.dart';
 import '../widgets/report_sheet.dart';
+import '../widgets/review_parts.dart';
 import 'booking_screen.dart';
 import 'chat_thread_screen.dart';
 
@@ -689,12 +690,34 @@ class _WeekHours extends StatelessWidget {
   }
 }
 
-/// The rating, the first reviews, and «Все отзывы» for the rest.
+/// The rating, the first reviews, and «Все отзывы» for the rest. A long
+/// press on a review reports it (P8; as a chat message is reported) — not
+/// on the student's own review.
 class _Reviews extends StatelessWidget {
   const _Reviews({required this.instructor, required this.reviews});
 
   final InstructorListing instructor;
   final Future<List<InstructorReview>> reviews;
+
+  /// The server refuses a report of one's own review (`own-review`), and a
+  /// review written before P8 has no id to report it by.
+  static bool _reportable(InstructorReview r) => r.id != null && !r.mine;
+
+  void _report(BuildContext context, InstructorReview r) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => ReportSheet(
+        contentType: 'review',
+        contextData: {
+          'instructorUid': instructor.id,
+          'reviewId': r.id,
+          'language': Provider.of<LanguageProvider>(context, listen: false).language,
+          'state': instructor.state,
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -722,99 +745,22 @@ class _Reviews extends StatelessWidget {
                 ].join(' · '),
                 style: AppTypography.label.copyWith(color: AppColors.inkSecondary),
               ),
-              for (final r in list.take(_reviewsOnPage)) _ReviewTile(review: r),
+              for (final r in list.take(_reviewsOnPage))
+                ReviewTile(review: r, onLongPress: _reportable(r) ? () => _report(context, r) : null),
               if (list.length > _reviewsOnPage) ...[
                 const SizedBox(height: AppSpacing.x3),
                 BentoActionButton(
                   text: l.translate('instructor_reviews_all'),
                   primary: false,
                   onCard: true,
-                  onTap: () => _showAll(context, list),
+                  onTap: () => showAllReviews(context, list,
+                      onLongPress: (r) => _report(context, r), reportable: _reportable),
                 ),
               ],
             ],
           ],
         );
       },
-    );
-  }
-
-  void _showAll(BuildContext context, List<InstructorReview> list) {
-    final l = AppLocalizations.of(context);
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
-        decoration: const BoxDecoration(
-          color: AppColors.paper,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(BentoTokens.card)),
-        ),
-        child: SafeArea(
-          child: ListView(
-            shrinkWrap: true,
-            padding: const EdgeInsets.fromLTRB(
-                AppSpacing.x4 + AppSpacing.x1, AppSpacing.x4, AppSpacing.x4 + AppSpacing.x1, AppSpacing.x4),
-            children: [
-              Text(
-                l.translate('instructor_reviews'),
-                style: AppTypography.title.copyWith(
-                  fontSize: 22,
-                  height: 28 / 22,
-                  color: AppColors.ink,
-                  fontVariations: const [FontVariation('wght', 600)],
-                ),
-              ),
-              for (final r in list) _ReviewTile(review: r),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ReviewTile extends StatelessWidget {
-  const _ReviewTile({required this.review});
-
-  final InstructorReview review;
-
-  @override
-  Widget build(BuildContext context) {
-    final date = review.createdAt;
-    return Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.x3),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  review.name,
-                  style: AppTypography.label.copyWith(
-                    color: AppColors.ink,
-                    fontVariations: const [FontVariation('wght', 600)],
-                  ),
-                ),
-              ),
-              InstructorFactPill(star: true, text: '${review.rating}/5'),
-            ],
-          ),
-          if (review.comment.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.x1),
-            Text(review.comment, style: AppTypography.body.copyWith(color: AppColors.ink)),
-          ],
-          if (date != null) ...[
-            const SizedBox(height: 2),
-            Text(
-              '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}',
-              style: AppTypography.caption.copyWith(color: AppColors.inkTertiary),
-            ),
-          ],
-        ],
-      ),
     );
   }
 }

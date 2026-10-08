@@ -6,7 +6,9 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:license_prep_app/localization/app_localizations.dart';
+import 'package:license_prep_app/models/instructor_listing.dart';
 import 'package:license_prep_app/services/instructor_service.dart';
+import 'package:license_prep_app/services/review_service.dart';
 import 'package:license_prep_app/widgets/instructor_profile_section.dart';
 
 /// Instructors P3b — «Фото профиля» (plan v2 §8): the photo goes to the
@@ -14,6 +16,12 @@ import 'package:license_prep_app/widgets/instructor_profile_section.dart';
 /// `photoStatus`. The instructor keeps seeing what they picked while it waits.
 final _png = base64Decode(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==');
+
+/// «Мои отзывы» (P8) sits in the same section; no reviews here.
+class _NoReviews extends ReviewService {
+  @override
+  Stream<List<InstructorReview>> reviewsOf(String instructorUid) => Stream.value(const []);
+}
 
 class _FakeService extends InstructorService {
   _FakeService(Map<String, dynamic> doc) {
@@ -88,7 +96,7 @@ Future<void> _pump(WidgetTester tester, _FakeService svc) async {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [Locale('en')],
-      home: Scaffold(body: SingleChildScrollView(child: InstructorProfileSection(uid: 'u1', service: svc))),
+      home: Scaffold(body: SingleChildScrollView(child: InstructorProfileSection(uid: 'u1', service: svc, reviews: _NoReviews()))),
     ));
     await Future<void>.delayed(const Duration(milliseconds: 100));
   });

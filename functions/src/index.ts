@@ -2601,3 +2601,4 @@ export {
 export { listInstructors, getInstructorProfile, getInstructorReviews, setSignupRole, registerAsInstructor, submitLicenseNumber, updateInstructorProfile, getInstructorContacts, onInstructorUpload, onInstructorWrite } from './instructors';
 export { sendMessage, markConversationRead, getInstructorContactInfo } from './chat';
 export { getBookingOptions, createBooking, cancelBooking, expirePendingBookings, markBookingsCompleted } from './bookings';
+export { submitReview, deleteReview, reportReview } from './reviews';

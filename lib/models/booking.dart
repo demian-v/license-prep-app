@@ -100,6 +100,10 @@ class Booking {
   /// read wrong under «Прошедшие»): either side, early or late.
   bool get cancelled => status == 'refunded' || status == 'late_cancelled';
 
+  /// The student may review the school once the lesson is held (plan v2
+  /// §11; `payout_released` arrives with P9). submitReview checks it again.
+  bool get reviewable => status == 'completed' || status == 'payout_released';
+
   /// The lesson's local start as a date with no zone, for formatting only.
   DateTime get localStart {
     final d = localDate.split('-').map(int.tryParse).toList();

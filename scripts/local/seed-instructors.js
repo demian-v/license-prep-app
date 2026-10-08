@@ -6,7 +6,9 @@
  *   instructors/{uid}           24 profiles across IL / TX / MD, every stage and kind,
  *                               plus one deactivated and one suspended (listed:false)
  *   instructorPrivate/{uid}     fictional 555-01xx phones, example.com emails
- *   instructors/{uid}/reviews   a few reviews, with ratingSum/Count/Avg kept consistent
+ *   instructors/{uid}/reviews   a few reviews, with ratingSum/Count/Avg kept consistent and an
+ *                               opaque reviewId each (P8); seed-student-paid's own reviews are
+ *                               removed on every run, so the numbers stay exact
  *   instructorStats/{state}     listedCount per state
  *   users/{uid}                 userType:'instructor'
  *   Auth accounts               seed-instr-NN@example.com / SEED_PASSWORD below, when
@@ -19,7 +21,9 @@
  *   bookings/{id}, bookingSlots P7: seed-student-paid's lessons with Lakeview (completed, late-cancelled,
  *                               refunded by the school, two upcoming) and Northside (one upcoming,
  *                               contacts unlocked, no messages yet), plus a pending hold past its
- *                               15 minutes for the expiry sweep; reset on every run
+ *                               15 minutes for the expiry sweep and a Northside lesson that ended
+ *                               yesterday but is still confirmed (fire markBookingsCompleted → the
+ *                               review push); reset on every run
  * Idempotent: a re-run overwrites the same ids.
  *
  * EMULATORS ONLY. Refuses to run unless FIRESTORE_EMULATOR_HOST is a local address.
@@ -128,9 +132,12 @@ const COMMENTS = ['Very patient, passed on the first try.', 'Clear explanations 
       name, email: `${uid}@example.com`, userType: 'instructor', signupRole: 'instructor',
       signupKind: kind, state, language: 'en', createdAt: now, status: 'active',
     });
+    // A review the paid student wrote in the app would no longer match the
+    // numbers just reset above.
+    batch.delete(db.collection('instructors').doc(uid).collection('reviews').doc('seed-student-paid'));
     reviews.forEach((rating, r) => {
       batch.set(db.collection('instructors').doc(uid).collection('reviews').doc(`seed-student-${r + 1}`), {
-        studentDisplayName: REVIEWERS[r % REVIEWERS.length], rating,
+        reviewId: `seedrev${n}x${r + 1}`, studentDisplayName: REVIEWERS[r % REVIEWERS.length], rating,
         comment: COMMENTS[(i + r) % COMMENTS.length], lastBookingId: `seed-booking-${n}-${r + 1}`,
         createdAt: now, updatedAt: now,
       });
@@ -260,7 +267,10 @@ const COMMENTS = ['Very patient, passed on the first try.', 'Clear explanations 
     ['seed-booking-lv-3', 'seed-instr-01', -3, 90, 'later', 'refunded', { cancelledBy: 'instructor' }],
     ['seed-booking-lv-4', 'seed-instr-01', 2, 90, 'later', 'confirmed', {}],
     ['seed-booking-lv-5', 'seed-instr-01', 6, 60, 'later', 'confirmed', {}],
-    ['seed-booking-ns-1', 'seed-instr-04', 3, 60, 'first', 'confirmed', {}],
+    // Ended yesterday, not yet swept: firing markBookingsCompleted completes
+    // it and sends «Как прошёл урок?» (P8).
+    ['seed-booking-ns-0', 'seed-instr-04', -1, 60, 'first', 'confirmed', {}],
+    ['seed-booking-ns-1', 'seed-instr-04', 3, 60, 'later', 'confirmed', {}],
     ['seed-booking-ns-2', 'seed-instr-04', 4, 60, 'later', 'pending_payment', {}],
   ]) {
     const row = ROWS[SCHOOLS[instructorUid]];
@@ -299,7 +309,7 @@ const COMMENTS = ['Very patient, passed on the first try.', 'Clear explanations 
     contactUnlocked: true, lastMessageText: '', lastMessageAt: ago(3 * 1440), lastMessageSender: null,
     studentUnread: 0, instructorUnread: 0, createdAt: ago(3 * 1440),
   });
-  console.log('Bookings: seed-student-paid with seed-instr-01 (5) and seed-instr-04 (1 upcoming + 1 expiring hold)');
+  console.log('Bookings: seed-student-paid with seed-instr-01 (5) and seed-instr-04 (1 ended but confirmed, 1 upcoming, 1 expiring hold)');
 
   console.log(`Seeded ${ROWS.length} instructors; listed per state:`, stats, '; launchStates: IL, TX');
 })().catch((e) => { console.error(e); process.exit(1); });

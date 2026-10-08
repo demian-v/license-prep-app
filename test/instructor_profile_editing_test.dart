@@ -5,7 +5,9 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:license_prep_app/localization/app_localizations.dart';
+import 'package:license_prep_app/models/instructor_listing.dart';
 import 'package:license_prep_app/services/instructor_service.dart';
+import 'package:license_prep_app/services/review_service.dart';
 import 'package:license_prep_app/widgets/instructor_profile_section.dart';
 
 /// Instructors P3b — editing the profile from Профиль: one row per section,
@@ -60,7 +62,7 @@ Future<void> _pump(WidgetTester tester, _FakeService svc, {String locale = 'en'}
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: [Locale(locale)],
-      home: Scaffold(body: SingleChildScrollView(child: InstructorProfileSection(uid: 'u1', service: svc))),
+      home: Scaffold(body: SingleChildScrollView(child: InstructorProfileSection(uid: 'u1', service: svc, reviews: _NoReviews()))),
     ));
     await Future<void>.delayed(const Duration(milliseconds: 100));
   });
@@ -193,4 +195,10 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+}
+
+/// «Мои отзывы» (P8) sits in the same section; no reviews here.
+class _NoReviews extends ReviewService {
+  @override
+  Stream<List<InstructorReview>> reviewsOf(String instructorUid) => Stream.value(const []);
 }

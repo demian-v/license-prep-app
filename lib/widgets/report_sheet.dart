@@ -9,12 +9,13 @@ import '../theme/app_theme.dart';
 import '../theme/bento_tokens.dart';
 
 class ReportSheet extends StatefulWidget {
-  final String contentType; // 'quiz_question' | 'theory_section' | 'instructor' | 'message'
+  final String contentType; // 'quiz_question' | 'theory_section' | 'instructor' | 'message' | 'review'
   final Map<String, dynamic> contextData; 
   // For quiz: {questionId, language, state, topicId?, ruleReference?}
   // For theory: {topicDocId, sectionIndex, sectionTitle, language, state}
   // For instructor: {instructorUid, language, state}
   // For message: {conversationId, messageId, language, state}
+  // For review: {instructorUid, reviewId, language, state}
 
   const ReportSheet({
     super.key,
@@ -31,11 +32,12 @@ class _ReportSheetState extends State<ReportSheet> {
 
   bool get _isInstructor => widget.contentType == 'instructor';
   bool get _isMessage => widget.contentType == 'message';
+  bool get _isReview => widget.contentType == 'review';
 
   /// Reason ids (stored as `reason`, checked by firestore.rules) and their
   /// labels. A profile and a chat message have their own reasons
   /// (instructors plan v2 §7).
-  List<(String, String)> get _reasons => _isMessage
+  List<(String, String)> get _reasons => _isMessage || _isReview
       ? const [
           ('harassment', 'report_reason_harassment'),
           ('inappropriate', 'report_reason_inappropriate'),
@@ -82,7 +84,16 @@ class _ReportSheetState extends State<ReportSheet> {
     final message = reason == 'other' ? _ctrl.text.trim() : null;
 
     try {
-      if (_isMessage) {
+      if (_isReview) {
+        await reportService.submitReviewReport(
+          instructorUid: widget.contextData['instructorUid'],
+          reviewId: widget.contextData['reviewId'],
+          reason: reason,
+          message: message,
+          language: widget.contextData['language'],
+          state: widget.contextData['state'],
+        );
+      } else if (_isMessage) {
         await reportService.submitMessageReport(
           conversationId: widget.contextData['conversationId'],
           messageId: widget.contextData['messageId'],
@@ -133,6 +144,7 @@ class _ReportSheetState extends State<ReportSheet> {
         );
       }
     } catch (e) {
+      debugPrint('ReportSheet: submit failed: $e');
       if (mounted) {
         setState(() => _submitting = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -241,7 +253,9 @@ class _ReportSheetState extends State<ReportSheet> {
               Text(
                 l.translate(_isMessage
                     ? 'report_message_title'
-                    : _isInstructor ? 'report_instructor_title' : 'report_issue'),
+                    : _isReview
+                        ? 'report_review_title'
+                        : _isInstructor ? 'report_instructor_title' : 'report_issue'),
                 style: AppTypography.title.copyWith(
                   fontSize: 22,
                   height: 28 / 22,

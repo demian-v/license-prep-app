@@ -810,6 +810,12 @@ class AnalyticsService {
     await logEvent('booking_confirmed', {'duration_minutes': durationMinutes});
   }
 
+  /// A student sent or changed a review (P8). No ids: the stars, and whether
+  /// it was an edit.
+  Future<void> logReviewSubmitted({required int rating, required bool edited}) async {
+    await logEvent('review_submitted', {'rating': rating, 'edited': edited ? 1 : 0});
+  }
+
   Future<void> logInstructorProfileViewed({required String kind, required int stage}) async {
     await logEvent('instructor_profile_viewed', {
       'instructor_kind': kind,

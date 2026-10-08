@@ -18,7 +18,8 @@ import * as admin from 'firebase-admin';
  */
 
 export type PushKind = 'photo_approved' | 'photo_rejected'
-  | 'booking_new' | 'booking_cancelled_student' | 'booking_cancelled_instructor';
+  | 'booking_new' | 'booking_cancelled_student' | 'booking_cancelled_instructor'
+  | 'review_request';
 
 export type Lang = 'en' | 'es' | 'uk' | 'ru' | 'pl';
 const LANGS: readonly Lang[] = ['en', 'es', 'uk', 'ru', 'pl'];
@@ -62,6 +63,15 @@ const TEXTS: Record<PushKind, Record<Lang, { title: string; body: string }>> = {
     uk: { title: 'Ваш урок скасовано', body: '{name} · {time}' },
     ru: { title: 'Ваш урок отменён', body: '{name} · {time}' },
     pl: { title: 'Twoja lekcja została odwołana', body: '{name} · {time}' },
+  },
+  // Reviews (P8): sent to the student when a lesson is completed. {name} is
+  // the school; the colon form needs no grammatical case for it.
+  review_request: {
+    en: { title: 'How was your lesson?', body: 'Leave a review: {name}' },
+    es: { title: '¿Qué tal tu clase?', body: 'Deja una reseña: {name}' },
+    uk: { title: 'Як пройшов урок?', body: 'Залиште відгук: {name}' },
+    ru: { title: 'Как прошёл урок?', body: 'Оставьте отзыв: {name}' },
+    pl: { title: 'Jak minęła lekcja?', body: 'Wystaw opinię: {name}' },
   },
 };
 

@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 /// One instructor as a student sees them: the public projection that
 /// `listInstructors` / `getInstructorProfile` send (functions/src/
 /// instructors.ts → publicInstructor). Nothing else reaches a student.
@@ -120,22 +122,45 @@ class InstructorListing {
   }
 }
 
-/// A review as `getInstructorReviews` sends it: no reviewer uid.
+/// A review as `getInstructorReviews` sends it: no reviewer uid. [id] is
+/// the opaque `reviewId` a report names it by (P8); [mine] marks the
+/// caller's own, which can't be reported.
 class InstructorReview {
-  const InstructorReview({required this.name, required this.rating, required this.comment, this.createdAt});
+  const InstructorReview({
+    required this.name,
+    required this.rating,
+    required this.comment,
+    this.createdAt,
+    this.id,
+    this.mine = false,
+  });
 
+  final String? id;
+  final bool mine;
   final String name;
   final int rating;
   final String comment;
   final DateTime? createdAt;
 
   factory InstructorReview.fromMap(Map<dynamic, dynamic> m) => InstructorReview(
+        id: m['id'] is String ? m['id'] as String : null,
+        mine: m['mine'] == true,
         name: m['name'] is String ? m['name'] as String : '',
         rating: m['rating'] is num ? (m['rating'] as num).toInt() : 0,
         comment: m['comment'] is String ? m['comment'] as String : '',
         createdAt: m['createdAtMs'] is num
             ? DateTime.fromMillisecondsSinceEpoch((m['createdAtMs'] as num).toInt())
             : null,
+      );
+
+  /// A review doc read directly: the instructor's own («Мои отзывы») or the
+  /// student's own (the lesson page) — firestore.rules allows only those.
+  factory InstructorReview.fromDoc(Map<String, dynamic> d) => InstructorReview(
+        id: d['reviewId'] as String?,
+        name: d['studentDisplayName'] as String? ?? '',
+        rating: (d['rating'] as num?)?.toInt() ?? 0,
+        comment: d['comment'] as String? ?? '',
+        createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
       );
 }
 

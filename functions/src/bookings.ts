@@ -415,19 +415,33 @@ export async function runExpirePendingBookings(nowMs = Date.now()): Promise<Swee
   });
 }
 
-/** `confirmed` whose end has passed → `completed`. */
+/**
+ * `confirmed` whose end has passed → `completed`, and the student is asked
+ * for a review (plan v2 §12) — unless they already reviewed this school
+ * (owner, 2026-10-07: a weekly student isn't asked every week).
+ */
 export async function runMarkBookingsCompleted(nowMs = Date.now()): Promise<SweepResult> {
   const db = admin.firestore();
   return sweepPaginated({
     label: 'markBookingsCompleted',
     baseQuery: db.collection('bookings').where('completeAfter', '<=', Timestamp.fromMillis(nowMs)).orderBy('completeAfter'),
     deadline: Date.now() + SWEEP_TIME_BUDGET_MS,
-    handle: (doc) => db.runTransaction(async (tx) => {
-      const b = await tx.get(doc.ref);
-      if (b.get('status') !== 'confirmed') return;
-      const at = Timestamp.now();
-      tx.update(doc.ref, { status: 'completed', completeAfter: FieldValue.delete(), completedAt: at, updatedAt: at });
-    }),
+    handle: async (doc) => {
+      const b = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(doc.ref);
+        if (snap.get('status') !== 'confirmed') return null;
+        const at = Timestamp.now();
+        tx.update(doc.ref, { status: 'completed', completeAfter: FieldValue.delete(), completedAt: at, updatedAt: at });
+        return snap;
+      });
+      // After the commit, so a retried transaction cannot push twice.
+      if (!b) return;
+      const studentUid: string = b.get('studentUid');
+      const reviewed = await db.collection('instructors').doc(b.get('instructorUid')).collection('reviews').doc(studentUid).get();
+      if (!reviewed.exists) {
+        await sendPushToUser(studentUid, 'review_request', `booking/${doc.id}`, () => ({ name: b.get('instructorName') || '—' }));
+      }
+    },
   });
 }
 

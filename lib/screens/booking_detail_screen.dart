@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../localization/app_localizations.dart';
 import '../models/booking.dart';
+import '../models/instructor_listing.dart';
 import '../services/booking_service.dart';
 import '../services/chat_service.dart';
+import '../services/review_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
@@ -11,20 +13,25 @@ import '../widgets/bento_empty_card.dart';
 import '../widgets/bento_question_parts.dart';
 import '../widgets/bento_result_parts.dart' show bentoHeadingAppBar;
 import '../widgets/booking_tile.dart';
+import '../widgets/destructive_dialog.dart';
 import '../widgets/instructor_card.dart' show timezoneLabel;
+import '../widgets/review_parts.dart';
 import 'booking_screen.dart' show PriceLines;
 import 'chat_thread_screen.dart';
 
 /// One lesson, for either side (instructors plan v2 §9.3): who, when, how
 /// long, where, the price, and — while it's ahead — «Написать» and
 /// «Отменить урок». Live, so a cancel by the other side shows at once. Opened
-/// from the lists, after booking, and from a `booking/<id>` push.
+/// from the lists, after booking, and from a `booking/<id>` push (the review
+/// push lands here too). Once the lesson is held, the student rates the
+/// school here (plan v2 §11, P8).
 class BookingDetailScreen extends StatefulWidget {
-  const BookingDetailScreen({super.key, required this.bookingId, required this.asInstructor, this.service});
+  const BookingDetailScreen({super.key, required this.bookingId, required this.asInstructor, this.service, this.reviews});
 
   final String bookingId;
   final bool asInstructor;
   final BookingService? service;
+  final ReviewService? reviews;
 
   @override
   State<BookingDetailScreen> createState() => _BookingDetailScreenState();
@@ -32,6 +39,7 @@ class BookingDetailScreen extends StatefulWidget {
 
 class _BookingDetailScreenState extends State<BookingDetailScreen> {
   late final BookingService _service = widget.service ?? BookingService();
+  late final ReviewService _reviews = widget.reviews ?? ReviewService();
   late final Stream<Booking?> _booking = _service.booking(widget.bookingId);
   bool _busy = false;
 
@@ -45,7 +53,12 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
             : 'booking_cancel_late';
     final ok = await showDialog<bool>(
       context: context,
-      builder: (context) => _CancelDialog(body: l.translate(body)),
+      builder: (context) => DestructiveDialog(
+        title: l.translate('booking_cancel_title'),
+        body: l.translate(body),
+        confirm: l.translate('booking_cancel'),
+        keep: l.translate('booking_keep'),
+      ),
     );
     if (ok != true || !mounted) return;
     setState(() => _busy = true);
@@ -128,6 +141,10 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                   ],
                 ],
               ),
+              if (!asInstructor && b.reviewable && !otherDeleted) ...[
+                const SizedBox(height: AppSpacing.x3),
+                _ReviewCard(booking: b, service: _reviews),
+              ],
               const SizedBox(height: AppSpacing.x3),
               _Card(
                 children: [
@@ -307,70 +324,65 @@ class _Fact extends StatelessWidget {
   }
 }
 
-/// The destructive confirmation (design-patterns: red ⚠ disc, one-line
-/// title, then two stacked pills — the cancel a field pill with a red label,
-/// the safe way out the dark ink pill).
-class _CancelDialog extends StatelessWidget {
-  const _CancelDialog({required this.body});
+/// The student's review of the school (plan v2 §11): before one exists,
+/// «Оцените урок» with five stars — the tapped star opens the sheet with it
+/// chosen; after, «Ваш отзыв» with the stars, the comment and «Изменить». One
+/// review per school, so every held lesson with it shows the same one. Live
+/// from the student's own review doc (firestore.rules lets the author read it).
+class _ReviewCard extends StatelessWidget {
+  const _ReviewCard({required this.booking, required this.service});
 
-  final String body;
+  final Booking booking;
+  final ReviewService service;
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    return AlertDialog(
-      icon: Container(
-        width: 56,
-        height: 56,
-        decoration: const BoxDecoration(color: AppColors.stopSurface, shape: BoxShape.circle),
-        alignment: Alignment.center,
-        child: const Icon(SolarIcons.dangerTriangleLinear, color: AppColors.stop, size: 28),
-      ),
-      title: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Text(
-          l.translate('booking_cancel_title'),
-          maxLines: 1,
-          style: AppTypography.title.copyWith(
-            fontSize: 22,
-            height: 28 / 22,
-            color: AppColors.ink,
-            fontVariations: const [FontVariation('wght', 600)],
-          ),
-        ),
-      ),
-      content: Text(body),
-      actionsPadding: const EdgeInsets.fromLTRB(AppSpacing.x6, 0, AppSpacing.x6, AppSpacing.x6),
-      actions: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    return StreamBuilder<InstructorReview?>(
+      stream: service.myReview(booking.instructorUid, booking.studentUid),
+      builder: (context, snap) {
+        // Nothing until the first answer, so the card doesn't flash empty.
+        if (snap.connectionState == ConnectionState.waiting) return const SizedBox.shrink();
+        final review = snap.data;
+        void open({int rating = 0}) => showReviewSheet(
+              context,
+              service: service,
+              bookingId: booking.id,
+              instructorUid: booking.instructorUid,
+              instructorName: booking.instructorName,
+              existing: review,
+              rating: rating,
+            );
+        final title = AppTypography.body.copyWith(
+          fontSize: 17,
+          color: AppColors.ink,
+          fontVariations: const [FontVariation('wght', 600)],
+        );
+        if (review == null) {
+          return _Card(
+            children: [
+              Text(l.translate('review_rate_title'), style: title),
+              const SizedBox(height: AppSpacing.x1),
+              Text(l.translate('review_rate_desc'), style: AppTypography.body.copyWith(color: AppColors.inkSecondary)),
+              const SizedBox(height: AppSpacing.x2),
+              Center(child: ReviewStars(rating: 0, size: 32, onTap: (n) => open(rating: n))),
+            ],
+          );
+        }
+        return _Card(
           children: [
-            TextButton(
-              style: TextButton.styleFrom(
-                backgroundColor: AppColors.field,
-                foregroundColor: AppColors.stop,
-                minimumSize: const Size.fromHeight(52),
-                shape: const StadiumBorder(),
-                textStyle: AppTypography.label.copyWith(fontSize: 16, fontVariations: const [FontVariation('wght', 500)]),
-              ),
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text(l.translate('booking_cancel')),
-            ),
+            Text(l.translate('review_yours'), style: title),
             const SizedBox(height: AppSpacing.x2),
-            TextButton(
-              style: TextButton.styleFrom(
-                backgroundColor: AppColors.ink,
-                foregroundColor: AppColors.onSignal,
-                minimumSize: const Size.fromHeight(52),
-                shape: const StadiumBorder(),
-                textStyle: AppTypography.label.copyWith(fontSize: 16, fontVariations: const [FontVariation('wght', 600)]),
-              ),
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(l.translate('booking_keep')),
-            ),
+            ReviewStars(rating: review.rating),
+            if (review.comment.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.x2),
+              Text(review.comment, style: AppTypography.body.copyWith(color: AppColors.ink)),
+            ],
+            const SizedBox(height: AppSpacing.x3),
+            BentoActionButton(text: l.translate('review_edit'), primary: false, onCard: true, onTap: open),
           ],
-        ),
-      ],
+        );
+      },
     );
   }
 }

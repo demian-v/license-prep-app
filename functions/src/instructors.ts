@@ -109,17 +109,21 @@ const REVIEW_LIMIT = 50;
 /**
  * The newest reviews, for the detail page and «Все отзывы». A review's doc
  * id is the student's uid (plan v2 §5), so it never leaves the server, and
- * neither does the booking it came from.
+ * neither does the booking it came from; `id` is the opaque `reviewId` a
+ * report names it by (reportReview, P8), and `mine` tells the caller which
+ * one is theirs, so the app offers no report on it.
  */
 export const getInstructorReviews = functions.https.onCall(async (data, context) => {
   const doc = await listedInstructor(data, context);
   const snap = await doc.ref.collection('reviews').orderBy('createdAt', 'desc').limit(REVIEW_LIMIT).get();
   return {
     reviews: snap.docs.map((r) => ({
+      id: r.get('reviewId') ?? null,
       name: r.get('studentDisplayName') ?? '',
       rating: r.get('rating'),
       comment: r.get('comment') ?? '',
       createdAtMs: r.get('createdAt')?.toMillis() ?? null,
+      mine: r.id === context.auth?.uid,
     })),
   };
 });

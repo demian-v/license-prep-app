@@ -189,8 +189,10 @@ service cloud.firestore {
           )) ||
           // Instructors plan v2 §7 (P4): a student reports a profile from
           // its detail page. The entity names an instructor that exists, so
-          // triage never receives a report about nobody. Review and message
-          // reports come with reviews (P8) and chat (P6).
+          // triage never receives a report about nobody. Message reports are
+          // below (P6); review reports are written by the reportReview
+          // callable (P8), which alone can resolve a review's opaque id
+          // without giving the author's uid to the reporter.
           (request.resource.data.contentType == 'instructor'
             && isNotAnonymous()
             && request.resource.data.reason in ['fake_profile','harassment','inappropriate','spam','other']
@@ -329,8 +331,11 @@ service cloud.firestore {
       allow create, delete: if false;
 
       // One review per student (doc id = studentUid), written by submitReview.
+      // The instructor reads all of theirs («Мои отзывы»); a student reads
+      // only the one they wrote, live on the lesson page (P8). Everyone else
+      // gets reviews from getInstructorReviews, without the author's uid.
       match /reviews/{studentUid} {
-        allow read: if isNotAnonymous() && request.auth.uid == uid;
+        allow read: if isNotAnonymous() && (request.auth.uid == uid || request.auth.uid == studentUid);
         allow write: if false;
       }
     }

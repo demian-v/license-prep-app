@@ -91,9 +91,10 @@ describe('getInstructorReviews', () => {
 
   it('returns the newest first, without the reviewer\'s uid or booking', async () => {
     const res = await reviews({ id: 'ip-1' });
+    // `id` is the opaque reviewId (P8); these fixtures predate it.
     expect(res.reviews).toEqual([
-      { name: 'Jake M.', rating: 4, comment: 'Good', createdAtMs: 2000 },
-      { name: 'Anna K.', rating: 5, comment: 'Great', createdAtMs: 1000 },
+      { id: null, name: 'Jake M.', rating: 4, comment: 'Good', createdAtMs: 2000, mine: false },
+      { id: null, name: 'Anna K.', rating: 5, comment: 'Great', createdAtMs: 1000, mine: false },
     ]);
     expect(JSON.stringify(res)).not.toContain('student-uid');
     expect(JSON.stringify(res)).not.toContain('b-1');

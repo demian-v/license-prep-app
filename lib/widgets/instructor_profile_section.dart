@@ -1,9 +1,13 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
 import '../localization/app_localizations.dart';
+import '../models/instructor_listing.dart';
+import '../providers/language_provider.dart';
 import '../services/instructor_service.dart';
+import '../services/review_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
@@ -11,21 +15,24 @@ import 'bento_auth_parts.dart';
 import 'bento_question_parts.dart';
 import 'instructor_form_fields.dart';
 import 'instructor_stage_badge.dart';
+import 'report_sheet.dart';
+import 'review_parts.dart';
 
 /// The instructor's own part of Профиль (instructors plan v2 §14.2): what
 /// has been checked, the licence numbers — which can be added here after a
 /// signup that skipped them (owner, 2026-09-30) — the photo and the profile
-/// students see (description, school, price, car, contacts; P3b) and
-/// «Показывать в поиске».
+/// students see (description, school, price, car, contacts; P3b), «Мои
+/// отзывы» (P8) and «Показывать в поиске».
 ///
 /// Reads the instructor's own public doc live (owner-readable in
 /// firestore.rules), so a change made on the server (the listing trigger,
 /// an admin review) shows at once.
 class InstructorProfileSection extends StatelessWidget {
-  const InstructorProfileSection({super.key, required this.uid, this.service});
+  const InstructorProfileSection({super.key, required this.uid, this.service, this.reviews});
 
   final String uid;
   final InstructorService? service;
+  final ReviewService? reviews;
 
   @override
   Widget build(BuildContext context) {
@@ -90,6 +97,8 @@ class InstructorProfileSection extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.x3),
             _PublicProfileCard(profile: p, service: svc),
+            const SizedBox(height: AppSpacing.x3),
+            _ReviewsCard(uid: uid, profile: p, service: reviews ?? ReviewService()),
             const SizedBox(height: AppSpacing.x3),
             _Card(
               children: [
@@ -250,6 +259,94 @@ class _LicenseSheetState extends State<_LicenseSheet> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// «Мои отзывы» (plan v2 §14.2): the rating students see, the newest
+/// reviews and «Все отзывы». Read straight from the instructor's own
+/// reviews (owner-readable in firestore.rules). A long press reports a
+/// review, as on the student's side; replies are v2.
+class _ReviewsCard extends StatelessWidget {
+  const _ReviewsCard({required this.uid, required this.profile, required this.service});
+
+  final String uid;
+  final Map<String, dynamic> profile;
+  final ReviewService service;
+
+  static const int _onCard = 3;
+
+  void _report(BuildContext context, InstructorReview r) {
+    if (r.id == null) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => ReportSheet(
+        contentType: 'review',
+        contextData: {
+          'instructorUid': uid,
+          'reviewId': r.id,
+          'language': Provider.of<LanguageProvider>(context, listen: false).language,
+          'state': profile['state'] as String? ?? '',
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return _Card(
+      children: [
+        Text(
+          l.translate('iprof_reviews_title'),
+          style: AppTypography.heading.copyWith(
+            fontSize: 18,
+            height: 24 / 18,
+            color: AppColors.ink,
+            fontVariations: const [FontVariation('wght', 600)],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.x1),
+        StreamBuilder<List<InstructorReview>>(
+          stream: service.reviewsOf(uid),
+          builder: (context, snap) {
+            final list = snap.data;
+            if (list == null) return const SizedBox(height: 24);
+            if (list.isEmpty) {
+              return Text(l.translate('iprof_reviews_none'),
+                  style: AppTypography.body.copyWith(color: AppColors.inkSecondary));
+            }
+            final avg = (profile['ratingAvg'] as num?)?.toDouble() ?? 0;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  [avg.toStringAsFixed(1), l.translate('instructor_reviews_count').replaceAll('{n}', '${list.length}')]
+                      .join(' · '),
+                  style: AppTypography.label.copyWith(color: AppColors.inkSecondary),
+                ),
+                // The listing shows «Новый» under 3 reviews (plan v2 §11).
+                if (list.length < 3) ...[
+                  const SizedBox(height: 2),
+                  Text(l.translate('iprof_reviews_new_note'),
+                      style: AppTypography.caption.copyWith(color: AppColors.inkSecondary)),
+                ],
+                for (final r in list.take(_onCard)) ReviewTile(review: r, onLongPress: () => _report(context, r)),
+                if (list.length > _onCard) ...[
+                  const SizedBox(height: AppSpacing.x3),
+                  BentoActionButton(
+                    text: l.translate('instructor_reviews_all'),
+                    primary: false,
+                    onCard: true,
+                    onTap: () => showAllReviews(context, list, onLongPress: (r) => _report(context, r)),
+                  ),
+                ],
+              ],
+            );
+          },
+        ),
+      ],
     );
   }
 }

@@ -172,6 +172,12 @@ describe('instructors/{uid}/reviews', () => {
     await assertFails(as('s2').collection('instructors').doc('i1').collection('reviews').doc('s1').get());
     await assertFails(as('s1').collection('instructors').doc('i1').collection('reviews').doc('s1')
       .set({ rating: 1 }));
+    await assertFails(as('s1').collection('instructors').doc('i1').collection('reviews').doc('s1').delete());
+  });
+
+  it('the author reads their own review, and only theirs (P8)', async () => {
+    await assertSucceeds(as('s1').collection('instructors').doc('i1').collection('reviews').doc('s1').get());
+    await assertFails(as('s1').collection('instructors').doc('i1').collection('reviews').get());
   });
 });
 
