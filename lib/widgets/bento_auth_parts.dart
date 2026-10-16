@@ -101,18 +101,26 @@ class BentoAuthCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // One line; a long translation shrinks rather than wraps.
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              title,
-              maxLines: 1,
-              textAlign: TextAlign.center,
-              style: AppTypography.title.copyWith(
-                fontSize: 26,
-                height: 32 / 26,
-                color: titleColor,
-                fontVariations: const [FontVariation('wght', 700)],
+          // One line; a long translation shrinks rather than wraps. A new
+          // title cross-fades in (Sign Up's student / instructor switch,
+          // owner 2026-10-15) instead of snapping.
+          AnimatedSwitcher(
+            duration: AppMotion.duration(context, AppMotion.base),
+            switchInCurve: AppMotion.enter,
+            switchOutCurve: AppMotion.exit,
+            child: FittedBox(
+              key: ValueKey(title),
+              fit: BoxFit.scaleDown,
+              child: Text(
+                title,
+                maxLines: 1,
+                textAlign: TextAlign.center,
+                style: AppTypography.title.copyWith(
+                  fontSize: 26,
+                  height: 32 / 26,
+                  color: titleColor,
+                  fontVariations: const [FontVariation('wght', 700)],
+                ),
               ),
             ),
           ),

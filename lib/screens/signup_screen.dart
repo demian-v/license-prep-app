@@ -527,20 +527,29 @@ class _SignupScreenState extends State<SignupScreen> {
                   onPressed: _isLoading ? null : _signup,
                   loading: _isLoading,
                 ),
+                // The student / instructor switch belongs to this form, so
+                // it sits in the card under the button (owner, 2026-10-15).
+                const SizedBox(height: AppSpacing.x2),
+                Center(
+                  child: AnimatedSwitcher(
+                    duration: AppMotion.duration(context, AppMotion.base),
+                    switchInCurve: AppMotion.enter,
+                    switchOutCurve: AppMotion.exit,
+                    child: BentoAuthLink(
+                      key: ValueKey(_instructor),
+                      label: _instructor
+                          ? l.translate('auth_switch_to_student')
+                          : l.translate('auth_switch_to_instructor'),
+                      onPressed: _isLoading ? null : () => setState(() => _instructor = !_instructor),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
         ],
       ),
       const SizedBox(height: AppSpacing.x3),
-      Center(
-        child: BentoAuthLink(
-          label: _instructor
-              ? l.translate('auth_switch_to_student')
-              : l.translate('auth_switch_to_instructor'),
-          onPressed: _isLoading ? null : () => setState(() => _instructor = !_instructor),
-        ),
-      ),
       Center(
         child: BentoAuthLink(
           label: l.translate('auth_have_account_login'),
