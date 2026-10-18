@@ -167,7 +167,8 @@ class BookingStatusPill extends StatelessWidget {
 }
 
 /// Where the school's money for a lesson stands (P9), on the lesson page:
-/// green once paid out, amber while held, grey while it waits its 48 h.
+/// green once paid out, amber while held, grey while it waits its 48 h,
+/// red text when a lost card dispute cancelled it.
 class PayoutPill extends StatelessWidget {
   const PayoutPill({super.key, required this.booking});
 
@@ -181,6 +182,7 @@ class PayoutPill extends StatelessWidget {
     final (bg, fg, text) = switch (booking.payout) {
       PayoutState.released => (AppColors.guideSurface, AppColors.guide, l.translate('payout_released')),
       PayoutState.held => (AppColors.warnSurface, AppColors.warn, l.translate('payout_held')),
+      PayoutState.cancelled => (AppColors.field, AppColors.stop, l.translate('payout_cancelled')),
       _ => (
           AppColors.field,
           AppColors.inkSecondary,

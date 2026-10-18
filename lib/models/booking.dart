@@ -30,6 +30,7 @@ class Booking {
     this.refundStatus,
     this.payoutReleaseAt,
     this.payoutReleasedAt,
+    this.payoutCancelledAt,
     this.disputeStatus,
   });
 
@@ -60,6 +61,7 @@ class Booking {
       refundStatus: d['refundStatus'] as String?,
       payoutReleaseAt: (d['payoutReleaseAt'] as Timestamp?)?.toDate(),
       payoutReleasedAt: (d['payoutReleasedAt'] as Timestamp?)?.toDate(),
+      payoutCancelledAt: (d['payoutCancelledAt'] as Timestamp?)?.toDate(),
       disputeStatus: d['disputeStatus'] as String?,
     );
   }
@@ -112,6 +114,10 @@ class Booking {
   /// this (it was never held, so it doesn't become `payout_released`).
   final DateTime? payoutReleasedAt;
 
+  /// The payout was cancelled: the student's bank took the money back (a
+  /// lost card dispute, payments.ts recordDispute).
+  final DateTime? payoutCancelledAt;
+
   /// A card dispute: 'open' while Stripe runs it, then Stripe's result.
   final String? disputeStatus;
 
@@ -153,16 +159,22 @@ class Booking {
   /// is none to come (cancelled with a refund, an expired hold, upcoming).
   PayoutState? get payout {
     if (status == 'payout_released' || payoutReleasedAt != null) return PayoutState.released;
-    // Any card dispute but a won one holds the money (releaseInstructorPayouts).
-    if (status == 'disputed' || (disputeStatus != null && disputeStatus != 'won')) return PayoutState.held;
+    // A card dispute the student won: the school isn't paid (owner, 2026-10-17).
+    if (payoutCancelledAt != null) return PayoutState.cancelled;
+    // A card dispute holds the money until it ends with the money kept
+    // (`won`, or an inquiry closed without a chargeback), as on the server.
+    if (status == 'disputed' || (disputeStatus != null && !const ['won', 'warning_closed'].contains(disputeStatus))) {
+      return PayoutState.held;
+    }
     if (payoutReleaseAt != null) return PayoutState.pending;
     return null;
   }
 }
 
-/// The school's money for one lesson: waiting the 48 h, paid out, or held
-/// while a no-show report or a card dispute is open.
-enum PayoutState { pending, released, held }
+/// The school's money for one lesson: waiting the 48 h, paid out, held
+/// while a no-show report or a card dispute is open, or cancelled because
+/// the student's bank took the money back.
+enum PayoutState { pending, released, held, cancelled }
 
 /// «Прошедшие и доход» (plan v2 §14.2): what has been paid out and what is
 /// still to come, in cents, over the instructor's bookings.
@@ -175,7 +187,7 @@ enum PayoutState { pending, released, held }
         released += b.lessonCents;
       case PayoutState.pending || PayoutState.held:
         pending += b.lessonCents;
-      case null:
+      case PayoutState.cancelled || null:
         break;
     }
   }

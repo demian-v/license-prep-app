@@ -102,13 +102,21 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
   }
 }
 
+/** The money stayed with the platform: `won`, or an inquiry closed without a chargeback. */
+export const DISPUTE_KEPT = ['won', 'warning_closed'];
+/** The money went back to the cardholder: a lost chargeback, or one Stripe prevented by refunding. */
+const DISPUTE_RETURNED = ['lost', 'prevented'];
+
 /**
  * A card dispute (chargeback) on a lesson's charge. The platform is the
  * merchant of record, so the dispute is ours; Stripe runs it. What we record:
  * `disputeStatus` (`open` while Stripe's status is a `needs_response` /
  * `under_review` kind, then Stripe's final word), the id, reason and amount.
- * An open dispute holds the payout; anything but `won` keeps it held for
- * the admin (P10).
+ * An open dispute holds the payout; money kept releases it. Money returned
+ * cancels a payout not made yet (owner, 2026-10-17: the school isn't paid;
+ * the P10 admin can pay it by hand) — `payoutReleaseAt` goes, so the lesson
+ * no longer waits or blocks deletion, and `payoutCancelledAt` says why. A
+ * payout already made stays made.
  */
 async function recordDispute(dispute: Stripe.Dispute, dedupe: FirebaseFirestore.DocumentReference) {
   const pi = typeof dispute.payment_intent === 'string' ? dispute.payment_intent : dispute.payment_intent?.id;
@@ -119,16 +127,21 @@ async function recordDispute(dispute: Stripe.Dispute, dedupe: FirebaseFirestore.
     return;
   }
   const ref = found.docs[0].ref;
-  const closed = ['won', 'lost', 'warning_closed', 'prevented'].includes(dispute.status);
+  const returned = DISPUTE_RETURNED.includes(dispute.status);
+  const closed = returned || DISPUTE_KEPT.includes(dispute.status);
   await db().runTransaction(async (tx) => {
     if ((await tx.get(dedupe)).exists) return;
+    const b = await tx.get(ref);
     tx.create(dedupe, { bookingId: ref.id, processedAt: Timestamp.now() });
+    const at = Timestamp.now();
+    const cancelPayout = returned && b.get('payoutReleaseAt') != null && b.get('payoutReleasedAt') == null;
     tx.update(ref, {
       disputeStatus: closed ? dispute.status : 'open',
       stripeDisputeId: dispute.id,
       disputeReason: dispute.reason ?? null,
       disputeAmountCents: dispute.amount ?? null,
-      updatedAt: Timestamp.now(),
+      ...(cancelPayout ? { payoutReleaseAt: FieldValue.delete(), payoutCancelledAt: at } : {}),
+      updatedAt: at,
     });
   });
 }
@@ -322,7 +335,7 @@ export const reportNoShow = functions.https.onCall(async (data, context) => {
 function releasable(b: FirebaseFirestore.DocumentSnapshot, nowMs: number): boolean {
   const dispute = b.get('disputeStatus');
   return ['completed', 'late_cancelled'].includes(b.get('status'))
-    && (dispute == null || dispute === 'won')
+    && (dispute == null || DISPUTE_KEPT.includes(dispute))
     && (b.get('payoutReleaseAt')?.toMillis() ?? Infinity) <= nowMs;
 }
 

@@ -92,8 +92,13 @@ class BookingService {
   }
 
   /// The PaymentSheet was closed without paying: the time is freed at once.
-  Future<void> releaseHold(String bookingId) =>
-      _fns.httpsCallable('releaseBookingHold').call({'bookingId': bookingId});
+  /// The status it ended in: `expired`, or `confirmed` / `pending_payment`
+  /// when Stripe says the payment went through (or is still processing)
+  /// although the sheet reported a failure.
+  Future<String> releaseHold(String bookingId) async {
+    final result = await _fns.httpsCallable('releaseBookingHold').call({'bookingId': bookingId});
+    return (result.data as Map)['status'] as String;
+  }
 
   /// «Урок не состоялся» (P9): holds the school's payout until the admin
   /// looks at it.

@@ -24,17 +24,26 @@ abstract class PaymentSheetLauncher {
 /// Google Pay later). No Customer, so no saved cards. The booking is
 /// confirmed by the server's webhook, not by this result: a paid sheet only
 /// means the app should wait for it.
+///
+/// [returnUrl] brings the student back from a bank page opened outside the
+/// sheet (3-D Secure that isn't the native challenge). Its scheme is the
+/// app's own `driveusa` (Info.plist); Stripe's iOS plugin takes these URLs
+/// before Flutter's deep links see them.
 class StripePaymentSheet implements PaymentSheetLauncher {
   const StripePaymentSheet();
+
+  static const returnUrl = 'driveusa://stripe-redirect';
 
   @override
   Future<PaymentResult> pay(PaymentStart start) async {
     try {
       Stripe.publishableKey = start.publishableKey;
+      Stripe.urlScheme = 'driveusa';
       await Stripe.instance.initPaymentSheet(
         paymentSheetParameters: SetupPaymentSheetParameters(
           paymentIntentClientSecret: start.clientSecret,
           merchantDisplayName: 'DriveUSA',
+          returnURL: returnUrl,
           style: ThemeMode.light,
         ),
       );

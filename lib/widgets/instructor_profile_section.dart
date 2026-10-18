@@ -369,8 +369,8 @@ class PayoutsCard extends StatefulWidget {
   final bool enabled;
   final InstructorService service;
 
-  /// Tests only: replaces the browser.
-  final Future<void> Function(Uri url)? openUrl;
+  /// Tests only: replaces the browser. False when nothing could open it.
+  final Future<bool> Function(Uri url)? openUrl;
 
   @override
   State<PayoutsCard> createState() => _PayoutsCardState();
@@ -394,6 +394,14 @@ class _PayoutsCardState extends State<PayoutsCard> with WidgetsBindingObserver {
   }
 
   @override
+  void didUpdateWidget(PayoutsCard old) {
+    super.didUpdateWidget(old);
+    // Stripe turned payouts off (it needs more details): show where the
+    // account stands instead of «Set up payouts».
+    if (old.enabled && !widget.enabled) _refresh();
+  }
+
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && !widget.enabled) _refresh();
   }
@@ -413,7 +421,8 @@ class _PayoutsCardState extends State<PayoutsCard> with WidgetsBindingObserver {
     setState(() => _busy = true);
     try {
       final url = Uri.parse(await widget.service.startPayouts());
-      await (widget.openUrl ?? (u) => launchUrl(u, mode: LaunchMode.externalApplication))(url);
+      final opened = await (widget.openUrl ?? (u) => launchUrl(u, mode: LaunchMode.externalApplication))(url);
+      if (!opened) throw StateError('no browser opened $url');
       if (mounted) setState(() => _state = 'pending');
     } catch (_) {
       messenger.showSnackBar(SnackBar(content: Text(l.translate('payouts_error')), backgroundColor: AppColors.stop));

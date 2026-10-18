@@ -33,6 +33,7 @@ Booking _booking({
   int lessonCents = 6500,
   DateTime? payoutReleaseAt,
   DateTime? payoutReleasedAt,
+  DateTime? payoutCancelledAt,
   String? refundStatus,
   String? disputeStatus,
   String? cancelledBy,
@@ -58,6 +59,7 @@ Booking _booking({
       refundStatus: refundStatus,
       payoutReleaseAt: payoutReleaseAt,
       payoutReleasedAt: payoutReleasedAt,
+      payoutCancelledAt: payoutCancelledAt,
       disputeStatus: disputeStatus,
     );
 
@@ -68,10 +70,13 @@ InstructorListing _school() => InstructorListing.fromMap({
     });
 
 class _Bookings extends BookingService {
-  _Bookings({this.shown, this.error});
+  _Bookings({this.shown, this.error, this.releasedAs = 'expired', this.noShowError});
 
   final Booking? shown;
   final FirebaseFunctionsException? error;
+  /// What releaseBookingHold answers (the server asks Stripe first).
+  final String releasedAs;
+  final FirebaseFunctionsException? noShowError;
   final released = <String>[];
   final noShows = <String>[];
 
@@ -103,10 +108,16 @@ class _Bookings extends BookingService {
   }
 
   @override
-  Future<void> releaseHold(String bookingId) async => released.add(bookingId);
+  Future<String> releaseHold(String bookingId) async {
+    released.add(bookingId);
+    return releasedAs;
+  }
 
   @override
-  Future<void> reportNoShow(String bookingId) async => noShows.add(bookingId);
+  Future<void> reportNoShow(String bookingId) async {
+    if (noShowError != null) throw noShowError!;
+    noShows.add(bookingId);
+  }
 
   @override
   Stream<Booking?> booking(String id) => Stream.value(shown ?? _booking(status: 'pending_payment'));
@@ -190,6 +201,10 @@ void main() {
       // A lost dispute stays held (the server never releases it), a won one pays out.
       expect(_booking(payoutReleaseAt: DateTime(2026, 10, 9), disputeStatus: 'lost').payout, PayoutState.held);
       expect(_booking(payoutReleaseAt: DateTime(2026, 10, 9), disputeStatus: 'won').payout, PayoutState.pending);
+      // An inquiry closed without a chargeback: the money stayed, so it pays out.
+      expect(_booking(payoutReleaseAt: DateTime(2026, 10, 9), disputeStatus: 'warning_closed').payout, PayoutState.pending);
+      // The server cancelled the payout after a lost dispute: the school isn't paid.
+      expect(_booking(disputeStatus: 'lost', payoutCancelledAt: DateTime(2026, 10, 9)).payout, PayoutState.cancelled);
       expect(_booking(status: 'refunded', cancelledBy: 'student').payout, isNull);
       // A paid-out late cancel stays a late cancel: never «held», never reviewable.
       final late = _booking(status: 'late_cancelled', payoutReleasedAt: DateTime(2026, 10, 9));
@@ -206,6 +221,7 @@ void main() {
         _booking(payoutReleaseAt: DateTime(2026, 10, 9), lessonCents: 6500),
         _booking(status: 'late_cancelled', payoutReleaseAt: DateTime(2026, 10, 9), lessonCents: 1000),
         _booking(status: 'refunded', lessonCents: 9999),
+        _booking(disputeStatus: 'lost', payoutCancelledAt: DateTime(2026, 10, 9), lessonCents: 8888),
       ]);
       expect(income, (releasedCents: 9000, pendingCents: 7500));
     });
@@ -247,6 +263,15 @@ void main() {
       expect(find.text("The payment didn't go through. Your card was declined."), findsOneWidget);
     });
 
+    testWidgets('the sheet said «failed» but Stripe says paid: the lesson page opens, no failure shown', (tester) async {
+      final svc = _Bookings(releasedAs: 'confirmed');
+      await _pump(tester, BookingScreen(instructor: _school(), service: svc, payments: _Sheet(const PaymentResult(PaymentOutcome.failed, 'Timed out.'))));
+      await _bookTen(tester);
+      expect(svc.released, ['new']);
+      expect(find.textContaining("The payment didn't go through"), findsNothing);
+      expect(find.byType(BookingDetailScreen), findsOneWidget);
+    });
+
     testWidgets('paid: the lesson page opens and waits for the server to confirm', (tester) async {
       final svc = _Bookings();
       await _pump(tester, BookingScreen(instructor: _school(), service: svc, payments: _Sheet(const PaymentResult(PaymentOutcome.paid))));
@@ -285,6 +310,19 @@ void main() {
       expect(find.text("Thank you, we'll check."), findsOneWidget);
     });
 
+    testWidgets('reported too late (the 48 h ran out on an open page): says so', (tester) async {
+      final svc = _Bookings(shown: _booking(), noShowError: FirebaseFunctionsException(code: 'failed-precondition', message: 'not-reportable'));
+      await open(tester, _booking(), svc: svc);
+      await tester.tap(find.widgetWithText(BentoActionButton, "Didn't happen"));
+      await tester.pumpAndSettle();
+      await tester.runAsync(() async {
+        await tester.tap(find.text('Report'));
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pumpAndSettle();
+      expect(find.text('The 48 hours to report this lesson have passed.'), findsOneWidget);
+    });
+
     testWidgets('no «Lesson didn’t happen» for the school, or once the 48 h are over', (tester) async {
       await open(tester, _booking(), asInstructor: true);
       expect(find.text("Didn't happen"), findsNothing);
@@ -300,6 +338,9 @@ void main() {
       expect(find.text("The student reported that the lesson didn't happen. The payout is on hold until we check."), findsOneWidget);
       await open(tester, _booking(payoutReleaseAt: DateTime(2026, 10, 9, 15)), asInstructor: true);
       expect(find.text('Payout after Oct 9'), findsOneWidget);
+      await open(tester, _booking(disputeStatus: 'lost', payoutCancelledAt: DateTime(2026, 10, 9)), asInstructor: true);
+      expect(find.text('No payout'), findsOneWidget);
+      expect(find.text("The student's bank returned the payment (a card dispute), so this lesson isn't paid out."), findsOneWidget);
     });
 
     testWidgets('the student sees the refund; a payment that came too late explains itself', (tester) async {
@@ -307,7 +348,8 @@ void main() {
       await open(tester, _booking(status: 'refunded', cancelledBy: 'student', refundStatus: 'succeeded', startAt: ahead));
       expect(find.text('Refund issued: the money returns to your card within 5–10 days.'), findsOneWidget);
       await open(tester, _booking(status: 'refunded', cancelledBy: 'system', refundStatus: 'failed', startAt: ahead));
-      expect(find.text('The time was taken while the payment went through. Your money has been returned.'), findsOneWidget);
+      // Says nothing about the money: the refund line below says where it stands.
+      expect(find.text('The time was taken while the payment went through, so the lesson was cancelled.'), findsOneWidget);
       expect(find.text('The refund is being issued.'), findsOneWidget);
     });
   });
@@ -358,7 +400,10 @@ void main() {
     Future<void> card(WidgetTester tester, {required bool enabled, required _Payouts svc, List<Uri>? opened}) => _pump(
           tester,
           Scaffold(
-            body: PayoutsCard(enabled: enabled, service: svc, openUrl: (u) async => opened?.add(u)),
+            body: PayoutsCard(enabled: enabled, service: svc, openUrl: (u) async {
+              opened?.add(u);
+              return true;
+            }),
           ),
         );
 
@@ -374,6 +419,33 @@ void main() {
       await tester.pumpAndSettle();
       expect(svc.started, 1);
       expect(opened.single.host, 'connect.stripe.com');
+      expect(find.text('Continue setup'), findsOneWidget);
+    });
+
+    testWidgets('no browser could open the link: an error, and the card stays as it was', (tester) async {
+      await _pump(tester, Scaffold(body: PayoutsCard(enabled: false, service: _Payouts('none'), openUrl: (u) async => false)));
+      await tester.runAsync(() async {
+        await tester.tap(find.text('Set up payouts'));
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pumpAndSettle();
+      expect(find.text("Couldn't open Stripe. Try again."), findsOneWidget);
+      expect(find.text('Set up payouts'), findsOneWidget);
+    });
+
+    testWidgets('Stripe turns payouts off while the page is open: the card re-reads the account', (tester) async {
+      final svc = _Payouts('pending');
+      final enabled = ValueNotifier(true);
+      await _pump(tester, Scaffold(body: ValueListenableBuilder<bool>(
+        valueListenable: enabled,
+        builder: (_, on, __) => PayoutsCard(enabled: on, service: svc),
+      )));
+      expect(find.byType(BentoActionButton), findsNothing);
+      await tester.runAsync(() async {
+        enabled.value = false;
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pumpAndSettle();
       expect(find.text('Continue setup'), findsOneWidget);
     });
 
@@ -417,6 +489,11 @@ void main() {
       expect(code('android/app/proguard-rules.pro'), contains('-keep class com.stripe.** { *; }'));
     });
 
+    test('a bank page outside the sheet returns to the app: the return URL uses the app’s registered scheme', () {
+      expect(StripePaymentSheet.returnUrl, startsWith('driveusa://'));
+      expect(File('ios/Runner/Info.plist').readAsStringSync(), contains('<string>driveusa</string>'));
+    });
+
     test('no Stripe key is built into the app', () {
       final hits = Directory('lib')
           .listSync(recursive: true)
@@ -440,6 +517,7 @@ void main() {
           'booking_status_disputed', 'payout_released', 'payout_held', 'payout_pending_on', 'income_pending',
           'payouts_desc_none', 'payouts_desc_pending', 'payouts_desc_enabled', 'booking_refund_done', 'booking_refund_pending',
           'booking_note_slot_taken', 'booking_note_pending', 'booking_note_disputed_student', 'booking_note_disputed_school',
+          'payout_cancelled', 'booking_note_payout_cancelled', 'noshow_too_late',
         ]) {
           expect(_locale(lang)[k], isA<String>(), reason: '$lang $k');
         }

@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 import '../localization/app_localizations.dart';
@@ -43,6 +46,23 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   late final ReviewService _reviews = widget.reviews ?? ReviewService();
   late final Stream<Booking?> _booking = _service.booking(widget.bookingId);
   bool _busy = false;
+  // Time-bound actions (cancel before the start, «Не состоялся» for 48 h
+  // after the end) are re-checked every minute on a page left open.
+  late final Timer _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick.cancel();
+    super.dispose();
+  }
 
   Future<void> _cancel(Booking b) async {
     final l = AppLocalizations.of(context);
@@ -93,6 +113,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       await _service.reportNoShow(b.id);
       messenger.hideCurrentSnackBar();
       messenger.showSnackBar(SnackBar(content: Text(l.translate('noshow_done')), backgroundColor: AppColors.guide));
+    } on FirebaseFunctionsException catch (e) {
+      final key = e.message == 'not-reportable' ? 'noshow_too_late' : 'noshow_error';
+      messenger.showSnackBar(SnackBar(content: Text(l.translate(key)), backgroundColor: AppColors.stop));
     } catch (_) {
       messenger.showSnackBar(SnackBar(content: Text(l.translate('noshow_error')), backgroundColor: AppColors.stop));
     } finally {
@@ -148,7 +171,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       'late_cancelled' => 'booking_note_late',
       'pending_payment' => asInstructor ? null : 'booking_note_pending',
       'disputed' => asInstructor ? 'booking_note_disputed_school' : 'booking_note_disputed_student',
-      _ => null,
+      _ => asInstructor && b.payout == PayoutState.cancelled ? 'booking_note_payout_cancelled' : null,
     };
     // A Stripe refund, for the student (P9): issued, or still being issued.
     final refund = asInstructor || b.refundStatus == null

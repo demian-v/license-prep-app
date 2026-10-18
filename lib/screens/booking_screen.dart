@@ -62,17 +62,22 @@ class _BookingScreenState extends State<BookingScreen> {
         final paid = await (widget.payments ?? const StripePaymentSheet()).pay(result.payment!);
         if (paid.outcome != PaymentOutcome.paid) {
           // Closed or refused: give the time back now, not after 15 minutes.
+          String? status;
           try {
-            await _service.releaseHold(result.id);
+            status = await _service.releaseHold(result.id);
           } catch (_) {
             // The expiry sweep frees it anyway.
           }
-          final text = paid.outcome == PaymentOutcome.cancelled
-              ? l.translate('booking_payment_cancelled')
-              : [l.translate('booking_payment_failed'), if (paid.message != null) paid.message!].join(' ');
-          messenger.showSnackBar(SnackBar(content: Text(text), backgroundColor: AppColors.stop));
-          if (mounted) _reload();
-          return;
+          // The sheet can report a failure for a payment that went through:
+          // the server asked Stripe, so trust its status over the sheet's.
+          if (status != 'confirmed' && status != 'pending_payment') {
+            final text = paid.outcome == PaymentOutcome.cancelled
+                ? l.translate('booking_payment_cancelled')
+                : [l.translate('booking_payment_failed'), if (paid.message != null) paid.message!].join(' ');
+            messenger.showSnackBar(SnackBar(content: Text(text), backgroundColor: AppColors.stop));
+            if (mounted) _reload();
+            return;
+          }
         }
         // Paid: the server's webhook confirms it; the lesson page follows live.
         analyticsService.logBookingConfirmed(durationMinutes: quote.durationMinutes);

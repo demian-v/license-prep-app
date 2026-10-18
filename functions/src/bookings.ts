@@ -348,12 +348,34 @@ export const createBooking = functions.runWith({ secrets: STRIPE_SECRETS }).http
  * The student closed the PaymentSheet without paying: the hold ends now
  * instead of after 15 minutes, so the time is free again and the hold no
  * longer counts against MAX_OPEN_HOLDS.
+ *
+ * The sheet can report a failure for a payment that went through (the
+ * connection dropped at the end), so Stripe is asked first: a succeeded
+ * PaymentIntent confirms the booking here (the webhook then finds it
+ * settled), a processing one keeps the hold for the webhook. The app reads
+ * the returned status.
  */
 export const releaseBookingHold = functions.runWith({ secrets: STRIPE_SECRETS }).https.onCall(async (data, context) => {
   const uid = signedIn(context);
   const ref = admin.firestore().collection('bookings').doc(bookingIdOf(data));
   const b = await ref.get();
   if (!b.exists || b.get('studentUid') !== uid) throw new functions.https.HttpsError('permission-denied', 'Not your booking.');
+  const paymentIntentId = b.get('stripePaymentIntentId');
+  if (b.get('status') === 'pending_payment' && b.get('paymentProvider') === 'stripe' && typeof paymentIntentId === 'string') {
+    try {
+      const pi = await stripe().paymentIntents.retrieve(paymentIntentId);
+      if (pi.status === 'succeeded') {
+        const chargeId = typeof pi.latest_charge === 'string' ? pi.latest_charge : pi.latest_charge?.id ?? null;
+        await settlePayment(ref.id, { paymentIntentId: pi.id, chargeId });
+        return { bookingId: ref.id, status: (await ref.get()).get('status') };
+      }
+      if (pi.status === 'processing') return { bookingId: ref.id, status: 'pending_payment' };
+    } catch (e: any) {
+      // Not read: release anyway; a payment that did go through comes back
+      // by the webhook's late-payment path (settlePayment).
+      functions.logger.warn('releaseBookingHold: PaymentIntent not read', { bookingId: ref.id, code: e?.code ?? String(e) });
+    }
+  }
   await expireHold(ref);
   return { bookingId: ref.id, status: (await ref.get()).get('status') };
 });

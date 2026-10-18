@@ -45,6 +45,8 @@ type Call = { params: any; options?: any; id?: string };
 let calls: Record<string, Call[]> = {};
 let failNext: Record<string, any> = {};
 let account: Record<string, unknown> = {};
+/** What paymentIntents.retrieve reports (the sheet's own result can be wrong). */
+let piStatus = 'requires_payment_method';
 /** A v2 account's recipient capabilities, as `include: ['configuration.recipient']` returns them. */
 const recipient = (transfers: string, payouts = transfers) => ({
   recipient: { applied: true, capabilities: { stripe_balance: { stripe_transfers: { status: transfers, status_details: [] }, payouts: { status: payouts, status_details: [] } } } },
@@ -64,6 +66,10 @@ const fake = {
     async create(params: any, options: any) {
       record('paymentIntents.create', { params, options });
       return { id: `pi_${params.metadata.bookingId}`, client_secret: `pi_${params.metadata.bookingId}_secret_test` };
+    },
+    async retrieve(id: string) {
+      record('paymentIntents.retrieve', { params: null, id });
+      return { id, status: piStatus, latest_charge: `ch_${id.slice(3)}` };
     },
     async cancel(id: string, params: any, options: any) {
       record('paymentIntents.cancel', { id, params, options });
@@ -179,6 +185,7 @@ beforeEach(async () => {
   calls = {};
   failNext = {};
   account = {};
+  piStatus = 'requires_payment_method';
   pushes = [];
   setPushTransport({
     async send(messages) {
@@ -260,6 +267,26 @@ describe('the Stripe gateway (plan v2 §9.2 step 1)', () => {
     // A second release changes nothing.
     expect(await releaseHold({ bookingId: res.bookingId }, STUDENT)).toMatchObject({ status: 'expired' });
     expect(calls['paymentIntents.cancel']).toHaveLength(1);
+  });
+
+  it('a sheet that reported a failure for a payment that went through: the release confirms it instead, and the webhook later changes nothing', async () => {
+    const res: any = await book({ instructorUid: SCHOOL, startAtMs: tenAm(3), durationMinutes: 60 }, STUDENT);
+    piStatus = 'succeeded';
+    expect(await releaseHold({ bookingId: res.bookingId }, STUDENT)).toEqual({ bookingId: res.bookingId, status: 'confirmed' });
+    expect((await bookingRef(res.bookingId).get()).data()).toMatchObject({ status: 'confirmed', stripeChargeId: `ch_${res.bookingId}` });
+    expect((await slot(tenAm(3)).get()).exists).toBe(true);
+    expect(calls['paymentIntents.cancel']).toBeUndefined();
+    expect(pushes.filter((p) => p.token === 'tok-school')).toHaveLength(1);
+    expect((await deliver(paid(res.bookingId))).status).toBe(200);
+    expect(pushes.filter((p) => p.token === 'tok-school')).toHaveLength(1);
+  });
+
+  it('a payment still processing keeps the hold for the webhook', async () => {
+    const res: any = await book({ instructorUid: SCHOOL, startAtMs: tenAm(3), durationMinutes: 60 }, STUDENT);
+    piStatus = 'processing';
+    expect(await releaseHold({ bookingId: res.bookingId }, STUDENT)).toEqual({ bookingId: res.bookingId, status: 'pending_payment' });
+    expect((await slot(tenAm(3)).get()).exists).toBe(true);
+    expect(calls['paymentIntents.cancel']).toBeUndefined();
   });
 
   it('the expiry sweep cancels the PaymentIntent of a dead hold', async () => {
@@ -360,6 +387,30 @@ describe('stripeWebhook (plan v2 §9.3)', () => {
     await deliver(dispute('won', 'evt_dp2'));
     await runReleaseInstructorPayouts();
     expect((await bookingRef(id).get()).get('status')).toBe('payout_released');
+  });
+
+  it('an inquiry closed without a chargeback lets the payout go; a lost or prevented one cancels it (the school is not paid, nothing blocks deletion)', async () => {
+    const dispute = (id: string, status: string, eventId: string) => ({
+      id: eventId, type: 'charge.dispute.closed',
+      data: { object: { id: `dp_${id}`, object: 'dispute', payment_intent: `pi_${id}`, charge: `ch_${id}`, status, reason: 'fraudulent', amount: 7500 } },
+    });
+    const kept = await paidBooking(3);
+    await bookingRef(kept).update({ status: 'completed', payoutReleaseAt: ts(Date.now() - 1000) });
+    await deliver(dispute(kept, 'warning_closed', 'evt_dpk'));
+    await runReleaseInstructorPayouts();
+    expect((await bookingRef(kept).get()).get('status')).toBe('payout_released');
+    for (const [days, status] of [[4, 'lost'], [5, 'prevented']] as const) {
+      const id = await paidBooking(days);
+      await bookingRef(id).update({ status: 'completed', payoutReleaseAt: ts(Date.now() - 1000) });
+      await deliver(dispute(id, status, `evt_dp_${status}`));
+      const b = (await bookingRef(id).get()).data()!;
+      expect(b).toMatchObject({ status: 'completed', disputeStatus: status });
+      expect(b.payoutReleaseAt).toBeUndefined();
+      expect(b.payoutCancelledAt).toBeDefined();
+    }
+    await runReleaseInstructorPayouts();
+    expect(calls['transfers.create']).toHaveLength(1);
+    expect(await unsettledBookingCount(db(), SCHOOL)).toBe(0);
   });
 
   it('a failure is dead-lettered and Stripe asked to retry', async () => {
