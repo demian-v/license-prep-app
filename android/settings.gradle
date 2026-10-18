@@ -27,6 +27,14 @@ plugins {
     id "com.google.firebase.crashlytics" version "3.0.2" apply false
     // END: FlutterFire Configuration
     id "org.jetbrains.kotlin.android" version "2.1.0" apply false
+    // stripe_android 14.x (instructors P9) puts the Compose compiler plugin
+    // for Kotlin 2.4.10 on its own classpath, while this root pins Kotlin
+    // 2.1.0, so its module failed with "Multiple values are not allowed for
+    // plugin option ...compose...:sourceInformation". Pinned here, the root's
+    // copy wins and matches the compiler (stripe_android 13.x used 2.1.0).
+    // Moving Kotlin to 2.2+ instead would break the plugins that still use
+    // `kotlinOptions` (an error since Kotlin 2.2).
+    id "org.jetbrains.kotlin.plugin.compose" version "2.1.0" apply false
 }
 
 include ":app"
