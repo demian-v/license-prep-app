@@ -14,3 +14,9 @@ process.env.GOOGLE_CREDENTIALS = '{"type":"service_account","project_id":"demo-d
 process.env.FIRST_FEE_BPS = '2500';
 process.env.LATER_FEE_BPS = '500';
 process.env.LATER_FEE_MIN_CENTS = '150';
+// Stripe (P9): dummies only, never a real key (the repo is public). Two
+// webhook secrets, as production will have (platform + connected accounts).
+// STRIPE_SECRET_KEY stays unset: tests hand bookings a fake client instead
+// (setStripeClient), so nothing can reach Stripe's API.
+process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_platform_dummy,whsec_test_connect_dummy';
+process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test_dummy';

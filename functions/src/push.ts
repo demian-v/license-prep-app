@@ -19,7 +19,7 @@ import * as admin from 'firebase-admin';
 
 export type PushKind = 'photo_approved' | 'photo_rejected'
   | 'booking_new' | 'booking_cancelled_student' | 'booking_cancelled_instructor'
-  | 'review_request';
+  | 'review_request' | 'booking_refunded' | 'payouts_enabled';
 
 export type Lang = 'en' | 'es' | 'uk' | 'ru' | 'pl';
 const LANGS: readonly Lang[] = ['en', 'es', 'uk', 'ru', 'pl'];
@@ -72,6 +72,23 @@ const TEXTS: Record<PushKind, Record<Lang, { title: string; body: string }>> = {
     uk: { title: 'Як пройшов урок?', body: 'Залиште відгук: {name}' },
     ru: { title: 'Как прошёл урок?', body: 'Оставьте отзыв: {name}' },
     pl: { title: 'Jak minęła lekcja?', body: 'Wystaw opinię: {name}' },
+  },
+  // Stripe (P9): to the student when a refund went through; {name} is the
+  // school, {time} the lesson, as in the cancellation pushes.
+  booking_refunded: {
+    en: { title: 'Refund issued', body: '{name} · {time}' },
+    es: { title: 'Reembolso emitido', body: '{name} · {time}' },
+    uk: { title: 'Повернення оформлено', body: '{name} · {time}' },
+    ru: { title: 'Возврат оформлен', body: '{name} · {time}' },
+    pl: { title: 'Zwrot zlecony', body: '{name} · {time}' },
+  },
+  // To a school when Stripe enabled its payouts; opens Профиль.
+  payouts_enabled: {
+    en: { title: 'Payouts are set up', body: 'Money for your lessons will arrive weekly.' },
+    es: { title: 'Pagos configurados', body: 'El dinero de tus clases llegará cada semana.' },
+    uk: { title: 'Виплати налаштовано', body: 'Гроші за уроки надходитимуть щотижня.' },
+    ru: { title: 'Выплаты подключены', body: 'Деньги за уроки будут приходить раз в неделю.' },
+    pl: { title: 'Wypłaty skonfigurowane', body: 'Pieniądze za lekcje będą wpływać co tydzień.' },
   },
 };
 

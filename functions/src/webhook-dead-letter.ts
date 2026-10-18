@@ -19,7 +19,7 @@ export const MAX_WEBHOOK_RETRIES = 5;
 const MAX_PAYLOAD_CHARS = 100_000;
 
 export interface WebhookFailure {
-  source: 'apple' | 'play';
+  source: 'apple' | 'play' | 'stripe';
   /** Stable per-notification id: Apple's notificationUUID, Play's messageId. */
   key: string;
   notificationType: string;

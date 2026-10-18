@@ -497,24 +497,30 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   }
 
   /// Instructors plan v2 §9.4: upcoming lessons are cancelled first, by the
-  /// user, so the other side hears about it. Checked here before the dialog;
-  /// deleteUserAccount refuses on its own too (`upcoming-bookings`).
+  /// user, so the other side hears about it; lessons whose money is still
+  /// open (P9: a no-show report, a dispute, a payout to come) settle first.
+  /// Checked here before the dialog; deleteUserAccount refuses on its own
+  /// too (`upcoming-bookings`, `unsettled-bookings`).
   Future<void> _deleteIfNoLessons(BuildContext context, LanguageProvider languageProvider) async {
     final uid = Provider.of<AuthProvider>(context, listen: false).user?.id;
     final l = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
     var upcoming = 0;
+    var unsettled = 0;
     if (uid != null) {
       try {
         upcoming = await BookingService().upcomingCount(uid);
+        if (upcoming == 0) unsettled = await BookingService().unsettledCount(uid);
       } catch (_) {
         // Offline or no bookings to read: the server still checks.
       }
     }
     if (!context.mounted) return;
-    if (upcoming > 0) {
+    if (upcoming > 0 || unsettled > 0) {
       messenger.showSnackBar(SnackBar(
-        content: Text(l.translate('delete_upcoming_bookings').replaceAll('{n}', '$upcoming')),
+        content: Text(upcoming > 0
+            ? l.translate('delete_upcoming_bookings').replaceAll('{n}', '$upcoming')
+            : l.translate('delete_unsettled_bookings').replaceAll('{n}', '$unsettled')),
         backgroundColor: AppColors.stop,
         duration: const Duration(seconds: 5),
       ));
@@ -665,6 +671,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                   final message = refusal?.message == 'upcoming-bookings'
                       ? l10n
                           .translate('delete_upcoming_bookings')
+                          .replaceAll('{n}', '${details is Map ? details['count'] : ''}')
+                      : refusal?.message == 'unsettled-bookings'
+                      ? l10n
+                          .translate('delete_unsettled_bookings')
                           .replaceAll('{n}', '${details is Map ? details['count'] : ''}')
                       : refusal != null
                           ? (refusal.message ?? refusal.code)

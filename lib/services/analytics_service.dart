@@ -810,6 +810,12 @@ class AnalyticsService {
     await logEvent('booking_confirmed', {'duration_minutes': durationMinutes});
   }
 
+  /// A lesson was cancelled with a refund (plan v2 §14.3, P9). No ids: only
+  /// who cancelled ('student' or 'instructor').
+  Future<void> logBookingRefunded({required String by}) async {
+    await logEvent('booking_refunded', {'cancelled_by': by});
+  }
+
   /// A student sent or changed a review (P8). No ids: the stars, and whether
   /// it was an edit.
   Future<void> logReviewSubmitted({required int rating, required bool edited}) async {

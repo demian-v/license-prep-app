@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../localization/app_localizations.dart';
 import '../models/booking.dart';
 import '../models/instructor_listing.dart';
+import '../services/analytics_service.dart';
 import '../services/booking_service.dart';
 import '../services/chat_service.dart';
 import '../services/review_service.dart';
@@ -63,9 +64,37 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     if (ok != true || !mounted) return;
     setState(() => _busy = true);
     try {
-      await _service.cancel(b.id);
+      final status = await _service.cancel(b.id);
+      if (status == 'refunded') analyticsService.logBookingRefunded(by: widget.asInstructor ? 'instructor' : 'student');
     } catch (_) {
       messenger.showSnackBar(SnackBar(content: Text(l.translate('booking_cancel_error')), backgroundColor: AppColors.stop));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// «Урок не состоялся» (P9): within 48 h of the end, before the school is
+  /// paid. The payout waits for the admin (P10).
+  Future<void> _reportNoShow(Booking b) async {
+    final l = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => DestructiveDialog(
+        title: l.translate('noshow_title'),
+        body: l.translate('noshow_body'),
+        confirm: l.translate('noshow_confirm'),
+        keep: l.translate('noshow_back'),
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await _service.reportNoShow(b.id);
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(SnackBar(content: Text(l.translate('noshow_done')), backgroundColor: AppColors.guide));
+    } catch (_) {
+      messenger.showSnackBar(SnackBar(content: Text(l.translate('noshow_error')), backgroundColor: AppColors.stop));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -109,11 +138,24 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
             : b.instructorName;
     final now = DateTime.now();
     final ahead = b.status == 'confirmed' && b.startAt.isAfter(now);
+    final noShow = !asInstructor && b.noShowReportable(now);
     final note = switch (b.status) {
-      'refunded' => b.cancelledBy == 'instructor' ? 'booking_note_by_school' : 'booking_note_by_student',
+      'refunded' => switch (b.cancelledBy) {
+          'instructor' => 'booking_note_by_school',
+          'system' => 'booking_note_slot_taken',
+          _ => 'booking_note_by_student',
+        },
       'late_cancelled' => 'booking_note_late',
+      'pending_payment' => asInstructor ? null : 'booking_note_pending',
+      'disputed' => asInstructor ? 'booking_note_disputed_school' : 'booking_note_disputed_student',
       _ => null,
     };
+    // A Stripe refund, for the student (P9): issued, or still being issued.
+    final refund = asInstructor || b.refundStatus == null
+        ? null
+        : b.refundStatus == 'succeeded'
+            ? 'booking_refund_done'
+            : 'booking_refund_pending';
     return Column(
       children: [
         Expanded(
@@ -138,6 +180,10 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                   if (note != null) ...[
                     const SizedBox(height: AppSpacing.x2),
                     Text(l.translate(note), style: AppTypography.caption.copyWith(color: AppColors.inkSecondary)),
+                  ],
+                  if (refund != null) ...[
+                    const SizedBox(height: AppSpacing.x1),
+                    Text(l.translate(refund), style: AppTypography.caption.copyWith(color: AppColors.inkSecondary)),
                   ],
                 ],
               ),
@@ -177,7 +223,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                   const SizedBox(height: AppSpacing.x3),
                   // The school gets its full price; the fee is the student's
                   // (plan v2 §9.1), so the school sees only its part.
-                  if (asInstructor)
+                  if (asInstructor) ...[
                     Text(
                       formatUsd(b.lessonCents),
                       style: AppTypography.title.copyWith(
@@ -187,8 +233,12 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                         fontVariations: const [FontVariation('wght', 700)],
                         fontFeatures: const [FontFeature.tabularFigures()],
                       ),
-                    )
-                  else
+                    ),
+                    if (b.payout != null) ...[
+                      const SizedBox(height: AppSpacing.x2),
+                      Align(alignment: Alignment.centerLeft, child: PayoutPill(booking: b)),
+                    ],
+                  ] else
                     PriceLines(
                       quote: BookingQuote(
                         durationMinutes: b.durationMinutes,
@@ -221,12 +271,12 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 // Two actions: white + black (owner rule 16).
                 : Row(
                     children: [
-                      if (ahead) ...[
+                      if (ahead || noShow) ...[
                         Expanded(
                           child: BentoActionButton(
-                            text: l.translate('booking_cancel'),
+                            text: l.translate(ahead ? 'booking_cancel' : 'noshow_action'),
                             primary: false,
-                            onTap: () => _cancel(b),
+                            onTap: () => ahead ? _cancel(b) : _reportNoShow(b),
                           ),
                         ),
                         const SizedBox(width: AppSpacing.x3),

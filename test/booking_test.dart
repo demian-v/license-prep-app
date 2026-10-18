@@ -96,10 +96,10 @@ class _FakeBookings extends BookingService {
   Future<BookingOptions> options(String instructorUid) async => _options();
 
   @override
-  Future<({String id, String status})> create(String instructorUid, int startAtMs, int durationMinutes) async {
+  Future<({String id, String status, PaymentStart? payment})> create(String instructorUid, int startAtMs, int durationMinutes) async {
     if (error != null) throw error!;
     created.add((instructorUid, startAtMs, durationMinutes));
-    return (id: 'new', status: 'confirmed');
+    return (id: 'new', status: 'confirmed', payment: null);
   }
 
   @override
@@ -279,14 +279,15 @@ void main() {
       ]);
       await _pump(tester, InstructorCalendarScreen(service: _Profile(2), bookings: svc, uid: 'i1'));
       expect(find.text('Upcoming lessons'), findsOneWidget);
-      expect(find.text('Past'), findsOneWidget);
+      // The school's past lessons carry its income (P9, plan v2 §14.2).
+      expect(find.text('Past lessons and income'), findsOneWidget);
       // The instructor sees the student; an expired hold is not a lesson.
       expect(find.text('Anna K.'), findsNWidgets(3));
       expect(find.text('Completed'), findsOneWidget);
       // In English the group header and the pill read the same.
       expect(find.text('Cancelled'), findsNWidgets(2));
       expect(
-        tester.getTopLeft(find.text('Past')).dy < tester.getTopLeft(find.text('Cancelled').first).dy,
+        tester.getTopLeft(find.text('Past lessons and income')).dy < tester.getTopLeft(find.text('Cancelled').first).dy,
         isTrue,
       );
     });
@@ -294,7 +295,7 @@ void main() {
     testWidgets('no lessons yet says so', (tester) async {
       await _pump(tester, InstructorCalendarScreen(service: _Profile(2), bookings: _FakeBookings(), uid: 'i1'));
       expect(find.text('No lessons booked yet.'), findsOneWidget);
-      expect(find.text('Past'), findsNothing);
+      expect(find.text('Past lessons and income'), findsNothing);
     });
 
     for (final lang in ['en', 'es', 'uk', 'ru', 'pl']) {

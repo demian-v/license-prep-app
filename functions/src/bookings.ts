@@ -7,6 +7,7 @@ import { studentDisplayName } from './chat';
 import { sendPushToUser, Lang } from './push';
 import { sweepPaginated, SWEEP_TIME_BUDGET_MS, SweepResult } from './sweep';
 import { wallClock, wallToUtc, weekDay, addDays, minutesOf, hhmm } from './zone';
+import { stripe, stripeConfigured, publishableKey, STRIPE_SECRETS } from './stripe-client';
 
 /**
  * Bookings without money (instructors plan v2 §9, P7).
@@ -20,9 +21,11 @@ import { wallClock, wallToUtc, weekDay, addDays, minutesOf, hhmm } from './zone'
  * stage 2 (ID + licence + payouts + hours, computeListing). Private
  * instructors never take bookings (plan v2 §6.2).
  *
- * Payment sits behind PaymentGateway. P7's emulator gateway "pays" at once;
- * anywhere else there is no gateway until Stripe (P9), so createBooking
- * refuses before locking anything (owner, 2026-10-05).
+ * Payment sits behind PaymentGateway (P9, 2026-10-17): Stripe when its
+ * secret key is set — a PaymentIntent on the platform account, confirmed by
+ * stripeWebhook (payments.ts); otherwise the emulator's instant gateway (jest
+ * and the seed); anywhere else none, so createBooking refuses before locking
+ * anything.
  *
  * The schedulers query one field each — `expiresAt` exists only while a
  * booking is `pending_payment`, `completeAfter` only while it is `confirmed`
@@ -36,6 +39,10 @@ export const MIN_LEAD_MS = 12 * HOUR_MS;
 export const MAX_AHEAD_MS = 60 * 24 * HOUR_MS;
 export const HOLD_MS = 15 * 60 * 1000;
 export const FREE_CANCEL_MS = 24 * HOUR_MS;
+/** Payout release after the lesson ends (plan v2 §9.2 step 3). */
+export const PAYOUT_HOLD_MS = 48 * HOUR_MS;
+/** Open, unpaid holds one student may have at once (P9 decision, risk register P7 residual). */
+export const MAX_OPEN_HOLDS = 2;
 
 // Fee settings (plan v2 §9.1): function params, never in client code.
 const firstFeeBps = defineInt('FIRST_FEE_BPS', { default: 2500 });
@@ -107,16 +114,50 @@ function open(availability: Availability, tz: string, cellMs: number, date: stri
 
 // ── Payment gateway ──────────────────────────────────────────────────────────
 
+/** What the app needs to open Stripe's PaymentSheet. */
+export interface PaymentStart {
+  clientSecret: string;
+  publishableKey: string;
+}
+
 /**
- * Takes a `pending_payment` booking towards `confirmed`. P9 puts Stripe
- * behind this (a PaymentIntent, then the webhook calls confirmBooking).
+ * Takes a `pending_payment` booking towards `confirmed`. Stripe creates a
+ * PaymentIntent and returns what the app's PaymentSheet needs; the webhook
+ * then calls settlePayment. The emulator's gateway confirms at once.
  */
 export interface PaymentGateway {
-  begin(bookingId: string): Promise<void>;
+  provider?: 'emulator' | 'stripe';
+  begin(bookingId: string, totalCents: number): Promise<PaymentStart | void>;
 }
 
 /** The emulator "pays" at once, so the whole flow runs without money. */
-const emulatorGateway: PaymentGateway = { begin: (bookingId) => confirmBooking(bookingId).then(() => undefined) };
+const emulatorGateway: PaymentGateway = {
+  provider: 'emulator',
+  begin: (bookingId) => confirmBooking(bookingId).then(() => undefined),
+};
+
+/**
+ * Separate charges and transfers (plan v2 §9.2): the charge is on the
+ * platform account, `transfer_group` ties the later transfer to it. Cards
+ * only for now (owner decision: Apple Pay / Google Pay later).
+ */
+const stripeGateway: PaymentGateway = {
+  provider: 'stripe',
+  async begin(bookingId, totalCents) {
+    const pi = await stripe().paymentIntents.create({
+      amount: totalCents,
+      currency: 'usd',
+      payment_method_types: ['card'],
+      transfer_group: bookingId,
+      description: 'Driving lesson',
+      metadata: { bookingId },
+    }, { idempotencyKey: `booking-pi-${bookingId}` });
+    await admin.firestore().collection('bookings').doc(bookingId)
+      .update({ stripePaymentIntentId: pi.id, updatedAt: Timestamp.now() });
+    if (!pi.client_secret) throw new Error(`PaymentIntent ${pi.id} came back without a client secret`);
+    return { clientSecret: pi.client_secret, publishableKey: publishableKey() };
+  },
+};
 
 let gatewayOverride: PaymentGateway | null | undefined;
 /** Tests only: replace the gateway (undefined restores the default). */
@@ -126,6 +167,7 @@ export function setPaymentGateway(gateway: PaymentGateway | null | undefined) {
 
 function paymentGateway(): PaymentGateway | null {
   if (gatewayOverride !== undefined) return gatewayOverride;
+  if (stripeConfigured()) return stripeGateway;
   return process.env.FUNCTIONS_EMULATOR === 'true' ? emulatorGateway : null;
 }
 
@@ -215,7 +257,7 @@ export const getBookingOptions = functions.https.onCall(async (data, context) =>
  * every half hour and writes the booking as `pending_payment` for 15 minutes;
  * then hands it to the payment gateway.
  */
-export const createBooking = functions.https.onCall(async (data, context) => {
+export const createBooking = functions.runWith({ secrets: STRIPE_SECRETS }).https.onCall(async (data, context) => {
   const uid = signedIn(context);
   const doc = await bookableInstructor(data?.instructorUid, context);
   const tz: string = doc.get('timezone');
@@ -247,7 +289,12 @@ export const createBooking = functions.https.onCall(async (data, context) => {
   let fees: Fees;
   try {
     fees = await db.runTransaction(async (tx) => {
-      const feeKind = feeKindFor(await studentBookings(uid, tx), doc.id, now);
+      const mine = await studentBookings(uid, tx);
+      // With real money a student could otherwise hold many half hours for
+      // 15 minutes each without paying (risk register, P7 residual).
+      const openHolds = mine.filter((b) => b.status === 'pending_payment' && (b.expiresAt?.toMillis() ?? 0) > now).length;
+      if (openHolds >= MAX_OPEN_HOLDS) throw new functions.https.HttpsError('resource-exhausted', 'too-many-holds');
+      const feeKind = feeKindFor(mine, doc.id, now);
       const f = computeFees(doc.get('hourlyRateCents'), durationMinutes, feeKind);
       const at = Timestamp.now();
       for (const c of cells) {
@@ -269,6 +316,7 @@ export const createBooking = functions.https.onCall(async (data, context) => {
         timezone: tz,
         ...f,
         status: 'pending_payment',
+        paymentProvider: gateway.provider ?? 'emulator',
         expiresAt: Timestamp.fromMillis(now + HOLD_MS),
         createdAt: at,
         updatedAt: at,
@@ -283,32 +331,151 @@ export const createBooking = functions.https.onCall(async (data, context) => {
     throw e;
   }
 
-  await gateway.begin(ref.id);
+  let payment: PaymentStart | void;
+  try {
+    payment = await gateway.begin(ref.id, fees.totalCents);
+  } catch (e) {
+    // No PaymentIntent, no payment: give the half hours back at once.
+    functions.logger.error('createBooking: the payment could not start', { bookingId: ref.id, error: String(e) });
+    await expireHold(ref);
+    throw new functions.https.HttpsError('unavailable', 'payment-start-failed');
+  }
   const status = (await ref.get()).get('status');
-  return { bookingId: ref.id, status, ...fees };
+  return { bookingId: ref.id, status, ...fees, payment: payment ?? null };
 });
 
 /**
- * `pending_payment` → `confirmed` (the emulator gateway now; Stripe's webhook
- * in P9). Unlocks the pair's contacts (plan v2 §10), creating the
- * conversation when they never wrote, and tells the instructor. Returns
- * false when the booking was no longer pending (a redelivery, or expired).
+ * The student closed the PaymentSheet without paying: the hold ends now
+ * instead of after 15 minutes, so the time is free again and the hold no
+ * longer counts against MAX_OPEN_HOLDS.
+ */
+export const releaseBookingHold = functions.runWith({ secrets: STRIPE_SECRETS }).https.onCall(async (data, context) => {
+  const uid = signedIn(context);
+  const ref = admin.firestore().collection('bookings').doc(bookingIdOf(data));
+  const b = await ref.get();
+  if (!b.exists || b.get('studentUid') !== uid) throw new functions.https.HttpsError('permission-denied', 'Not your booking.');
+  await expireHold(ref);
+  return { bookingId: ref.id, status: (await ref.get()).get('status') };
+});
+
+function bookingIdOf(data: any): string {
+  const bookingId = data?.bookingId;
+  if (typeof bookingId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(bookingId)) {
+    throw new functions.https.HttpsError('invalid-argument', 'A booking id is required.');
+  }
+  return bookingId;
+}
+
+/**
+ * `pending_payment` → `expired`, half hours freed, and the PaymentIntent
+ * cancelled so it can no longer be paid. With `dueBy`, only a hold whose 15
+ * minutes are over by then. A PaymentIntent that succeeded in the meantime
+ * cannot be cancelled; its webhook then re-locks the time (settlePayment).
+ */
+async function expireHold(ref: FirebaseFirestore.DocumentReference, dueBy?: number): Promise<boolean> {
+  const db = admin.firestore();
+  const expired = await db.runTransaction(async (tx) => {
+    const b = await tx.get(ref);
+    if (b.get('status') !== 'pending_payment') return null;
+    if (dueBy !== undefined && b.get('expiresAt').toMillis() > dueBy) return null;
+    for (const c of cellsOf(b.get('startAt').toMillis(), b.get('durationMinutes'))) tx.delete(slotRef(b.get('instructorUid'), c));
+    tx.update(ref, { status: 'expired', expiresAt: FieldValue.delete(), updatedAt: Timestamp.now() });
+    return { paymentIntentId: (b.get('stripePaymentIntentId') ?? null) as string | null };
+  });
+  if (expired?.paymentIntentId) {
+    try {
+      await stripe().paymentIntents.cancel(expired.paymentIntentId, {}, { idempotencyKey: `booking-pi-cancel-${ref.id}` });
+    } catch (e: any) {
+      functions.logger.warn('expireHold: PaymentIntent not cancelled', { bookingId: ref.id, code: e?.code ?? String(e) });
+    }
+  }
+  return expired !== null;
+}
+
+/**
+ * `pending_payment` → `confirmed` without a payment record: the emulator
+ * gateway and tests. Stripe's webhook calls settlePayment. False when the
+ * booking was no longer pending (a redelivery, or expired).
  */
 export async function confirmBooking(bookingId: string): Promise<boolean> {
+  return (await settlePayment(bookingId)) === 'confirmed';
+}
+
+export type SettleOutcome = 'confirmed' | 'duplicate' | 'not-pending' | 'slot-taken';
+
+export interface SettleOptions {
+  /** processedWebhooks/stripe_<event.id>: checked and written in the same transaction. */
+  dedupe?: FirebaseFirestore.DocumentReference;
+  paymentIntentId?: string;
+  chargeId?: string | null;
+}
+
+/**
+ * A booking was paid (plan v2 §9.2 step 2, §9.3). Confirms it, unlocks the
+ * pair's contacts (§10, creating the conversation when they never wrote) and
+ * tells the instructor.
+ *
+ * Paid in the last second of an `expired` hold: the half hours are locked
+ * again if they are still free; if one was taken meanwhile the booking is
+ * refunded automatically and the student told.
+ *
+ * With `dedupe`, a redelivered webhook changes nothing and pushes nothing.
+ */
+export async function settlePayment(bookingId: string, opts: SettleOptions = {}): Promise<SettleOutcome> {
   const db = admin.firestore();
   const ref = db.collection('bookings').doc(bookingId);
-  const done = await db.runTransaction(async (tx) => {
+  const result = await db.runTransaction(async (tx): Promise<{ outcome: SettleOutcome; b?: FirebaseFirestore.DocumentSnapshot }> => {
+    if (opts.dedupe && (await tx.get(opts.dedupe)).exists) return { outcome: 'duplicate' };
     const b = await tx.get(ref);
-    if (!b.exists || b.get('status') !== 'pending_payment') return null;
+    const markProcessed = () => {
+      if (opts.dedupe) tx.create(opts.dedupe, { bookingId, processedAt: Timestamp.now() });
+    };
+    const status = b.get('status');
+    const knownIntent = b.get('stripePaymentIntentId');
+    const sameIntent = !opts.paymentIntentId || !knownIntent || knownIntent === opts.paymentIntentId;
+    const late = status === 'expired' && opts.paymentIntentId !== undefined;
+    if (!b.exists || !sameIntent || (status !== 'pending_payment' && !late)) {
+      markProcessed();
+      return { outcome: 'not-pending' };
+    }
+
     const studentUid: string = b.get('studentUid');
     const instructorUid: string = b.get('instructorUid');
+    const startMs: number = b.get('startAt').toMillis();
+    const cells = cellsOf(startMs, b.get('durationMinutes'));
     const convRef = db.collection('conversations').doc(`${studentUid}_${instructorUid}`);
+    // Every read before any write (Firestore transactions).
+    const slots = late ? await tx.getAll(...cells.map((c) => slotRef(instructorUid, c))) : [];
     const [conv, instructor] = await Promise.all([tx.get(convRef), tx.get(db.collection('instructors').doc(instructorUid))]);
     const now = Timestamp.now();
+    const payment = {
+      ...(opts.paymentIntentId ? { stripePaymentIntentId: opts.paymentIntentId } : {}),
+      ...(opts.chargeId ? { stripeChargeId: opts.chargeId } : {}),
+      paidAt: now,
+    };
+    markProcessed();
+
+    if (late && slots.some((s) => s.exists)) {
+      tx.update(ref, {
+        ...payment,
+        status: 'refunded',
+        cancelledBy: 'system',
+        cancelReason: 'slot-taken',
+        cancelledAt: now,
+        refundStatus: 'pending',
+        refundDueAt: now,
+        updatedAt: now,
+      });
+      return { outcome: 'slot-taken', b };
+    }
+    if (late) {
+      for (const c of cells) tx.create(slotRef(instructorUid, c), { instructorUid, bookingId, startAt: Timestamp.fromMillis(c) });
+    }
     tx.update(ref, {
+      ...payment,
       status: 'confirmed',
       expiresAt: FieldValue.delete(),
-      completeAfter: Timestamp.fromMillis(b.get('startAt').toMillis() + b.get('durationMinutes') * 60000),
+      completeAfter: Timestamp.fromMillis(startMs + b.get('durationMinutes') * 60000),
       confirmedAt: now,
       updatedAt: now,
     });
@@ -333,10 +500,57 @@ export async function confirmBooking(bookingId: string): Promise<boolean> {
         createdAt: now,
       });
     }
-    return b;
+    return { outcome: 'confirmed', b };
   });
-  if (!done) return false;
-  await sendPushToUser(done.get('instructorUid'), 'booking_new', `booking/${bookingId}`, pushVars(done, 'studentDisplayName'));
+
+  // After the commit, so a retried transaction cannot push twice.
+  if (result.outcome === 'confirmed') {
+    await sendPushToUser(result.b!.get('instructorUid'), 'booking_new', `booking/${bookingId}`, pushVars(result.b!, 'studentDisplayName'));
+  } else if (result.outcome === 'slot-taken') {
+    functions.logger.warn('settlePayment: paid after the hold expired and the time was taken; refunding', { bookingId });
+    await processRefund(bookingId);
+  }
+  return result.outcome;
+}
+
+/**
+ * Returns a Stripe payment in full (owner decision, P9: a free cancel refunds
+ * the service fee too; Stripe keeps its own processing fee). Money already
+ * transferred to the school is reversed first (plan v2 §9.2 step 5).
+ *
+ * Runs only for a booking whose transaction set `refundDueAt`; on success it
+ * is cleared and the student told «Возврат оформлен». A failure leaves it
+ * set, so releaseInstructorPayouts retries with the same idempotency keys.
+ * Never throws.
+ */
+export async function processRefund(bookingId: string): Promise<boolean> {
+  const ref = admin.firestore().collection('bookings').doc(bookingId);
+  const b = await ref.get();
+  if (!b.exists || !b.get('refundDueAt')) return false;
+  const paymentIntentId: string | undefined = b.get('stripePaymentIntentId');
+  try {
+    if (!paymentIntentId) throw new Error('no PaymentIntent on the booking');
+    const transferId: string | undefined = b.get('stripeTransferId');
+    if (transferId && !b.get('stripeTransferReversalId')) {
+      const reversal = await stripe().transfers.createReversal(transferId, { metadata: { bookingId } }, { idempotencyKey: `booking-reversal-${bookingId}` });
+      await ref.update({ stripeTransferReversalId: reversal.id });
+    }
+    let refundId: string | null = null;
+    try {
+      const refund = await stripe().refunds.create({ payment_intent: paymentIntentId, metadata: { bookingId } }, { idempotencyKey: `booking-refund-${bookingId}` });
+      refundId = refund.id;
+    } catch (e: any) {
+      if (e?.code !== 'charge_already_refunded') throw e;
+    }
+    const at = Timestamp.now();
+    await ref.update({ refundStatus: 'succeeded', stripeRefundId: refundId, refundedAt: at, refundDueAt: FieldValue.delete(), updatedAt: at });
+  } catch (e: any) {
+    functions.logger.error('processRefund failed; the hourly job retries', { bookingId, code: e?.code ?? String(e) });
+    await ref.update({ refundStatus: 'failed', refundAttempts: FieldValue.increment(1), refundLastError: String(e?.code ?? e?.message ?? e).slice(0, 200) })
+      .catch(() => undefined);
+    return false;
+  }
+  await sendPushToUser(b.get('studentUid'), 'booking_refunded', `booking/${bookingId}`, pushVars(b, 'instructorName'));
   return true;
 }
 
@@ -353,15 +567,14 @@ function pushVars(b: FirebaseFirestore.DocumentSnapshot, nameField: 'studentDisp
 /**
  * Cancels a confirmed lesson (plan v2 §9.3). The student: 24 h or more
  * before the start → `refunded`, later → `late_cancelled` (no refund, the
- * time stays blocked). The instructor: always `refunded`. A refund frees the
- * half hours; the money itself moves in P9. The other side gets a push.
+ * time stays blocked, the school is paid 48 h after the start). The
+ * instructor: always `refunded`. A refund frees the half hours; a Stripe
+ * payment is returned in full (processRefund, marked due inside this
+ * transaction so a failed refund is retried). The other side gets a push.
  */
-export const cancelBooking = functions.https.onCall(async (data, context) => {
+export const cancelBooking = functions.runWith({ secrets: STRIPE_SECRETS }).https.onCall(async (data, context) => {
   const uid = signedIn(context);
-  const bookingId = data?.bookingId;
-  if (typeof bookingId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(bookingId)) {
-    throw new functions.https.HttpsError('invalid-argument', 'A booking id is required.');
-  }
+  const bookingId = bookingIdOf(data);
   const db = admin.firestore();
   const ref = db.collection('bookings').doc(bookingId);
   const result = await db.runTransaction(async (tx) => {
@@ -380,19 +593,23 @@ export const cancelBooking = functions.https.onCall(async (data, context) => {
       for (const c of cellsOf(startMs, b.get('durationMinutes'))) tx.delete(slotRef(b.get('instructorUid'), c));
     }
     const at = Timestamp.now();
+    const paidByStripe = typeof b.get('stripePaymentIntentId') === 'string' && b.get('paymentProvider') === 'stripe';
     tx.update(ref, {
       status,
       cancelledBy: byStudent ? 'student' : 'instructor',
       cancelledAt: at,
       completeAfter: FieldValue.delete(),
+      ...(status === 'refunded' && paidByStripe ? { refundStatus: 'pending', refundDueAt: at } : {}),
+      ...(status === 'late_cancelled' ? { payoutReleaseAt: Timestamp.fromMillis(startMs + PAYOUT_HOLD_MS) } : {}),
       updatedAt: at,
     });
-    return { b, status, byStudent };
+    return { b, status, byStudent, refund: status === 'refunded' && paidByStripe };
   });
-  const { b, status, byStudent } = result;
+  const { b, status, byStudent, refund } = result;
   await (byStudent
     ? sendPushToUser(b.get('instructorUid'), 'booking_cancelled_student', `booking/${bookingId}`, pushVars(b, 'studentDisplayName'))
     : sendPushToUser(b.get('studentUid'), 'booking_cancelled_instructor', `booking/${bookingId}`, pushVars(b, 'instructorName')));
+  if (refund) await processRefund(bookingId);
   return { bookingId, status };
 });
 
@@ -405,18 +622,13 @@ export async function runExpirePendingBookings(nowMs = Date.now()): Promise<Swee
     label: 'expirePendingBookings',
     baseQuery: db.collection('bookings').where('expiresAt', '<=', Timestamp.fromMillis(nowMs)).orderBy('expiresAt'),
     deadline: Date.now() + SWEEP_TIME_BUDGET_MS,
-    handle: (doc) => db.runTransaction(async (tx) => {
-      const b = await tx.get(doc.ref);
-      if (b.get('status') !== 'pending_payment' || b.get('expiresAt').toMillis() > nowMs) return;
-      // P9: the gateway also cancels the PaymentIntent here.
-      for (const c of cellsOf(b.get('startAt').toMillis(), b.get('durationMinutes'))) tx.delete(slotRef(b.get('instructorUid'), c));
-      tx.update(doc.ref, { status: 'expired', expiresAt: FieldValue.delete(), updatedAt: Timestamp.now() });
-    }),
+    handle: async (doc) => { await expireHold(doc.ref, nowMs); },
   });
 }
 
 /**
- * `confirmed` whose end has passed → `completed`, and the student is asked
+ * `confirmed` whose end has passed → `completed`, due for payout 48 h after
+ * the end (`payoutReleaseAt`, releaseInstructorPayouts), and the student is asked
  * for a review (plan v2 §12) — unless they already reviewed this school
  * (owner, 2026-10-07: a weekly student isn't asked every week).
  */
@@ -431,7 +643,13 @@ export async function runMarkBookingsCompleted(nowMs = Date.now()): Promise<Swee
         const snap = await tx.get(doc.ref);
         if (snap.get('status') !== 'confirmed') return null;
         const at = Timestamp.now();
-        tx.update(doc.ref, { status: 'completed', completeAfter: FieldValue.delete(), completedAt: at, updatedAt: at });
+        tx.update(doc.ref, {
+          status: 'completed',
+          completeAfter: FieldValue.delete(),
+          payoutReleaseAt: Timestamp.fromMillis(snap.get('completeAfter').toMillis() + PAYOUT_HOLD_MS),
+          completedAt: at,
+          updatedAt: at,
+        });
         return snap;
       });
       // After the commit, so a retried transaction cannot push twice.
@@ -446,7 +664,7 @@ export async function runMarkBookingsCompleted(nowMs = Date.now()): Promise<Swee
 }
 
 export const expirePendingBookings = functions
-  .runWith({ timeoutSeconds: 540, memory: '256MB' })
+  .runWith({ timeoutSeconds: 540, memory: '256MB', secrets: STRIPE_SECRETS })
   .pubsub.schedule('every 5 minutes').timeZone('America/Chicago')
   .onRun(async () => { await runExpirePendingBookings(); });
 
@@ -465,4 +683,17 @@ export async function upcomingBookingCount(db: FirebaseFirestore.Firestore, uid:
   const sides = await Promise.all(['studentUid', 'instructorUid'].map((f) => db.collection('bookings').where(f, '==', uid).get()));
   return sides.flatMap((s) => s.docs)
     .filter((d) => d.get('status') === 'confirmed' && d.get('startAt').toMillis() > nowMs).length;
+}
+
+/**
+ * Money still open on either side (plan v2 §9.4, P9): a no-show report or a
+ * card dispute not resolved yet, and — for the instructor — a held lesson not
+ * paid out yet (`payoutReleaseAt` is set until releaseInstructorPayouts
+ * transfers it). deleteUserAccount refuses while there are any.
+ */
+export async function unsettledBookingCount(db: FirebaseFirestore.Firestore, uid: string): Promise<number> {
+  const [asStudent, asInstructor] = await Promise.all(['studentUid', 'instructorUid'].map((f) => db.collection('bookings').where(f, '==', uid).get()));
+  const disputed = (d: FirebaseFirestore.QueryDocumentSnapshot) => d.get('status') === 'disputed' || d.get('disputeStatus') === 'open';
+  return asStudent.docs.filter(disputed).length
+    + asInstructor.docs.filter((d) => disputed(d) || d.get('payoutReleaseAt') != null).length;
 }

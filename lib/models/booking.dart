@@ -26,6 +26,11 @@ class Booking {
     this.cancelledBy,
     this.studentDeleted = false,
     this.instructorDeleted = false,
+    this.paymentProvider,
+    this.refundStatus,
+    this.payoutReleaseAt,
+    this.payoutReleasedAt,
+    this.disputeStatus,
   });
 
   factory Booking.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -51,6 +56,11 @@ class Booking {
       cancelledBy: d['cancelledBy'] as String?,
       studentDeleted: d['studentDeleted'] == true,
       instructorDeleted: d['instructorDeleted'] == true,
+      paymentProvider: d['paymentProvider'] as String?,
+      refundStatus: d['refundStatus'] as String?,
+      payoutReleaseAt: (d['payoutReleaseAt'] as Timestamp?)?.toDate(),
+      payoutReleasedAt: (d['payoutReleasedAt'] as Timestamp?)?.toDate(),
+      disputeStatus: d['disputeStatus'] as String?,
     );
   }
 
@@ -77,24 +87,44 @@ class Booking {
   final String feeKind;
 
   /// §9.3: pending_payment, confirmed, completed, late_cancelled, refunded,
-  /// expired.
+  /// expired; P9 adds disputed (a no-show report) and payout_released.
   final String status;
   final String? timezone;
   final String? schoolAddress;
 
-  /// 'student' or 'instructor', once cancelled.
+  /// 'student' or 'instructor', once cancelled; 'system' when a payment
+  /// arrived after the hold ran out and the time was taken (P9).
   final String? cancelledBy;
   final bool studentDeleted;
   final bool instructorDeleted;
+
+  /// 'stripe' (real money, P9) or 'emulator' (the instant local gateway).
+  final String? paymentProvider;
+
+  /// A Stripe refund: 'pending', 'failed' (retried hourly), 'succeeded'.
+  final String? refundStatus;
+
+  /// When the school's money is released (48 h after the end; after the
+  /// start for a late cancel). Set only while it waits.
+  final DateTime? payoutReleaseAt;
+
+  /// When it was paid out. A late cancel keeps its status and carries only
+  /// this (it was never held, so it doesn't become `payout_released`).
+  final DateTime? payoutReleasedAt;
+
+  /// A card dispute: 'open' while Stripe runs it, then Stripe's result.
+  final String? disputeStatus;
 
   DateTime get endAt => startAt.add(Duration(minutes: durationMinutes));
 
   /// A confirmed lesson that hasn't ended: both lists' «Предстоящие».
   bool upcoming(DateTime now) => status == 'confirmed' && endAt.isAfter(now);
 
-  /// Shown under «Прошедшие»: held, or a confirmed lesson the completion
-  /// sweep hasn't reached yet. Holds and expired holds are not lessons.
-  bool past(DateTime now) => status == 'completed' || (status == 'confirmed' && !endAt.isAfter(now));
+  /// Shown under «Прошедшие»: held (paid out or not, or under a no-show
+  /// report), or a confirmed lesson the completion sweep hasn't reached yet.
+  /// Holds and expired holds are not lessons.
+  bool past(DateTime now) =>
+      const {'completed', 'payout_released', 'disputed'}.contains(status) || (status == 'confirmed' && !endAt.isAfter(now));
 
   /// Shown under «Отменённые» (owner, 2026-10-05: a cancelled future lesson
   /// read wrong under «Прошедшие»): either side, early or late.
@@ -114,6 +144,51 @@ class Booking {
 
   /// The student may cancel with a refund until 24 h before (plan v2 §9.3).
   bool freeCancel(DateTime now) => startAt.difference(now) >= const Duration(hours: 24);
+
+  /// The student can say a held lesson didn't happen until 48 h after its
+  /// end, before the school is paid (reportNoShow, P9).
+  bool noShowReportable(DateTime now) => status == 'completed' && now.isBefore(endAt.add(const Duration(hours: 48)));
+
+  /// Where the school's money stands (instructor side, P9): null when there
+  /// is none to come (cancelled with a refund, an expired hold, upcoming).
+  PayoutState? get payout {
+    if (status == 'payout_released' || payoutReleasedAt != null) return PayoutState.released;
+    // Any card dispute but a won one holds the money (releaseInstructorPayouts).
+    if (status == 'disputed' || (disputeStatus != null && disputeStatus != 'won')) return PayoutState.held;
+    if (payoutReleaseAt != null) return PayoutState.pending;
+    return null;
+  }
+}
+
+/// The school's money for one lesson: waiting the 48 h, paid out, or held
+/// while a no-show report or a card dispute is open.
+enum PayoutState { pending, released, held }
+
+/// «Прошедшие и доход» (plan v2 §14.2): what has been paid out and what is
+/// still to come, in cents, over the instructor's bookings.
+({int releasedCents, int pendingCents}) incomeOf(Iterable<Booking> bookings) {
+  var released = 0;
+  var pending = 0;
+  for (final b in bookings) {
+    switch (b.payout) {
+      case PayoutState.released:
+        released += b.lessonCents;
+      case PayoutState.pending || PayoutState.held:
+        pending += b.lessonCents;
+      case null:
+        break;
+    }
+  }
+  return (releasedCents: released, pendingCents: pending);
+}
+
+/// What createBooking returns for a Stripe payment (P9): the PaymentIntent's
+/// client secret and the publishable key, so the app has no key built in.
+class PaymentStart {
+  const PaymentStart({required this.clientSecret, required this.publishableKey});
+
+  final String clientSecret;
+  final String publishableKey;
 }
 
 /// The price of one lesson length for this student (getBookingOptions).

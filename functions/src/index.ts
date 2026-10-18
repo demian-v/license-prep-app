@@ -14,7 +14,9 @@ import { mapPlayNotification, PLAY_NOTIFICATION, playDedupKey } from './play-not
 import { recordWebhookFailure } from './webhook-dead-letter';
 import { anonymizeTrialDevicesForUser } from './trial-devices';
 import { collectUserDataForDeletion, applyDeletionPlan, assertRecentLogin, deleteUserStorage, anonymousIdFor } from './account-deletion';
-import { upcomingBookingCount } from './bookings';
+import { upcomingBookingCount, unsettledBookingCount } from './bookings';
+import { closeConnectedAccount } from './payments';
+import { STRIPE_SECRETS, stripeConfigured } from './stripe-client';
 import { readContentVersion } from './content-version';
 import { sweepPaginated, SWEEP_TIME_BUDGET_MS } from './sweep';
 import {
@@ -1357,7 +1359,7 @@ export const updateProfile = functions.https.onCall(async (data, context) => {
 // Account Management Functions
 
 // Delete user account with comprehensive error handling and logging
-export const deleteUserAccount = functions.https.onCall(async (data, context) => {
+export const deleteUserAccount = functions.runWith({ secrets: STRIPE_SECRETS }).https.onCall(async (data, context) => {
   try {
     console.log('deleteUserAccount called with data:', data);
     
@@ -1391,6 +1393,12 @@ export const deleteUserAccount = functions.https.onCall(async (data, context) =>
     if (upcoming > 0) {
       throw new functions.https.HttpsError('failed-precondition', 'upcoming-bookings', { count: upcoming });
     }
+    // P9 (plan v2 §9.4): an open no-show report or card dispute, or a school's
+    // lesson not paid out yet — the money has to settle first.
+    const unsettled = await unsettledBookingCount(db, userId);
+    if (unsettled > 0) {
+      throw new functions.https.HttpsError('failed-precondition', 'unsettled-bookings', { count: unsettled });
+    }
 
     // Risk #14 — require a recent login. admin.auth().deleteUser() bypasses
     // Firebase's own requires-recent-login entirely, so nothing enforced this:
@@ -1413,6 +1421,11 @@ export const deleteUserAccount = functions.https.onCall(async (data, context) =>
     // implementation deleted two of at least eight, while privacy_policy.md
     // promised "your account and all associated data".
     const targets = await collectUserDataForDeletion(db, userId);
+    // The school's Stripe account (plan v2 §17) is closed after the data is
+    // gone; read its id now, while instructorPrivate still exists.
+    const instructorPrivate = await db.collection('instructorPrivate').doc(userId).get();
+    const stripeAccountId: string | null =
+      instructorPrivate.get('stripeAccountId') ?? instructorPrivate.get('stripePendingAccountId') ?? null;
     console.log(
       `deleteUserAccount: ${targets.length} target(s) for ${userId}: ` +
       targets.map((t) => `${t.collection}:${t.action}`).join(', '),
@@ -1476,6 +1489,15 @@ export const deleteUserAccount = functions.https.onCall(async (data, context) =>
       }
     }
     
+    // Close the connected account (nothing is owed: unsettled lessons refused
+    // above). A refusal — money still on it before the weekly payout — is
+    // retried hourly by releaseInstructorPayouts (stripeAccountClosures).
+    if (stripeAccountId) {
+      await db.collection('stripeAccountClosures').doc(stripeAccountId)
+        .set({ accountId: stripeAccountId, retryAt: Timestamp.now() }, { merge: true });
+      if (stripeConfigured()) await closeConnectedAccount(stripeAccountId);
+    }
+
     console.log(`Account deletion completed successfully for user: ${userId}`);
     
     // Step 7: Return success response
@@ -2600,5 +2622,6 @@ export {
 // ============================================================================
 export { listInstructors, getInstructorProfile, getInstructorReviews, setSignupRole, registerAsInstructor, submitLicenseNumber, updateInstructorProfile, getInstructorContacts, onInstructorUpload, onInstructorWrite } from './instructors';
 export { sendMessage, markConversationRead, getInstructorContactInfo } from './chat';
-export { getBookingOptions, createBooking, cancelBooking, expirePendingBookings, markBookingsCompleted } from './bookings';
+export { getBookingOptions, createBooking, releaseBookingHold, cancelBooking, expirePendingBookings, markBookingsCompleted } from './bookings';
+export { stripeWebhook, startInstructorPayouts, getInstructorPayouts, stripeOnboardingReturn, reportNoShow, releaseInstructorPayouts } from './payments';
 export { submitReview, deleteReview, reportReview } from './reviews';

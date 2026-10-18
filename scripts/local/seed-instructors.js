@@ -23,7 +23,15 @@
  *                               contacts unlocked, no messages yet), plus a pending hold past its
  *                               15 minutes for the expiry sweep and a Northside lesson that ended
  *                               yesterday but is still confirmed (fire markBookingsCompleted → the
- *                               review push); reset on every run
+ *                               review push); reset on every run. P9: every seed lesson is
+ *                               `paymentProvider: 'emulator'` (no Stripe money): the oldest Lakeview
+ *                               lesson is paid out, one held yesterday waits for its payout (48 h;
+ *                               the student can still report a no-show), and the late cancel is due
+ *                               (fire releaseInstructorPayouts → paid out without Stripe)
+ *   SEED_STRIPE_ACCOUNT_ID      optional, P9: a Stripe TEST connected account (acct_…) already
+ *                               onboarded through the app as seed-instr-01. Emulator data does not
+ *                               survive a restart, so this re-attaches it to Lakeview on every seed
+ *                               instead of onboarding again. Never commit the id.
  * Idempotent: a re-run overwrites the same ids.
  *
  * EMULATORS ONLY. Refuses to run unless FIRESTORE_EMULATOR_HOST is a local address.
@@ -121,9 +129,12 @@ const COMMENTS = ['Very patient, passed on the first try.', 'Clear explanations 
       ratingSum, ratingCount, ratingAvg: ratingCount ? Math.round((ratingSum / ratingCount) * 10) / 10 : 0,
       status, listed, createdAt: now, updatedAt: now,
     });
+    // P9: re-attach a test connected account onboarded once in the app.
+    const stripeAccountId = uid === 'seed-instr-01' && /^acct_[A-Za-z0-9]+$/.test(process.env.SEED_STRIPE_ACCOUNT_ID || '')
+      ? process.env.SEED_STRIPE_ACCOUNT_ID : null;
     batch.set(db.collection('instructorPrivate').doc(uid), {
       phone: `+1 312 555 01${n}`, contactEmail: `${uid}@example.com`,
-      stripeAccountId: null, stripePendingAccountId: null,
+      stripeAccountId, stripePendingAccountId: stripeAccountId,
       identitySessionIds: [], biometricConsentAt: stage >= 1 ? now : null,
       licenseNumber: kind === 'schoolInstructor' ? `${state}-DI-${5000 + i}` : null,
       moderation: { photo: { status: 'none' } },
@@ -262,7 +273,10 @@ const COMMENTS = ['Very patient, passed on the first try.', 'Clear explanations 
   };
   const SCHOOLS = { 'seed-instr-01': 0, 'seed-instr-04': 3 }; // ROWS index
   for (const [id, instructorUid, days, minutes, feeKind, status, extra] of [
-    ['seed-booking-lv-1', 'seed-instr-01', -12, 60, 'first', 'completed', {}],
+    // P9: paid out 48 h after it ended.
+    ['seed-booking-lv-1', 'seed-instr-01', -12, 60, 'first', 'payout_released', {}],
+    // Held yesterday: its payout waits 48 h, and a no-show can still be reported.
+    ['seed-booking-lv-6', 'seed-instr-01', -1, 60, 'later', 'completed', {}],
     ['seed-booking-lv-2', 'seed-instr-01', -5, 60, 'later', 'late_cancelled', { cancelledBy: 'student' }],
     ['seed-booking-lv-3', 'seed-instr-01', -3, 90, 'later', 'refunded', { cancelledBy: 'instructor' }],
     ['seed-booking-lv-4', 'seed-instr-01', 2, 90, 'later', 'confirmed', {}],
@@ -283,9 +297,11 @@ const COMMENTS = ['Very patient, passed on the first try.', 'Clear explanations 
       startAt: Timestamp.fromMillis(startMs), durationMinutes: minutes, timezone: tz,
       localDate: wallClock(startMs, tz).date,
       localTime: new Date(Date.UTC(2000, 0, 1, 0, wallClock(startMs, tz).minutes)).toISOString().slice(11, 16),
-      ...fees(row[7], minutes, feeKind), status,
+      ...fees(row[7], minutes, feeKind), status, paymentProvider: 'emulator',
       ...(status === 'confirmed' ? { completeAfter: Timestamp.fromMillis(endMs), confirmedAt: at } : {}),
-      ...(status === 'completed' ? { confirmedAt: at, completedAt: Timestamp.fromMillis(endMs) } : {}),
+      ...(status === 'completed' ? { confirmedAt: at, completedAt: Timestamp.fromMillis(endMs), payoutReleaseAt: Timestamp.fromMillis(endMs + 48 * 3600e3) } : {}),
+      ...(status === 'payout_released' ? { confirmedAt: at, completedAt: Timestamp.fromMillis(endMs), payoutReleasedAt: Timestamp.fromMillis(endMs + 48 * 3600e3), stripeTransferId: null } : {}),
+      ...(status === 'late_cancelled' ? { payoutReleaseAt: Timestamp.fromMillis(startMs + 48 * 3600e3) } : {}),
       // A hold that ran out a minute ago: the 5-minute sweep expires it.
       ...(status === 'pending_payment' ? { expiresAt: Timestamp.fromMillis(Date.now() - 60e3) } : {}),
       ...(extra.cancelledBy ? { cancelledBy: extra.cancelledBy, cancelledAt: Timestamp.fromMillis(startMs - (extra.cancelledBy === 'student' ? 5 : 30) * 3600e3) } : {}),
@@ -309,7 +325,7 @@ const COMMENTS = ['Very patient, passed on the first try.', 'Clear explanations 
     contactUnlocked: true, lastMessageText: '', lastMessageAt: ago(3 * 1440), lastMessageSender: null,
     studentUnread: 0, instructorUnread: 0, createdAt: ago(3 * 1440),
   });
-  console.log('Bookings: seed-student-paid with seed-instr-01 (5) and seed-instr-04 (1 ended but confirmed, 1 upcoming, 1 expiring hold)');
+  console.log('Bookings: seed-student-paid with seed-instr-01 (6: paid out, awaiting payout, late cancel due, refunded, 2 upcoming) and seed-instr-04 (1 ended but confirmed, 1 upcoming, 1 expiring hold)');
 
   console.log(`Seeded ${ROWS.length} instructors; listed per state:`, stats, '; launchStates: IL, TX');
 })().catch((e) => { console.error(e); process.exit(1); });

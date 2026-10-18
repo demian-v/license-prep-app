@@ -19,9 +19,9 @@ import 'booking_detail_screen.dart';
 /// to 22:00, in the instructor's own timezone. Tap opens or closes one half
 /// hour; hold, then drag, marks a range (a plain drag scrolls the page).
 /// Saved through updateInstructorProfile, which merges the cells into
-/// intervals. Under the grid, «Предстоящие уроки» and «Прошедшие» (P7; the
-/// income part of «Прошедшие и доход» is P9). A tab page, so no title
-/// (owner rule 1).
+/// intervals. Under the grid, «Предстоящие уроки» and «Прошедшие и доход»
+/// (P7; the income tiles — paid out, awaiting payout — P9). A tab page, so
+/// no title (owner rule 1).
 class InstructorCalendarScreen extends StatefulWidget {
   const InstructorCalendarScreen({super.key, this.service, this.bookings, this.uid});
 

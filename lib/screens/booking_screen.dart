@@ -7,6 +7,7 @@ import '../models/booking.dart';
 import '../models/instructor_listing.dart';
 import '../services/analytics_service.dart';
 import '../services/booking_service.dart';
+import '../services/payment_sheet.dart';
 import '../theme/app_theme.dart';
 import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
@@ -22,11 +23,14 @@ import 'booking_detail_screen.dart';
 /// button says only the action). Times are the school's wall clock (owner,
 /// 2026-10-05), with the zone named under them. The free half hours and the
 /// prices come from getBookingOptions; createBooking checks everything again.
+/// With Stripe (P9) the booking holds the time for 15 minutes and Stripe's
+/// PaymentSheet opens; closing it frees the time at once.
 class BookingScreen extends StatefulWidget {
-  const BookingScreen({super.key, required this.instructor, this.service});
+  const BookingScreen({super.key, required this.instructor, this.service, this.payments});
 
   final InstructorListing instructor;
   final BookingService? service;
+  final PaymentSheetLauncher? payments;
 
   @override
   State<BookingScreen> createState() => _BookingScreenState();
@@ -54,14 +58,38 @@ class _BookingScreenState extends State<BookingScreen> {
     try {
       final result = await _service.create(widget.instructor.id, _start!.startAtMs, quote.durationMinutes);
       analyticsService.logBookingCreated(durationMinutes: quote.durationMinutes, feeKind: quote.feeKind);
-      if (result.status == 'confirmed') analyticsService.logBookingConfirmed(durationMinutes: quote.durationMinutes);
+      if (result.payment != null) {
+        final paid = await (widget.payments ?? const StripePaymentSheet()).pay(result.payment!);
+        if (paid.outcome != PaymentOutcome.paid) {
+          // Closed or refused: give the time back now, not after 15 minutes.
+          try {
+            await _service.releaseHold(result.id);
+          } catch (_) {
+            // The expiry sweep frees it anyway.
+          }
+          final text = paid.outcome == PaymentOutcome.cancelled
+              ? l.translate('booking_payment_cancelled')
+              : [l.translate('booking_payment_failed'), if (paid.message != null) paid.message!].join(' ');
+          messenger.showSnackBar(SnackBar(content: Text(text), backgroundColor: AppColors.stop));
+          if (mounted) _reload();
+          return;
+        }
+        // Paid: the server's webhook confirms it; the lesson page follows live.
+        analyticsService.logBookingConfirmed(durationMinutes: quote.durationMinutes);
+      } else if (result.status == 'confirmed') {
+        analyticsService.logBookingConfirmed(durationMinutes: quote.durationMinutes);
+      }
       navigator.pushReplacement(ForwardPageRoute(child: BookingDetailScreen(bookingId: result.id, asInstructor: false, service: widget.service)));
     } on FirebaseFunctionsException catch (e) {
       final key = e.code == 'already-exists'
           ? 'booking_slot_taken'
-          : e.code == 'failed-precondition' && (e.message == 'payments-unavailable' || e.message == 'not-bookable')
-              ? 'booking_unavailable'
-              : 'booking_error';
+          : e.code == 'resource-exhausted' && e.message == 'too-many-holds'
+              ? 'booking_too_many_holds'
+              : e.code == 'unavailable' && e.message == 'payment-start-failed'
+                  ? 'booking_payment_unavailable'
+                  : e.code == 'failed-precondition' && (e.message == 'payments-unavailable' || e.message == 'not-bookable')
+                      ? 'booking_unavailable'
+                      : 'booking_error';
       messenger.showSnackBar(SnackBar(content: Text(l.translate(key)), backgroundColor: AppColors.stop));
       if (e.code == 'already-exists') _reload();
     } catch (_) {

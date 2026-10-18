@@ -109,6 +109,21 @@ class InstructorService {
       .doc(uid)
       .update({'status': visible ? 'active' : 'deactivated', 'updatedAt': FieldValue.serverTimestamp()});
 
+  /// «Настроить выплаты» (P9, driving schools only): the one-time Stripe
+  /// onboarding link for the school's connected account (created on the
+  /// first call, reused after).
+  Future<String> startPayouts() async {
+    final result = await _fns.httpsCallable('startInstructorPayouts').call();
+    return (result.data as Map)['url'] as String;
+  }
+
+  /// The payouts card's state: 'none', 'pending' or 'enabled'. The server
+  /// re-reads the Stripe account while it is pending.
+  Future<String> payoutsState() async {
+    final result = await _fns.httpsCallable('getInstructorPayouts').call();
+    return (result.data as Map)['state'] as String? ?? 'none';
+  }
+
   /// One fetch of the state's listing per app session (plan v2 §13): the
   /// student tabs are rebuilt on every switch, so the answer is kept here,
   /// not in the screen. Pull-to-refresh passes [refresh]; a failure is not

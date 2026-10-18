@@ -17,7 +17,8 @@ String bookingWhen(BuildContext context, Booking b) {
 /// localization_coverage_test sees each one.
 String bookingStatusText(AppLocalizations l, Booking b) => l.translate(switch (b.status) {
       'confirmed' => 'booking_status_confirmed',
-      'completed' => 'booking_status_completed',
+      'completed' || 'payout_released' => 'booking_status_completed',
+      'disputed' => 'booking_status_disputed',
       'late_cancelled' => 'booking_status_late_cancelled',
       'refunded' => 'booking_status_refunded',
       'pending_payment' => 'booking_status_pending_payment',
@@ -150,6 +151,7 @@ class BookingStatusPill extends StatelessWidget {
     final (bg, fg) = switch (booking.status) {
       'confirmed' => (AppColors.signal50, AppColors.signal),
       'refunded' || 'late_cancelled' || 'expired' => (AppColors.stopSurface, AppColors.stop),
+      'disputed' => (AppColors.warnSurface, AppColors.warn),
       _ => (AppColors.field, AppColors.inkSecondary),
     };
     return Container(
@@ -160,6 +162,88 @@ class BookingStatusPill extends StatelessWidget {
         maxLines: 1,
         style: AppTypography.caption.copyWith(color: fg, fontVariations: const [FontVariation('wght', 600)]),
       ),
+    );
+  }
+}
+
+/// Where the school's money for a lesson stands (P9), on the lesson page:
+/// green once paid out, amber while held, grey while it waits its 48 h.
+class PayoutPill extends StatelessWidget {
+  const PayoutPill({super.key, required this.booking});
+
+  final Booking booking;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final locale = Localizations.localeOf(context).toString();
+    final at = booking.payoutReleaseAt;
+    final (bg, fg, text) = switch (booking.payout) {
+      PayoutState.released => (AppColors.guideSurface, AppColors.guide, l.translate('payout_released')),
+      PayoutState.held => (AppColors.warnSurface, AppColors.warn, l.translate('payout_held')),
+      _ => (
+          AppColors.field,
+          AppColors.inkSecondary,
+          at == null ? l.translate('income_pending') : l.translate('payout_pending_on').replaceAll('{date}', DateFormat.MMMd(locale).format(at)),
+        ),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x3, vertical: 5),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(BentoTokens.chip)),
+      child: Text(
+        text,
+        maxLines: 1,
+        style: AppTypography.caption.copyWith(color: fg, fontVariations: const [FontVariation('wght', 600)]),
+      ),
+    );
+  }
+}
+
+/// «Прошедшие и доход» (instructor, P9): paid out so far and still to come,
+/// as two tiles above the past lessons.
+class IncomeSummary extends StatelessWidget {
+  const IncomeSummary({super.key, required this.bookings});
+
+  final List<Booking> bookings;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final income = incomeOf(bookings);
+    Widget tile(String label, int cents) => Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(AppSpacing.x3),
+            decoration: BoxDecoration(
+              color: AppColors.paper,
+              borderRadius: BorderRadius.circular(BentoTokens.card),
+              boxShadow: AppColors.shadowCard,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTypography.caption.copyWith(color: AppColors.inkSecondary)),
+                const SizedBox(height: 2),
+                Text(
+                  formatUsd(cents),
+                  style: AppTypography.title.copyWith(
+                    fontSize: 20,
+                    height: 26 / 20,
+                    color: AppColors.ink,
+                    fontVariations: const [FontVariation('wght', 700)],
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.x3),
+      child: Row(children: [
+        tile(l.translate('income_released'), income.releasedCents),
+        const SizedBox(width: AppSpacing.x2),
+        tile(l.translate('income_pending'), income.pendingCents),
+      ]),
     );
   }
 }
@@ -204,9 +288,12 @@ List<Widget> bookingSections(
       )
     else
       ...tiles(upcoming),
-    if (past.isNotEmpty) ...[
+    // The school's income sits with its past lessons (plan v2 §14.2, P9); a
+    // late cancel still pays, so it counts too.
+    if (past.isNotEmpty || (asInstructor && all.any((b) => b.payout != null))) ...[
       const SizedBox(height: AppSpacing.x3),
-      header('lessons_past'),
+      header(asInstructor ? 'lessons_past_income' : 'lessons_past'),
+      if (asInstructor) IncomeSummary(bookings: all),
       ...tiles(past),
     ],
     if (cancelled.isNotEmpty) ...[

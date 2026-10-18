@@ -62,6 +62,16 @@ dependencies:
   # resized on the device. Added alone: only its own platform packages and
   # file_selector, no version bumps.
   image_picker: ^1.2.3
+  # Lesson payments (instructors P9, 2026-10-17): Stripe PaymentSheet, cards
+  # only for now. Pinned exactly: 14.1.0 is the newest release older than two
+  # weeks (14.2.0 came out 2026-10-14); it needs Flutter >= 3.41 (we are on
+  # 3.41.7), FlutterFragmentActivity and an AppCompat theme on Android.
+  flutter_stripe: 14.1.0
+  # Its own platform packages are `^14.1.0`, which resolved to the 3-day-old
+  # 14.2.0; pinned to the release flutter_stripe 14.1.0 shipped with.
+  stripe_android: 14.1.0
+  stripe_ios: 14.1.0
+  stripe_platform_interface: 14.1.0
 
 # Removing overrides as they may be causing conflicts
 

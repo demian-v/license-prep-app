@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../localization/app_localizations.dart';
 import '../models/instructor_listing.dart';
@@ -22,7 +23,8 @@ import 'review_parts.dart';
 /// has been checked, the licence numbers — which can be added here after a
 /// signup that skipped them (owner, 2026-09-30) — the photo and the profile
 /// students see (description, school, price, car, contacts; P3b), «Мои
-/// отзывы» (P8) and «Показывать в поиске».
+/// отзывы» (P8), «Выплаты» for a driving school (P9) and «Показывать в
+/// поиске».
 ///
 /// Reads the instructor's own public doc live (owner-readable in
 /// firestore.rules), so a change made on the server (the listing trigger,
@@ -95,6 +97,11 @@ class InstructorProfileSection extends StatelessWidget {
                 ),
               ],
             ),
+            // Only a driving school takes payments (plan v2 §6.2).
+            if (isSchool) ...[
+              const SizedBox(height: AppSpacing.x3),
+              PayoutsCard(enabled: p['payoutsEnabled'] == true, service: svc),
+            ],
             const SizedBox(height: AppSpacing.x3),
             _PublicProfileCard(profile: p, service: svc),
             const SizedBox(height: AppSpacing.x3),
@@ -346,6 +353,110 @@ class _ReviewsCard extends StatelessWidget {
             );
           },
         ),
+      ],
+    );
+  }
+}
+
+/// «Выплаты» (plan v2 §9.2, §14.2, P9): connects the school's Stripe
+/// account. Stripe's onboarding opens in the browser; when the app comes
+/// back to the foreground the state is read again (the server re-checks the
+/// account, so the card is right even before the webhook arrives).
+/// `payoutsEnabled` on the live profile switches it to «Подключены» at once.
+class PayoutsCard extends StatefulWidget {
+  const PayoutsCard({super.key, required this.enabled, required this.service, this.openUrl});
+
+  final bool enabled;
+  final InstructorService service;
+
+  /// Tests only: replaces the browser.
+  final Future<void> Function(Uri url)? openUrl;
+
+  @override
+  State<PayoutsCard> createState() => _PayoutsCardState();
+}
+
+class _PayoutsCardState extends State<PayoutsCard> with WidgetsBindingObserver {
+  String? _state;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    if (!widget.enabled) _refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && !widget.enabled) _refresh();
+  }
+
+  Future<void> _refresh() async {
+    try {
+      final s = await widget.service.payoutsState();
+      if (mounted) setState(() => _state = s);
+    } catch (_) {
+      // Offline: the card keeps what it showed.
+    }
+  }
+
+  Future<void> _start() async {
+    final l = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _busy = true);
+    try {
+      final url = Uri.parse(await widget.service.startPayouts());
+      await (widget.openUrl ?? (u) => launchUrl(u, mode: LaunchMode.externalApplication))(url);
+      if (mounted) setState(() => _state = 'pending');
+    } catch (_) {
+      messenger.showSnackBar(SnackBar(content: Text(l.translate('payouts_error')), backgroundColor: AppColors.stop));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final state = widget.enabled ? 'enabled' : (_state ?? 'none');
+    return _Card(
+      children: [
+        Text(
+          l.translate('payouts_title'),
+          style: AppTypography.heading.copyWith(
+            fontSize: 18,
+            height: 24 / 18,
+            color: AppColors.ink,
+            fontVariations: const [FontVariation('wght', 600)],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.x1),
+        Text(
+          l.translate(switch (state) {
+            'enabled' => 'payouts_desc_enabled',
+            'pending' => 'payouts_desc_pending',
+            _ => 'payouts_desc_none',
+          }),
+          style: AppTypography.body.copyWith(color: AppColors.inkSecondary),
+        ),
+        if (state != 'enabled') ...[
+          const SizedBox(height: AppSpacing.x3),
+          _busy
+              ? const SizedBox(height: 56, child: Center(child: CircularProgressIndicator()))
+              // The card's own action, not a step in a flow: black (rule 16).
+              : BentoActionButton(
+                  text: l.translate(state == 'pending' ? 'payouts_continue' : 'payouts_start'),
+                  ink: true,
+                  onTap: _start,
+                ),
+        ],
       ],
     );
   }

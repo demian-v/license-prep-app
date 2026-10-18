@@ -31,6 +31,20 @@ class BookingService {
         return list;
       });
 
+  /// Lessons whose money is still open (P9, plan v2 §9.4): a no-show report
+  /// or a card dispute on either side, or — for the school — a held lesson
+  /// not paid out yet. Account deletion waits for them; the server checks
+  /// the same (`unsettled-bookings`).
+  Future<int> unsettledCount(String uid) async {
+    final sides = await Future.wait([
+      for (final field in ['studentUid', 'instructorUid'])
+        _firestore.collection('bookings').where(field, isEqualTo: uid).get(),
+    ]);
+    bool disputed(Booking b) => b.status == 'disputed' || b.disputeStatus == 'open';
+    return sides[0].docs.map(Booking.fromDoc).where(disputed).length +
+        sides[1].docs.map(Booking.fromDoc).where((b) => disputed(b) || b.payoutReleaseAt != null).length;
+  }
+
   /// Upcoming confirmed lessons on either side — account deletion waits for
   /// them to be cancelled (plan v2 §9.4).
   Future<int> upcomingCount(String uid) async {
@@ -57,16 +71,34 @@ class BookingService {
     return BookingOptions.fromMap(result.data as Map);
   }
 
-  /// Returns the new booking's id and status (`confirmed` on the emulator).
-  Future<({String id, String status})> create(String instructorUid, int startAtMs, int durationMinutes) async {
+  /// Returns the new booking's id and status: `confirmed` from the
+  /// emulator's instant gateway, or `pending_payment` with what Stripe's
+  /// PaymentSheet needs (P9).
+  Future<({String id, String status, PaymentStart? payment})> create(String instructorUid, int startAtMs, int durationMinutes) async {
     final result = await _fns.httpsCallable('createBooking').call({
       'instructorUid': instructorUid,
       'startAtMs': startAtMs,
       'durationMinutes': durationMinutes,
     });
     final data = result.data as Map;
-    return (id: data['bookingId'] as String, status: data['status'] as String);
+    final payment = data['payment'];
+    return (
+      id: data['bookingId'] as String,
+      status: data['status'] as String,
+      payment: payment is Map
+          ? PaymentStart(clientSecret: payment['clientSecret'] as String, publishableKey: payment['publishableKey'] as String)
+          : null,
+    );
   }
+
+  /// The PaymentSheet was closed without paying: the time is freed at once.
+  Future<void> releaseHold(String bookingId) =>
+      _fns.httpsCallable('releaseBookingHold').call({'bookingId': bookingId});
+
+  /// «Урок не состоялся» (P9): holds the school's payout until the admin
+  /// looks at it.
+  Future<void> reportNoShow(String bookingId) =>
+      _fns.httpsCallable('reportNoShow').call({'bookingId': bookingId, 'reason': 'instructor_no_show'});
 
   /// The status it ended in: `refunded` or `late_cancelled`.
   Future<String> cancel(String bookingId) async {
