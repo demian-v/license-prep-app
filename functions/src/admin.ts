@@ -173,6 +173,9 @@ export const adminGetQueue = functions.https.onCall(async (_data, context) => {
       schoolName: d.get('schoolName') ?? null, schoolLicenseNumber: d.get('schoolLicenseNumber') ?? null,
       instructorLicenseNumber: privates[i].get('licenseNumber') ?? null,
       licenseExpiresAtMs: ms(d.get('licenseExpiresAt')),
+      // P10b: the licence photo, fetched separately (adminGetLicenseImage).
+      hasLicenseImage: typeof privates[i].get('licenseImagePath') === 'string',
+      licensePhotoAtMs: ms(d.get('licensePhotoAt')),
     });
   });
 
@@ -414,6 +417,23 @@ export const adminReviewLicense = functions.https.onCall(async (data, context) =
     tx.set(privRef, { adminReviewingAt: FieldValue.delete() }, { merge: true });
   });
   return { uid, licenseCheck: approved === null ? 'pending' : approved ? 'passed' : 'rejected' };
+});
+
+/**
+ * The licence photo for the review (P10b), as a data URL: licence images are
+ * closed to every client in storage.rules, so the admin gets the bytes
+ * through this callable rather than a Storage link. At most 5 MB (the upload
+ * rule), well under a callable's response limit.
+ */
+export const adminGetLicenseImage = functions.https.onCall(async (data, context) => {
+  await requireAdmin(context);
+  const uid = id(data?.uid, 'uid');
+  const priv = await db().collection('instructorPrivate').doc(uid).get();
+  const path = priv.get('licenseImagePath');
+  if (typeof path !== 'string') throw new functions.https.HttpsError('not-found', 'no-license-image');
+  const bucket = priv.get('licenseImageBucket');
+  const [bytes] = await (typeof bucket === 'string' ? admin.storage().bucket(bucket) : admin.storage().bucket()).file(path).download();
+  return { dataUrl: `data:image/jpeg;base64,${bytes.toString('base64')}`, uploadedAtMs: ms(priv.get('moderation.license.updatedAt')) };
 });
 
 /**

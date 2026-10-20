@@ -95,6 +95,26 @@ class InstructorService {
         .putData(await photo.readAsBytes(), SettableMetadata(contentType: 'image/jpeg'));
   }
 
+  /// A licence photo (P10b): larger than a profile photo so the number stays
+  /// legible for the admin's review. Null when the instructor cancels.
+  Future<XFile?> pickLicensePhoto() => ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 2000,
+        maxHeight: 2000,
+        imageQuality: 90,
+        requestFullMetadata: false,
+      );
+
+  /// Uploads to the private pending path; onInstructorUpload files it where
+  /// only the admin sees it (`instructorLicenses/`, never public) and sets
+  /// `licensePhotoStatus` on the owner's doc.
+  Future<void> uploadLicensePhoto(String uid, XFile photo) async {
+    final id = '${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(1 << 32).toRadixString(16)}';
+    await _storage
+        .ref('instructorUploads/$uid/license/$id.jpg')
+        .putData(await photo.readAsBytes(), SettableMetadata(contentType: 'image/jpeg'));
+  }
+
   /// A download URL for an approved photo's Storage path (storage.rules).
   Future<String> photoUrl(String path) => _storage.ref(path).getDownloadURL();
 

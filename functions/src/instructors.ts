@@ -479,6 +479,7 @@ export const getInstructorContacts = functions.https.onCall(async (_data, contex
 // ── Profile photo (plan v2 §8) ───────────────────────────────────────────────
 
 const PHOTO_UPLOAD = /^instructorUploads\/([^/]+)\/photo\/([A-Za-z0-9_-]{1,64})\.jpg$/;
+const LICENSE_UPLOAD = /^instructorUploads\/([^/]+)\/license\/([A-Za-z0-9_-]{1,64})\.jpg$/;
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 
 /**
@@ -494,6 +495,11 @@ const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
  * instructor, so repeated tries don't pile up.
  */
 export const onInstructorUpload = functions.storage.object().onFinalize(async (object) => {
+  const licence = LICENSE_UPLOAD.exec(object.name ?? '');
+  if (licence) {
+    await fileLicenseImage(object, licence[1], licence[2]);
+    return;
+  }
   const match = PHOTO_UPLOAD.exec(object.name ?? '');
   if (!match) return;
   const [, uid, uploadId] = match;
@@ -549,6 +555,46 @@ export const onInstructorUpload = functions.storage.object().onFinalize(async (o
   // (upload missing), so it doesn't notify twice.
   await sendPushToUser(uid, 'photo_approved', 'profile');
 });
+
+/**
+ * A licence photo (plan v2 §8, P10b): evidence for the admin's licence
+ * review, never shown to students. So unlike the profile photo it needs no
+ * SafeSearch gate — it is filed at once, in every environment: metadata
+ * stripped (a phone photo carries GPS), copied to the server-only
+ * `instructorLicenses/{uid}/{uploadId}.jpg`, the upload and the previous
+ * licence image deleted. The path stays in instructorPrivate; the owner's
+ * doc gets `licensePhotoAt` (not a public field) so Профиль can say it
+ * arrived. It doesn't change `licenseCheck`: the photo backs the number.
+ */
+async function fileLicenseImage(object: functions.storage.ObjectMetadata, uid: string, uploadId: string) {
+  const bucket = admin.storage().bucket(object.bucket);
+  const upload = bucket.file(object.name!);
+  if (!(await upload.exists())[0]) return; // a redelivered event
+  const db = admin.firestore();
+  const ref = db.collection('instructors').doc(uid);
+  const privateRef = db.collection('instructorPrivate').doc(uid);
+  const snap = await ref.get();
+  if (!snap.exists || object.contentType !== 'image/jpeg' || Number(object.size) >= MAX_PHOTO_BYTES) {
+    await upload.delete({ ignoreNotFound: true });
+    return;
+  }
+  const [original] = await upload.download();
+  const clean = stripJpegMetadata(original);
+  const now = Timestamp.now();
+  if (!clean) {
+    await upload.delete({ ignoreNotFound: true });
+    await privateRef.set({ moderation: { license: { status: 'unreadable', uploadId, updatedAt: now } } }, { merge: true });
+    await ref.update({ licensePhotoStatus: 'unreadable', updatedAt: now });
+    return;
+  }
+  const path = `instructorLicenses/${uid}/${uploadId}.jpg`;
+  const previous = (await privateRef.get()).get('licenseImagePath');
+  await bucket.file(path).save(clean, { contentType: 'image/jpeg', resumable: false });
+  await privateRef.set({ licenseImagePath: path, licenseImageBucket: object.bucket, moderation: { license: { status: 'received', uploadId, updatedAt: now } } }, { merge: true });
+  await ref.update({ licensePhotoAt: now, licensePhotoStatus: 'received', updatedAt: now });
+  await upload.delete({ ignoreNotFound: true });
+  if (typeof previous === 'string' && previous !== path) await bucket.file(previous).delete({ ignoreNotFound: true });
+}
 
 /**
  * Keeps `listed` / `stage` true to computeListing whatever wrote the doc

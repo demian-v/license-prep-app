@@ -61,6 +61,21 @@ class _FakeService extends InstructorService {
     if (failUpload) throw Exception('network');
   }
 
+  // Licence photo (P10b).
+  final licenceUploads = <String>[];
+  bool failLicence = false;
+  Completer<void>? licenceGate;
+
+  @override
+  Future<XFile?> pickLicensePhoto() async => picked;
+
+  @override
+  Future<void> uploadLicensePhoto(String uid, XFile photo) async {
+    licenceUploads.add(uid);
+    if (licenceGate != null) await licenceGate!.future;
+    if (failLicence) throw Exception('network');
+  }
+
   // Never resolves: the card shows the placeholder, and no network is used.
   @override
   Future<String> photoUrl(String path) {
@@ -69,7 +84,8 @@ class _FakeService extends InstructorService {
   }
 }
 
-Map<String, dynamic> _doc({String photoStatus = 'none', String? photoPath, String status = 'active'}) => {
+Map<String, dynamic> _doc({String photoStatus = 'none', String? photoPath, String status = 'active', String? licensePhotoStatus}) => {
+      if (licensePhotoStatus != null) 'licensePhotoStatus': licensePhotoStatus,
       'kind': 'school',
       'status': status,
       'stage': 0,
@@ -176,5 +192,45 @@ void main() {
     await tester.tap(find.text('Profile photo'));
     await tester.pumpAndSettle();
     expect(svc.picks, 0);
+  });
+
+  group('«Licence photo» (P10b)', () {
+    Finder row() => find.ancestor(of: find.text('Licence photo'), matching: find.byType(InkWell)).first;
+
+    testWidgets('sends a picked photo at once, then shows what the server says', (tester) async {
+      final svc = _svc(_doc())..licenceGate = Completer<void>();
+      await _pump(tester, svc);
+      expect(find.descendant(of: row(), matching: find.text('Add')), findsOneWidget);
+      await tester.tap(find.text('Licence photo'));
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pump();
+      expect(svc.licenceUploads, ['u1']);
+      expect(find.text('Sending…'), findsOneWidget);
+      svc.licenceGate!.complete();
+      await tester.runAsync(() async {
+        svc.push(_doc(licensePhotoStatus: 'received'));
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pumpAndSettle();
+      expect(find.text('Received'), findsOneWidget);
+    });
+
+    testWidgets('an unreadable photo asks for another; a failed send says so', (tester) async {
+      final svc = _svc(_doc(licensePhotoStatus: 'unreadable'))..failLicence = true;
+      await _pump(tester, svc);
+      expect(find.text('Try another'), findsOneWidget);
+      await tester.tap(find.text('Licence photo'));
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pumpAndSettle();
+      expect(find.text("Couldn't send the photo. Try again."), findsOneWidget);
+    });
+
+    testWidgets('a suspended profile cannot send one', (tester) async {
+      final svc = _svc(_doc(status: 'suspended'));
+      await _pump(tester, svc);
+      await tester.tap(find.text('Licence photo'));
+      await tester.pump();
+      expect(svc.licenceUploads, isEmpty);
+    });
   });
 }

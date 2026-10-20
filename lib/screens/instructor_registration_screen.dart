@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -63,6 +64,9 @@ class _InstructorRegistrationScreenState extends State<InstructorRegistrationScr
   bool _forward = true;
   bool _busy = false;
   String? _error;
+  /// An optional licence photo (P10b), sent right after registration: the
+  /// upload rule needs the instructor profile to exist first.
+  XFile? _licensePhoto;
 
   final Set<String> _languages = {};
   String? _state;
@@ -269,6 +273,15 @@ class _InstructorRegistrationScreenState extends State<InstructorRegistrationScr
         // A retry after a lost response: the account is already registered.
         if (e.code != 'already-exists') rethrow;
         state = _state!;
+      }
+      final photo = skipLicense ? null : _licensePhoto;
+      if (photo != null) {
+        // Never blocks the signup: it can be sent again from Профиль.
+        try {
+          await _service.uploadLicensePhoto(auth.user!.id, photo);
+        } catch (e) {
+          debugPrint('InstructorRegistration: licence photo upload failed: $e');
+        }
       }
       await auth.applyInstructorRole(state);
       final prefs = await SharedPreferences.getInstance();
@@ -486,6 +499,14 @@ class _InstructorRegistrationScreenState extends State<InstructorRegistrationScr
         return (translate('ireg_license_title'), translate('ireg_license_desc'), [
           _text('schoolLicense', translate('ireg_school_license'), SolarIcons.documentTextLinear),
           if (!_isSchool) _text('instructorLicense', translate('ireg_instructor_license'), SolarIcons.documentTextLinear),
+          _LicensePhotoPicker(
+            chosen: _licensePhoto != null,
+            label: translate(_licensePhoto != null ? 'ireg_license_photo_chosen' : 'ireg_license_photo'),
+            onTap: () async {
+              final photo = await _service.pickLicensePhoto();
+              if (photo != null && mounted) setState(() => _licensePhoto = photo);
+            },
+          ),
           // Not a driver's licence: that one is read by the identity check.
           Text(
             _isSchool ? translate('ireg_license_note_school') : translate('ireg_license_note_private'),
@@ -637,6 +658,39 @@ class _OptionsScrollbarState extends State<_OptionsScrollbar> {
       radius: const Radius.circular(2),
       thumbColor: AppColors.inkTertiary.withValues(alpha: 0.5),
       child: widget.builder(_controller),
+    );
+  }
+}
+
+/// The wizard's optional licence photo (P10b): one tappable line under the
+/// licence numbers.
+class _LicensePhotoPicker extends StatelessWidget {
+  const _LicensePhotoPicker({required this.chosen, required this.label, required this.onTap});
+
+  final bool chosen;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.x3),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.x2),
+          child: Row(
+            children: [
+              Icon(chosen ? SolarIcons.checkCircleBold : SolarIcons.galleryLinear, size: 22,
+                  color: chosen ? AppColors.guide : AppColors.inkSecondary),
+              const SizedBox(width: AppSpacing.x3),
+              Expanded(child: Text(label, style: AppTypography.body.copyWith(color: AppColors.ink))),
+              const Icon(SolarIcons.altArrowRightLinear, size: 18, color: AppColors.signal),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

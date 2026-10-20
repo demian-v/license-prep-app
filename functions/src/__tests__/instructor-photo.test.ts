@@ -27,6 +27,7 @@ const priv = async (uid: string) => (await db().collection('instructorPrivate').
 async function wipe() {
   await bucket().deleteFiles({ prefix: 'instructorUploads/ph-' }).catch(() => {});
   await bucket().deleteFiles({ prefix: 'instructorPhotos/ph-' }).catch(() => {});
+  await bucket().deleteFiles({ prefix: 'instructorLicenses/ph-' }).catch(() => {});
   for (const uid of ['ph-1', 'ph-2']) {
     await db().collection('users').doc(uid).collection('fcmTokens').doc('t1').delete().catch(() => {});
     await db().collection('users').doc(uid).delete().catch(() => {});
@@ -209,5 +210,47 @@ describe('onInstructorUpload — refusals', () => {
     await finalize('result_memes/90-100/a.webp', { contentType: 'image/webp' });
     expect(await exists('instructorPhotos/ph-1/x.jpg')).toBe(true);
     expect((await pub('ph-1')).photoStatus).toBe('none');
+  });
+});
+
+describe('onInstructorUpload — licence photo (P10b)', () => {
+  // Production behaviour: a licence image is filed at once (never public, so
+  // no SafeSearch gate), unlike the profile photo.
+  it('files it privately without its metadata, in production too, and keeps licenseCheck', async () => {
+    await db().collection('instructors').doc('ph-1').update({ licenseCheck: 'pending' });
+    await upload('instructorUploads/ph-1/license/l1.jpg');
+    await finalize('instructorUploads/ph-1/license/l1.jpg');
+    expect(await exists('instructorUploads/ph-1/license/l1.jpg')).toBe(false);
+    const [filed] = await bucket().file('instructorLicenses/ph-1/l1.jpg').download();
+    expect(filed.toString('latin1')).not.toContain('GPSLatitude');
+    const p = await priv('ph-1');
+    expect(p).toMatchObject({ licenseImagePath: 'instructorLicenses/ph-1/l1.jpg', licenseImageBucket: BUCKET, moderation: { license: { status: 'received', uploadId: 'l1' } } });
+    const u = await pub('ph-1');
+    expect(u).toMatchObject({ licensePhotoStatus: 'received', licenseCheck: 'pending', photoStatus: 'none' });
+    expect(u.licensePhotoAt).toBeDefined();
+    expect(pushes).toHaveLength(0);
+  });
+
+  it('a new licence photo replaces the previous one', async () => {
+    await upload('instructorUploads/ph-1/license/l1.jpg');
+    await finalize('instructorUploads/ph-1/license/l1.jpg');
+    await upload('instructorUploads/ph-1/license/l2.jpg');
+    await finalize('instructorUploads/ph-1/license/l2.jpg');
+    expect(await exists('instructorLicenses/ph-1/l1.jpg')).toBe(false);
+    expect(await exists('instructorLicenses/ph-1/l2.jpg')).toBe(true);
+    expect((await priv('ph-1')).licenseImagePath).toBe('instructorLicenses/ph-1/l2.jpg');
+  });
+
+  it('refuses an unreadable file, a non-JPEG and someone with no profile', async () => {
+    await upload('instructorUploads/ph-1/license/l3.jpg', Buffer.alloc(2048));
+    await finalize('instructorUploads/ph-1/license/l3.jpg');
+    expect(await exists('instructorLicenses/ph-1/l3.jpg')).toBe(false);
+    expect((await pub('ph-1')).licensePhotoStatus).toBe('unreadable');
+    await upload('instructorUploads/ph-1/license/l4.jpg');
+    await finalize('instructorUploads/ph-1/license/l4.jpg', { contentType: 'image/png' });
+    expect(await exists('instructorUploads/ph-1/license/l4.jpg')).toBe(false);
+    await upload('instructorUploads/ph-2/license/l5.jpg');
+    await finalize('instructorUploads/ph-2/license/l5.jpg');
+    expect(await exists('instructorLicenses/ph-2/l5.jpg')).toBe(false);
   });
 });

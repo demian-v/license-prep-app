@@ -97,13 +97,22 @@ describe('instructorUploads/{uid}/photo', () => {
     await assertFails(put(s, 'instructorUploads/sr-i1/photo/big.jpg', jpeg(5 * 1024 * 1024)));
     await assertFails(put(s, 'instructorUploads/sr-i1/photo/abc123.png', jpeg()));
     await assertFails(put(s, 'instructorUploads/sr-i1/photo/../x.jpg', jpeg()));
-    await assertFails(put(s, 'instructorUploads/sr-i1/license/abc123.jpg', jpeg()));
+    await assertFails(put(s, 'instructorUploads/sr-i1/passport/abc123.jpg', jpeg()));
   });
 
   it('an upload is never overwritten or deleted by the client', async () => {
     await seedFile('instructorUploads/sr-i1/photo/abc123.jpg');
     await assertFails(put(storageAs('sr-i1'), 'instructorUploads/sr-i1/photo/abc123.jpg', jpeg()));
     await assertFails(storageAs('sr-i1').ref('instructorUploads/sr-i1/photo/abc123.jpg').delete());
+  });
+});
+
+describe('instructorUploads/{uid}/license (P10b)', () => {
+  it('an instructor uploads a licence photo to their own folder; a student or a stranger cannot', async () => {
+    await assertSucceeds(put(storageAs('sr-i1'), 'instructorUploads/sr-i1/license/lic123.jpg', jpeg()));
+    await assertFails(put(storageAs('sr-s1'), 'instructorUploads/sr-s1/license/lic123.jpg', jpeg()));
+    await assertFails(put(storageAs('sr-s1'), 'instructorUploads/sr-i1/license/lic999.jpg', jpeg()));
+    await assertFails(put(storageAs('sr-i1'), 'instructorUploads/sr-i1/license/lic.png', jpeg(), 'image/png'));
   });
 });
 

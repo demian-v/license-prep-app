@@ -35,6 +35,7 @@ const booking = (id: string) => db().collection('bookings').doc(id);
 const ADMIN_CALLABLES = [
   'adminGetQueue', 'adminListInstructors', 'adminGetBookings', 'adminSetReportStatus', 'adminHideReview',
   'adminSetInstructorStatus', 'adminReviewLicense', 'adminSetInReview', 'adminResolveNoShow', 'adminResolveLostDispute',
+  'adminGetLicenseImage',
 ] as const;
 
 // ── Fake Stripe ──────────────────────────────────────────────────────────────
@@ -472,5 +473,21 @@ describe('the board (adminGetQueue)', () => {
     const row = bookings.find((b: any) => b.id === 'adm-bk-1');
     expect(row).toMatchObject({ state: 'ZQ', lessonCents: 6500, platformFeeCents: 1625, noShow: true });
     expect(JSON.stringify(row)).not.toContain('Anna');
+  });
+});
+
+describe('adminGetLicenseImage (P10b)', () => {
+  const BUCKET = 'demo-driveusa.appspot.com';
+  it('returns the filed licence photo as a data URL; not-found without one', async () => {
+    await seedSchool();
+    await expect(call(fns.adminGetLicenseImage)({ uid: SCHOOL })).rejects.toMatchObject({ message: 'no-license-image' });
+    const bytes = Buffer.from([0xff, 0xd8, 1, 2, 3, 0xff, 0xd9]);
+    await admin.storage().bucket(BUCKET).file(`instructorLicenses/${SCHOOL}/l1.jpg`).save(bytes, { contentType: 'image/jpeg' });
+    await db().collection('instructorPrivate').doc(SCHOOL).set({ licenseImagePath: `instructorLicenses/${SCHOOL}/l1.jpg`, licenseImageBucket: BUCKET }, { merge: true });
+    const res = await call(fns.adminGetLicenseImage)({ uid: SCHOOL });
+    expect(res.dataUrl).toBe(`data:image/jpeg;base64,${bytes.toString('base64')}`);
+    const { items } = await call(fns.adminGetQueue)({});
+    expect(items.find((i: any) => i.key === `licence:${SCHOOL}`)).toMatchObject({ hasLicenseImage: true });
+    await admin.storage().bucket(BUCKET).file(`instructorLicenses/${SCHOOL}/l1.jpg`).delete();
   });
 });

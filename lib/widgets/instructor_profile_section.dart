@@ -89,6 +89,7 @@ class InstructorProfileSection extends StatelessWidget {
                   actionable: p['licenseCheck'] != 'passed' && p['licenseCheck'] != 'pending',
                   onTap: () => _editLicense(context, svc, isSchool, p['schoolLicenseNumber'] as String?),
                 ),
+                _LicensePhotoRow(uid: uid, profile: p, service: svc),
                 _Row(
                   icon: SolarIcons.userRoundedLinear,
                   title: l.translate('iprof_id_check'),
@@ -528,6 +529,60 @@ class _Row extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// «Фото лицензии» (P10b): a photo of the licence, for the admin's review
+/// only (never shown to students). Tapping picks and sends it at once; the
+/// value follows the server's `licensePhotoStatus`. Open in every licence
+/// state but suspension — a photo helps most while the review is pending.
+class _LicensePhotoRow extends StatefulWidget {
+  const _LicensePhotoRow({required this.uid, required this.profile, required this.service});
+
+  final String uid;
+  final Map<String, dynamic> profile;
+  final InstructorService service;
+
+  @override
+  State<_LicensePhotoRow> createState() => _LicensePhotoRowState();
+}
+
+class _LicensePhotoRowState extends State<_LicensePhotoRow> {
+  bool _sending = false;
+
+  Future<void> _choose() async {
+    final l = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final photo = await widget.service.pickLicensePhoto();
+    if (photo == null || !mounted) return;
+    setState(() => _sending = true);
+    try {
+      await widget.service.uploadLicensePhoto(widget.uid, photo);
+    } catch (e) {
+      debugPrint('InstructorProfileSection: licence photo upload failed: $e');
+      messenger.showSnackBar(SnackBar(content: Text(l.translate('iprof_license_photo_error'))));
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final status = widget.profile['licensePhotoStatus'] as String?;
+    return _Row(
+      icon: SolarIcons.galleryLinear,
+      title: l.translate('iprof_license_photo'),
+      value: _sending
+          ? l.translate('status_sending')
+          : switch (status) {
+              'received' => l.translate('status_received'),
+              'unreadable' => l.translate('status_unreadable'),
+              _ => l.translate('status_add'),
+            },
+      actionable: !_sending && widget.profile['status'] != 'suspended',
+      onTap: _choose,
     );
   }
 }
