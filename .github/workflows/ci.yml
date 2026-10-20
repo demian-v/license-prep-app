@@ -140,6 +140,32 @@ jobs:
         # rather than accumulated noise.
         run: npm run lint
 
+  site:
+    # driveusallc.com (site/): the copy is complete in all 5 languages, the
+    # pages build, and the facts on them (states, trial) still match the app.
+    name: Website — build & test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
   android:
     name: Android — build (Java ${{ matrix.java }})
     runs-on: ubuntu-latest
