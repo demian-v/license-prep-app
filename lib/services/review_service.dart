@@ -29,10 +29,15 @@ class ReviewService {
       .map((s) => s.exists ? InstructorReview.fromDoc(s.data()!) : null);
 
   /// An instructor's reviews of themselves, newest first («Мои отзывы»).
+  /// A review an admin hid (adminHideReview, P10a) isn't shown: it is out
+  /// of the rating numbers too.
   Stream<List<InstructorReview>> reviewsOf(String instructorUid) => _reviews(instructorUid)
       .orderBy('createdAt', descending: true)
       .snapshots()
-      .map((snap) => [for (final d in snap.docs) InstructorReview.fromDoc(d.data())]);
+      .map((snap) => [
+            for (final d in snap.docs)
+              if (d.data()['hidden'] != true) InstructorReview.fromDoc(d.data())
+          ]);
 
   /// Writes or edits the review of the school from [bookingId]. Returns
   /// whether it was an edit.

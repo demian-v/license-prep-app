@@ -19,7 +19,7 @@ import * as admin from 'firebase-admin';
 
 export type PushKind = 'photo_approved' | 'photo_rejected'
   | 'booking_new' | 'booking_cancelled_student' | 'booking_cancelled_instructor'
-  | 'review_request' | 'booking_refunded' | 'payouts_enabled';
+  | 'review_request' | 'booking_refunded' | 'payouts_enabled' | 'license_expired';
 
 export type Lang = 'en' | 'es' | 'uk' | 'ru' | 'pl';
 const LANGS: readonly Lang[] = ['en', 'es', 'uk', 'ru', 'pl'];
@@ -89,6 +89,15 @@ const TEXTS: Record<PushKind, Record<Lang, { title: string; body: string }>> = {
     uk: { title: 'Виплати налаштовано', body: 'Гроші за уроки надходитимуть щотижня.' },
     ru: { title: 'Выплаты подключены', body: 'Деньги за уроки будут приходить раз в неделю.' },
     pl: { title: 'Wypłaty skonfigurowane', body: 'Pieniądze za lekcje będą wpływać co tydzień.' },
+  },
+  // P10: the daily expireInstructorLicenses found the reviewed licence past
+  // its expiry date; bookings stop until a renewed one is checked. Opens Профиль.
+  license_expired: {
+    en: { title: 'Your licence has expired', body: 'Send the renewed licence in Profile to take bookings again.' },
+    es: { title: 'Tu licencia ha caducado', body: 'Envía la licencia renovada en Perfil para volver a recibir reservas.' },
+    uk: { title: 'Термін дії ліцензії минув', body: 'Надішліть поновлену ліцензію у Профілі, щоб знову приймати бронювання.' },
+    ru: { title: 'Срок лицензии истёк', body: 'Отправьте продлённую лицензию в Профиле, чтобы снова принимать брони.' },
+    pl: { title: 'Licencja wygasła', body: 'Wyślij odnowioną licencję w Profilu, aby znów przyjmować rezerwacje.' },
   },
 };
 

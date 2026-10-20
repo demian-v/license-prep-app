@@ -2625,3 +2625,4 @@ export { sendMessage, markConversationRead, getInstructorContactInfo } from './c
 export { getBookingOptions, createBooking, releaseBookingHold, cancelBooking, expirePendingBookings, markBookingsCompleted } from './bookings';
 export { stripeWebhook, startInstructorPayouts, getInstructorPayouts, stripeOnboardingReturn, reportNoShow, releaseInstructorPayouts } from './payments';
 export { submitReview, deleteReview, reportReview } from './reviews';
+export { adminGetQueue, adminListInstructors, adminGetBookings, adminSetReportStatus, adminHideReview, adminSetInstructorStatus, adminReviewLicense, adminSetInReview, adminResolveNoShow, adminResolveLostDispute, expireInstructorLicenses } from './admin';

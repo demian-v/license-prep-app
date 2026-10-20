@@ -37,6 +37,7 @@ Booking _booking({
   String? refundStatus,
   String? disputeStatus,
   String? cancelledBy,
+  String? noShowResolution,
 }) =>
     Booking(
       id: 'b1',
@@ -61,6 +62,7 @@ Booking _booking({
       payoutReleasedAt: payoutReleasedAt,
       payoutCancelledAt: payoutCancelledAt,
       disputeStatus: disputeStatus,
+      noShowResolution: noShowResolution,
     );
 
 InstructorListing _school() => InstructorListing.fromMap({
@@ -232,6 +234,8 @@ void main() {
       expect(_booking(startAt: now.subtract(const Duration(hours: 50))).noShowReportable(now), isFalse);
       expect(_booking(status: 'confirmed').noShowReportable(now), isFalse);
       expect(_booking(status: 'payout_released').noShowReportable(now), isFalse);
+      // The admin released it back to `completed` (P10a): not again.
+      expect(_booking(startAt: now.subtract(const Duration(hours: 3)), noShowResolution: 'release').noShowReportable(now), isFalse);
     });
 
     test('a paid-out or disputed lesson is still listed under past lessons', () {
@@ -351,6 +355,21 @@ void main() {
       // Says nothing about the money: the refund line below says where it stands.
       expect(find.text('The time was taken while the payment went through, so the lesson was cancelled.'), findsOneWidget);
       expect(find.text('The refund is being issued.'), findsOneWidget);
+    });
+
+    testWidgets('the admin’s answer to a no-show report, on both sides (P10a)', (tester) async {
+      const refunded = "We checked the report that the lesson didn't happen and refunded it in full.";
+      const released = "We checked the report that the lesson didn't happen: it counts as given, and the school is paid.";
+      await open(tester, _booking(status: 'refunded', cancelledBy: 'admin', refundStatus: 'succeeded', noShowResolution: 'refund'));
+      expect(find.text(refunded), findsOneWidget);
+      expect(find.text('Cancelled by the student'), findsNothing);
+      await open(tester, _booking(status: 'refunded', cancelledBy: 'admin', noShowResolution: 'refund'), asInstructor: true);
+      expect(find.text(refunded), findsOneWidget);
+      await open(tester, _booking(noShowResolution: 'release'));
+      expect(find.text(released), findsOneWidget);
+      expect(find.text("Didn't happen"), findsNothing);
+      await open(tester, _booking(status: 'payout_released', noShowResolution: 'release'), asInstructor: true);
+      expect(find.text(released), findsOneWidget);
     });
   });
 
@@ -518,6 +537,7 @@ void main() {
           'payouts_desc_none', 'payouts_desc_pending', 'payouts_desc_enabled', 'booking_refund_done', 'booking_refund_pending',
           'booking_note_slot_taken', 'booking_note_pending', 'booking_note_disputed_student', 'booking_note_disputed_school',
           'payout_cancelled', 'booking_note_payout_cancelled', 'noshow_too_late',
+          'booking_note_no_show_refunded', 'booking_note_no_show_released',
         ]) {
           expect(_locale(lang)[k], isA<String>(), reason: '$lang $k');
         }

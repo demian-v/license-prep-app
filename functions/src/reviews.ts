@@ -100,9 +100,14 @@ export const submitReview = functions.https.onCall(async (data, context) => {
     const [instructor, old] = await Promise.all([tx.get(instructorRef), tx.get(ref)]);
     if (!instructor.exists) throw new functions.https.HttpsError('not-found', 'This profile is not available.');
     const now = Timestamp.now();
-    tx.update(instructorRef, ratingTotals(
-      instructor.get('ratingSum') ?? 0, instructor.get('ratingCount') ?? 0, old.exists ? old.get('rating') : null, rating,
-    ));
+    // A review an admin hid (P10a) stays hidden through an edit, and out of
+    // the numbers; only adminHideReview brings it back.
+    const hidden = old.get('hidden') === true;
+    if (!hidden) {
+      tx.update(instructorRef, ratingTotals(
+        instructor.get('ratingSum') ?? 0, instructor.get('ratingCount') ?? 0, old.exists ? old.get('rating') : null, rating,
+      ));
+    }
     tx.set(ref, {
       reviewId: old.get('reviewId') ?? instructorRef.collection('reviews').doc().id,
       studentDisplayName: studentDisplayName(student.get('name')),
@@ -111,6 +116,8 @@ export const submitReview = functions.https.onCall(async (data, context) => {
       lastBookingId: bookingId,
       createdAt: old.exists ? old.get('createdAt') : now,
       updatedAt: now,
+      ...(hidden ? Object.fromEntries(['hidden', 'hiddenAt', 'hiddenBy', 'hiddenReportId']
+        .filter((k) => old.get(k) !== undefined).map((k) => [k, old.get(k)])) : {}),
     });
     return old.exists;
   });
@@ -129,7 +136,8 @@ export async function removeReview(db: FirebaseFirestore.Firestore, instructorUi
     const [instructor, old] = await Promise.all([tx.get(instructorRef), tx.get(ref)]);
     if (!old.exists) return false;
     tx.delete(ref);
-    if (instructor.exists) {
+    // A hidden review is already out of the numbers.
+    if (instructor.exists && old.get('hidden') !== true) {
       tx.update(instructorRef, ratingTotals(instructor.get('ratingSum') ?? 0, instructor.get('ratingCount') ?? 0, old.get('rating'), null));
     }
     return true;
@@ -168,7 +176,9 @@ export const reportReview = functions.https.onCall(async (data, context) => {
   const db = admin.firestore();
   const found = await db.collection('instructors').doc(instructorUid).collection('reviews')
     .where('reviewId', '==', reviewId).limit(1).get();
-  if (found.empty) throw new functions.https.HttpsError('not-found', 'This review is not available.');
+  if (found.empty || found.docs[0].get('hidden') === true) {
+    throw new functions.https.HttpsError('not-found', 'This review is not available.');
+  }
   const review = found.docs[0];
   if (review.id === uid) throw new functions.https.HttpsError('failed-precondition', 'own-review');
 

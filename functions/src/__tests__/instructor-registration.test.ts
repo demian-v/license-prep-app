@@ -126,6 +126,16 @@ describe('submitLicenseNumber', () => {
     await expect(submitLicense({ instructorLicenseNumber: 'IL-INS-78' }, 'lic-p')).resolves.toEqual({ licenseCheck: 'pending' });
   });
 
+  // Owner, 2026-10-19 (P10a): a renewed licence usually keeps its number.
+  it.each(['expired', 'rejected'])('the same number after a %s licence goes back up for review', async (state) => {
+    await register(school, 'lic-a');
+    await submitLicense({ schoolLicenseNumber: 'IL-DS-9' }, 'lic-a');
+    const ref = db().collection('instructors').doc('lic-a');
+    await ref.update({ licenseCheck: state, licenseExpiresAt: admin.firestore.Timestamp.fromMillis(Date.now() - 864e5) });
+    await expect(submitLicense({ schoolLicenseNumber: 'IL-DS-9' }, 'lic-a')).resolves.toEqual({ licenseCheck: 'pending' });
+    expect((await ref.get()).data()).toMatchObject({ licenseCheck: 'pending', licenseExpiresAt: null });
+  });
+
   it('still requires some licence number', async () => {
     await register(privateInstructor(), 'lic-p');
     await expect(submitLicense({}, 'lic-p')).rejects.toMatchObject({ code: 'invalid-argument' });

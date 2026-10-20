@@ -635,6 +635,8 @@
   "booking_note_disputed_student": "Informaste que la clase no se dio. El pago a la autoescuela queda retenido hasta que lo revisemos.",
   "booking_note_disputed_school": "El alumno informó que la clase no se dio. El pago queda retenido hasta que lo revisemos.",
   "booking_note_payout_cancelled": "El banco del alumno devolvió el pago (una disputa de tarjeta), así que esta clase no se paga.",
+  "booking_note_no_show_refunded": "Revisamos el aviso de que la clase no se dio y la reembolsamos por completo.",
+  "booking_note_no_show_released": "Revisamos el aviso de que la clase no se dio: cuenta como dada y la autoescuela recibe el pago.",
   "payout_pending_on": "Pago después del {date}",
   "payout_released": "Pagado",
   "payout_held": "Pago retenido",

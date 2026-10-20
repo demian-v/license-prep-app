@@ -3,6 +3,7 @@ import * as admin from 'firebase-admin';
 import { FieldPath, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { defineInt } from 'firebase-functions/params';
 import { listedInstructor } from './instructors';
+import { noteSchoolCancellation } from './admin';
 import { studentDisplayName } from './chat';
 import { sendPushToUser, Lang } from './push';
 import { sweepPaginated, SWEEP_TIME_BUDGET_MS, SweepResult } from './sweep';
@@ -632,6 +633,9 @@ export const cancelBooking = functions.runWith({ secrets: STRIPE_SECRETS }).http
     ? sendPushToUser(b.get('instructorUid'), 'booking_cancelled_student', `booking/${bookingId}`, pushVars(b, 'studentDisplayName'))
     : sendPushToUser(b.get('studentUid'), 'booking_cancelled_instructor', `booking/${bookingId}`, pushVars(b, 'instructorName')));
   if (refund) await processRefund(bookingId);
+  // Three school cancellations in 30 days → an alert on the admin board (P10a).
+  if (!byStudent) await noteSchoolCancellation(b.get('instructorUid')).catch((e) =>
+    functions.logger.error('cancelBooking: cancellation alert not written', { bookingId, error: String(e) }));
   return { bookingId, status };
 });
 

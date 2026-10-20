@@ -28,6 +28,10 @@
  *                               lesson is paid out, one held yesterday waits for its payout (48 h;
  *                               the student can still report a no-show), and the late cancel is due
  *                               (fire releaseInstructorPayouts → paid out without Stripe)
+ *   admins/seed-admin, reports  P10a: the dashboard's admin (seed-admin@example.com, Auth emulator only),
+ *                               reports of every kind, two no-show reports, two card disputes, a
+ *                               school-cancellations alert, ~150 past lessons for Insights (a student
+ *                               with no account; schools the app demos don't use); reset on every run
  *   SEED_STRIPE_ACCOUNT_ID      optional, P9: a Stripe TEST connected account (acct_…) already
  *                               onboarded through the app as seed-instr-01. Emulator data does not
  *                               survive a restart, so this re-attaches it to Lakeview on every seed
@@ -326,6 +330,125 @@ const COMMENTS = ['Very patient, passed on the first try.', 'Clear explanations 
     studentUnread: 0, instructorUnread: 0, createdAt: ago(3 * 1440),
   });
   console.log('Bookings: seed-student-paid with seed-instr-01 (6: paid out, awaiting payout, late cancel due, refunded, 2 upcoming) and seed-instr-04 (1 ended but confirmed, 1 upcoming, 1 expiring hold)');
+
+  // P10a — the admin dashboard (admin/). An admin account, and something on
+  // every column of its board. All ids start with seed-booking- /
+  // seed-report-, so a re-run resets them; nothing here is real data.
+  if (AUTH_HOST) {
+    const account = { email: 'seed-admin@example.com', password: SEED_PASSWORD, displayName: 'Seed Admin', emailVerified: true };
+    await admin.auth().getUser('seed-admin').catch(() => admin.auth().createUser({ uid: 'seed-admin', ...account }));
+    await db.collection('admins').doc('seed-admin').set({ note: 'emulator seed only', grantedAt: now });
+    console.log(`Admin (dashboard): ${account.email}`);
+  }
+  const daysAgo = (d) => Timestamp.fromMillis(Date.now() - d * 864e5);
+  const oldReports = await db.collection('reports').where(admin.firestore.FieldPath.documentId(), '>=', 'seed-report-')
+    .where(admin.firestore.FieldPath.documentId(), '<', 'seed-report.').get();
+  await Promise.all(oldReports.docs.map((d) => d.ref.delete()));
+  const lvThread = db.collection('conversations').doc('seed-student-paid_seed-instr-01');
+  const phoneMsg = (await lvThread.collection('messages').where('text', '==', 'Call us any time: +1 312 555 0101').limit(1).get()).docs[0];
+  const report = (id, doc) => db.collection('reports').doc(id).set({ userId: 'seed-student-paid', language: 'ru', state: 'IL', ...doc });
+  // Northside's 3-star review, reported as written; its author softened it since.
+  await report('seed-report-review', {
+    contentType: 'review', reason: 'harassment', entity: { instructorUid: 'seed-instr-04', reviewId: 'seedrev04x4' },
+    review: { rating: 1, comment: 'Worst school ever, the instructor yelled at me the whole lesson.' },
+    message: 'Insulting, and not what happened.', status: 'open', createdAt: daysAgo(0.2),
+  });
+  await report('seed-report-message', {
+    contentType: 'message', reason: 'spam', entity: { conversationId: lvThread.id, messageId: phoneMsg ? phoneMsg.id : 'missing' },
+    message: 'Keeps asking me to call outside the app.', status: 'open', createdAt: daysAgo(1.1),
+  });
+  await report('seed-report-instructor', {
+    contentType: 'instructor', reason: 'fake_profile', entity: { instructorUid: 'seed-instr-17' },
+    message: "The name and photo don't match the school's website.", status: 'in_review', createdAt: daysAgo(2.3),
+  });
+  await report('seed-report-question', {
+    contentType: 'quiz_question', reason: 'translation', entity: { questionId: 'IL_q_0142', path: 'questions/IL_q_0142' },
+    message: 'The Spanish answer B says the opposite of the English one.', language: 'es', status: 'open', createdAt: daysAgo(4),
+  });
+  await report('seed-report-theory', {
+    contentType: 'theory_section', reason: 'image', entity: { topicDocId: 'IL_t_signs', sectionIndex: 3, path: 'trafficRuleTopics/IL_t_signs' },
+    status: 'dismissed', resolution: 'dismissed', resolvedAt: daysAgo(1), resolvedBy: 'seed-admin', createdAt: daysAgo(6),
+  });
+
+  // Lessons for the board and for Insights. History goes to a student with no
+  // account and to schools the app demos don't use, so Lakeview's and
+  // Northside's lists stay as described above.
+  const at10 = (rowIndex, d) => wallToUtc(addDays(wallClock(Date.now(), ROWS[rowIndex][2]).date, d), 600, ROWS[rowIndex][2]);
+  const lesson = async (id, rowIndex, d, minutes, feeKind, status, extra = {}) => {
+    const row = ROWS[rowIndex];
+    const uid = `seed-instr-${String(rowIndex + 1).padStart(2, '0')}`;
+    const startMs = at10(rowIndex, d);
+    const created = Timestamp.fromMillis(Math.min(Date.now() - 3600e3, startMs - (2 + (Math.abs(d) % 5)) * 864e5));
+    await db.collection('bookings').doc(id).set({
+      studentUid: 'seed-student-history', instructorUid: uid, studentDisplayName: REVIEWERS[Math.abs(d) % REVIEWERS.length],
+      instructorName: row[4], startAt: Timestamp.fromMillis(startMs), durationMinutes: minutes, timezone: row[2],
+      localDate: wallClock(startMs, row[2]).date, localTime: '10:00', ...fees(row[7], minutes, feeKind), status,
+      paymentProvider: 'emulator', confirmedAt: created, createdAt: created, updatedAt: created, ...extra,
+    });
+    return startMs + minutes * 60e3;
+  };
+  // No-show reports (disputed): one from seed-student-paid with Northside, so
+  // the student's side can be checked after a decision; one waiting longer.
+  {
+    const startMs = lessonStart(3, -2);
+    const endMs = startMs + 60 * 60e3;
+    await db.collection('bookings').doc('seed-booking-ns-3').set({
+      studentUid: 'seed-student-paid', instructorUid: 'seed-instr-04', studentDisplayName: 'Paid S.', instructorName: 'Northside Auto Academy',
+      schoolAddress: '103 Main St, Chicago, IL', startAt: Timestamp.fromMillis(startMs), durationMinutes: 60, timezone: tz,
+      localDate: wallClock(startMs, tz).date, localTime: new Date(Date.UTC(2000, 0, 1, 0, wallClock(startMs, tz).minutes)).toISOString().slice(11, 16),
+      ...fees(75, 60, 'later'), status: 'disputed', paymentProvider: 'emulator', noShowReason: 'instructor_no_show',
+      noShowReportedAt: Timestamp.fromMillis(endMs + 3 * 3600e3), completedAt: Timestamp.fromMillis(endMs),
+      payoutReleaseAt: Timestamp.fromMillis(endMs + 48 * 3600e3), createdAt: daysAgo(5), updatedAt: Timestamp.fromMillis(endMs + 3 * 3600e3),
+    });
+  }
+  {
+    const endMs = await lesson('seed-booking-h-ns-1', 10, -4, 90, 'later', 'disputed', { noShowReason: 'lesson_not_given' });
+    await db.collection('bookings').doc('seed-booking-h-ns-1').update({
+      noShowReportedAt: Timestamp.fromMillis(endMs + 20 * 3600e3), completedAt: Timestamp.fromMillis(endMs),
+      payoutReleaseAt: Timestamp.fromMillis(endMs + 48 * 3600e3),
+    });
+  }
+  // Card disputes: one lost (the school's payout cancelled — pay by hand or
+  // not), one Stripe is still running.
+  {
+    const endMs = await lesson('seed-booking-h-cd-1', 13, -9, 60, 'later', 'completed', {
+      disputeStatus: 'lost', disputeReason: 'fraudulent', disputeAmountCents: 7350, stripeDisputeId: 'dp_seed_lost',
+    });
+    await db.collection('bookings').doc('seed-booking-h-cd-1').update({ completedAt: Timestamp.fromMillis(endMs), payoutCancelledAt: daysAgo(1.5) });
+    await lesson('seed-booking-h-cd-2', 15, -6, 60, 'later', 'completed', {
+      disputeStatus: 'open', disputeReason: 'product_not_received', disputeAmountCents: 8925, stripeDisputeId: 'dp_seed_open',
+      payoutReleaseAt: daysAgo(-2),
+    });
+  }
+  // Three school cancellations in 30 days (Bayou City) and the alert
+  // noteSchoolCancellation (functions/src/admin.ts) writes for them.
+  for (const [n, d] of [[1, 3], [2, 9], [3, 17]]) {
+    await lesson(`seed-booking-h-cx-${n}`, 10, d, 60, 'later', 'refunded', { cancelledBy: 'instructor', cancelledAt: daysAgo(n * 4) });
+  }
+  await db.collection('reports').doc('alert_cancellations_seed-instr-11').set({
+    contentType: 'school_cancellations', reason: 'cancellations', entity: { instructorUid: 'seed-instr-11' },
+    count: 3, userId: 'system', status: 'open', createdAt: daysAgo(4), updatedAt: daysAgo(4),
+  });
+  // 90 days of lessons across six schools: mostly paid out (a few late),
+  // some refunded, a few late cancels.
+  const HISTORY = [5, 10, 13, 15, 18, 20];
+  let h = 0;
+  for (let d = 88; d >= 3; d -= 1) {
+    for (let k = 0; k < 1 + ((d * 7) % 3); k++) {
+      h += 1;
+      const rowIndex = HISTORY[(d + k) % HISTORY.length];
+      const roll = (d * 13 + k * 7) % 20;
+      const status = roll < 2 ? 'refunded' : roll < 3 ? 'late_cancelled' : 'payout_released';
+      const minutes = [60, 90, 120][(d + k) % 3];
+      const endMs = at10(rowIndex, -d) + minutes * 60e3;
+      const lateHours = roll === 19 ? 30 : 1;
+      await lesson(`seed-booking-h-${String(h).padStart(3, '0')}`, rowIndex, -d, minutes, h % 6 === 1 ? 'first' : 'later', status,
+        status === 'payout_released' ? { completedAt: Timestamp.fromMillis(endMs), payoutReleasedAt: Timestamp.fromMillis(endMs + (48 + lateHours) * 3600e3) }
+          : status === 'refunded' ? { cancelledBy: roll === 0 ? 'instructor' : 'student', cancelledAt: Timestamp.fromMillis(endMs - 72 * 3600e3), refundedAt: Timestamp.fromMillis(endMs - 72 * 3600e3) }
+            : { cancelledBy: 'student', cancelledAt: Timestamp.fromMillis(endMs - 10 * 3600e3), payoutReleasedAt: Timestamp.fromMillis(endMs + 47 * 3600e3) });
+    }
+  }
+  console.log(`Admin board: 5 reports (review, message, instructor, question, theory dismissed), 2 no-show reports, 2 card disputes, 1 cancellations alert; ${h} past lessons for Insights`);
 
   console.log(`Seeded ${ROWS.length} instructors; listed per state:`, stats, '; launchStates: IL, TX');
 })().catch((e) => { console.error(e); process.exit(1); });

@@ -111,13 +111,16 @@ const REVIEW_LIMIT = 50;
  * id is the student's uid (plan v2 §5), so it never leaves the server, and
  * neither does the booking it came from; `id` is the opaque `reviewId` a
  * report names it by (reportReview, P8), and `mine` tells the caller which
- * one is theirs, so the app offers no report on it.
+ * one is theirs, so the app offers no report on it. A hidden review stays
+ * out of the list (and out of the numbers, adminHideReview).
  */
 export const getInstructorReviews = functions.https.onCall(async (data, context) => {
   const doc = await listedInstructor(data, context);
   const snap = await doc.ref.collection('reviews').orderBy('createdAt', 'desc').limit(REVIEW_LIMIT).get();
   return {
-    reviews: snap.docs.map((r) => ({
+    // A review an admin hid (P10a, plan v2 §18a) is shown to nobody but its
+    // author, who isn't told.
+    reviews: snap.docs.filter((r) => r.get('hidden') !== true || r.id === context.auth?.uid).map((r) => ({
       id: r.get('reviewId') ?? null,
       name: r.get('studentDisplayName') ?? '',
       rating: r.get('rating'),
@@ -307,7 +310,8 @@ export const registerAsInstructor = functions.https.onCall(async (data, context)
 /**
  * Adds or changes the licence numbers later, from Профиль (owner,
  * 2026-09-30: verification can be done after signup). A changed number goes
- * back to 'pending' for the admin review (plan v2 §6.4).
+ * back to 'pending' for the admin review (plan v2 §6.4), and so does the same
+ * number after an expired or rejected licence (P10a).
  */
 export const submitLicenseNumber = functions.https.onCall(async (data, context) => {
   if (!context?.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in first.');
@@ -333,17 +337,21 @@ export const submitLicenseNumber = functions.https.onCall(async (data, context) 
     ? (await db.collection('instructorPrivate').doc(uid).get()).get('licenseNumber') ?? null : null;
   const changed = (snap.get('schoolLicenseNumber') ?? null) !== schoolLicenseNumber
     || (instructorLicenseNumber !== null && instructorLicenseNumber !== ownBefore);
+  // A renewed licence usually keeps its number (owner, 2026-10-19): after it
+  // expired or was rejected, sending the same number puts it back up for
+  // review too. A passed one stays passed.
+  const requeue = changed || ['expired', 'rejected'].includes(snap.get('licenseCheck'));
   await db.runTransaction(async (tx) => {
     tx.update(ref, {
       schoolLicenseNumber,
-      ...(changed ? { licenseCheck: 'pending', licenseExpiresAt: null } : {}),
+      ...(requeue ? { licenseCheck: 'pending', licenseExpiresAt: null } : {}),
       updatedAt: Timestamp.now(),
     });
     if (instructorLicenseNumber) {
       tx.set(db.collection('instructorPrivate').doc(uid), { licenseNumber: instructorLicenseNumber }, { merge: true });
     }
   });
-  return { licenseCheck: changed ? 'pending' : snap.get('licenseCheck') };
+  return { licenseCheck: requeue ? 'pending' : snap.get('licenseCheck') };
 });
 
 /**

@@ -32,6 +32,7 @@ class Booking {
     this.payoutReleasedAt,
     this.payoutCancelledAt,
     this.disputeStatus,
+    this.noShowResolution,
   });
 
   factory Booking.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -63,6 +64,7 @@ class Booking {
       payoutReleasedAt: (d['payoutReleasedAt'] as Timestamp?)?.toDate(),
       payoutCancelledAt: (d['payoutCancelledAt'] as Timestamp?)?.toDate(),
       disputeStatus: d['disputeStatus'] as String?,
+      noShowResolution: d['noShowResolution'] as String?,
     );
   }
 
@@ -95,7 +97,8 @@ class Booking {
   final String? schoolAddress;
 
   /// 'student' or 'instructor', once cancelled; 'system' when a payment
-  /// arrived after the hold ran out and the time was taken (P9).
+  /// arrived after the hold ran out and the time was taken (P9); 'admin'
+  /// when a no-show report was resolved with a refund (P10a).
   final String? cancelledBy;
   final bool studentDeleted;
   final bool instructorDeleted;
@@ -120,6 +123,10 @@ class Booking {
 
   /// A card dispute: 'open' while Stripe runs it, then Stripe's result.
   final String? disputeStatus;
+
+  /// The admin's answer to a no-show report (adminResolveNoShow, P10a):
+  /// 'refund' or 'release'. Once set, the lesson can't be reported again.
+  final String? noShowResolution;
 
   DateTime get endAt => startAt.add(Duration(minutes: durationMinutes));
 
@@ -153,7 +160,8 @@ class Booking {
 
   /// The student can say a held lesson didn't happen until 48 h after its
   /// end, before the school is paid (reportNoShow, P9).
-  bool noShowReportable(DateTime now) => status == 'completed' && now.isBefore(endAt.add(const Duration(hours: 48)));
+  bool noShowReportable(DateTime now) =>
+      status == 'completed' && noShowResolution == null && now.isBefore(endAt.add(const Duration(hours: 48)));
 
   /// Where the school's money stands (instructor side, P9): null when there
   /// is none to come (cancelled with a refund, an expired hold, upcoming).

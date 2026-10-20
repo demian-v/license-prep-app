@@ -166,11 +166,13 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       'refunded' => switch (b.cancelledBy) {
           'instructor' => 'booking_note_by_school',
           'system' => 'booking_note_slot_taken',
+          'admin' => 'booking_note_no_show_refunded',
           _ => 'booking_note_by_student',
         },
       'late_cancelled' => 'booking_note_late',
       'pending_payment' => asInstructor ? null : 'booking_note_pending',
       'disputed' => asInstructor ? 'booking_note_disputed_school' : 'booking_note_disputed_student',
+      _ when b.noShowResolution == 'release' => 'booking_note_no_show_released',
       _ => asInstructor && b.payout == PayoutState.cancelled ? 'booking_note_payout_cancelled' : null,
     };
     // A Stripe refund, for the student (P9): issued, or still being issued.

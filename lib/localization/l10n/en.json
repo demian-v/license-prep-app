@@ -635,6 +635,8 @@
   "booking_note_disputed_student": "You reported that the lesson didn't happen. The school's payout is on hold until we check.",
   "booking_note_disputed_school": "The student reported that the lesson didn't happen. The payout is on hold until we check.",
   "booking_note_payout_cancelled": "The student's bank returned the payment (a card dispute), so this lesson isn't paid out.",
+  "booking_note_no_show_refunded": "We checked the report that the lesson didn't happen and refunded it in full.",
+  "booking_note_no_show_released": "We checked the report that the lesson didn't happen: it counts as given, and the school is paid.",
   "payout_pending_on": "Payout after {date}",
   "payout_released": "Paid out",
   "payout_held": "Payout on hold",

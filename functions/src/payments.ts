@@ -306,7 +306,7 @@ const NO_SHOW_REASONS = ['instructor_no_show', 'lesson_not_given', 'other'];
  * The student says the lesson didn't happen: `completed` → `disputed`,
  * within 48 h of its end, so before the payout. The payout is held
  * (releaseInstructorPayouts only takes `completed`); the admin resolves it
- * in P10 (refund or release).
+ * (adminResolveNoShow, P10a: refund or release).
  */
 export const reportNoShow = functions.https.onCall(async (data, context) => {
   const uid = signedIn(context);
@@ -320,7 +320,8 @@ export const reportNoShow = functions.https.onCall(async (data, context) => {
     const b = await tx.get(ref);
     if (!b.exists || b.get('studentUid') !== uid) throw new functions.https.HttpsError('permission-denied', 'Not your booking.');
     const endMs = b.get('startAt').toMillis() + b.get('durationMinutes') * 60000;
-    if (b.get('status') !== 'completed' || Date.now() > endMs + NO_SHOW_WINDOW_MS) {
+    // Once the admin has resolved a report (adminResolveNoShow), not again.
+    if (b.get('status') !== 'completed' || b.get('noShowResolvedAt') != null || Date.now() > endMs + NO_SHOW_WINDOW_MS) {
       throw new functions.https.HttpsError('failed-precondition', 'not-reportable');
     }
     const at = Timestamp.now();

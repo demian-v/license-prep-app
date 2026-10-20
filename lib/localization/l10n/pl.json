@@ -635,6 +635,8 @@
   "booking_note_disputed_student": "Zgłoszono, że lekcja się nie odbyła. Wypłata dla szkoły jest wstrzymana do weryfikacji.",
   "booking_note_disputed_school": "Kursant zgłosił, że lekcja się nie odbyła. Wypłata jest wstrzymana do weryfikacji.",
   "booking_note_payout_cancelled": "Bank kursanta zwrócił płatność (spór kartowy), więc ta lekcja nie zostanie wypłacona.",
+  "booking_note_no_show_refunded": "Sprawdziliśmy zgłoszenie, że lekcja się nie odbyła, i zwróciliśmy całą kwotę.",
+  "booking_note_no_show_released": "Sprawdziliśmy zgłoszenie, że lekcja się nie odbyła: jest zaliczona, a szkoła otrzyma zapłatę.",
   "payout_pending_on": "Wypłata po {date}",
   "payout_released": "Wypłacono",
   "payout_held": "Wypłata wstrzymana",

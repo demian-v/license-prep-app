@@ -1,0 +1,173 @@
+@import "tailwindcss";
+
+/*
+ * The panel's own dark "liquid glass" theme (owner, 2026-10-19), not the
+ * app's Bento tokens: a charcoal wallpaper, frosted panels (24 px radius,
+ * 1 px light inner border, a faint top highlight), white/grey text, one
+ * accent. Everything reads these variables, so Settings re-tints the whole
+ * panel live (the transitions below crossfade it).
+ *
+ * Contrast, worst case over every wallpaper, Tinted and Clear glass (checked
+ * 2026-10-19 by blending the tokens): --ink-3 ≥ 4.8:1, tag text ≥ 4.7:1,
+ * accent fills with white text ≥ 4.6:1 — AA for body text. Blur is on panels
+ * only, never on the cards inside them, so a long board scrolls smoothly.
+ */
+:root {
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Inter, Roboto, system-ui, sans-serif;
+  --radius-panel: 24px;
+  --radius-card: 16px;
+  --accent: #2563eb;      /* fills (white text on it is AA) */
+  --accent-ink: #60a5fa;  /* links, checks, selected text on glass */
+  --accent-glow: rgb(37 99 235 / 0.45);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #16171a;
+  --ink: #f4f5f7;
+  --ink-2: rgb(244 245 247 / 0.72);
+  --ink-3: rgb(244 245 247 / 0.62);
+  --panel: rgb(36 38 43 / 0.7);
+  --panel-solid: #24262b;
+  --card: rgb(255 255 255 / 0.045);
+  --card-hover: rgb(255 255 255 / 0.075);
+  --field: rgb(255 255 255 / 0.07);
+  --line: rgb(255 255 255 / 0.09);
+  --edge: rgb(255 255 255 / 0.12);
+  --highlight: rgb(255 255 255 / 0.10);
+  --shadow: 0 18px 40px -18px rgb(0 0 0 / 0.65), 0 2px 6px rgb(0 0 0 / 0.25);
+  --track: rgb(255 255 255 / 0.08);
+  --tag-l: 80%;
+  --tag-a: 0.15;
+  --bad: #ff8a8a;
+  --good: #4ade80;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #e7e8ec;
+  --ink: #121316;
+  --ink-2: rgb(18 19 22 / 0.72);
+  --ink-3: rgb(18 19 22 / 0.64);
+  --panel: rgb(255 255 255 / 0.62);
+  --panel-solid: #fbfbfc;
+  --card: rgb(255 255 255 / 0.6);
+  --card-hover: rgb(255 255 255 / 0.9);
+  --field: rgb(18 19 22 / 0.06);
+  --line: rgb(18 19 22 / 0.08);
+  --edge: rgb(255 255 255 / 0.75);
+  --highlight: rgb(255 255 255 / 0.9);
+  --shadow: 0 18px 40px -20px rgb(20 24 40 / 0.35), 0 2px 6px rgb(20 24 40 / 0.08);
+  --track: rgb(18 19 22 / 0.08);
+  --tag-l: 24%;
+  --tag-a: 0.12;
+  --bad: #b91c1c;
+  --good: #15803d;
+}
+
+/* «Glass: Clear» shows more of the wallpaper. */
+:root[data-theme="dark"][data-glass="clear"] { --panel: rgb(36 38 43 / 0.58); }
+:root[data-theme="light"][data-glass="clear"] { --panel: rgb(255 255 255 / 0.5); }
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-line: var(--line);
+  --color-field: var(--field);
+  --color-card: var(--card);
+  --font-sans: var(--font);
+}
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Component classes sit in a layer, so Tailwind's utilities (fixed, !p-…) win over them. */
+@layer components {
+  /* Colours crossfade when Settings changes them (the video's live re-tint). */
+  .glass, .card, .chip, .btn, .field, .tag, .rail-item, .seg {
+    transition: background-color 380ms ease, border-color 380ms ease, color 380ms ease, box-shadow 380ms ease;
+  }
+
+  .glass {
+    position: relative;
+    background: var(--panel);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow), inset 0 0 0 1px var(--edge), inset 0 1px 0 var(--highlight);
+    backdrop-filter: blur(28px) saturate(150%);
+    -webkit-backdrop-filter: blur(28px) saturate(150%);
+  }
+  /* Reduce transparency: solid surfaces, no frost. */
+  :root[data-solid="true"] .glass {
+    background: var(--panel-solid);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .card {
+    background: var(--card);
+    border-radius: var(--radius-card);
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+  .card.interactive { cursor: pointer; }
+  .card.interactive:hover { background: var(--card-hover); }
+
+  /* A type tag (review, licence, no-show…): --h is its hue; text AA on glass. */
+  .tag {
+    --h: 220;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 2px 8px 2px 7px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 600; line-height: 18px; white-space: nowrap;
+    color: hsl(var(--h) 85% var(--tag-l));
+    background: hsl(var(--h) 80% 55% / var(--tag-a));
+  }
+  .tag .dot { width: 6px; height: 6px; border-radius: 999px; background: hsl(var(--h) 85% 60%); }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    height: 36px; padding: 0 14px; border-radius: 999px;
+    font-size: 13.5px; font-weight: 600; color: var(--ink);
+    background: var(--field); box-shadow: inset 0 0 0 1px var(--line);
+  }
+  .btn:hover:not(:disabled) { background: var(--card-hover); }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  .btn.primary { background: var(--accent); color: #fff; box-shadow: 0 6px 20px -6px var(--accent-glow), inset 0 1px 0 rgb(255 255 255 / 0.25); }
+  .btn.primary:hover:not(:disabled) { filter: brightness(1.08); }
+  .btn.danger { background: #b91c1c; color: #fff; }
+  .btn.small { height: 30px; padding: 0 11px; font-size: 12.5px; }
+
+  .field {
+    height: 36px; padding: 0 14px; border-radius: 999px; background: var(--field);
+    box-shadow: inset 0 0 0 1px var(--line); color: var(--ink); font-size: 13.5px; outline: none;
+  }
+  .field::placeholder { color: var(--ink-3); }
+}
+
+/* A visible keyboard focus ring everywhere. */
+:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+}
+@layer base {
+  button { cursor: pointer; font: inherit; color: inherit; background: none; border: 0; padding: 0; }
+  input, select, textarea { font: inherit; }
+}
+
+.scroll-fade {
+  mask-image: linear-gradient(to bottom, black calc(100% - 48px), transparent);
+}
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .glass, .card, .chip, .btn, .field, .tag, .rail-item, .seg { transition: none; }
+}
