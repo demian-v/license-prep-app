@@ -11,7 +11,7 @@ import { sweepPaginated, SWEEP_TIME_BUDGET_MS, SweepResult } from './sweep';
 /**
  * The admin dashboard's server side (instructors plan v2 §18a, P10a).
  *
- * The dashboard (`admin/`, a web app on the Firebase JS SDK) is only a
+ * The dashboard (the private repo driveusa-admin, a web app on the Firebase JS SDK) is only a
  * client: every read and every action is a callable here, each gated on
  * requireAdmin (admins/{uid}, empty in production until P11). Reads go
  * through callables too, so no rule had to widen for the panel — the

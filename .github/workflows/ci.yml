@@ -140,35 +140,6 @@ jobs:
         # rather than accumulated noise.
         run: npm run lint
 
-  admin:
-    # P10a: the admin dashboard (admin/, Vite + React). Typecheck, the
-    # board/insights logic tests, and the production build. It runs against
-    # the emulators only and is never deployed from here (Hosting is P11).
-    name: Admin panel — build & test
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: admin
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: admin/package-lock.json
-
-      # admin/.npmrc sets legacy-peer-deps: npm's resolver crashes on
-      # vitest 5's optional peers otherwise.
-      - run: npm ci
-
-      - name: Test
-        run: npm test
-
-      - name: Build (tsc + vite)
-        run: npm run build
-
   android:
     name: Android — build (Java ${{ matrix.java }})
     runs-on: ubuntu-latest
