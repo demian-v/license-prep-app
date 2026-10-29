@@ -5,6 +5,9 @@ import { requirePaidSubscriber } from './entitlement';
 import { RELEASED_STATES, timezoneForZip } from './zip-timezone';
 import { stripJpegMetadata } from './jpeg-metadata';
 import { sendPushToUser } from './push';
+import { isUnsafe, vision } from './vision-client';
+
+type StorageFile = ReturnType<ReturnType<ReturnType<typeof admin.storage>['bucket']>['file']>;
 
 /**
  * Instructors marketplace — the student-side read path (plan v2 §3, §13).
@@ -144,9 +147,9 @@ const LESSON_DURATIONS = [60, 90, 120];
 /**
  * The one place that decides whether a profile is in search and at which
  * verification stage it stands (plan v2 §5, §6.4). Owner decision
- * 2026-09-30: verification may be skipped at signup, so a complete, active
- * profile is listed at stage 0 («Не проверен») — nobody is held back for a
- * pending photo or check.
+ * 2026-10-22 (plan decision 31): students see only instructors whose licence
+ * an admin checked and that is still in date. Verification may still be
+ * skipped at signup; the profile just stays out of search until then.
  */
 export function computeListing(p: FirebaseFirestore.DocumentData, nowMs = Date.now()) {
   const profileComplete = typeof p.name === 'string' && p.name.length > 0
@@ -154,11 +157,12 @@ export function computeListing(p: FirebaseFirestore.DocumentData, nowMs = Date.n
     && Array.isArray(p.languages) && p.languages.length > 0
     && Number.isInteger(p.hourlyRateCents)
     && Array.isArray(p.lessonDurations) && p.lessonDurations.length > 0;
-  const listed = p.status === 'active' && profileComplete;
 
   const idPassed = p.idCheck === 'passed';
   const licenseLive = p.licenseCheck === 'passed'
     && (p.licenseExpiresAt == null || p.licenseExpiresAt.toMillis() > nowMs);
+  // An admin approval always carries a future expiry (adminReviewLicense).
+  const listed = p.status === 'active' && profileComplete && licenseLive && p.licenseExpiresAt != null;
   const hasHours = p.availability != null
     && Object.values(p.availability).some((day) => Array.isArray(day) && day.length > 0);
   const stage = idPassed && licenseLive && p.payoutsEnabled === true && hasHours ? 2 : idPassed ? 1 : 0;
@@ -484,15 +488,15 @@ const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 
 /**
  * A finished upload to the private pending path. The client never writes
- * photoPath: this trigger decides what students see. Until P10's SafeSearch
- * check exists, production keeps the photo `pending` (fail-closed — nothing
- * unmoderated is shown, and an approved older photo stays); only the
- * emulator auto-approves, so the flow can be built and tested end to end.
- * Approving writes the file, stripped of its metadata (the phone's GPS
- * position travels in EXIF), to a versioned public name (no stale cache)
- * and removes the upload and the previous photo. A file that is not a JPEG
- * the stripper can read is refused. One pending upload is kept per
- * instructor, so repeated tries don't pile up.
+ * photoPath: this trigger decides what students see (plan v2 §8, P10b).
+ * Every environment runs SafeSearch (the emulator and jest on a fake —
+ * vision-client.ts): LIKELY or above on adult, violence or racy refuses the
+ * photo (upload deleted, push); a clean one is published. When Vision can't
+ * answer, the photo is HELD — fail-closed: `pending`, nothing unmoderated
+ * shown, an approved older photo stays — until an admin approves or
+ * rejects it in the panel (adminReviewPhoto). One held upload is kept per
+ * instructor, so repeated tries don't pile up. A file that is not a JPEG
+ * the metadata stripper can read is refused.
  */
 export const onInstructorUpload = functions.storage.object().onFinalize(async (object) => {
   const licence = LICENSE_UPLOAD.exec(object.name ?? '');
@@ -518,28 +522,51 @@ export const onInstructorUpload = functions.storage.object().onFinalize(async (o
     return;
   }
 
+  const [original] = await upload.download();
+  let verdict: 'ok' | 'unsafe' | 'held';
+  try {
+    verdict = isUnsafe(await vision().safeSearch(original)) ? 'unsafe' : 'ok';
+  } catch (error) {
+    // The admin's alert is the held photo on the panel's Licences page.
+    functions.logger.error('onInstructorUpload: SafeSearch failed, photo held for an admin', { uid, uploadId, error: (error as Error).message });
+    verdict = 'held';
+  }
   const now = Timestamp.now();
-  if (process.env.FUNCTIONS_EMULATOR !== 'true') {
+  if (verdict === 'held') {
     const before = (await privateRef.get()).get('moderation.photo');
     if (before?.status === 'pending' && before.uploadId && before.uploadId !== uploadId) {
       await bucket.file(`instructorUploads/${uid}/photo/${before.uploadId}.jpg`).delete({ ignoreNotFound: true });
     }
-    await privateRef.set({ moderation: { photo: { status: 'pending', uploadId, updatedAt: now } } }, { merge: true });
+    await privateRef.set({ moderation: { photo: { status: 'pending', uploadId, bucket: object.bucket, reason: 'vision_error', updatedAt: now } } }, { merge: true });
     await ref.update({ photoStatus: 'pending', updatedAt: now });
     return;
   }
-
-  // Published without the phone's metadata (GPS position, device, time).
-  const [original] = await upload.download();
-  const clean = stripJpegMetadata(original);
-  if (!clean) {
-    await upload.delete({ ignoreNotFound: true });
-    await ref.update({ photoStatus: 'rejected', updatedAt: now });
-    await sendPushToUser(uid, 'photo_rejected', 'profile');
+  if (verdict === 'unsafe') {
+    await rejectPhoto(uid, upload, 'safesearch');
     return;
   }
+  await publishPhoto(uid, uploadId, upload, original);
+});
+
+/**
+ * A held or clean photo goes public: without the phone's metadata (GPS
+ * position, device, time), under a versioned name (no stale cache); the
+ * upload and the previous photo are removed. Also adminReviewPhoto's
+ * approve. Refused instead when the stripper can't read the JPEG.
+ */
+export async function publishPhoto(uid: string, uploadId: string, upload: StorageFile, original: Buffer): Promise<boolean> {
+  const db = admin.firestore();
+  const ref = db.collection('instructors').doc(uid);
+  const privateRef = db.collection('instructorPrivate').doc(uid);
+  const clean = stripJpegMetadata(original);
+  if (!clean) {
+    await rejectPhoto(uid, upload, 'unreadable');
+    return false;
+  }
+  const now = Timestamp.now();
+  const bucket = admin.storage().bucket(upload.bucket.name);
   const photoPath = `instructorPhotos/${uid}/${uploadId}.jpg`;
-  const previous = snap.get('photoPath');
+  const previous = (await ref.get()).get('photoPath');
   await bucket.file(photoPath).save(clean, { contentType: 'image/jpeg', resumable: false });
   await ref.update({ photoPath, photoApproved: true, photoStatus: 'approved', updatedAt: now });
   // Threads carry the photo path (plan v2 §5) and the previous file goes
@@ -551,10 +578,22 @@ export const onInstructorUpload = functions.storage.object().onFinalize(async (o
   if (typeof previous === 'string' && previous !== photoPath) {
     await bucket.file(previous).delete({ ignoreNotFound: true });
   }
-  // Last, after the upload is gone: a redelivered event returns early above
-  // (upload missing), so it doesn't notify twice.
+  // Last, after the upload is gone: a redelivered event returns early (upload
+  // missing), so it doesn't notify twice.
   await sendPushToUser(uid, 'photo_approved', 'profile');
-});
+  return true;
+}
+
+/** The upload is deleted, Профиль says «Не принято», a push says so. An approved older photo stays. */
+export async function rejectPhoto(uid: string, upload: StorageFile, reason: 'safesearch' | 'unreadable' | 'admin') {
+  const db = admin.firestore();
+  const now = Timestamp.now();
+  await upload.delete({ ignoreNotFound: true });
+  await db.collection('instructors').doc(uid).update({ photoStatus: 'rejected', updatedAt: now });
+  await db.collection('instructorPrivate').doc(uid)
+    .set({ moderation: { photo: { status: 'rejected', reason, updatedAt: now } } }, { merge: true });
+  await sendPushToUser(uid, 'photo_rejected', 'profile');
+}
 
 /**
  * A licence photo (plan v2 §8, P10b): evidence for the admin's licence

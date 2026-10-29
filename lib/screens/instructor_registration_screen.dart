@@ -29,9 +29,9 @@ import 'instructor_kind_screen.dart';
 /// at the bottom. It ends with registerAsInstructor, which grants the role.
 ///
 /// Owner decision 2026-09-30: verification is not a wall. The last step (the
-/// licence numbers) can be skipped; the profile is then listed as
-/// «Не проверен» and the numbers — and later the photo and the ID check —
-/// are added in Профиль.
+/// licence numbers) can be skipped and the numbers — and later the photo and
+/// the ID check — are added in Профиль. Students see the profile only once
+/// the licence is checked (decision 31, owner 2026-10-22).
 ///
 /// The draft is saved on the device after every step, so an interrupted
 /// signup resumes with what was typed. It belongs to one account: another

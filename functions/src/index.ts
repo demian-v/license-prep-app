@@ -14,6 +14,8 @@ import { mapPlayNotification, PLAY_NOTIFICATION, playDedupKey } from './play-not
 import { recordWebhookFailure } from './webhook-dead-letter';
 import { anonymizeTrialDevicesForUser } from './trial-devices';
 import { collectUserDataForDeletion, applyDeletionPlan, assertRecentLogin, deleteUserStorage, anonymousIdFor } from './account-deletion';
+import { eraseDiditDataForDeletedAccount } from './identity';
+import { DIDIT_SECRETS } from './didit-client';
 import { upcomingBookingCount, unsettledBookingCount } from './bookings';
 import { closeConnectedAccount } from './payments';
 import { STRIPE_SECRETS, stripeConfigured } from './stripe-client';
@@ -1359,7 +1361,7 @@ export const updateProfile = functions.https.onCall(async (data, context) => {
 // Account Management Functions
 
 // Delete user account with comprehensive error handling and logging
-export const deleteUserAccount = functions.runWith({ secrets: STRIPE_SECRETS }).https.onCall(async (data, context) => {
+export const deleteUserAccount = functions.runWith({ secrets: [...STRIPE_SECRETS, ...DIDIT_SECRETS] }).https.onCall(async (data, context) => {
   try {
     console.log('deleteUserAccount called with data:', data);
     
@@ -1426,6 +1428,8 @@ export const deleteUserAccount = functions.runWith({ secrets: STRIPE_SECRETS }).
     const instructorPrivate = await db.collection('instructorPrivate').doc(userId).get();
     const stripeAccountId: string | null =
       instructorPrivate.get('stripeAccountId') ?? instructorPrivate.get('stripePendingAccountId') ?? null;
+    // And the Didit sessions of the identity check (P10b), erased at Didit below.
+    const identitySessionIds: string[] = instructorPrivate.get('identitySessionIds') ?? [];
     console.log(
       `deleteUserAccount: ${targets.length} target(s) for ${userId}: ` +
       targets.map((t) => `${t.collection}:${t.action}`).join(', '),
@@ -1497,6 +1501,8 @@ export const deleteUserAccount = functions.runWith({ secrets: STRIPE_SECRETS }).
         .set({ accountId: stripeAccountId, retryAt: Timestamp.now() }, { merge: true });
       if (stripeConfigured()) await closeConnectedAccount(stripeAccountId);
     }
+    // Never throws: a Didit failure is queued and retried (identity.ts).
+    await eraseDiditDataForDeletedAccount(userId, identitySessionIds);
 
     console.log(`Account deletion completed successfully for user: ${userId}`);
     
@@ -2625,4 +2631,5 @@ export { sendMessage, markConversationRead, getInstructorContactInfo } from './c
 export { getBookingOptions, createBooking, releaseBookingHold, cancelBooking, expirePendingBookings, markBookingsCompleted } from './bookings';
 export { stripeWebhook, startInstructorPayouts, getInstructorPayouts, stripeOnboardingReturn, reportNoShow, releaseInstructorPayouts } from './payments';
 export { submitReview, deleteReview, reportReview } from './reviews';
-export { adminGetQueue, adminListInstructors, adminGetBookings, adminSetReportStatus, adminHideReview, adminSetInstructorStatus, adminReviewLicense, adminSetInReview, adminResolveNoShow, adminResolveLostDispute, adminGetLicenseImage, expireInstructorLicenses } from './admin';
+export { adminGetQueue, adminListInstructors, adminGetBookings, adminSetReportStatus, adminHideReview, adminSetInstructorStatus, adminReviewLicense, adminSetInReview, adminResolveNoShow, adminResolveLostDispute, adminGetLicenseImage, adminListHeldPhotos, adminGetHeldPhoto, adminReviewPhoto, expireInstructorLicenses } from './admin';
+export { recordBiometricConsent, createIdentitySession, diditWebhook, reconcileIdentitySessions } from './identity';

@@ -20,3 +20,7 @@ process.env.LATER_FEE_MIN_CENTS = '150';
 // (setStripeClient), so nothing can reach Stripe's API.
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_platform_dummy,whsec_test_connect_dummy';
 process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test_dummy';
+// Didit (P10b): dummies only. DIDIT_API_KEY stays unset: tests hand identity
+// a fake client (setDiditClient), so nothing can reach Didit's API.
+process.env.DIDIT_WEBHOOK_SECRET = 'didit_whsec_test_dummy';
+process.env.DIDIT_WORKFLOW_ID = 'wf_test_dummy';

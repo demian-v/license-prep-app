@@ -6,25 +6,32 @@ import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
 
 /// What was checked about an instructor, as a pill (instructors plan v2
-/// §6.4). Factual, never "Safe": stage 0 «Не проверен», 1 «Личность
-/// подтверждена», 2 «Проверен».
+/// §6.4). Factual, never "Safe". Students see only profiles with a checked
+/// licence (decision 31, owner 2026-10-22): stage 0 «Лицензия проверена»,
+/// 1–2 «Проверен». The instructor's own Профиль passes [licenseChecked], so
+/// before the licence check it still says «Не проверен» / «Личность
+/// подтверждена».
 ///
 /// Colours from the palette: amber *text* fails AA at pill size, so the
 /// unchecked stages are a neutral `field` pill with `inkSecondary` text and an
 /// amber icon (graphics need only 3:1); the checked stage is `guide` on
 /// `guideSurface` (4.86:1).
 class InstructorStageBadge extends StatelessWidget {
-  const InstructorStageBadge({super.key, required this.stage});
+  const InstructorStageBadge({super.key, required this.stage, this.licenseChecked = true});
 
   final int stage;
+
+  /// Always true for a listed profile, which is all a student sees.
+  final bool licenseChecked;
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final verified = stage >= 2;
-    final label = switch (stage) {
-      0 => l.translate('stage_unverified'),
-      1 => l.translate('stage_id_checked'),
+    final verified = licenseChecked && stage >= 1;
+    final label = switch ((licenseChecked, stage)) {
+      (false, 0) => l.translate('stage_unverified'),
+      (false, _) => l.translate('stage_id_checked'),
+      (true, 0) => l.translate('stage_license_checked'),
       _ => l.translate('stage_verified'),
     };
     return Container(

@@ -113,9 +113,9 @@ class _InstructorDetailScreenState extends State<InstructorDetailScreen> {
                 padding: _pagePadding,
                 children: [
                   _Hero(instructor: i),
-                  if (i.stage < 2) ...[
+                  if (i.stage < 1) ...[
                     const SizedBox(height: AppSpacing.x3),
-                    _Notice(stage: i.stage),
+                    const _Notice(),
                   ],
                   const SizedBox(height: AppSpacing.x3),
                   _Actions(instructor: i, uid: widget.uid),
@@ -228,19 +228,17 @@ class _Hero extends StatelessWidget {
   }
 }
 
-/// The big amber notice for a profile whose checks aren't done (plan v2
-/// §6.4): amber title at a size where it passes contrast, never red.
+/// The big amber notice for a listed profile whose ID isn't checked yet
+/// (plan v2 §6.4; its licence always is, decision 31): amber title at a size
+/// where it passes contrast, never red.
 class _Notice extends StatelessWidget {
-  const _Notice({required this.stage});
-
-  final int stage;
+  const _Notice();
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final (title, desc) = stage == 0
-        ? ('instructor_notice_unverified_title', 'instructor_notice_unverified_desc')
-        : ('instructor_notice_id_checked_title', 'instructor_notice_id_checked_desc');
+    const title = 'instructor_notice_id_pending_title';
+    const desc = 'instructor_notice_id_pending_desc';
     return Container(
       padding: const EdgeInsets.all(AppSpacing.x4 + AppSpacing.x1),
       decoration: BoxDecoration(
@@ -295,7 +293,7 @@ class _Actions extends StatelessWidget {
     final l = AppLocalizations.of(context);
     final i = instructor;
     final reasons = [
-      if (i.isSchool && !i.bookable) l.translate('instructor_book_after_check'),
+      if (i.isSchool && !i.bookable) l.translate('instructor_book_not_open'),
       if (i.stage < 1) l.translate('instructor_chat_after_id'),
     ];
     return Column(

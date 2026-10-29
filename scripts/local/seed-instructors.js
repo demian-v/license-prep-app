@@ -4,7 +4,8 @@
  * Plan v2 P1 (vault raw/drive_usa/2026-09-30-Instructors Plan v2.md). Writes:
  *   config/instructors          { launchStates: ['IL', 'TX'] }   (owner decision 2026-09-30)
  *   instructors/{uid}           24 profiles across IL / TX / MD, every stage and kind,
- *                               plus one deactivated and one suspended (listed:false)
+ *                               plus one deactivated and one suspended (listed:false); stage-0 rows
+ *                               keep their licence pending and are not listed (decision 31)
  *   instructorPrivate/{uid}     fictional 555-01xx phones, example.com emails
  *   instructors/{uid}/reviews   a few reviews, with ratingSum/Count/Avg kept consistent and an
  *                               opaque reviewId each (P8); seed-student-paid's own reviews are
@@ -97,6 +98,11 @@ const ROWS = [
   ['MD', 'Towson', 'America/New_York', 'schoolInstructor', 'Svitlana Melnyk', 'Harbor Driving School', ['uk', 'en'], 60, 2, 'active', [5]],
 ];
 
+// P10b: one identity check in progress and one declined, for the panel's
+// Identity checks list (both stage 0, licence pending).
+const ID_CHECK = { 'seed-instr-05': 'pending', 'seed-instr-08': 'failed' };
+const OWNER_NAMES = ['Robert Miller', 'Linda Garcia', 'James Wilson', 'Patricia Moore'];
+
 const REVIEWERS = ['Anna K.', 'Jake M.', 'Sofia R.', 'Taras P.', 'Emily W.'];
 const COMMENTS = ['Very patient, passed on the first try.', 'Clear explanations of the road test route.',
   'Good lessons, sometimes late.', 'Explained everything in my language.', 'Calm and professional.'];
@@ -109,7 +115,10 @@ const COMMENTS = ['Very patient, passed on the first try.', 'Clear explanations 
   ROWS.forEach(([state, city, timezone, kind, name, schoolName, languages, rateUsd, stage, status, reviews], i) => {
     const n = String(i + 1).padStart(2, '0');
     const uid = `seed-instr-${n}`;
-    const listed = status === 'active';
+    // Decision 31 (owner, 2026-10-22): only a checked licence lists a profile,
+    // so the stage-0 rows stay out of search with their licence pending.
+    const licensePassed = stage >= 1;
+    const listed = status === 'active' && licensePassed;
     const ratingSum = reviews.reduce((a, b) => a + b, 0);
     const ratingCount = reviews.length;
     if (listed) stats[state] = (stats[state] || 0) + 1;
@@ -124,10 +133,11 @@ const COMMENTS = ['Very patient, passed on the first try.', 'Clear explanations 
       carYear: 2019 + (i % 6), hasDualControls: true,
       bio: `${kind === 'school' ? 'Licensed driving school' : 'Instructor'} in ${city}. Road test preparation, highway and parking practice.`,
       hourlyRateCents: rateUsd * 100, lessonDurations: [60, 90, 120],
-      idCheck: stage >= 1 ? 'passed' : 'none',
-      licenseCheck: stage === 2 ? 'passed' : 'pending',
+      idCheck: ID_CHECK[uid] ?? (stage >= 1 ? 'passed' : 'none'),
+      ...(ID_CHECK[uid] === 'failed' ? { idCheckReason: 'DOCUMENT_EXPIRED' } : {}),
+      licenseCheck: licensePassed ? 'passed' : 'pending',
       licenseState: state,
-      licenseExpiresAt: stage === 2 ? Timestamp.fromMillis(Date.now() + 365 * 864e5) : null,
+      licenseExpiresAt: licensePassed ? Timestamp.fromMillis(Date.now() + 365 * 864e5) : null,
       stage, payoutsEnabled: stage === 2,
       availability: i % 3 === 0 ? { ...WEEKDAYS, ...WEEKENDS } : i % 3 === 1 ? WEEKDAYS : {},
       ratingSum, ratingCount, ratingAvg: ratingCount ? Math.round((ratingSum / ratingCount) * 10) / 10 : 0,
@@ -140,6 +150,10 @@ const COMMENTS = ['Very patient, passed on the first try.', 'Clear explanations 
       phone: `+1 312 555 01${n}`, contactEmail: `${uid}@example.com`,
       stripeAccountId, stripePendingAccountId: stripeAccountId,
       identitySessionIds: [], biometricConsentAt: stage >= 1 ? now : null,
+      // P10b: what Didit read off the ID (a school's is its owner's), for the
+      // panel's name check beside the licence photo. Fictional names.
+      identity: stage >= 1 ? { fullName: kind === 'school' ? OWNER_NAMES[i % OWNER_NAMES.length] : name, dateOfBirth: '1985-06-15',
+        documentExpiresOn: '2030-06-15', status: 'Approved', sessionId: `seed-session-${n}`, checkedAt: now } : null,
       licenseNumber: kind === 'schoolInstructor' ? `${state}-DI-${5000 + i}` : null,
       moderation: { photo: { status: 'none' } },
     });
@@ -449,6 +463,21 @@ const COMMENTS = ['Very patient, passed on the first try.', 'Clear explanations 
     }
   }
   console.log(`Admin board: 5 reports (review, message, instructor, question, theory dismissed), 2 no-show reports, 2 card disputes, 1 cancellations alert; ${h} past lessons for Insights`);
+
+  // P10b: a profile photo held for an admin (plan v2 §8). The JPEG carries
+  // the emulator fake Vision's test marker, so onInstructorUpload "can't
+  // check" it and holds it; Storage emulator only.
+  if (process.env.FIREBASE_STORAGE_EMULATOR_HOST) {
+    const fs = require('fs');
+    const path = require('path');
+    const photo = fs.readFileSync(path.join(__dirname, '../../design/onboarding/_src/shots/c_profile.jpg'));
+    const marker = Buffer.from('DRIVEUSA-VISION-TEST:error', 'latin1');
+    const com = Buffer.concat([Buffer.from([0xff, 0xfe, (marker.length + 2) >> 8, (marker.length + 2) & 0xff]), marker]);
+    const held = Buffer.concat([photo.subarray(0, 2), com, photo.subarray(2)]);
+    await admin.storage().bucket('licenseprepapp.firebasestorage.app')
+      .file('instructorUploads/seed-instr-06/photo/seed-held-1.jpg').save(held, { contentType: 'image/jpeg', resumable: false });
+    console.log('Held photo: instructorUploads/seed-instr-06/photo/seed-held-1.jpg (Prairie Road School), held by the trigger');
+  }
 
   console.log(`Seeded ${ROWS.length} instructors; listed per state:`, stats, '; launchStates: IL, TX');
 })().catch((e) => { console.error(e); process.exit(1); });

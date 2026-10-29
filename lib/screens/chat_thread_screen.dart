@@ -224,7 +224,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
       if (listing.bookable) {
         navigator.push(ForwardPageRoute(child: BookingScreen(instructor: listing)));
       } else {
-        messenger.showSnackBar(SnackBar(content: Text(l.translate('instructor_book_after_check'))));
+        messenger.showSnackBar(SnackBar(content: Text(l.translate('instructor_book_not_open'))));
       }
     } catch (_) {
       messenger.showSnackBar(

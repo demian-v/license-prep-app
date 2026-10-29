@@ -258,13 +258,13 @@ void main() {
     testWidgets('opens for a stage-2 school, with no reason under it', (tester) async {
       await _pump(tester, InstructorDetailScreen(instructor: _school(), uid: 's1', service: _Profile(2)));
       expect(book(tester).onTap, isNotNull);
-      expect(find.text('Booking opens once the licence is checked.'), findsNothing);
+      expect(find.text(_locale('en')['instructor_book_not_open'] as String), findsNothing);
     });
 
-    testWidgets('stays disabled below stage 2, with the licence reason', (tester) async {
+    testWidgets('stays disabled below stage 2, with the reason', (tester) async {
       await _pump(tester, InstructorDetailScreen(instructor: _school(stage: 1), uid: 's1', service: _Profile(1)));
       expect(book(tester).onTap, isNull);
-      expect(find.text(_locale('en')['instructor_book_after_check'] as String), findsOneWidget);
+      expect(find.text(_locale('en')['instructor_book_not_open'] as String), findsOneWidget);
     });
   });
 

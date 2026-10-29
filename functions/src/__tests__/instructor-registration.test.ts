@@ -1,8 +1,9 @@
 /**
  * Instructors plan v2 §4.3 / §5 / §6.4 — registration, the listing rule and
  * the trigger that keeps `listed`, `stage` and the per-state count honest.
- * Owner decision 2026-09-30: verification can be skipped at signup, so a
- * complete profile is listed at stage 0.
+ * Owner decision 2026-10-22 (plan decision 31): students see only
+ * instructors whose licence is checked and in date, so a new profile is not
+ * listed until an admin approves the licence.
  */
 import * as fs from 'fs';
 import * as path from 'path';
@@ -43,10 +44,10 @@ describe('registerAsInstructor', () => {
   beforeEach(() => wipe('reg-a', 'reg-b', 'reg-c', 'reg-d', 'reg-e'));
 
   it('creates the public and private docs and grants the role', async () => {
-    await expect(register(school, 'reg-a')).resolves.toEqual({ state: 'IL', listed: true, stage: 0 });
+    await expect(register(school, 'reg-a')).resolves.toEqual({ state: 'IL', listed: false, stage: 0 });
     const pub = (await db().collection('instructors').doc('reg-a').get()).data()!;
     expect(pub).toMatchObject({ kind: 'school', schoolName: 'Lakeview Driving School', timezone: 'America/Chicago',
-      listed: true, stage: 0, idCheck: 'none', licenseCheck: 'none', status: 'active', cityKey: 'chicago' });
+      listed: false, stage: 0, idCheck: 'none', licenseCheck: 'none', status: 'active', cityKey: 'chicago' });
     expect(pub.phone).toBeUndefined();
     const priv = (await db().collection('instructorPrivate').doc('reg-a').get()).data()!;
     expect(priv).toMatchObject({ phone: '+1 312 555 0100', contactEmail: 'school@example.com' });
@@ -75,7 +76,7 @@ describe('registerAsInstructor', () => {
     const { schoolAddress, fleetSize, instructorCount, ...rest } = school;
     void schoolAddress; void fleetSize; void instructorCount;
     const instructor = { ...rest, kind: 'schoolInstructor', name: 'Marek Nowak' };
-    await expect(register(instructor, 'reg-d')).resolves.toMatchObject({ listed: true });
+    await expect(register(instructor, 'reg-d')).resolves.toMatchObject({ listed: false });
     expect((await db().collection('instructors').doc('reg-d').get()).get('schoolName')).toBeNull();
     await expect(register({ ...instructor, schoolName: 'x' }, 'reg-e')).rejects.toMatchObject({ code: 'invalid-argument' });
   });
@@ -151,12 +152,26 @@ describe('computeListing', () => {
   const base = { name: 'A', state: 'IL', city: 'Chicago', languages: ['en'], hourlyRateCents: 6000,
     lessonDurations: [60], status: 'active' };
 
-  it('lists a complete active profile at stage 0 with nothing verified', () => {
-    expect(computeListing(base)).toEqual({ listed: true, stage: 0 });
+  const checked = { ...base, licenseCheck: 'passed',
+    licenseExpiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 864e5) };
+
+  it('does not list a complete profile until its licence is checked', () => {
+    expect(computeListing(base)).toEqual({ listed: false, stage: 0 });
+    for (const licenseCheck of ['none', 'pending', 'rejected', 'expired']) {
+      expect(computeListing({ ...checked, licenseCheck }).listed).toBe(false);
+    }
+  });
+  it('lists a complete active profile with a checked licence in date', () => {
+    expect(computeListing(checked)).toEqual({ listed: true, stage: 0 });
+  });
+  it('does not list a checked licence that is past its date or has none', () => {
+    const past = admin.firestore.Timestamp.fromMillis(Date.now() - 1000);
+    expect(computeListing({ ...checked, licenseExpiresAt: past }).listed).toBe(false);
+    expect(computeListing({ ...checked, licenseExpiresAt: null }).listed).toBe(false);
   });
   it('does not list a deactivated or suspended profile', () => {
-    expect(computeListing({ ...base, status: 'deactivated' }).listed).toBe(false);
-    expect(computeListing({ ...base, status: 'suspended' }).listed).toBe(false);
+    expect(computeListing({ ...checked, status: 'deactivated' }).listed).toBe(false);
+    expect(computeListing({ ...checked, status: 'suspended' }).listed).toBe(false);
   });
   it('stage 1 once the ID check passed; 2 only with licence, payouts and hours', () => {
     expect(computeListing({ ...base, idCheck: 'passed' }).stage).toBe(1);
@@ -174,7 +189,8 @@ describe('onInstructorWrite', () => {
   const snap = (data: unknown, id: string) => testEnv.firestore.makeDocumentSnapshot(data as any, `instructors/${id}`);
   // Its own fake state: list-instructors.test.ts reads every listed profile
   // in 'ZI', so leftovers here would show up there.
-  const doc = { name: 'A', state: 'ZT', city: 'X', languages: ['en'], hourlyRateCents: 6000, lessonDurations: [60] };
+  const doc = { name: 'A', state: 'ZT', city: 'X', languages: ['en'], hourlyRateCents: 6000, lessonDurations: [60],
+    licenseCheck: 'passed', licenseExpiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 864e5) };
 
   beforeEach(async () => {
     const old = await db().collection('instructors').where('state', '==', 'ZT').get();

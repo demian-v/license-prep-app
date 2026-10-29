@@ -19,7 +19,8 @@ import * as admin from 'firebase-admin';
 
 export type PushKind = 'photo_approved' | 'photo_rejected'
   | 'booking_new' | 'booking_cancelled_student' | 'booking_cancelled_instructor'
-  | 'review_request' | 'booking_refunded' | 'payouts_enabled' | 'license_expired';
+  | 'review_request' | 'booking_refunded' | 'payouts_enabled' | 'license_expired'
+  | 'identity_passed' | 'identity_failed';
 
 export type Lang = 'en' | 'es' | 'uk' | 'ru' | 'pl';
 const LANGS: readonly Lang[] = ['en', 'es', 'uk', 'ru', 'pl'];
@@ -91,13 +92,29 @@ const TEXTS: Record<PushKind, Record<Lang, { title: string; body: string }>> = {
     pl: { title: 'Wypłaty skonfigurowane', body: 'Pieniądze za lekcje będą wpływać co tydzień.' },
   },
   // P10: the daily expireInstructorLicenses found the reviewed licence past
-  // its expiry date; bookings stop until a renewed one is checked. Opens Профиль.
+  // its expiry date; the profile leaves search (decision 31) until a renewed
+  // one is checked. Opens Профиль.
   license_expired: {
-    en: { title: 'Your licence has expired', body: 'Send the renewed licence in Profile to take bookings again.' },
-    es: { title: 'Tu licencia ha caducado', body: 'Envía la licencia renovada en Perfil para volver a recibir reservas.' },
-    uk: { title: 'Термін дії ліцензії минув', body: 'Надішліть поновлену ліцензію у Профілі, щоб знову приймати бронювання.' },
-    ru: { title: 'Срок лицензии истёк', body: 'Отправьте продлённую лицензию в Профиле, чтобы снова принимать брони.' },
-    pl: { title: 'Licencja wygasła', body: 'Wyślij odnowioną licencję w Profilu, aby znów przyjmować rezerwacje.' },
+    en: { title: 'Your licence has expired', body: 'Students can’t see your profile until the renewed licence is checked. Send it in Profile.' },
+    es: { title: 'Tu licencia ha caducado', body: 'Los alumnos no verán tu perfil hasta que se verifique la licencia renovada. Envíala en Perfil.' },
+    uk: { title: 'Термін дії ліцензії минув', body: 'Учні не бачитимуть ваш профіль, доки поновлену ліцензію не перевірять. Надішліть її у Профілі.' },
+    ru: { title: 'Срок лицензии истёк', body: 'Ученики не увидят ваш профиль, пока продлённую лицензию не проверят. Отправьте её в Профиле.' },
+    pl: { title: 'Licencja wygasła', body: 'Uczniowie nie zobaczą Twojego profilu, dopóki odnowiona licencja nie zostanie sprawdzona. Wyślij ją w Profilu.' },
+  },
+  // P10b: Didit's result for the instructor's identity check. Opens Профиль.
+  identity_passed: {
+    en: { title: 'Identity confirmed', body: 'The identity check in your Profile is done.' },
+    es: { title: 'Identidad confirmada', body: 'La verificación de identidad de tu Perfil está hecha.' },
+    uk: { title: 'Особу підтверджено', body: 'Перевірку особи у вашому Профілі завершено.' },
+    ru: { title: 'Личность подтверждена', body: 'Проверка личности в вашем Профиле пройдена.' },
+    pl: { title: 'Tożsamość potwierdzona', body: 'Weryfikacja tożsamości w Twoim Profilu zakończona.' },
+  },
+  identity_failed: {
+    en: { title: 'Identity check failed', body: 'Open Profile to see what to do next.' },
+    es: { title: 'La verificación de identidad no se superó', body: 'Abre Perfil para ver qué hacer.' },
+    uk: { title: 'Перевірку особи не пройдено', body: 'Відкрийте Профіль, щоб дізнатися, що робити далі.' },
+    ru: { title: 'Проверка личности не пройдена', body: 'Откройте Профиль, чтобы узнать, что делать дальше.' },
+    pl: { title: 'Weryfikacja tożsamości nieudana', body: 'Otwórz Profil, aby zobaczyć, co dalej.' },
   },
 };
 

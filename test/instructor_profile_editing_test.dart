@@ -78,6 +78,39 @@ Future<void> _openRow(WidgetTester tester, String title) async {
 }
 
 void main() {
+  // Decision 31 (owner, 2026-10-22): students see the profile only once the
+  // licence is checked, and the instructor is told so.
+  testWidgets('says students can’t see the profile until the licence is checked', (tester) async {
+    await _pump(tester, _FakeService(_doc()));
+    expect(find.text('Students can’t see you yet'), findsOneWidget);
+    expect(find.text('Not verified'), findsOneWidget);
+  });
+
+  testWidgets('no such notice once the licence is checked', (tester) async {
+    await _pump(tester, _FakeService({..._doc(), 'licenseCheck': 'passed'}));
+    expect(find.text('Students can’t see you yet'), findsNothing);
+    expect(find.text('Licence checked'), findsOneWidget);
+  });
+
+  // P10b: the identity row starts the consent screen, says «Checking…»
+  // while Didit decides, and sends a declined check to support.
+  testWidgets('the identity row: Start opens the consent screen', (tester) async {
+    await _pump(tester, _FakeService(_doc()));
+    await tester.tap(find.text('Start'));
+    await tester.pumpAndSettle();
+    expect(find.text('Biometric consent'), findsOneWidget);
+  });
+
+  testWidgets('the identity row: Checking… while pending, support after a decline', (tester) async {
+    await _pump(tester, _FakeService({..._doc(), 'idCheck': 'pending'}));
+    expect(find.text('Checking…'), findsOneWidget);
+    await _pump(tester, _FakeService({..._doc(), 'idCheck': 'failed'}));
+    await tester.tap(find.text('Rejected'));
+    await tester.pumpAndSettle();
+    expect(find.text('Identity check didn’t pass'), findsOneWidget);
+    expect(find.text('Write to support'), findsOneWidget);
+  });
+
   testWidgets('a school edits description, price, car and contacts — no School row', (tester) async {
     await _pump(tester, _FakeService(_doc()));
     expect(find.text('Profile for students'), findsOneWidget);
@@ -187,10 +220,9 @@ void main() {
         await tester.tap(rows.at(i));
         await tester.pumpAndSettle();
         expect(texts().where(raw), isEmpty);
-        if (find.byType(BottomSheet).evaluate().isNotEmpty) {
-          Navigator.of(tester.element(find.byType(BottomSheet))).pop();
-          await tester.pumpAndSettle();
-        }
+        // A sheet, or a pushed screen (the identity row's consent screen).
+        Navigator.of(tester.element(find.byType(InstructorProfileSection, skipOffstage: false))).popUntil((r) => r.isFirst);
+        await tester.pumpAndSettle();
       }
       expect(tester.takeException(), isNull);
     });

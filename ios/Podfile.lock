@@ -1206,6 +1206,10 @@ PODS:
     - Flutter
   - device_info_plus (0.0.1):
     - Flutter
+  - didit_sdk_autodetection (4.9.1):
+    - DiditSDK/AutoDetection (= 4.9.1)
+    - Flutter
+  - DiditSDK/AutoDetection (4.9.1)
   - Firebase/Auth (12.0.0):
     - Firebase/CoreOnly
     - FirebaseAuth (~> 12.0.0)
@@ -1607,6 +1611,8 @@ DEPENDENCIES:
   - cloud_functions (from `.symlinks/plugins/cloud_functions/ios`)
   - connectivity_plus (from `.symlinks/plugins/connectivity_plus/ios`)
   - device_info_plus (from `.symlinks/plugins/device_info_plus/ios`)
+  - didit_sdk_autodetection (from `.symlinks/plugins/didit_sdk_autodetection/ios`)
+  - DiditSDK/AutoDetection (from `https://raw.githubusercontent.com/didit-protocol/sdk-ios/4.9.1/DiditSDK.podspec`)
   - firebase_analytics (from `.symlinks/plugins/firebase_analytics/ios`)
   - firebase_auth (from `.symlinks/plugins/firebase_auth/ios`)
   - firebase_core (from `.symlinks/plugins/firebase_core/ios`)
@@ -1680,6 +1686,10 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/connectivity_plus/ios"
   device_info_plus:
     :path: ".symlinks/plugins/device_info_plus/ios"
+  didit_sdk_autodetection:
+    :path: ".symlinks/plugins/didit_sdk_autodetection/ios"
+  DiditSDK:
+    :podspec: https://raw.githubusercontent.com/didit-protocol/sdk-ios/4.9.1/DiditSDK.podspec
   firebase_analytics:
     :path: ".symlinks/plugins/firebase_analytics/ios"
   firebase_auth:
@@ -1722,6 +1732,8 @@ SPEC CHECKSUMS:
   cloud_functions: 9b2e5ced78e97f80c1dcf7edfb293cf2e19fe71a
   connectivity_plus: cb623214f4e1f6ef8fe7403d580fdad517d2f7dd
   device_info_plus: 21fcca2080fbcd348be798aa36c3e5ed849eefbe
+  didit_sdk_autodetection: ee8898ae752f4541fde730c5797b3030ca0baa5d
+  DiditSDK: 593a9b86f2ad825c149fab18236ce88af0dcac46
   Firebase: 800d487043c0557d9faed71477a38d9aafb08a41
   firebase_analytics: cd56fc56f75c1df30a6ff5290cd56e230996a76d
   firebase_auth: 4734e8223034e214039a9a805ff2cfb323223e34
@@ -1781,6 +1793,6 @@ SPEC CHECKSUMS:
   StripeUICore: cd7242a0449cea4e4b38b61d11584dfabb8e28ce
   url_launcher_ios: 7a95fa5b60cc718a708b8f2966718e93db0cef1b
 
-PODFILE CHECKSUM: 53a6aebc29ccee84c41f92f409fc20cd4ca011f1
+PODFILE CHECKSUM: 6c786c99b596999b9c53f30f8b0be27d24851ce3
 
 COCOAPODS: 1.16.2

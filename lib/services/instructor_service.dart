@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:didit_sdk_autodetection/sdk_flutter.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -142,6 +143,32 @@ class InstructorService {
   Future<String> payoutsState() async {
     final result = await _fns.httpsCallable('getInstructorPayouts').call();
     return (result.data as Map)['state'] as String? ?? 'none';
+  }
+
+  /// The wording BiometricConsentScreen shows — a DRAFT for the lawyer (P11).
+  /// New wording, new version, here and in BIOMETRIC_CONSENT_VERSIONS
+  /// (functions/src/identity.ts).
+  static const biometricConsentVersion = 'draft-2026-10-28';
+
+  /// The ticked box on the consent screen, stored on the server (plan v2 §6.3).
+  Future<void> recordBiometricConsent() async {
+    await _fns.httpsCallable('recordBiometricConsent').call({'version': biometricConsentVersion, 'agreed': true});
+  }
+
+  /// Didit's session for this instructor, created on the server; the token
+  /// for the SDK. Codes: consent-required, too-many-sessions, already-passed.
+  Future<String> createIdentitySession() async {
+    final result = await _fns.httpsCallable('createIdentitySession').call();
+    return (result.data as Map)['sessionToken'] as String;
+  }
+
+  /// Didit's own flow (document, selfie). True when the person went through
+  /// it — the result then arrives on the server. The emulator's fake Didit
+  /// hands out tokens the SDK can't open; those skip straight to «Проверяем…».
+  Future<bool> runIdentityCheck(String token, String languageCode) async {
+    if (token.startsWith('fake-token-')) return true;
+    final result = await DiditSdk.startVerification(token, config: DiditConfig(languageCode: languageCode));
+    return result is VerificationCompleted;
   }
 
   /// One fetch of the state's listing per app session (plan v2 §13): the

@@ -17,6 +17,7 @@ import { runReleaseInstructorPayouts } from '../payments';
 import { setStripeClient } from '../stripe-client';
 import { setPushTransport } from '../push';
 import { computeListing } from '../instructors';
+import { phonePhoto } from './helpers/jpeg';
 
 const db = () => admin.firestore();
 const ADMIN = 'adm-admin';
@@ -35,7 +36,7 @@ const booking = (id: string) => db().collection('bookings').doc(id);
 const ADMIN_CALLABLES = [
   'adminGetQueue', 'adminListInstructors', 'adminGetBookings', 'adminSetReportStatus', 'adminHideReview',
   'adminSetInstructorStatus', 'adminReviewLicense', 'adminSetInReview', 'adminResolveNoShow', 'adminResolveLostDispute',
-  'adminGetLicenseImage',
+  'adminGetLicenseImage', 'adminListHeldPhotos', 'adminGetHeldPhoto', 'adminReviewPhoto',
 ] as const;
 
 // ── Fake Stripe ──────────────────────────────────────────────────────────────
@@ -272,15 +273,22 @@ describe('adminReviewLicense + expireInstructorLicenses', () => {
   it('approves until a future date, rejects, and goes back to pending', async () => {
     await expect(call(fns.adminReviewLicense)({ uid: SCHOOL, approved: true, expiresAtMs: Date.now() - 1000 })).rejects.toMatchObject({ code: 'invalid-argument' });
     const until = Date.now() + 365 * 864e5;
+    expect(computeListing((await school().get()).data()!).listed).toBe(false);
     await call(fns.adminReviewLicense)({ uid: SCHOOL, approved: true, expiresAtMs: until });
     expect((await school().get()).data()).toMatchObject({ licenseCheck: 'passed', licenseReviewedBy: ADMIN });
     expect((await school().get()).get('licenseExpiresAt').toMillis()).toBe(until);
+    // Decision 31 (owner, 2026-10-22): approval lists the profile, a
+    // rejection or a step back to pending takes it out again.
+    expect(computeListing((await school().get()).data()!).listed).toBe(true);
     await call(fns.adminReviewLicense)({ uid: SCHOOL, approved: false });
     expect((await school().get()).data()).toMatchObject({ licenseCheck: 'rejected', licenseExpiresAt: null });
+    expect(computeListing((await school().get()).data()!).listed).toBe(false);
+    await call(fns.adminReviewLicense)({ uid: SCHOOL, approved: true, expiresAtMs: until });
     await call(fns.adminReviewLicense)({ uid: SCHOOL, approved: null });
     const p = (await school().get()).data()!;
     expect(p.licenseCheck).toBe('pending');
     expect(p.licenseReviewedAt).toBeUndefined();
+    expect(computeListing(p).listed).toBe(false);
   });
   it('refuses a profile with no licence number', async () => {
     await school().update({ licenseCheck: 'none' });
@@ -290,7 +298,7 @@ describe('adminReviewLicense + expireInstructorLicenses', () => {
     await school().update({ licenseCheck: 'passed', licenseExpiresAt: inDays(-1) });
     await runExpireInstructorLicenses();
     expect((await school().get()).get('licenseCheck')).toBe('expired');
-    expect(computeListing((await school().get()).data()!).stage).toBe(0);
+    expect(computeListing((await school().get()).data()!)).toEqual({ listed: false, stage: 0 });
     expect(pushes).toEqual([expect.objectContaining({ token: 'tok-school', title: 'Срок лицензии истёк', route: 'profile' })]);
     await runExpireInstructorLicenses();
     expect(pushes).toHaveLength(1);
@@ -489,5 +497,56 @@ describe('adminGetLicenseImage (P10b)', () => {
     const { items } = await call(fns.adminGetQueue)({});
     expect(items.find((i: any) => i.key === `licence:${SCHOOL}`)).toMatchObject({ hasLicenseImage: true });
     await admin.storage().bucket(BUCKET).file(`instructorLicenses/${SCHOOL}/l1.jpg`).delete();
+  });
+  it("shows the ID check and the name Didit read beside the licence (plan v2 §6.1 step 6)", async () => {
+    await seedSchool({ idCheck: 'passed' });
+    await db().collection('instructorPrivate').doc(SCHOOL).set({ identity: { fullName: 'Jan Kowalski', dateOfBirth: '1980-01-01' } }, { merge: true });
+    const { items } = await call(fns.adminGetQueue)({});
+    const item = items.find((i: any) => i.key === `licence:${SCHOOL}`);
+    expect(item).toMatchObject({ idCheck: 'passed', identityName: 'Jan Kowalski' });
+    expect(JSON.stringify(item)).not.toContain('1980');
+  });
+});
+
+describe('held profile photos (P10b, plan v2 §8)', () => {
+  const BUCKET = 'demo-driveusa.appspot.com';
+  const path = (u: string) => `instructorUploads/${SCHOOL}/photo/${u}.jpg`;
+  const hold = async (u: string) => {
+    await admin.storage().bucket(BUCKET).file(path(u)).save(phonePhoto(), { contentType: 'image/jpeg' });
+    await db().collection('instructorPrivate').doc(SCHOOL).set(
+      { moderation: { photo: { status: 'pending', uploadId: u, bucket: BUCKET, reason: 'vision_error', updatedAt: ts(Date.now()) } } }, { merge: true });
+    await school().update({ photoStatus: 'pending' });
+  };
+  beforeEach(() => seedSchool());
+  afterEach(async () => {
+    await admin.storage().bucket(BUCKET).deleteFiles({ prefix: `instructorUploads/${SCHOOL}/` }).catch(() => {});
+    await admin.storage().bucket(BUCKET).deleteFiles({ prefix: `instructorPhotos/${SCHOOL}/` }).catch(() => {});
+  });
+
+  it('lists a held photo and returns it as a data URL', async () => {
+    await hold('h1');
+    const { photos } = await call(fns.adminListHeldPhotos)({});
+    expect(photos).toContainEqual(expect.objectContaining({ uid: SCHOOL, uploadId: 'h1', reason: 'vision_error', name: 'Admin Test Driving School' }));
+    const res = await call(fns.adminGetHeldPhoto)({ uid: SCHOOL });
+    expect(res.dataUrl.startsWith('data:image/jpeg;base64,')).toBe(true);
+  });
+  it('approve publishes it without metadata and tells the instructor', async () => {
+    await hold('h2');
+    await expect(call(fns.adminReviewPhoto)({ uid: SCHOOL, approved: true })).resolves.toMatchObject({ photoStatus: 'approved' });
+    expect((await school().get()).data()).toMatchObject({ photoStatus: 'approved', photoPath: `instructorPhotos/${SCHOOL}/h2.jpg` });
+    const [published] = await admin.storage().bucket(BUCKET).file(`instructorPhotos/${SCHOOL}/h2.jpg`).download();
+    expect(published.includes(Buffer.from('Exif'))).toBe(false);
+    expect((await admin.storage().bucket(BUCKET).file(path('h2')).exists())[0]).toBe(false);
+    expect(pushes).toEqual([expect.objectContaining({ token: 'tok-school', title: 'Фото опубликовано' })]);
+    const { photos } = await call(fns.adminListHeldPhotos)({});
+    expect(photos.find((p: any) => p.uid === SCHOOL)).toBeUndefined();
+  });
+  it('reject deletes it; a second decision is refused', async () => {
+    await hold('h3');
+    await expect(call(fns.adminReviewPhoto)({ uid: SCHOOL, approved: false })).resolves.toMatchObject({ photoStatus: 'rejected' });
+    expect((await school().get()).get('photoStatus')).toBe('rejected');
+    expect((await admin.storage().bucket(BUCKET).file(path('h3')).exists())[0]).toBe(false);
+    await expect(call(fns.adminReviewPhoto)({ uid: SCHOOL, approved: true })).rejects.toMatchObject({ message: 'not-held' });
+    await expect(call(fns.adminGetHeldPhoto)({ uid: SCHOOL })).rejects.toMatchObject({ message: 'no-held-photo' });
   });
 });

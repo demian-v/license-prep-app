@@ -50,11 +50,12 @@ InstructorListing _listing({
     });
 
 class _FakeService extends InstructorService {
-  _FakeService({this.detailError, this.kind = 'school', List<InstructorReview>? reviews})
+  _FakeService({this.detailError, this.kind = 'school', this.stage = 0, List<InstructorReview>? reviews})
       : _reviews = reviews ?? const [];
 
   final Object? detailError;
   final String kind;
+  final int stage;
   final List<InstructorReview> _reviews;
   final favorites$ = StreamController<Set<String>>.broadcast();
   final saves = <(String, bool)>[];
@@ -64,7 +65,7 @@ class _FakeService extends InstructorService {
     if (detailError != null) throw detailError!;
     return InstructorListing.fromMap({
       'id': id, 'kind': kind, 'name': 'Lakeview', 'city': 'Chicago', 'state': 'IL',
-      'languages': ['en'], 'stage': 0, 'ratingAvg': 0, 'ratingCount': 0, 'lessonDurations': [60],
+      'languages': ['en'], 'stage': stage, 'ratingAvg': 0, 'ratingCount': 0, 'lessonDurations': [60],
       'hourlyRateCents': 6500, 'schoolName': 'Lakeview',
       'availability': {'mon': [{'start': '09:00', 'end': '12:00'}, {'start': '14:00', 'end': '18:00'}]},
       'timezone': 'America/Chicago',
@@ -205,14 +206,18 @@ void main() {
   });
 
   group('detail page', () {
+    // Decision 31 (owner, 2026-10-22): a listed profile always has its
+    // licence checked, so stage 0 means only the ID isn't checked yet.
     testWidgets('stage 0 school: amber notice, disabled actions with reasons, hours, reviews', (tester) async {
       final svc = _FakeService(reviews: [
         for (var n = 1; n <= 4; n++) InstructorReview(name: 'Student $n', rating: 5, comment: 'Comment $n'),
       ]);
       await _pump(tester, InstructorDetailScreen(instructor: _listing(stage: 0), uid: 'u1', service: svc));
 
-      expect(find.text('Licence and identity not checked yet'), findsOneWidget);
-      expect(find.text('Booking opens once the licence is checked.'), findsOneWidget);
+      expect(find.text('Licence checked'), findsOneWidget);
+      expect(find.text('Identity not confirmed yet'), findsOneWidget);
+      expect(find.text('Not verified'), findsNothing);
+      expect(find.text('This school doesn’t take bookings in the app yet.'), findsOneWidget);
       expect(find.text('Messages open once the ID is checked.'), findsOneWidget);
       expect(find.text('Monday'), findsOneWidget);
       expect(find.text('09:00–12:00'), findsOneWidget);
@@ -224,6 +229,13 @@ void main() {
       await tester.tap(find.text('All reviews'));
       await tester.pumpAndSettle();
       expect(find.text('Comment 4'), findsOneWidget);
+    });
+
+    testWidgets('stage 1: «Verified» and no amber notice', (tester) async {
+      await _pump(tester, InstructorDetailScreen(instructor: _listing(stage: 1), uid: 'u1', service: _FakeService(stage: 1)));
+      expect(find.text('Verified'), findsOneWidget);
+      expect(find.text('Identity not confirmed yet'), findsNothing);
+      expect(find.text('Identity confirmed'), findsNothing);
     });
 
     testWidgets('a private instructor gets no booking button', (tester) async {

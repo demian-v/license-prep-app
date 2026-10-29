@@ -7,6 +7,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../localization/app_localizations.dart';
 import '../models/instructor_listing.dart';
 import '../providers/language_provider.dart';
+import '../screens/biometric_consent_screen.dart';
+import '../screens/support_screen.dart';
 import '../services/instructor_service.dart';
 import '../services/review_service.dart';
 import '../theme/app_theme.dart';
@@ -56,16 +58,28 @@ class InstructorProfileSection extends StatelessWidget {
               'expired' => l.translate('status_expired'),
               _ => l.translate('status_add'),
             };
-        String idValue() => switch (p['idCheck']) {
-              'pending' => l.translate('status_pending'),
+        // P10b: «Пройти» opens the consent screen, then Didit; «Проверяем…»
+        // can be tapped to go on with an unfinished check (Didit returns the
+        // same session); a declined one goes to support (plan v2 §6.1).
+        final idCheck = p['idCheck'] as String? ?? 'none';
+        String idValue() => switch (idCheck) {
+              'pending' => l.translate('iprof_id_checking'),
               'passed' => l.translate('status_done'),
               'failed' => l.translate('status_rejected'),
-              _ => l.translate('status_soon'),
+              _ => l.translate('iprof_id_start'),
             };
+        final idActionable = status != 'suspended' && idCheck != 'passed';
+
+        final licenseChecked = p['licenseCheck'] == 'passed';
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Decision 31 (owner, 2026-10-22): no listing before the licence check.
+            if (!licenseChecked) ...[
+              const _HiddenNotice(),
+              const SizedBox(height: AppSpacing.x3),
+            ],
             _PhotoCard(uid: uid, profile: p, service: svc),
             const SizedBox(height: AppSpacing.x3),
             _Card(
@@ -80,7 +94,10 @@ class InstructorProfileSection extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.x2),
-                Align(alignment: Alignment.centerLeft, child: InstructorStageBadge(stage: stage)),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: InstructorStageBadge(stage: stage, licenseChecked: licenseChecked),
+                ),
                 const SizedBox(height: AppSpacing.x3),
                 _Row(
                   icon: SolarIcons.documentTextLinear,
@@ -94,7 +111,14 @@ class InstructorProfileSection extends StatelessWidget {
                   icon: SolarIcons.userRoundedLinear,
                   title: l.translate('iprof_id_check'),
                   value: idValue(),
-                  actionable: false,
+                  actionable: idActionable,
+                  onTap: !idActionable
+                      ? null
+                      : idCheck == 'failed'
+                          ? () => _identityFailed(context)
+                          : () => Navigator.of(context).push(
+                                ForwardPageRoute(child: BiometricConsentScreen(service: svc)),
+                              ),
                 ),
               ],
             ),
@@ -154,6 +178,38 @@ class InstructorProfileSection extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+
+  /// A declined identity check: what happened and «Написать в поддержку».
+  Future<void> _identityFailed(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.field,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(BentoTokens.card)),
+      ),
+      builder: (sheet) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.x4),
+          child: BentoAuthCard(
+            title: l.translate('iid_failed_title'),
+            children: [
+              const SizedBox(height: AppSpacing.x2),
+              Text(l.translate('iid_failed_desc'), style: AppTypography.body.copyWith(color: AppColors.ink)),
+              const SizedBox(height: AppSpacing.x4),
+              BentoAuthPrimaryButton(
+                label: l.translate('iid_contact_support'),
+                onPressed: () {
+                  Navigator.of(sheet).pop();
+                  Navigator.of(context).push(ForwardPageRoute(child: SupportScreen()));
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -468,6 +524,52 @@ class _PayoutsCardState extends State<PayoutsCard> with WidgetsBindingObserver {
                 ),
         ],
       ],
+    );
+  }
+}
+
+/// «Ученики пока вас не видят»: amber (access), the title large enough to
+/// pass contrast, like the student-side notice on the detail screen.
+class _HiddenNotice extends StatelessWidget {
+  const _HiddenNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.x4 + AppSpacing.x1),
+      decoration: BoxDecoration(
+        color: AppColors.warnSurface,
+        borderRadius: BorderRadius.circular(BentoTokens.card),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(top: 2),
+                child: Icon(SolarIcons.dangerCircleLinear, size: 24, color: AppColors.warn),
+              ),
+              const SizedBox(width: AppSpacing.x2),
+              Expanded(
+                child: Text(
+                  l.translate('iprof_hidden_title'),
+                  style: AppTypography.title.copyWith(
+                    fontSize: 20,
+                    height: 26 / 20,
+                    color: AppColors.warn,
+                    fontVariations: const [FontVariation('wght', 700)],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.x2),
+          Text(l.translate('iprof_hidden_desc'), style: AppTypography.body.copyWith(color: AppColors.ink)),
+        ],
+      ),
     );
   }
 }

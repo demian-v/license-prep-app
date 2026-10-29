@@ -6,6 +6,7 @@ import { ratingTotals } from './reviews';
 import { processRefund } from './bookings';
 import { stripe, STRIPE_SECRETS } from './stripe-client';
 import { sendPushToUser } from './push';
+import { publishPhoto, rejectPhoto } from './instructors';
 import { sweepPaginated, SWEEP_TIME_BUDGET_MS, SweepResult } from './sweep';
 
 /**
@@ -176,6 +177,10 @@ export const adminGetQueue = functions.https.onCall(async (_data, context) => {
       // P10b: the licence photo, fetched separately (adminGetLicenseImage).
       hasLicenseImage: typeof privates[i].get('licenseImagePath') === 'string',
       licensePhotoAtMs: ms(d.get('licensePhotoAt')),
+      // P10b, plan v2 §6.1 step 6: the name on the ID Didit read, to compare
+      // with the licence's (null until the identity check has a result).
+      idCheck: d.get('idCheck') ?? 'none',
+      identityName: privates[i].get('identity.fullName') ?? null,
     });
   });
 
@@ -434,6 +439,70 @@ export const adminGetLicenseImage = functions.https.onCall(async (data, context)
   const bucket = priv.get('licenseImageBucket');
   const [bytes] = await (typeof bucket === 'string' ? admin.storage().bucket(bucket) : admin.storage().bucket()).file(path).download();
   return { dataUrl: `data:image/jpeg;base64,${bytes.toString('base64')}`, uploadedAtMs: ms(priv.get('moderation.license.updatedAt')) };
+});
+
+// ── Held profile photos (P10b, plan v2 §8) ───────────────────────────────────
+
+/**
+ * Profile photos SafeSearch couldn't check (a Vision error): held `pending`,
+ * fail-closed, until an admin decides here. Shown on the Licences page.
+ */
+export const adminListHeldPhotos = functions.https.onCall(async (_data, context) => {
+  await requireAdmin(context);
+  const held = await db().collection('instructorPrivate').where('moderation.photo.status', '==', 'pending').get();
+  const pubs = held.size ? await db().getAll(...held.docs.map((d) => db().collection('instructors').doc(d.id))) : [];
+  return {
+    photos: held.docs.map((d, i) => ({
+      uid: d.id, name: pubs[i].get('name') ?? '', kind: pubs[i].get('kind') ?? null, state: pubs[i].get('state') ?? null,
+      uploadId: d.get('moderation.photo.uploadId') ?? null, reason: d.get('moderation.photo.reason') ?? null,
+      heldAtMs: ms(d.get('moderation.photo.updatedAt')),
+    })).filter((p) => typeof p.uploadId === 'string'),
+  };
+});
+
+function heldUpload(uid: string, priv: FirebaseFirestore.DocumentSnapshot) {
+  const uploadId = priv.get('moderation.photo.uploadId');
+  if (typeof uploadId !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(uploadId)) {
+    throw new functions.https.HttpsError('not-found', 'no-held-photo');
+  }
+  const bucket = priv.get('moderation.photo.bucket');
+  return { uploadId, file: (typeof bucket === 'string' ? admin.storage().bucket(bucket) : admin.storage().bucket())
+    .file(`instructorUploads/${uid}/photo/${uploadId}.jpg`) };
+}
+
+/** The held photo itself, as a data URL (uploads are closed to every client but the owner). */
+export const adminGetHeldPhoto = functions.https.onCall(async (data, context) => {
+  await requireAdmin(context);
+  const uid = id(data?.uid, 'uid');
+  const priv = await db().collection('instructorPrivate').doc(uid).get();
+  if (priv.get('moderation.photo.status') !== 'pending') throw new functions.https.HttpsError('not-found', 'no-held-photo');
+  const { file } = heldUpload(uid, priv);
+  if (!(await file.exists())[0]) throw new functions.https.HttpsError('not-found', 'no-held-photo');
+  const [bytes] = await file.download();
+  return { dataUrl: `data:image/jpeg;base64,${bytes.toString('base64')}` };
+});
+
+/** Approve publishes it (metadata stripped, as the trigger does); reject deletes it and tells the instructor. */
+export const adminReviewPhoto = functions.https.onCall(async (data, context) => {
+  const by = await requireAdmin(context);
+  const uid = id(data?.uid, 'uid');
+  if (data?.approved !== true && data?.approved !== false) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid or missing field: approved');
+  }
+  const privRef = db().collection('instructorPrivate').doc(uid);
+  const priv = await privRef.get();
+  if (priv.get('moderation.photo.status') !== 'pending') throw new functions.https.HttpsError('failed-precondition', 'not-held');
+  const { uploadId, file } = heldUpload(uid, priv);
+  if (!(await file.exists())[0]) throw new functions.https.HttpsError('not-found', 'no-held-photo');
+  let photoStatus: 'approved' | 'rejected' = 'rejected';
+  if (data.approved) {
+    const [bytes] = await file.download();
+    photoStatus = (await publishPhoto(uid, uploadId, file, bytes)) ? 'approved' : 'rejected';
+  } else {
+    await rejectPhoto(uid, file, 'admin');
+  }
+  await privRef.set({ moderation: { photo: { reviewedBy: by } } }, { merge: true });
+  return { uid, photoStatus };
 });
 
 /**

@@ -93,7 +93,11 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Instructors choose a profile photo from Photos to show students.</string>
+	<string>Instructors choose a profile photo, a licence photo or an ID document for the identity check from Photos.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Instructors use the camera to photograph their ID and take a selfie for the identity check.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>The identity check records a short selfie video to confirm it is really you.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>DriveUSA saves your result picture to Photos when you choose Save Image.</string>
 </dict>

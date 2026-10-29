@@ -30,6 +30,10 @@ flutter_ios_podfile_setup
 target 'Runner' do
   use_frameworks!
 
+  # Didit identity check (instructors P10b): its native pod is not on the
+  # CocoaPods trunk; the plugin's README points at the podspec in Didit's
+  # repo, pinned to the plugin's version (didit_sdk_autodetection 4.9.1).
+  pod 'DiditSDK/AutoDetection', :podspec => 'https://raw.githubusercontent.com/didit-protocol/sdk-ios/4.9.1/DiditSDK.podspec'
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   target 'RunnerTests' do
     inherit! :search_paths

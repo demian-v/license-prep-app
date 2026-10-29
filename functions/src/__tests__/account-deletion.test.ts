@@ -21,6 +21,7 @@ const testEnv = functionsTest();
 import * as fns from '../index';
 import { collectUserDataForDeletion } from '../account-deletion';
 import { phonePhoto } from './helpers/jpeg';
+import { DiditClient, setDiditClient } from '../didit-client';
 
 const db = () => admin.firestore();
 const UID = 'delete-me';
@@ -136,7 +137,8 @@ describe('Instructors plan v2 §17 — an instructor account', () => {
     const b = db().batch();
     for (const uid of [IUID, OTHER]) {
       b.set(db().collection('instructors').doc(uid), { kind: 'school', state: 'ZX', listed: false, photoPath: `instructorPhotos/${uid}/p2.jpg` });
-      b.set(db().collection('instructorPrivate').doc(uid), { phone: '+1 312 555 0100', contactEmail: `${uid}@example.com` });
+      b.set(db().collection('instructorPrivate').doc(uid), { phone: '+1 312 555 0100', contactEmail: `${uid}@example.com`,
+        identitySessionIds: [`sess-${uid}-1`, `sess-${uid}-2`] });
       b.set(db().collection('instructors').doc(uid).collection('reviews').doc('student-1'), { rating: 5, comment: 'Great' });
     }
     b.set(db().collection('favorites').doc(IUID), { instructorUids: [OTHER] });
@@ -148,8 +150,22 @@ describe('Instructors plan v2 §17 — an instructor account', () => {
       await file(`instructorUploads/${uid}/photo/u1.jpg`);
       await file(`instructorLicenses/${uid}/l1.jpg`);
     }
+    setDiditClient(fakeDidit);
     await testEnv.wrap(fns.deleteUserAccount as any)({} as any, ctx(IUID) as any);
+    setDiditClient(null);
   }, 60000);
+
+  // P10b: Didit's copy of the identity check goes too (plan v2 §17).
+  const diditCalls: string[] = [];
+  const fakeDidit: DiditClient = {
+    async createSession() { throw new Error('not here'); },
+    async getDecision() { throw new Error('not here'); },
+    async deleteSession(id) { diditCalls.push(`session:${id}`); },
+    async deleteUsers(v) { diditCalls.push(`users:${v.join(',')}`); },
+  };
+  it('erases every Didit session and the Didit user, nobody else\'s', () => {
+    expect(diditCalls).toEqual([`session:sess-${IUID}-1`, `session:sess-${IUID}-2`, `users:${IUID}`]);
+  });
 
   afterAll(async () => {
     for (const prefix of ['instructorPhotos/', 'instructorUploads/', 'instructorLicenses/']) {
