@@ -100,10 +100,13 @@ class MetaEvents {
     try {
       if (_isIos) {
         final system = answerOf(debugTrackingStatus ?? await AppTrackingTransparency.trackingAuthorizationStatus);
-        final stored = await allowed();
-        // The prompt reset in Settings is no longer a yes.
-        final now = system ?? (stored == true ? false : null);
-        if (now != null && now != stored) await answer(now);
+        if (system == null) {
+          // Undecided with an answer stored (a restored phone, a reset prompt):
+          // iOS would refuse the yes, so it goes back to being asked.
+          await (await SharedPreferences.getInstance()).remove(choiceKey);
+        } else if (system != await allowed()) {
+          await answer(system);
+        }
       }
       if (await allowed() == true) await _start();
     } catch (e) {

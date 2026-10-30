@@ -73,7 +73,11 @@
       ".git",
       "firebase-debug.log",
       "firebase-debug.*.log",
-      "*.local"
+      "*.local",
+      "*.log",
+      ".DS_Store",
+      "build",
+      "service-account.json"
     ],
     "predeploy": [
       "npm --prefix \"$RESOURCE_DIR\" run build"

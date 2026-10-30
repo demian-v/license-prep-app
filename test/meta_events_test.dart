@@ -122,10 +122,15 @@ void main() {
       expect((await SharedPreferences.getInstance()).getStringList(MetaEvents.pendingKey), hasLength(1));
     });
 
-    test('a yes with the prompt reset is no longer a yes', () async {
+    test('a stored answer meeting an undecided system goes back to being asked', () async {
       await meta.answer(true);
       await launch(TrackingStatus.notDetermined);
-      expect(await meta.allowed(), isFalse);
+      expect(await meta.allowed(), isNull, reason: 'a restored phone: not a yes iOS would honour, and not a no they gave');
+      await analytics.logSignupTrialStarted();
+      expect(sent, isEmpty);
+      await meta.answer(false);
+      await launch(TrackingStatus.notDetermined);
+      expect(await meta.allowed(), isNull);
     });
 
     test('a yes given just before the app died still sends what waited', () async {
