@@ -12,7 +12,7 @@ import functionsTest from 'firebase-functions-test';
 
 const testEnv = functionsTest();
 import * as fns from '../index';
-import { DiditClient, DiditDecision, didit, fakeDidit, setDiditClient, verifyDiditSignature } from '../didit-client';
+import { DiditClient, DiditDecision, didit, fakeDidit, setDiditClient, verifyDiditSignature, webhookSecret } from '../didit-client';
 import { BIOMETRIC_CONSENT_VERSIONS, eraseDiditDataForDeletedAccount, idCheckFor, runDiditErasures, runReconcileIdentitySessions, splitName } from '../identity';
 import { setPushTransport } from '../push';
 
@@ -331,15 +331,25 @@ describe('which Didit client (risk register: the emulator reads production secre
     process.env = { ...env };
     setDiditClient(fake);
   });
-  it('the emulator uses the fake without a key, and with any key but a sandbox one', () => {
+  // Didit's keys carry no sandbox/live prefix, so the emulator never reads the
+  // production names — only the sandbox ones from functions/.env.local.
+  it('the emulator ignores the production key and uses the fake without sandbox values', () => {
     process.env.FUNCTIONS_EMULATOR = 'true';
     expect(didit()).toBe(fakeDidit);
-    process.env.DIDIT_API_KEY = 'sk_live_' + 'x'.repeat(43);
+    process.env.DIDIT_API_KEY = 'x'.repeat(43);
     expect(didit()).toBe(fakeDidit);
-    process.env.DIDIT_API_KEY = 'no-prefix-key';
-    expect(didit()).toBe(fakeDidit);
-    process.env.DIDIT_API_KEY = 'sk_test_' + 'x'.repeat(43);
+    process.env.DIDIT_SANDBOX_API_KEY = 'y'.repeat(43);
+    expect(didit()).toBe(fakeDidit); // no sandbox workflow id yet
+    process.env.DIDIT_SANDBOX_WORKFLOW_ID = 'wf_sandbox_dummy';
     expect(didit()).not.toBe(fakeDidit);
+  });
+  it('the emulator checks webhooks with the sandbox secret only', () => {
+    process.env.FUNCTIONS_EMULATOR = 'true';
+    expect(webhookSecret()).toBe('');
+    process.env.DIDIT_SANDBOX_WEBHOOK_SECRET = 'sandbox-secret';
+    expect(webhookSecret()).toBe('sandbox-secret');
+    delete process.env.FUNCTIONS_EMULATOR;
+    expect(webhookSecret()).toBe(SECRET);
   });
   it('production without a key refuses instead of faking', () => {
     delete process.env.FUNCTIONS_EMULATOR;

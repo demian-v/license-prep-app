@@ -14,9 +14,12 @@ import { defineSecret } from 'firebase-functions/params';
  * emulator at a prompt; risk register 2026-10-17).
  *
  * The emulator reads a secret missing from .secret.local from PRODUCTION
- * Secret Manager (risk register 2026-10-17), so on the emulator the real
- * client runs only with a sandbox key (`sk_test_…`); anything else gets the
- * fake below, and no emulator run can verify a real person by accident.
+ * Secret Manager (risk register 2026-10-17), so the emulator never uses
+ * these three. It reads only DIDIT_SANDBOX_API_KEY, DIDIT_SANDBOX_WORKFLOW_ID
+ * and DIDIT_SANDBOX_WEBHOOK_SECRET from the git-ignored functions/.env.local
+ * (a deploy never reads .env.local, and production has no such names); without
+ * them it gets the fake below. Didit's keys carry no sandbox/live prefix
+ * (checked 2026-10-29), so the key itself can't tell them apart.
  */
 export const diditApiKey = defineSecret('DIDIT_API_KEY');
 export const diditWebhookSecret = defineSecret('DIDIT_WEBHOOK_SECRET');
@@ -71,8 +74,10 @@ function secret(s: ReturnType<typeof defineSecret>): string {
   }
 }
 
+const onEmulator = () => process.env.FUNCTIONS_EMULATOR === 'true';
+
 export function workflowId(): string {
-  return secret(diditWorkflowId);
+  return onEmulator() ? process.env.DIDIT_SANDBOX_WORKFLOW_ID ?? '' : secret(diditWorkflowId);
 }
 
 let override: DiditClient | null = null;
@@ -84,16 +89,16 @@ export function setDiditClient(fake: DiditClient | null) {
 
 /**
  * The client to use. Production: the real one, or none without a key.
- * Emulator: the real one only with a sandbox key, else the fake.
+ * Emulator: the real one only with the sandbox values from .env.local, else
+ * the fake.
  */
 export function didit(): DiditClient {
   if (override) return override;
-  const key = secret(diditApiKey);
-  if (process.env.FUNCTIONS_EMULATOR === 'true') {
-    if (key.startsWith('sk_test_') && workflowId()) return realClient(key);
-    if (key) functions.logger.warn('Didit: not a sandbox key on the emulator — using the fake client.');
-    return fakeDidit;
+  if (onEmulator()) {
+    const sandboxKey = process.env.DIDIT_SANDBOX_API_KEY ?? '';
+    return sandboxKey && workflowId() ? realClient(sandboxKey) : fakeDidit;
   }
+  const key = secret(diditApiKey);
   if (!key || !workflowId()) throw new functions.https.HttpsError('failed-precondition', 'identity-unavailable');
   return realClient(key);
 }
@@ -198,5 +203,5 @@ export function verifyDiditSignature(
 }
 
 export function webhookSecret(): string {
-  return secret(diditWebhookSecret);
+  return onEmulator() ? process.env.DIDIT_SANDBOX_WEBHOOK_SECRET ?? '' : secret(diditWebhookSecret);
 }
