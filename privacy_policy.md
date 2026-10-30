@@ -1,7 +1,7 @@
 # Privacy Policy for DriveUSA
 
 **Effective Date:** November 17, 2025  
-**Last Updated:** September 17, 2026
+**Last Updated:** October 30, 2026
 
 ## 1. About This Privacy Policy
 
@@ -40,7 +40,7 @@ We do NOT collect:
 - SMS or call log data
 - Health or biometric information
 - Payment card numbers, bank details, or billing addresses
-- Advertising identifiers (IDFA / AAID), and we do not track you across other apps or websites
+- Advertising identifiers (IDFA / AAID), and we do not track you across other apps or websites, unless you allow it (see Section 4.1)
 
 ## 3. How We Use Your Information
 
@@ -78,6 +78,12 @@ We share information with trusted third-party services that help us operate our 
 - Apple App Store (for iOS subscriptions)
 - Payment processing and subscription management
 
+
+**Meta Platforms (Facebook and Instagram), only if you allow it:**
+- We share your device's advertising identifier and events in the App (completing registration, starting a free trial, subscribing, and the product and price of a purchase), so we can measure which ads work and show our ads to people likely to be interested
+- We do not share your name, email address or test results with Meta, which handles this data under its own Privacy Policy
+- On iPhone you choose in the system prompt and can change it in Settings → Privacy & Security → Tracking. On Android you choose in the App and can change it in Profile → Ad measurement. If you do not allow it, nothing is shared and the App works the same
+
 ### 4.2 Legal Requirements
 We may disclose your information if required by law, court order, or government regulation, or to:
 - Protect our rights, privacy, safety, or property
@@ -89,7 +95,7 @@ If we are involved in a merger, acquisition, or sale of assets, your information
 
 ### 4.4 What We DON'T Do
 - **No Data Selling:** We never sell, rent, or trade your personal information to third parties
-- **No Advertising Networks:** We don't share your data with advertising companies
+- **No Advertising Networks without your yes:** We share data with an advertising company (Meta) only if you allow it (Section 4.1)
 - **No Data Brokers:** We don't provide your information to data brokers or marketing companies
 
 ## 5. Data Security and Storage
@@ -146,7 +152,7 @@ You can request information about the personal information we collect, use, and 
 You can request deletion of personal information we have collected about you (subject to certain exceptions).
 
 ### 7.3 Right to Opt-Out
-You have the right to opt-out of the sale of personal information. **Note: We do not sell personal information.**
+You have the right to opt-out of the sale of personal information. **Note: We do not sell personal information.** If you allow ad measurement, sending data to Meta may count as "sharing" for cross-contextual behavioral advertising under the CCPA. You can stop it at any time: on iPhone in Settings → Privacy & Security → Tracking, on Android in Profile → Ad measurement.
 
 ### 7.4 Non-Discrimination
 We will not discriminate against you for exercising your CCPA rights.
