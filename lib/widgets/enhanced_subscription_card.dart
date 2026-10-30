@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
+import '../config/legal_links.dart';
 import '../models/subscription.dart';
 import '../models/user_subscription.dart';
 import '../providers/subscription_provider.dart';
@@ -287,7 +288,7 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> {
                 ),
                 recognizer: TapGestureRecognizer()
                   ..onTap = () => launchUrl(
-                        Uri.parse('https://sites.google.com/view/driveusa/home'),
+                        LegalLinks.terms,
                         mode: LaunchMode.externalApplication,
                       ),
               ),
@@ -301,7 +302,7 @@ class _EnhancedSubscriptionCardState extends State<EnhancedSubscriptionCard> {
                 ),
                 recognizer: TapGestureRecognizer()
                   ..onTap = () => launchUrl(
-                        Uri.parse('https://sites.google.com/view/driveusa/privacy-policy'),
+                        LegalLinks.privacy,
                         mode: LaunchMode.externalApplication,
                       ),
               ),

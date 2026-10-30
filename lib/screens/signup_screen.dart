@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../config/legal_links.dart';
 import '../providers/auth_provider.dart';
 import '../services/analytics_service.dart';
 import '../services/in_app_purchase_service.dart';
@@ -100,7 +101,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   /// Launch Terms of Service URL
   Future<void> _launchTermsOfService() async {
-    final Uri url = Uri.parse('https://sites.google.com/view/driveusa/home');
+    final Uri url = LegalLinks.terms;
     try {
       if (await canLaunchUrl(url)) {
         await launchUrl(url, mode: LaunchMode.externalApplication);
