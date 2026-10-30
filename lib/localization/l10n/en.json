@@ -683,5 +683,13 @@
   "payouts_start": "Set up payouts",
   "payouts_continue": "Continue setup",
   "payouts_error": "Couldn't open Stripe. Try again.",
-  "delete_unsettled_bookings": "Lessons with payments still open: {n}. You can delete your account once they are paid out or checked."
+  "delete_unsettled_bookings": "Lessons with payments still open: {n}. You can delete your account once they are paid out or checked.",
+  "tracking_title": "Allow ad measurement?",
+  "tracking_body": "If you allow it, DriveUSA shares your device's advertising ID and steps like signing up, starting a trial and subscribing with Meta (Facebook and Instagram), so we can see which ads work. The app works the same either way, and you can change this any time in Profile.",
+  "tracking_allow": "Allow",
+  "tracking_decline": "Don't allow",
+  "tracking_setting": "Ad measurement",
+  "tracking_setting_desc": "Share sign-ups and purchases with Meta",
+  "tracking_on": "On",
+  "tracking_off": "Off"
 }

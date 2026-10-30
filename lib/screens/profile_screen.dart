@@ -15,6 +15,7 @@ import '../providers/state_provider.dart';
 import '../services/email_sync_service.dart';
 import '../services/analytics_service.dart';
 import '../services/crash_reporter.dart';
+import '../services/meta_events.dart';
 import '../services/session_notification_service.dart';
 import 'package:flutter/foundation.dart';
 import '../models/user.dart';
@@ -24,6 +25,7 @@ import '../main.dart';
 import 'personal_info_screen.dart';
 import 'support_screen.dart';
 import '../widgets/trial_status_widget.dart';
+import '../widgets/tracking_consent_dialog.dart';
 import '../widgets/instructor_profile_section.dart';
 import '../services/instructor_service.dart';
 import '../theme/solar_icons.dart';
@@ -36,6 +38,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserver {
+  bool _trackingOn = false;
   /// Risk-aware gate for the content prefetch: every content callable requires
   /// entitlement, so prefetching without one is two guaranteed refusals. Skips
   /// only when a subscription exists AND is not valid — a null subscription
@@ -86,6 +89,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
   void initState() {
     super.initState();
     _loadAppVersion();
+    if (MetaEvents.instance.hasOwnSwitch) _loadTracking();
     // Force sync the email in Firestore when the profile screen loads
     _syncEmailOnScreenLoad();
     
@@ -735,6 +739,18 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
             description: _translate('subscription_desc', languageProvider),
           ),
           ],
+          if (!isInstructor && MetaEvents.instance.hasOwnSwitch) ...[
+          const SizedBox(height: AppSpacing.x3),
+          _buildEnhancedMenuCard(
+            AppLocalizations.of(context).translate('tracking_setting'),
+            AppLocalizations.of(context).translate(_trackingOn ? 'tracking_on' : 'tracking_off'),
+            SolarIcons.shieldCheckBold,
+            4,
+            _trackingOn,
+            _onTracking,
+            description: AppLocalizations.of(context).translate('tracking_setting_desc'),
+          ),
+          ],
           const SizedBox(height: AppSpacing.x3),
           _buildEnhancedMenuCard(
             _translate('support', languageProvider),
@@ -785,6 +801,19 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
 
   // Handlers — moved unchanged from the inline closures, so the cards can
   // change without touching navigation, dialogs or logout.
+
+  /// Android's off switch for ad measurement: the same question as after
+  /// onboarding (iOS has it in the system settings).
+  Future<void> _onTracking() async {
+    final yes = await TrackingConsentDialog.show(context);
+    await MetaEvents.instance.answer(yes);
+    if (mounted) setState(() => _trackingOn = yes);
+  }
+
+  Future<void> _loadTracking() async {
+    final on = await MetaEvents.instance.allowed() ?? false;
+    if (mounted) setState(() => _trackingOn = on);
+  }
 
   void _onEditProfile() {
     // Navigate to edit profile screen

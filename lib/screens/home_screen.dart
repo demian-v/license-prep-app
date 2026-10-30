@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../services/analytics_service.dart';
 import '../services/crash_reporter.dart';
@@ -11,6 +13,7 @@ import '../screens/booking_detail_screen.dart';
 import '../screens/chat_thread_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/onboarding_screen.dart';
+import '../services/meta_events.dart';
 import '../theme/app_colors.dart';
 import '../widgets/super_enhanced_footer.dart';
 import '../widgets/lazy_indexed_stack.dart';
@@ -236,7 +239,11 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     final show = await OnboardingGate.shouldShow();
     if (!mounted) return;
     setState(() => _showOnboarding = show);
-    if (show) _prefetchTheoryForOnboarding();
+    if (show) {
+      _prefetchTheoryForOnboarding();
+    } else {
+      unawaited(MetaEvents.instance.askOnce(context));
+    }
   }
 
   void _prefetchTheoryForOnboarding() {
@@ -252,7 +259,9 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
 
   Future<void> _onOnboardingDone() async {
     await OnboardingGate.markSeen();
-    if (mounted) setState(() => _showOnboarding = false);
+    if (!mounted) return;
+    setState(() => _showOnboarding = false);
+    unawaited(MetaEvents.instance.askOnce(context));
   }
 
   void _onTabTapped(int index) {

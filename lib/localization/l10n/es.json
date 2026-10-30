@@ -683,5 +683,13 @@
   "payouts_start": "Configurar pagos",
   "payouts_continue": "Continuar",
   "payouts_error": "No se pudo abrir Stripe. Inténtalo de nuevo.",
-  "delete_unsettled_bookings": "Clases con pagos pendientes: {n}. Podrás eliminar tu cuenta cuando se paguen o revisen."
+  "delete_unsettled_bookings": "Clases con pagos pendientes: {n}. Podrás eliminar tu cuenta cuando se paguen o revisen.",
+  "tracking_title": "¿Permitir la medición de anuncios?",
+  "tracking_body": "Si lo permites, DriveUSA comparte con Meta (Facebook e Instagram) el identificador de publicidad de tu dispositivo y pasos como registrarte, iniciar una prueba y suscribirte, para saber qué anuncios funcionan. La app funciona igual en ambos casos, y puedes cambiarlo cuando quieras en Perfil.",
+  "tracking_allow": "Permitir",
+  "tracking_decline": "No permitir",
+  "tracking_setting": "Medición de anuncios",
+  "tracking_setting_desc": "Compartir registros y compras con Meta",
+  "tracking_on": "Sí",
+  "tracking_off": "No"
 }

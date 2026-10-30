@@ -88,5 +88,12 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- Meta App Events: asleep until the person says yes (lib/services/meta_events.dart). -->
+        <meta-data android:name="com.facebook.sdk.ApplicationId" android:value="@string/facebook_app_id" />
+        <meta-data android:name="com.facebook.sdk.ClientToken" android:value="@string/facebook_client_token" />
+        <meta-data android:name="com.facebook.sdk.AutoInitEnabled" android:value="false" />
+        <meta-data android:name="com.facebook.sdk.AutoLogAppEventsEnabled" android:value="false" />
+        <meta-data android:name="com.facebook.sdk.AdvertiserIDCollectionEnabled" android:value="false" />
+        <meta-data android:name="com.facebook.sdk.AutoLogAppMetadataEnabled" android:value="false" />
     </application>
 </manifest>

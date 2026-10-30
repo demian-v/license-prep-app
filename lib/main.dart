@@ -16,6 +16,7 @@ import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
 import 'firebase_options.dart';
 
+import 'services/meta_events.dart';
 import 'services/service_locator.dart';
 import 'services/service_locator_extensions.dart';
 import 'services/api/api_implementation.dart';
@@ -383,6 +384,7 @@ Future<void> _startApp() async {
   
   // Initialize Firebase Analytics
   await analyticsService.initialize();
+  await MetaEvents.instance.startIfAllowed();
   debugPrint('📊 Firebase Analytics initialized');
   
   // Set up auth listener to detect email changes

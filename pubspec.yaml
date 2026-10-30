@@ -78,6 +78,8 @@ dependencies:
   didit_sdk_autodetection: 4.9.1
   stripe_ios: 14.1.0
   stripe_platform_interface: 14.1.0
+  facebook_app_events: 0.31.0
+  app_tracking_transparency: 2.0.7
 
 # Removing overrides as they may be causing conflicts
 

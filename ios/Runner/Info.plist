@@ -34,9 +34,29 @@
 				<string>driveusa</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>fb1116179314720357</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>FacebookAdvertiserIDCollectionEnabled</key>
+	<false/>
+	<key>FacebookAppID</key>
+	<string>1116179314720357</string>
+	<key>FacebookAutoInitEnabled</key>
+	<false/>
+	<key>FacebookAutoLogAppEventsEnabled</key>
+	<false/>
+	<key>FacebookClientToken</key>
+	<string>1d1ddcf3f37457ac556609a13a1338b4</string>
+	<key>FacebookDisplayName</key>
+	<string>Drive USA</string>
 	<key>FirebaseAppDelegateProxyEnabled</key>
 	<true/>
 	<key>FirebaseDynamicLinksCustomDomains</key>
@@ -100,5 +120,7 @@
 	<string>The identity check records a short selfie video to confirm it is really you.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>DriveUSA saves your result picture to Photos when you choose Save Image.</string>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>If you allow it, DriveUSA shares your device's advertising ID and steps like signing up and subscribing with Meta, so we can see which ads work.</string>
 </dict>
 </plist>

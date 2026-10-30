@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:math';
+import 'meta_events.dart';
 
 /// GA4-compliant AnalyticsService that provides proper Firebase Analytics integration
 /// with DebugView support and proper stream configuration
@@ -229,6 +230,7 @@ class AnalyticsService {
   /// Log user signup event
   Future<void> logSignUp([String? method]) async {
     await logEvent('sign_up', method != null ? {'method': method} : null);
+    await MetaEvents.instance.send('registration', {'method': method ?? 'email'});
   }
   
   // MARK: - Enhanced Signup Journey Events
@@ -287,6 +289,7 @@ class AnalyticsService {
       'currency': 'USD',
       'timestamp': DateTime.now().millisecondsSinceEpoch,
     });
+    await MetaEvents.instance.send('start_trial', const {});
   }
 
   /// Log signup failure event
@@ -976,6 +979,9 @@ class AnalyticsService {
       if (currency != null) 'currency': currency,
       if (transactionId != null && transactionId.isNotEmpty) 'transaction_id': transactionId,
     });
+    if (value != null && currency != null) {
+      await MetaEvents.instance.send('purchase', {'amount': value, 'currency': currency, 'product_id': productId});
+    }
   }
 
   /// A purchase the user started did not go through. [reason] is a short code

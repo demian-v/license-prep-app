@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Meta App Events: public ids, not secrets (the App Secret never goes in the app). -->
+    <string name="facebook_app_id" translatable="false">1116179314720357</string>
+    <string name="facebook_client_token" translatable="false">1d1ddcf3f37457ac556609a13a1338b4</string>
+</resources>

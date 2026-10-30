@@ -683,5 +683,13 @@
   "payouts_start": "Skonfiguruj wypłaty",
   "payouts_continue": "Kontynuuj konfigurację",
   "payouts_error": "Nie udało się otworzyć Stripe. Spróbuj ponownie.",
-  "delete_unsettled_bookings": "Lekcje z otwartymi rozliczeniami: {n}. Konto można usunąć po wypłacie lub weryfikacji."
+  "delete_unsettled_bookings": "Lekcje z otwartymi rozliczeniami: {n}. Konto można usunąć po wypłacie lub weryfikacji.",
+  "tracking_title": "Zezwolić na pomiar reklam?",
+  "tracking_body": "Jeśli się zgodzisz, DriveUSA udostępni firmie Meta (Facebook i Instagram) identyfikator reklamowy Twojego urządzenia oraz kroki takie jak rejestracja, rozpoczęcie okresu próbnego i subskrypcja, abyśmy wiedzieli, które reklamy działają. Aplikacja działa tak samo w obu przypadkach, a zmienić to możesz w każdej chwili w Profilu.",
+  "tracking_allow": "Zezwól",
+  "tracking_decline": "Nie zezwalaj",
+  "tracking_setting": "Pomiar reklam",
+  "tracking_setting_desc": "Udostępniaj rejestracje i zakupy firmie Meta",
+  "tracking_on": "Wł.",
+  "tracking_off": "Wył."
 }
