@@ -29,6 +29,9 @@ class AnalyticsService {
   String? _clientId;
   String? _currentLanguage;
   String? _currentUserId;
+  // The last paywall opened in this run: the purchase events carry it, so
+  // conversion can be read per entry point.
+  String? _paywallSource;
   Map<String, dynamic> _userProperties = {};
   
   bool _isInitialized = false;
@@ -944,12 +947,16 @@ class AnalyticsService {
   /// `theory_locked`, `test_locked`, `quiz_locked`... so conversion can be
   /// read per entry point.
   Future<void> logPaywallViewed(String source) async {
+    _paywallSource = source;
     await logEvent('paywall_viewed', {'source': source});
   }
 
   /// The user tapped Subscribe and the store sheet is about to open.
   Future<void> logPurchaseStarted(String productId) async {
-    await logEvent('purchase_started', {'product_id': productId});
+    await logEvent('purchase_started', {
+      'product_id': productId,
+      if (_paywallSource != null) 'source': _paywallSource,
+    });
   }
 
   /// GA4's recommended `purchase`, logged once the server validated the
@@ -964,6 +971,7 @@ class AnalyticsService {
     await logEvent('purchase', {
       'item_id': productId,
       'product_id': productId,
+      if (_paywallSource != null) 'source': _paywallSource,
       if (value != null) 'value': value,
       if (currency != null) 'currency': currency,
       if (transactionId != null && transactionId.isNotEmpty) 'transaction_id': transactionId,
@@ -976,13 +984,17 @@ class AnalyticsService {
   Future<void> logPurchaseFailed(String productId, String reason) async {
     await logEvent('purchase_failed', {
       'product_id': productId,
+      if (_paywallSource != null) 'source': _paywallSource,
       'reason': reason.length > 100 ? reason.substring(0, 100) : reason,
     });
   }
 
   /// The user closed the store sheet without buying.
   Future<void> logPurchaseCancelled(String productId) async {
-    await logEvent('purchase_cancelled', {'product_id': productId});
+    await logEvent('purchase_cancelled', {
+      'product_id': productId,
+      if (_paywallSource != null) 'source': _paywallSource,
+    });
   }
 
   /// Restore purchases was tapped; [result] is `started`, `unavailable` or
@@ -1201,6 +1213,7 @@ class AnalyticsService {
   
   /// Reset service (useful for testing)
   void reset() {
+    _paywallSource = null;
     _isInitialized = false;
     _isAnalyticsEnabled = true;
     _userProperties.clear();

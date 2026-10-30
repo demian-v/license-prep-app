@@ -43,6 +43,23 @@ void main() {
       expect(params('paywall_viewed'), {'source': 'theory_locked'});
     });
 
+    test('the purchase events carry the last paywall source, so conversion reads per source', () async {
+      await analytics.logPaywallViewed('profile');
+      await analytics.logPaywallViewed('trial_banner');
+      await analytics.logPurchaseStarted('monthly_sub');
+      await analytics.logPurchase(productId: 'monthly_sub');
+      await analytics.logPurchaseFailed('monthly_sub', 'store_unavailable');
+      await analytics.logPurchaseCancelled('monthly_sub');
+      for (final name in ['purchase_started', 'purchase', 'purchase_failed', 'purchase_cancelled']) {
+        expect(params(name)!['source'], 'trial_banner', reason: name);
+      }
+    });
+
+    test('a purchase with no paywall opened in this run has no source', () async {
+      await analytics.logPurchase(productId: 'monthly_sub');
+      expect(params('purchase')!.containsKey('source'), isFalse);
+    });
+
     test("purchase has GA4's revenue fields", () async {
       await analytics.logPurchase(productId: 'monthly_sub', value: 9.99, currency: 'USD', transactionId: 't1');
       expect(params('purchase'), {

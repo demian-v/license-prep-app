@@ -33,6 +33,9 @@
  *                               reports of every kind, two no-show reports, two card disputes, a
  *                               school-cancellations alert, ~150 past lessons for Insights (a student
  *                               with no account; schools the app demos don't use); reset on every run
+ *                               Analytics plan D: profiles registered over the last months, each with
+ *                               its licence, ID and listing dates, for the panel's Funnel tab; two have
+ *                               sent no licence and one was rejected
  *   SEED_STRIPE_ACCOUNT_ID      optional, P9: a Stripe TEST connected account (acct_…) already
  *                               onboarded through the app as seed-instr-01. Emulator data does not
  *                               survive a restart, so this re-attaches it to Lakeview on every seed
@@ -101,6 +104,9 @@ const ROWS = [
 // P10b: one identity check in progress and one declined, for the panel's
 // Identity checks list (both stage 0, licence pending).
 const ID_CHECK = { 'seed-instr-05': 'pending', 'seed-instr-08': 'failed' };
+// Analytics plan D: stage-0 rows that stopped earlier on the way in.
+const NO_LICENCE = new Set(['seed-instr-18', 'seed-instr-23']);
+const LICENCE_REJECTED = new Set(['seed-instr-17']);
 const OWNER_NAMES = ['Robert Miller', 'Linda Garcia', 'James Wilson', 'Patricia Moore'];
 
 const REVIEWERS = ['Anna K.', 'Jake M.', 'Sofia R.', 'Taras P.', 'Emily W.'];
@@ -119,13 +125,20 @@ const COMMENTS = ['Very patient, passed on the first try.', 'Clear explanations 
     // so the stage-0 rows stay out of search with their licence pending.
     const licensePassed = stage >= 1;
     const listed = status === 'active' && licensePassed;
+    // Analytics plan D: dates on the way in, the funnel's time between steps.
+    const registeredMs = now.toMillis() - (160 - i * 3) * 864e5;
+    const photoMs = registeredMs + (1 + i % 4) * 864e5;
+    const reviewedMs = photoMs + (1 + i % 3) * 864e5;
+    const idMs = reviewedMs + (2 + i % 5) * 864e5;
+    const noLicence = NO_LICENCE.has(uid);
+    const rejected = LICENCE_REJECTED.has(uid);
     const ratingSum = reviews.reduce((a, b) => a + b, 0);
     const ratingCount = reviews.length;
     if (listed) stats[state] = (stats[state] || 0) + 1;
 
     batch.set(db.collection('instructors').doc(uid), {
       kind, name, schoolName: kind === 'school' ? name : schoolName,
-      schoolLicenseNumber: `${state}-DS-${1000 + i}`,
+      schoolLicenseNumber: noLicence ? null : `${state}-DS-${1000 + i}`,
       ...(kind === 'school' ? { schoolAddress: `${100 + i} Main St, ${city}, ${state}`, fleetSize: 3 + (i % 5), instructorCount: 2 + (i % 4) } : {}),
       photoPath: null, photoApproved: false, photoStatus: 'none',
       state, city, cityKey: city.toLowerCase(), zipCode: null, timezone,
@@ -134,14 +147,17 @@ const COMMENTS = ['Very patient, passed on the first try.', 'Clear explanations 
       bio: `${kind === 'school' ? 'Licensed driving school' : 'Instructor'} in ${city}. Road test preparation, highway and parking practice.`,
       hourlyRateCents: rateUsd * 100, lessonDurations: [60, 90, 120],
       idCheck: ID_CHECK[uid] ?? (stage >= 1 ? 'passed' : 'none'),
+      ...(stage >= 1 ? { idCheckedAt: Timestamp.fromMillis(idMs) } : {}),
       ...(ID_CHECK[uid] === 'failed' ? { idCheckReason: 'DOCUMENT_EXPIRED' } : {}),
-      licenseCheck: licensePassed ? 'passed' : 'pending',
+      licenseCheck: noLicence ? 'none' : rejected ? 'rejected' : licensePassed ? 'passed' : 'pending',
+      ...(!noLicence && i % 4 !== 3 ? { licensePhotoAt: Timestamp.fromMillis(photoMs), licensePhotoStatus: 'received' } : {}),
+      ...(licensePassed || rejected ? { licenseReviewedAt: Timestamp.fromMillis(reviewedMs) } : {}),
       licenseState: state,
       licenseExpiresAt: licensePassed ? Timestamp.fromMillis(Date.now() + 365 * 864e5) : null,
       stage, payoutsEnabled: stage === 2,
       availability: i % 3 === 0 ? { ...WEEKDAYS, ...WEEKENDS } : i % 3 === 1 ? WEEKDAYS : {},
       ratingSum, ratingCount, ratingAvg: ratingCount ? Math.round((ratingSum / ratingCount) * 10) / 10 : 0,
-      status, listed, createdAt: now, updatedAt: now,
+      status, listed, createdAt: Timestamp.fromMillis(registeredMs), updatedAt: now,
     });
     // P9: re-attach a test connected account onboarded once in the app.
     const stripeAccountId = uid === 'seed-instr-01' && /^acct_[A-Za-z0-9]+$/.test(process.env.SEED_STRIPE_ACCOUNT_ID || '')
