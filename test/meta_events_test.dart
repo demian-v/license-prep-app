@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:license_prep_app/config/meta_config.dart';
 import 'package:license_prep_app/services/analytics_service.dart';
 import 'package:license_prep_app/services/meta_events.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -160,9 +159,8 @@ void main() {
     });
   });
 
-  group('off until the Meta app exists', () {
-    test('the shipped switch is off, and with it off nothing happens at all', () async {
-      expect(metaConfigured, isFalse, reason: 'flip it only with the privacy policy live');
+  group('the switch', () {
+    test('with it off nothing happens at all', () async {
       MetaEvents.debugConfigured = false;
       await analytics.logSignUp('email');
       await meta.startIfAllowed();

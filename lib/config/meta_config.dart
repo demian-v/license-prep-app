@@ -3,5 +3,6 @@
 /// While this is false the app shows no tracking prompt, sends Meta nothing
 /// and keeps the Facebook SDK asleep.
 ///
-/// Set it true only with the privacy policy updated and live.
-const bool metaConfigured = false;
+/// True since 2026-10-30: the privacy policy covers Meta and the Meta app is
+/// published. It stays true only while both do.
+const bool metaConfigured = true;
