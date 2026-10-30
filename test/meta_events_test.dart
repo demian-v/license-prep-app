@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:license_prep_app/services/analytics_service.dart';
@@ -23,12 +24,14 @@ void main() {
     MetaEvents.debugConfigured = true;
     MetaEvents.debugSink = (kind, params) => sent.add((kind, params));
     MetaEvents.debugAsk = null;
+    MetaEvents.debugTrackingStatus = null;
     analytics.reset();
   });
   tearDown(() {
     MetaEvents.debugConfigured = null;
     MetaEvents.debugSink = null;
     MetaEvents.debugAsk = null;
+    MetaEvents.debugTrackingStatus = null;
   });
 
   List<String> kinds() => [for (final e in sent) e.$1];
@@ -89,6 +92,49 @@ void main() {
     });
   });
 
+  group('iOS: the system setting is the truth at launch', () {
+    Future<void> launch(TrackingStatus status) async {
+      meta.debugReset();
+      MetaEvents.debugTrackingStatus = status;
+      await meta.startIfAllowed();
+    }
+
+    test('a no turned to yes in Settings counts', () async {
+      await meta.answer(false);
+      await launch(TrackingStatus.authorized);
+      expect(await meta.allowed(), isTrue);
+      await analytics.logSignupTrialStarted();
+      expect(kinds(), ['start_trial']);
+    });
+
+    test('a yes turned to no in Settings counts', () async {
+      await meta.answer(true);
+      await launch(TrackingStatus.denied);
+      expect(await meta.allowed(), isFalse);
+      await analytics.logSignupTrialStarted();
+      expect(sent, isEmpty);
+    });
+
+    test('not asked yet stays not asked, and what waits keeps waiting', () async {
+      await analytics.logSignUp('email');
+      await launch(TrackingStatus.notDetermined);
+      expect(await meta.allowed(), isNull);
+      expect((await SharedPreferences.getInstance()).getStringList(MetaEvents.pendingKey), hasLength(1));
+    });
+
+    test('a yes with the prompt reset is no longer a yes', () async {
+      await meta.answer(true);
+      await launch(TrackingStatus.notDetermined);
+      expect(await meta.allowed(), isFalse);
+    });
+
+    test('a yes given just before the app died still sends what waited', () async {
+      await analytics.logSignUp('email');
+      await launch(TrackingStatus.authorized);
+      expect(kinds(), ['registration']);
+    });
+  });
+
   group('asking', () {
     testWidgets('asks once, after the calm delay, and never again', (tester) async {
       var asked = 0;
@@ -122,6 +168,32 @@ void main() {
       });
       expect(asked, 1);
       expect(await meta.allowed(), isFalse);
+    });
+
+    testWidgets('no answer keeps what waits, and the next launch asks again', (tester) async {
+      var asked = 0;
+      MetaEvents.debugAsk = () async {
+        asked++;
+        return asked == 1 ? null : true;
+      };
+      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+      final context = tester.element(find.byType(SizedBox));
+      await tester.runAsync(() async {
+        await analytics.logSignUp('email');
+        await meta.askOnce(context);
+        expect(await meta.allowed(), isNull);
+        expect(sent, isEmpty);
+        await meta.askOnce(context);
+      });
+      expect(asked, 2);
+      expect(kinds(), ['registration']);
+    });
+
+    test('iOS: a prompt that never appeared is no answer, anything else is', () {
+      expect(MetaEvents.answerOf(TrackingStatus.notDetermined), isNull);
+      expect(MetaEvents.answerOf(TrackingStatus.authorized), isTrue);
+      expect(MetaEvents.answerOf(TrackingStatus.denied), isFalse);
+      expect(MetaEvents.answerOf(TrackingStatus.restricted), isFalse);
     });
 
     test('home asks after onboarding, and only there', () {

@@ -82,7 +82,8 @@ We share information with trusted third-party services that help us operate our 
 **Meta Platforms (Facebook and Instagram), only if you allow it:**
 - We share your device's advertising identifier and events in the App (completing registration, starting a free trial, subscribing, and the product and price of a purchase), so we can measure which ads work and show our ads to people likely to be interested
 - We do not share your name, email address or test results with Meta, which handles this data under its own Privacy Policy
-- On iPhone you choose in the system prompt and can change it in Settings → Privacy & Security → Tracking. On Android you choose in the App and can change it in Profile → Ad measurement. If you do not allow it, nothing is shared and the App works the same
+- On iPhone you choose in the system prompt and can change it in Settings → Privacy & Security → Tracking. On Android you choose in the App and can change it in Profile → Ad measurement. If you do not allow it, your advertising identifier and these events are not shared, and the App works the same
+- On Android, Meta's software in the App still connects to Meta when the App starts, to fetch its settings, so Meta can see your device's IP address and that it runs the App. This happens before you choose and after you say no
 
 ### 4.2 Legal Requirements
 We may disclose your information if required by law, court order, or government regulation, or to:
@@ -152,7 +153,7 @@ You can request information about the personal information we collect, use, and 
 You can request deletion of personal information we have collected about you (subject to certain exceptions).
 
 ### 7.3 Right to Opt-Out
-You have the right to opt-out of the sale of personal information. **Note: We do not sell personal information.** If you allow ad measurement, sending data to Meta may count as "sharing" for cross-contextual behavioral advertising under the CCPA. You can stop it at any time: on iPhone in Settings → Privacy & Security → Tracking, on Android in Profile → Ad measurement.
+You have the right to opt-out of the sale of personal information. **Note: We do not sell personal information.** If you allow ad measurement, sending data to Meta may count as "sharing" for cross-contextual behavioral advertising under the CCPA. You can stop it at any time: on iPhone in Settings → Privacy & Security → Tracking, on Android in Profile → Ad measurement, which stops it fully the next time the App starts.
 
 ### 7.4 Non-Discrimination
 We will not discriminate against you for exercising your CCPA rights.

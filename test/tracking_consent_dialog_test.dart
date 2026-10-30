@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 
 import 'package:flutter/material.dart';
@@ -42,7 +43,7 @@ void main() {
       final context = await pump(tester, locale);
       for (final (label, expected) in [(allow[locale]!, true), (decline[locale]!, false)]) {
         bool? got;
-        unawaited(TrackingConsentDialog.show(context).then((v) => got = v));
+        unawaited(TrackingConsentDialog.show(context, required: true).then((v) => got = v));
         await tester.pumpAndSettle();
         await tester.tap(find.text(label));
         await tester.pumpAndSettle();
@@ -51,15 +52,47 @@ void main() {
     });
   }
 
-  testWidgets('tapping outside does not answer', (tester) async {
+  testWidgets('after onboarding, tapping outside does not answer', (tester) async {
     final context = await pump(tester, 'en');
     bool? got;
-    unawaited(TrackingConsentDialog.show(context).then((v) => got = v));
+    unawaited(TrackingConsentDialog.show(context, required: true).then((v) => got = v));
     await tester.pumpAndSettle();
     await tester.tapAt(const Offset(4, 4));
     await tester.pumpAndSettle();
     expect(got, isNull);
     expect(find.text('Allow'), findsOneWidget);
+  });
+
+  testWidgets('after onboarding, the back button does not answer', (tester) async {
+    final context = await pump(tester, 'en');
+    bool? got;
+    unawaited(TrackingConsentDialog.show(context, required: true).then((v) => got = v));
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(got, isNull);
+    expect(find.text('Allow'), findsOneWidget, reason: 'a closed dialog would delete the waiting sign-up and trial');
+  });
+
+  testWidgets('from Profile, the back button closes it and answers nothing', (tester) async {
+    final context = await pump(tester, 'en');
+    var done = false;
+    bool? got = true;
+    unawaited(TrackingConsentDialog.show(context).then((v) {
+      got = v;
+      done = true;
+    }));
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(done, isTrue);
+    expect(got, isNull, reason: 'someone who said yes and backs out stays on');
+    expect(find.text('Allow'), findsNothing);
+  });
+
+  test('Profile keeps the choice when the dialog closes without an answer', () {
+    final profile = File('lib/screens/profile_screen.dart').readAsStringSync();
+    expect(profile, contains('if (yes == null) return;'));
   });
 
   testWidgets('both answers are the same size', (tester) async {

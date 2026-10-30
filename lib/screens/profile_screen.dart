@@ -806,6 +806,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
   /// onboarding (iOS has it in the system settings).
   Future<void> _onTracking() async {
     final yes = await TrackingConsentDialog.show(context);
+    if (yes == null) return;
     await MetaEvents.instance.answer(yes);
     if (mounted) setState(() => _trackingOn = yes);
   }

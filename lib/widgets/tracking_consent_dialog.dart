@@ -8,15 +8,14 @@ import '../theme/app_theme.dart';
 class TrackingConsentDialog extends StatelessWidget {
   const TrackingConsentDialog({super.key});
 
-  /// True for Allow. It can't be dismissed without an answer.
-  static Future<bool> show(BuildContext context) async {
-    final yes = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const TrackingConsentDialog(),
-    );
-    return yes ?? false;
-  }
+  /// True for Allow. [required]: after onboarding there is no way past it
+  /// without an answer, as closing it must not read as a no. From Profile,
+  /// closing it changes nothing and returns null.
+  static Future<bool?> show(BuildContext context, {bool required = false}) => showDialog<bool>(
+        context: context,
+        barrierDismissible: !required,
+        builder: (_) => PopScope(canPop: !required, child: const TrackingConsentDialog()),
+      );
 
   @override
   Widget build(BuildContext context) {

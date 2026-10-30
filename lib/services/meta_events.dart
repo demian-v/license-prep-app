@@ -13,16 +13,22 @@ import '../widgets/tracking_consent_dialog.dart';
 /// Meta's App Events, behind the person's own answer (analytics plan E; the
 /// owner's decisions of 2026-10-30).
 ///
-/// - **Nothing reaches Meta before a yes.** The SDK's auto-init and
-///   auto-logging are off in Info.plist and the Android manifest, so it stays
-///   asleep until [_start]. Auto-logging stays off for good: it would log
+/// - **No events and no advertising ID reach Meta before a yes.** The SDK's
+///   auto-init and auto-logging are off in Info.plist and the Android
+///   manifest. On iOS it stays fully asleep until [_start]. Android can't: the
+///   SDK's own provider starts it with the process and fetches its settings
+///   from Meta, and the plugin needs that to attach, so Meta sees the device's
+///   IP address and the app there, before an answer and after a no. The
+///   privacy policy says so. Auto-logging stays off for good: it would log
 ///   store purchases itself, before server validation and with renewals.
 /// - **Sign-up and the trial come before the question**, which is asked after
 ///   onboarding, so they wait here on the device: a yes sends them, a no
 ///   deletes them.
-/// - **A no sends nothing and blocks nothing.** On iOS the answer is the
-///   system prompt; Android has none, so it gets [TrackingConsentDialog] and
-///   a row in Profile.
+/// - **A no sends no events and blocks nothing.** On iOS the answer is the
+///   system prompt, and the system setting stays the truth afterwards; Android
+///   has none, so it gets [TrackingConsentDialog] and a row in Profile. A no
+///   there quiets the advertising ID at once, but the SDK keeps counting app
+///   opens until the app closes, as it has no way to stop.
 ///
 /// Only [AnalyticsService] sends events, next to the GA4 ones, so the two
 /// can't drift. No email, name or user id ever goes to Meta.
@@ -43,14 +49,26 @@ class MetaEvents {
   static void Function(String kind, Map<String, dynamic> params)? debugSink;
   @visibleForTesting
   static bool? debugConfigured;
-  /// Tests only: the person's answer to the question, instead of the prompt.
+  /// Tests only: the person's answer to the question, instead of the prompt;
+  /// null when no answer came.
   @visibleForTesting
-  static Future<bool> Function()? debugAsk;
+  static Future<bool?> Function()? debugAsk;
+  /// Tests only: run as iOS, with this system tracking status.
+  @visibleForTesting
+  static TrackingStatus? debugTrackingStatus;
 
   final FacebookAppEvents _sdk = FacebookAppEvents();
   bool _started = false;
 
   bool get _configured => debugConfigured ?? metaConfigured;
+  bool get _isIos => debugTrackingStatus != null || (!kIsWeb && Platform.isIOS);
+
+  /// What a system tracking status means as an answer. `notDetermined` is no
+  /// answer: iOS shows the prompt only to an active app, and returns this
+  /// without showing it when the person left in time.
+  @visibleForTesting
+  static bool? answerOf(TrackingStatus status) =>
+      status == TrackingStatus.notDetermined ? null : status == TrackingStatus.authorized;
 
   /// The stored answer; null until the person answered.
   Future<bool?> allowed() async => (await SharedPreferences.getInstance()).getBool(choiceKey);
@@ -75,37 +93,38 @@ class MetaEvents {
     }
   }
 
-  /// At launch: a yes from an earlier run wakes the SDK. A yes withdrawn in
-  /// the iOS settings counts as a no from here on.
+  /// At launch: on iOS the system setting is the truth, in both directions,
+  /// so a change made in Settings counts from here on. A yes wakes the SDK.
   Future<void> startIfAllowed() async {
     if (!_configured) return;
     try {
-      if (await allowed() != true) return;
-      if (debugSink == null && Platform.isIOS
-          && await AppTrackingTransparency.trackingAuthorizationStatus != TrackingStatus.authorized) {
-        await answer(false);
-        return;
+      if (_isIos) {
+        final system = answerOf(debugTrackingStatus ?? await AppTrackingTransparency.trackingAuthorizationStatus);
+        final stored = await allowed();
+        // The prompt reset in Settings is no longer a yes.
+        final now = system ?? (stored == true ? false : null);
+        if (now != null && now != stored) await answer(now);
       }
-      await _start();
+      if (await allowed() == true) await _start();
     } catch (e) {
       debugPrint('❌ Meta start: $e');
     }
   }
 
   /// Once, at a calm moment after onboarding. Never on the first screens, and
-  /// not at all for someone who already answered.
+  /// not at all for someone who already answered. When no answer came, what
+  /// waits keeps waiting and the next launch asks again.
   Future<void> askOnce(BuildContext context) async {
     if (!_configured || await allowed() != null) return;
     await Future<void>.delayed(_calmAfter);
     if (!context.mounted) return;
-    await answer(await (debugAsk?.call() ?? _ask(context)));
+    final yes = await (debugAsk?.call() ?? _ask(context));
+    if (yes != null) await answer(yes);
   }
 
-  Future<bool> _ask(BuildContext context) async {
-    if (Platform.isIOS) {
-      return await AppTrackingTransparency.requestTrackingAuthorization() == TrackingStatus.authorized;
-    }
-    return await TrackingConsentDialog.show(context);
+  Future<bool?> _ask(BuildContext context) async {
+    if (_isIos) return answerOf(await AppTrackingTransparency.requestTrackingAuthorization());
+    return TrackingConsentDialog.show(context, required: true);
   }
 
   /// Stores the answer. A yes sends what was kept; a no deletes it and quiets
