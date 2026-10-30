@@ -39,6 +39,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
   @override
   void initState() {
     super.initState();
+    AnalyticsService().logScreenView('exam');
     
     // Scroll to current pill when screen initializes
     WidgetsBinding.instance.addPostFrameCallback((_) {

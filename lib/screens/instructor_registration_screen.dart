@@ -11,6 +11,7 @@ import '../data/state_data.dart';
 import '../data/teaching_languages.dart';
 import '../localization/app_localizations.dart';
 import '../providers/auth_provider.dart';
+import '../services/analytics_service.dart';
 import '../services/instructor_service.dart';
 import '../services/push_service.dart';
 import '../theme/app_theme.dart';
@@ -93,6 +94,7 @@ class _InstructorRegistrationScreenState extends State<InstructorRegistrationScr
   @override
   void initState() {
     super.initState();
+    AnalyticsService().logScreenView('instructor_registration');
     WidgetsBinding.instance.addPostFrameCallback((_) => _restoreDraft());
   }
 

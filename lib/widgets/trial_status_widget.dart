@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/subscription_provider.dart';
 import '../services/subscription_management_service.dart';
+import '../services/analytics_service.dart';
 import '../localization/app_localizations.dart';
 import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
@@ -298,7 +299,7 @@ class TrialStatusWidget extends StatelessWidget {
           : localizations.translate('subscribe_now'),
       onAction: needsVerification
           ? null
-          : () => Navigator.pushNamed(context, '/subscription'),
+          : () => Navigator.pushNamed(context, '/subscription', arguments: 'no_subscription'),
     );
   }
 
@@ -322,6 +323,9 @@ class TrialStatusWidget extends StatelessWidget {
         ? localizations.translate('subscription_required')
         : '${localizations.translate('days_left')}: $daysRemaining';
 
+    // Once per app run, however often the card rebuilds.
+    if (isExpired) AnalyticsService().logTrialExpiredSeen();
+
     return _buildRow(
       context: context,
       iconAsset: AppIcons.clock,
@@ -337,7 +341,7 @@ class TrialStatusWidget extends StatelessWidget {
       // sentence («Потрібна підписка для продовження») and goes plain grey.
       pillSubtitle: !isExpired,
       actionLabel: localizations.translate('upgrade_now'),
-      onAction: () => Navigator.pushNamed(context, '/subscription'),
+      onAction: () => Navigator.pushNamed(context, '/subscription', arguments: 'trial_banner'),
     );
   }
 
@@ -355,7 +359,7 @@ class TrialStatusWidget extends StatelessWidget {
       tone: AppColors.stop,
       toneSurface: AppColors.stopSurface,
       actionLabel: localizations.translate('renew_now'),
-      onAction: () => Navigator.pushNamed(context, '/subscription'),
+      onAction: () => Navigator.pushNamed(context, '/subscription', arguments: 'expired_banner'),
     );
   }
 }

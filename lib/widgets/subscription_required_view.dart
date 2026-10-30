@@ -78,7 +78,7 @@ class SubscriptionRequiredView extends StatelessWidget {
                 const SizedBox(height: AppSpacing.x6),
                 BentoAuthPrimaryButton(
                   label: localizations.translate('subscribe_now'),
-                  onPressed: () => Navigator.pushNamed(context, '/subscription'),
+                  onPressed: () => Navigator.pushNamed(context, '/subscription', arguments: 'locked_view'),
                 ),
               ],
             ),

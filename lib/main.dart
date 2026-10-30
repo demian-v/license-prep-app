@@ -498,9 +498,6 @@ Future<void> _startApp() async {
   // Connect AuthProvider and LanguageProvider for synchronization
   authProvider.setLanguageProvider(languageProvider);
   
-  // Connect AuthProvider with SubscriptionProvider for analytics
-  authProvider.setSubscriptionProvider(subscriptionProvider);
-  
   final stateProvider = StateProvider();
   
   // Connect AuthProvider with StateProvider for synchronization
@@ -566,30 +563,19 @@ Future<void> _startApp() async {
       await subscriptionProvider.initialize(user!.id);
     });
     
-    // Set up initial user properties for analytics
+    // Set up initial user properties for analytics. subscription_status is
+    // set by SubscriptionProvider once the subscription loads.
     await analyticsService.setUserProperties(
       userId: user.id,
       state: user.state,
       language: user.language ?? languageProvider.language,
-      subscriptionStatus: 'trial', // Default to trial, will be updated when subscription loads
     );
-    
-    // Log user configured event
-    await analyticsService.logEvent('user_configured', {
-      'subscription_type': 'trial',
-      'is_trial': 'true',
-    });
+    await analyticsService.setUserType(user.userType);
   } else {
     // For anonymous users, set basic properties
     await analyticsService.setUserProperties(
       language: languageProvider.language,
-      subscriptionStatus: 'trial',
     );
-    
-    // Log anonymous user configured event
-    await analyticsService.logEvent('anonymous_user_configured', {
-      'subscription_type': 'trial',
-    });
   }
   
   runApp(

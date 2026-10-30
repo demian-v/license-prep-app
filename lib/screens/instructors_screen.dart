@@ -11,6 +11,7 @@ import '../models/instructor_listing.dart';
 import '../providers/auth_provider.dart';
 import '../providers/state_provider.dart';
 import '../providers/subscription_provider.dart';
+import '../services/analytics_service.dart';
 import '../services/booking_service.dart';
 import '../services/chat_service.dart';
 import '../services/instructor_service.dart';
@@ -353,7 +354,14 @@ class _InstructorsScreenState extends State<InstructorsScreen> {
         found: found.length,
         onTap: () async {
           final next = await showInstructorFilters(context, current: _filters, all: all);
-          if (next != null && mounted) setState(() => _filters = next);
+          if (next != null && mounted) {
+            AnalyticsService().logInstructorListFiltered(
+              kind: next.kind ?? 'any',
+              language: next.languages.isEmpty ? 'any' : (next.languages.toList()..sort()).join(','),
+              activeCount: next.activeCount,
+            );
+            setState(() => _filters = next);
+          }
         },
       ),
       const SizedBox(height: AppSpacing.x3),

@@ -33,6 +33,13 @@ class AnalyticsService {
   
   bool _isInitialized = false;
   bool _isAnalyticsEnabled = true;
+
+  /// Tests capture events and user properties here. Called before the
+  /// initialised check, so no Firebase is needed.
+  @visibleForTesting
+  static void Function(String name, Map<String, dynamic>? parameters)? debugEventSink;
+  @visibleForTesting
+  static void Function(String name, String? value)? debugUserPropertySink;
   
   /// Initialize Firebase Analytics with GA4 compliance
   Future<void> initialize() async {
@@ -159,6 +166,7 @@ class AnalyticsService {
   
   /// Log a custom event with GA4 compliance
   Future<void> logEvent(String eventName, [Map<String, dynamic>? parameters]) async {
+    debugEventSink?.call(eventName, parameters);
     if (!_isInitialized || !_isAnalyticsEnabled) return;
     
     try {
@@ -184,6 +192,7 @@ class AnalyticsService {
   
   /// Set user property (GA4 compliant)
   Future<void> setUserProperty(String name, String? value) async {
+    debugUserPropertySink?.call(name, value);
     if (!_isInitialized || !_isAnalyticsEnabled) return;
     
     try {
@@ -289,11 +298,6 @@ class AnalyticsService {
       if (errorMessage != null) 'error_message': errorMessage,
       'timestamp': DateTime.now().millisecondsSinceEpoch,
     });
-  }
-  
-  /// Log password reset event
-  Future<void> logPasswordReset() async {
-    await logEvent('password_reset');
   }
   
   // MARK: - Enhanced Password Reset Journey Events
@@ -530,30 +534,11 @@ class AnalyticsService {
     String? language,
     String? licenseType,
   }) async {
+    await _logFirstLearningAction('theory');
     await logEvent('theory_module_selected', {
       if (moduleId != null) 'module_id': moduleId,
       if (moduleTitle != null) 'module_title': moduleTitle,
       if (timeOnListSeconds != null) 'time_on_list_seconds': timeOnListSeconds,
-      if (state != null) 'state': state,
-      if (language != null) 'language': language,
-      if (licenseType != null) 'license_type': licenseType,
-      'timestamp': DateTime.now().millisecondsSinceEpoch,
-    });
-  }
-
-  /// Log when theory module list fails to load
-  Future<void> logTheoryModuleListFailed({
-    String? errorType,
-    String? errorMessage,
-    String? state,
-    String? language,
-    String? licenseType,
-  }) async {
-    await logEvent('theory_module_list_failed', {
-      'error_type': errorType ?? 'unknown_error',
-      'error_message': errorMessage != null 
-          ? (errorMessage.length > 100 ? errorMessage.substring(0, 97) + '...' : errorMessage)
-          : 'unknown',
       if (state != null) 'state': state,
       if (language != null) 'language': language,
       if (licenseType != null) 'license_type': licenseType,
@@ -644,6 +629,7 @@ class AnalyticsService {
     int? totalQuestions,
     int? timeLimitMinutes,
   }) async {
+    await _logFirstLearningAction('exam');
     await logEvent('exam_started', {
       if (examId != null) 'exam_id': examId,
       if (state != null) 'state': state,
@@ -720,6 +706,7 @@ class AnalyticsService {
     int? totalQuestions, // null for unlimited
     int? timeLimitMinutes, // null for unlimited time
   }) async {
+    await _logFirstLearningAction('practice');
     await logEvent('practice_started', {
       'practice_id': practiceId,
       'state': state,
@@ -884,6 +871,7 @@ class AnalyticsService {
       'question_count': questionCount,
       'timestamp': DateTime.now().millisecondsSinceEpoch,
     };
+    await _logFirstLearningAction('quiz');
     await logEvent('q_topic_started', parameters);
   }
 
@@ -945,229 +933,214 @@ class AnalyticsService {
     await logEvent('q_topic_finished', parameters);
   }
   
-  // MARK: - Learning Events
-  
-  /// Log quiz start event
-  Future<void> logQuizStart({
-    String? quizId,
-    String? quizType,
-    String? state,
-    String? licenseType,
-  }) async {
-    await logEvent('quiz_start', {
-      if (quizId != null) 'quiz_id': quizId,
-      if (quizType != null) 'quiz_type': quizType,
-      if (state != null) 'state': state,
-      if (licenseType != null) 'license_type': licenseType,
-    });
-  }
-  
-  /// Log quiz completion event
-  Future<void> logQuizComplete({
-    String? quizId,
-    String? quizType,
-    int? score,
-    int? totalQuestions,
-    int? correctAnswers,
-    int? timeSpent,
-    String? state,
-    String? licenseType,
-  }) async {
-    await logEvent('quiz_complete', {
-      if (quizId != null) 'quiz_id': quizId,
-      if (quizType != null) 'quiz_type': quizType,
-      if (score != null) 'score': score,
-      if (totalQuestions != null) 'total_questions': totalQuestions,
-      if (correctAnswers != null) 'correct_answers': correctAnswers,
-      if (timeSpent != null) 'time_spent_seconds': timeSpent,
-      if (state != null) 'state': state,
-      if (licenseType != null) 'license_type': licenseType,
-    });
-  }
-  
-  /// Log exam start event
-  Future<void> logExamStart({
-    String? examId,
-    String? state,
-    String? licenseType,
-  }) async {
-    await logEvent('exam_start', {
-      if (examId != null) 'exam_id': examId,
-      if (state != null) 'state': state,
-      if (licenseType != null) 'license_type': licenseType,
-    });
-  }
-  
-  /// Log exam completion event
-  Future<void> logExamComplete({
-    String? examId,
-    int? score,
-    int? totalQuestions,
-    int? correctAnswers,
-    int? timeSpent,
-    bool? passed,
-    String? state,
-    String? licenseType,
-  }) async {
-    await logEvent('exam_complete', {
-      if (examId != null) 'exam_id': examId,
-      if (score != null) 'score': score,
-      if (totalQuestions != null) 'total_questions': totalQuestions,
-      if (correctAnswers != null) 'correct_answers': correctAnswers,
-      if (timeSpent != null) 'time_spent_seconds': timeSpent,
-      if (passed != null) 'passed': passed.toString(),
-      if (state != null) 'state': state,
-      if (licenseType != null) 'license_type': licenseType,
-    });
-  }
-  
-  /// Log practice session start event
-  Future<void> logPracticeStart({
-    String? sessionId,
-    String? state,
-    String? licenseType,
-  }) async {
-    await logEvent('practice_start', {
-      if (sessionId != null) 'session_id': sessionId,
-      if (state != null) 'state': state,
-      if (licenseType != null) 'license_type': licenseType,
-    });
-  }
-  
-  /// Log practice session completion event
-  Future<void> logPracticeComplete({
-    String? sessionId,
-    int? questionsAnswered,
-    int? correctAnswers,
-    int? timeSpent,
-    String? state,
-    String? licenseType,
-  }) async {
-    await logEvent('practice_complete', {
-      if (sessionId != null) 'session_id': sessionId,
-      if (questionsAnswered != null) 'questions_answered': questionsAnswered,
-      if (correctAnswers != null) 'correct_answers': correctAnswers,
-      if (timeSpent != null) 'time_spent_seconds': timeSpent,
-      if (state != null) 'state': state,
-      if (licenseType != null) 'license_type': licenseType,
-    });
-  }
-  
-  /// Log question answered event
-  Future<void> logQuestionAnswered({
-    String? questionId,
-    String? questionType,
-    bool? isCorrect,
-    int? timeSpent,
-    String? state,
-    String? licenseType,
-  }) async {
-    await logEvent('question_answered', {
-      if (questionId != null) 'question_id': questionId,
-      if (questionType != null) 'question_type': questionType,
-      if (isCorrect != null) 'is_correct': isCorrect.toString(),
-      if (timeSpent != null) 'time_spent_seconds': timeSpent,
-      if (state != null) 'state': state,
-      if (licenseType != null) 'license_type': licenseType,
-    });
-  }
-  
-  /// Log content viewed event
-  Future<void> logContentViewed({
-    String? contentId,
-    String? contentType,
-    String? state,
-    String? licenseType,
-  }) async {
-    await logEvent('content_viewed', {
-      if (contentId != null) 'content_id': contentId,
-      if (contentType != null) 'content_type': contentType,
-      if (state != null) 'state': state,
-      if (licenseType != null) 'license_type': licenseType,
-    });
-  }
-  
-  // MARK: - User Journey Events
-  
-  /// Log state selection event
-  Future<void> logStateSelected(String state) async {
-    await logEvent('state_selected', {'state': state});
-    await setUserProperty('user_state', state);
-  }
-  
-  /// Log license type selection event
-  Future<void> logLicenseSelected(String licenseType) async {
-    await logEvent('license_selected', {'license_type': licenseType});
-    await setUserProperty('license_type', licenseType);
-  }
-  
-  
-  /// Log subscription viewed event
-  Future<void> logSubscriptionViewed() async {
-    await logEvent('subscription_viewed');
-  }
-  
-  /// Log subscription purchased event (GA4 purchase event)
-  Future<void> logSubscriptionPurchased({
-    String? planType,
-    double? price,
-    String? currency,
-  }) async {
-    await logEvent('purchase', {
-      if (planType != null) 'item_name': planType,
-      if (price != null) 'value': price,
-      if (currency != null) 'currency': currency,
-      'item_category': 'subscription',
-    });
-    if (planType != null) {
-      await setUserProperty('subscription_status', planType);
-    }
-  }
-  
-  // MARK: - Engagement Events
-  
-  /// Log question saved event
-  Future<void> logQuestionSaved({
-    String? questionId,
-    String? questionType,
-    String? state,
-    String? licenseType,
-  }) async {
-    await logEvent('question_saved', {
-      if (questionId != null) 'question_id': questionId,
-      if (questionType != null) 'question_type': questionType,
-      if (state != null) 'state': state,
-      if (licenseType != null) 'license_type': licenseType,
-    });
-  }
-  
-  /// Log question unsaved event
-  Future<void> logQuestionUnsaved({
-    String? questionId,
-    String? questionType,
-    String? state,
-    String? licenseType,
-  }) async {
-    await logEvent('question_unsaved', {
-      if (questionId != null) 'question_id': questionId,
-      if (questionType != null) 'question_type': questionType,
-      if (state != null) 'state': state,
-      if (licenseType != null) 'license_type': licenseType,
-    });
-  }
-  
-  /// Log app opened event
+  /// Log app opened event (every cold start, from [initialize])
   Future<void> logAppOpened() async {
     await logEvent('app_opened');
   }
-  
-  /// Log session start event
-  Future<void> logSessionStart() async {
-    await logEvent('session_start', {
-      'session_id': DateTime.now().millisecondsSinceEpoch.toString(),
+
+  // MARK: - Paywall and Purchases
+
+  /// The paywall opened. [source] says from where: `profile`, `trial_banner`,
+  /// `theory_locked`, `test_locked`, `quiz_locked`... so conversion can be
+  /// read per entry point.
+  Future<void> logPaywallViewed(String source) async {
+    await logEvent('paywall_viewed', {'source': source});
+  }
+
+  /// The user tapped Subscribe and the store sheet is about to open.
+  Future<void> logPurchaseStarted(String productId) async {
+    await logEvent('purchase_started', {'product_id': productId});
+  }
+
+  /// GA4's recommended `purchase`, logged once the server validated the
+  /// receipt of a purchase the user started (not renewals or restores; those
+  /// reach the panel's Revenue from the store reports).
+  Future<void> logPurchase({
+    required String productId,
+    double? value,
+    String? currency,
+    String? transactionId,
+  }) async {
+    await logEvent('purchase', {
+      'item_id': productId,
+      'product_id': productId,
+      if (value != null) 'value': value,
+      if (currency != null) 'currency': currency,
+      if (transactionId != null && transactionId.isNotEmpty) 'transaction_id': transactionId,
     });
   }
-  
+
+  /// A purchase the user started did not go through. [reason] is a short code
+  /// (`store_unavailable`, `validation_failed`, the store's error code...),
+  /// never a message with personal data in it.
+  Future<void> logPurchaseFailed(String productId, String reason) async {
+    await logEvent('purchase_failed', {
+      'product_id': productId,
+      'reason': reason.length > 100 ? reason.substring(0, 100) : reason,
+    });
+  }
+
+  /// The user closed the store sheet without buying.
+  Future<void> logPurchaseCancelled(String productId) async {
+    await logEvent('purchase_cancelled', {'product_id': productId});
+  }
+
+  /// Restore purchases was tapped; [result] is `started`, `unavailable` or
+  /// `error`.
+  Future<void> logRestorePurchases(String result) async {
+    await logEvent('restore_purchases', {'result': result});
+  }
+
+  // MARK: - Onboarding and Activation
+
+  Future<void> logTutorialBegin() async {
+    await logEvent('tutorial_begin');
+  }
+
+  Future<void> logTutorialComplete({required int stepsSeen}) async {
+    await logEvent('tutorial_complete', {'steps_seen': stepsSeen});
+  }
+
+  Future<void> logTutorialSkipped({required int atStep}) async {
+    await logEvent('tutorial_skipped', {'at_step': atStep});
+  }
+
+  @visibleForTesting
+  static const String firstLearningActionKey = 'analytics_first_learning_action_v1';
+
+  /// The first time this device opens theory, a topic quiz, a practice ticket
+  /// or an exam: the step between sign-up and the paywall. Once per device.
+  Future<void> _logFirstLearningAction(String kind) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool(firstLearningActionKey) == true) return;
+      await prefs.setBool(firstLearningActionKey, true);
+      await logEvent('first_learning_action', {'kind': kind});
+    } catch (e) {
+      debugPrint('⚠️ AnalyticsService: first_learning_action not recorded: $e');
+    }
+  }
+
+  bool _trialExpiredSeenLogged = false;
+
+  /// The expired-trial UI showed. Once per app run, however often it rebuilds.
+  Future<void> logTrialExpiredSeen() async {
+    if (_trialExpiredSeenLogged) return;
+    _trialExpiredSeenLogged = true;
+    await logEvent('trial_expired_seen');
+  }
+
+  // MARK: - Push and Account
+
+  /// A push was tapped. [kind] is the push's `kind` (booking_request,
+  /// license_approved...), [route] where the app took the user.
+  Future<void> logNotificationOpened({required String kind, required String route}) async {
+    await logEvent('notification_opened', {'kind': kind, 'route': route});
+  }
+
+  Future<void> logAccountDeleted({required String userType}) async {
+    await logEvent('account_deleted', {'user_type': userType});
+  }
+
+  /// `user_type` (student / instructor) and, for instructors, `instructor_kind`
+  /// (school / private), so every report can be split by side. The kind is
+  /// known at registration; a later call without it leaves an instructor's
+  /// kind alone and clears it for a student.
+  Future<void> setUserType(String userType, {String? instructorKind}) async {
+    await setUserProperty('user_type', userType);
+    if (instructorKind != null || userType != 'instructor') {
+      await setUserProperty('instructor_kind', instructorKind);
+    }
+  }
+
+  // MARK: - Instructors (student side)
+
+  /// [launched]: whether the state is open for instructors yet (the tab
+  /// shows a «coming soon» card when it is not).
+  Future<void> logInstructorsTabViewed({
+    required bool launched,
+    required String state,
+    required int listedCount,
+  }) async {
+    await logEvent('instructors_tab_viewed', {
+      'launched': launched ? 'true' : 'false',
+      'state': state,
+      'listed_count': listedCount,
+    });
+  }
+
+  /// The filters sheet was applied. [kind] / [language] are `any` when not
+  /// set; [activeCount] is how many filters are on.
+  Future<void> logInstructorListFiltered({
+    required String kind,
+    required String language,
+    required int activeCount,
+  }) async {
+    await logEvent('instructor_list_filtered', {
+      'kind': kind,
+      'language': language,
+      'active_count': activeCount,
+    });
+  }
+
+  Future<void> logInstructorFavorited({required bool on}) async {
+    await logEvent('instructor_favorited', {'on': on ? 'true' : 'false'});
+  }
+
+  // MARK: - Instructors (instructor side)
+  // Server-side truths (licence approved, listed, first booking) come from
+  // Firestore in the admin panel, not from GA4.
+
+  Future<void> logInstructorRegistered({required String kind}) async {
+    await logEvent('instructor_registered', {'kind': kind});
+  }
+
+  Future<void> logLicenseSubmitted() async {
+    await logEvent('license_submitted');
+  }
+
+  Future<void> logLicensePhotoUploaded() async {
+    await logEvent('license_photo_uploaded');
+  }
+
+  Future<void> logProfilePhotoUploaded() async {
+    await logEvent('profile_photo_uploaded');
+  }
+
+  Future<void> logIdentityCheckStarted() async {
+    await logEvent('identity_check_started');
+  }
+
+  /// [result] is whether the instructor got through Didit's steps:
+  /// `completed` or `not_completed`. Didit's decision (approved / declined)
+  /// reaches the server by webhook and the panel reads it from Firestore.
+  Future<void> logIdentityCheckResult(String result) async {
+    await logEvent('identity_check_result', {'result': result});
+  }
+
+  /// A driving school opened Stripe's payouts onboarding. Whether it finished
+  /// is the server's to know (the panel reads it from Firestore).
+  Future<void> logPayoutsSetupStarted() async {
+    await logEvent('payouts_setup_started');
+  }
+
+  Future<void> logAvailabilitySaved() async {
+    await logEvent('availability_saved');
+  }
+
+  // MARK: - Screens
+
+  /// Flutter runs in one native view, so GA4's automatic screen names are all
+  /// the same; key screens name themselves here.
+  Future<void> logScreenView(String screenName) async {
+    debugEventSink?.call('screen_view', {'screen_name': screenName});
+    if (!_isInitialized || !_isAnalyticsEnabled) return;
+    try {
+      await _analytics.logScreenView(screenName: screenName, screenClass: screenName);
+    } catch (e) {
+      debugPrint('❌ Error logging screen view $screenName: $e');
+    }
+  }
   // MARK: - GA4 User Properties Management
   
   /// Set user properties for a logged-in user (GA4 compliant)
@@ -1203,14 +1176,6 @@ class AnalyticsService {
     if (subscriptionStatus != null) await setUserProperty('subscription_status', subscriptionStatus);
     if (registrationDate != null) await setUserProperty('registration_date', registrationDate);
     
-    // Log user properties update
-    await logEvent('user_properties_updated', {
-      'properties_count': _userProperties.length,
-      'has_user_id': userId != null ? 'true' : 'false',
-      'has_state': state != null ? 'true' : 'false',
-      'has_language': language != null ? 'true' : 'false',
-    });
-    
     debugPrint('👤 GA4 User properties updated: $_userProperties');
   }
   
@@ -1240,6 +1205,7 @@ class AnalyticsService {
     _isAnalyticsEnabled = true;
     _userProperties.clear();
     _currentUserId = null;
+    _trialExpiredSeenLogged = false;
     debugPrint('🔄 GA4 AnalyticsService reset');
   }
 }

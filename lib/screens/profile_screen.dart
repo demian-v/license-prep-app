@@ -818,7 +818,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
   }
 
   void _onSubscription() {
-    Navigator.pushNamed(context, '/subscription');
+    Navigator.pushNamed(context, '/subscription', arguments: 'profile');
   }
 
   Future<void> _onLogout(AuthProvider authProvider) async {

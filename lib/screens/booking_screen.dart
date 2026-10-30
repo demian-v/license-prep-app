@@ -37,6 +37,12 @@ class BookingScreen extends StatefulWidget {
 }
 
 class _BookingScreenState extends State<BookingScreen> {
+  @override
+  void initState() {
+    super.initState();
+    AnalyticsService().logScreenView('booking');
+  }
+
   late final BookingService _service = widget.service ?? BookingService();
   late Future<BookingOptions> _options = _service.options(widget.instructor.id);
 

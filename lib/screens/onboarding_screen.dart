@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../localization/app_localizations.dart';
+import '../services/analytics_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/bento_tokens.dart';
 import '../theme/solar_icons.dart';
@@ -120,6 +121,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   Rect _rect(String key) => onboardingShotRects[_locale]![key]!;
 
   @override
+  void initState() {
+    super.initState();
+    AnalyticsService().logTutorialBegin();
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     for (final screen in const ['tests', 'theory', 'instructors', 'profile']) {
@@ -196,8 +203,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     }
   }
 
-  Future<void> _finish() async {
+  /// [skipped]: the Skip button, as opposed to tapping on past the last step.
+  Future<void> _finish({bool skipped = false}) async {
     if (_finishing) return;
+    if (skipped) {
+      AnalyticsService().logTutorialSkipped(atStep: _i);
+    } else {
+      AnalyticsService().logTutorialComplete(stepsSeen: _i + 1);
+    }
     setState(() {
       _finishing = true;
       _marks = null;
@@ -361,7 +374,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   child: Opacity(
                     opacity: chrome,
                     child: TextButton(
-                      onPressed: _finishing ? null : _finish,
+                      onPressed: _finishing ? null : () => _finish(skipped: true),
                       style: TextButton.styleFrom(foregroundColor: AppColors.inkSecondary),
                       child: Text(
                         l.translate('skip'),

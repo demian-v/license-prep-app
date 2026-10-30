@@ -22,6 +22,12 @@ class PracticeResultScreen extends StatefulWidget {
 }
 
 class _PracticeResultScreenState extends State<PracticeResultScreen> {
+  @override
+  void initState() {
+    super.initState();
+    AnalyticsService().logScreenView('practice_result');
+  }
+
   // Chosen once per result page, not on every rebuild.
   Future<String?>? _memeUrl;
 

@@ -6,6 +6,7 @@ import 'package:didit_sdk_autodetection/sdk_flutter.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'analytics_service.dart';
 import '../models/instructor_listing.dart';
 
 /// What the Инструкторы tab needs before it can show anything: whether the
@@ -34,6 +35,7 @@ class InstructorService {
 
   FirebaseFirestore get _firestore => _firestoreOverride ?? FirebaseFirestore.instance;
   FirebaseFunctions get _fns => _functions ?? FirebaseFunctions.instance;
+  AnalyticsService get _analytics => AnalyticsService();
   FirebaseStorage get _storage => _storageOverride ?? FirebaseStorage.instance;
 
   /// Who is signing up, after the email code (functions/src/instructors.ts).
@@ -50,6 +52,9 @@ class InstructorService {
   /// teaching state it saved.
   Future<String> register(Map<String, dynamic> profile) async {
     final result = await _fns.httpsCallable('registerAsInstructor').call(profile);
+    final kind = '${profile['kind']}';
+    await _analytics.logInstructorRegistered(kind: kind);
+    await _analytics.setUserType('instructor', instructorKind: kind);
     return (result.data as Map)['state'] as String;
   }
 
@@ -60,6 +65,7 @@ class InstructorService {
       'schoolLicenseNumber': school,
       if (instructor != null && instructor.isNotEmpty) 'instructorLicenseNumber': instructor,
     });
+    await _analytics.logLicenseSubmitted();
   }
 
   /// One Профиль section — `bio`, `school`, `price`, `car` or `contacts` —
@@ -67,6 +73,7 @@ class InstructorService {
   /// registerAsInstructor does (functions/src/instructors.ts).
   Future<void> updateProfile(String section, Map<String, dynamic> fields) async {
     await _fns.httpsCallable('updateInstructorProfile').call({'section': section, ...fields});
+    if (section == 'availability') await _analytics.logAvailabilitySaved();
   }
 
   /// The owner's phone and contact email: they live in instructorPrivate,
@@ -94,6 +101,7 @@ class InstructorService {
     await _storage
         .ref('instructorUploads/$uid/photo/$id.jpg')
         .putData(await photo.readAsBytes(), SettableMetadata(contentType: 'image/jpeg'));
+    await _analytics.logProfilePhotoUploaded();
   }
 
   /// A licence photo (P10b): larger than a profile photo so the number stays
@@ -114,6 +122,7 @@ class InstructorService {
     await _storage
         .ref('instructorUploads/$uid/license/$id.jpg')
         .putData(await photo.readAsBytes(), SettableMetadata(contentType: 'image/jpeg'));
+    await _analytics.logLicensePhotoUploaded();
   }
 
   /// A download URL for an approved photo's Storage path (storage.rules).
@@ -135,6 +144,7 @@ class InstructorService {
   /// first call, reused after).
   Future<String> startPayouts() async {
     final result = await _fns.httpsCallable('startInstructorPayouts').call();
+    await _analytics.logPayoutsSetupStarted();
     return (result.data as Map)['url'] as String;
   }
 
@@ -159,6 +169,7 @@ class InstructorService {
   /// for the SDK. Codes: consent-required, too-many-sessions, already-passed.
   Future<String> createIdentitySession() async {
     final result = await _fns.httpsCallable('createIdentitySession').call();
+    await _analytics.logIdentityCheckStarted();
     return (result.data as Map)['sessionToken'] as String;
   }
 
@@ -166,8 +177,12 @@ class InstructorService {
   /// it — the result then arrives on the server. The emulator's fake Didit
   /// hands out tokens the SDK can't open; those skip straight to «Проверяем…».
   Future<bool> runIdentityCheck(String token, String languageCode) async {
-    if (token.startsWith('fake-token-')) return true;
+    if (token.startsWith('fake-token-')) {
+      await _analytics.logIdentityCheckResult('completed');
+      return true;
+    }
     final result = await DiditSdk.startVerification(token, config: DiditConfig(languageCode: languageCode));
+    await _analytics.logIdentityCheckResult(result is VerificationCompleted ? 'completed' : 'not_completed');
     return result is VerificationCompleted;
   }
 
@@ -211,11 +226,13 @@ class InstructorService {
       (s) => {for (final id in (s.data()?['instructorUids'] as List? ?? const [])) '$id'});
 
   /// Saves or removes one; the doc is created on the first save.
-  Future<void> setFavorite(String uid, String instructorId, bool saved) =>
-      _firestore.collection('favorites').doc(uid).set({
-        'instructorUids': saved ? FieldValue.arrayUnion([instructorId]) : FieldValue.arrayRemove([instructorId]),
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+  Future<void> setFavorite(String uid, String instructorId, bool saved) async {
+    await _firestore.collection('favorites').doc(uid).set({
+      'instructorUids': saved ? FieldValue.arrayUnion([instructorId]) : FieldValue.arrayRemove([instructorId]),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+    await _analytics.logInstructorFavorited(on: saved);
+  }
 
   Future<InstructorTabInfo> tabInfo(String state) async {
     final results = await Future.wait([
@@ -224,9 +241,11 @@ class InstructorService {
     ]);
     final launchStates = results[0].data()?['launchStates'];
     final count = results[1].data()?['listedCount'];
-    return InstructorTabInfo(
+    final info = InstructorTabInfo(
       launched: launchStates is List && launchStates.contains(state),
       listedCount: count is int ? count : 0,
     );
+    await _analytics.logInstructorsTabViewed(launched: info.launched, state: state, listedCount: info.listedCount);
+    return info;
   }
 }

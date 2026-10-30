@@ -22,6 +22,12 @@ class ExamResultScreen extends StatefulWidget {
 }
 
 class _ExamResultScreenState extends State<ExamResultScreen> {
+  @override
+  void initState() {
+    super.initState();
+    AnalyticsService().logScreenView('exam_result');
+  }
+
   // Chosen once per result page, not on every rebuild.
   Future<String?>? _memeUrl;
 

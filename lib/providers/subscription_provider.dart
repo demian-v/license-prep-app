@@ -3,6 +3,7 @@ import '../models/user_subscription.dart';
 import '../models/subscription_package.dart';
 import '../services/subscription_management_service.dart';
 import '../services/in_app_purchase_service.dart';
+import '../services/analytics_service.dart';
 import '../services/crash_reporter.dart';
 
 class SubscriptionProvider extends ChangeNotifier {
@@ -326,6 +327,17 @@ class SubscriptionProvider extends ChangeNotifier {
           : '${sub.planType}/${sub.status}',
       entitled: hasValidSubscription,
     );
+    AnalyticsService().setUserProperty('subscription_status', analyticsStatus(sub));
+  }
+
+  /// GA4's `subscription_status` user property: `trial`, `monthly`, `yearly`,
+  /// `expired` or `none`. Set from the loaded subscription every time it
+  /// changes; it used to be hard-coded to `trial` at every app start.
+  @visibleForTesting
+  static String analyticsStatus(UserSubscription? sub) {
+    if (sub == null) return 'none';
+    if (!sub.isValidSubscription) return 'expired';
+    return sub.planType;
   }
 
   /// Forgets the previous account's subscription (risk #78 follow-up,

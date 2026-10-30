@@ -96,14 +96,8 @@ class ContentLoadingManager {
 
     work.then((_) {
       print('ContentLoadingManager: prefetch complete ($reason)');
-      // Analytics is the ONLY channel that reports from a release build: #34
-      // silenced print and debugPrint there, and the app has no crash
-      // reporting at all. Without this, a prefetch that quietly stopped working
-      // would be invisible — the app would just get slower.
-      analyticsService.logEvent('content_prefetch', {
-        'outcome': 'success',
-        'reason': reason,
-      });
+      // No analytics event on success (2026-10-29): it fired on every
+      // prefetch and said nothing about behaviour. Failures still report below.
     }).catchError((Object e, StackTrace stack) {
       // Swallowed on purpose — see above. Recorded, not raised.
       print('ContentLoadingManager: prefetch failed, ignoring ($reason): $e');

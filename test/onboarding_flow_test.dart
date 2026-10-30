@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:license_prep_app/localization/app_localizations.dart';
 import 'package:license_prep_app/screens/onboarding_screen.dart';
+import 'package:license_prep_app/services/analytics_service.dart';
 import 'package:license_prep_app/widgets/onboarding_shots.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -55,7 +56,17 @@ Future<void> settle(WidgetTester tester, [int ms = 1200]) async {
 }
 
 void main() {
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  // GA4 funnel (analytics plan, 2026-10-29): tutorial_begin, then either
+  // tutorial_complete or tutorial_skipped, once.
+  final events = <(String, Map<String, dynamic>?)>[];
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+    events.clear();
+    AnalyticsService.debugEventSink = (name, params) {
+      if (name.startsWith('tutorial_')) events.add((name, params));
+    };
+  });
+  tearDown(() => AnalyticsService.debugEventSink = null);
 
   group('onboarding flow', () {
     testWidgets('greeting first, with no Back', (tester) async {
@@ -104,6 +115,9 @@ void main() {
       await tester.tap(find.text('Начать'), warnIfMissed: false);
       await settle(tester, 2000);
       expect(done, 1, reason: 'Start must not end the onboarding twice');
+      // The greeting and the seven screenshot steps.
+      expect([for (final e in events) e.$1], ['tutorial_begin', 'tutorial_complete']);
+      expect(events.last.$2, {'steps_seen': 8});
     });
 
     testWidgets('Skip ends it from the greeting and from a step', (tester) async {
@@ -112,6 +126,8 @@ void main() {
       await tester.tap(find.text('Пропустить'));
       await settle(tester);
       expect(done, 1);
+      expect(events.last.$1, 'tutorial_skipped');
+      expect(events.last.$2, {'at_step': 0});
 
       done = 0;
       await pumpOnboarding(tester, onDone: () => done++);
@@ -120,6 +136,9 @@ void main() {
       await tester.tap(find.text('Пропустить'));
       await settle(tester, 2000);
       expect(done, 1);
+      expect(events.last.$1, 'tutorial_skipped');
+      expect(events.last.$2, {'at_step': 1});
+      expect(events.where((e) => e.$1 == 'tutorial_complete'), isEmpty);
     });
 
     testWidgets('with full motion it plays through without errors', (tester) async {

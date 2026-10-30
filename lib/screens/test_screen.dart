@@ -161,7 +161,7 @@ class _TestScreenState extends State<TestScreen> {
       onUpgradePressed: () {
         debugPrint('🔄 TestScreen: User clicked Upgrade Now from premium block dialog');
         Navigator.of(context).pop(); // Close dialog
-        Navigator.pushNamed(context, '/subscription'); // Navigate to subscription screen
+        Navigator.pushNamed(context, '/subscription', arguments: 'test_locked'); // Navigate to subscription screen
       },
       onClosePressed: () {
         debugPrint('❌ TestScreen: User closed premium block dialog');

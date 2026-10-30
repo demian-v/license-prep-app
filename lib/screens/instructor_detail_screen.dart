@@ -52,6 +52,7 @@ class _InstructorDetailScreenState extends State<InstructorDetailScreen> {
   @override
   void initState() {
     super.initState();
+    AnalyticsService().logScreenView('instructor_detail');
     analyticsService.logInstructorProfileViewed(kind: widget.instructor.kind, stage: widget.instructor.stage);
   }
 

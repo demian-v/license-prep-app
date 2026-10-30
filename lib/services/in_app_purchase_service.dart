@@ -5,6 +5,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
+import 'analytics_service.dart';
 import 'crash_reporter.dart';
 
 class InAppPurchaseService {
@@ -162,6 +163,7 @@ class InAppPurchaseService {
   Future<bool> purchaseProduct(String productId) async {
     if (!_isAvailable) {
       debugPrint('❌ InAppPurchaseService: Store is not available');
+      AnalyticsService().logPurchaseFailed(productId, 'store_unavailable');
       onPurchaseError?.call('Store is not available');
       return false;
     }
@@ -175,11 +177,13 @@ class InAppPurchaseService {
     final product = getProduct(productId);
     if (product == null) {
       debugPrint('❌ InAppPurchaseService: Product $productId not found');
+      AnalyticsService().logPurchaseFailed(productId, 'product_not_found');
       onPurchaseError?.call('Product not found');
       return false;
     }
 
     debugPrint('🛒 InAppPurchaseService: Starting purchase for ${product.id}');
+    AnalyticsService().logPurchaseStarted(productId);
     _purchasePending = true;
     _pendingProductId = productId;
 
@@ -218,12 +222,14 @@ class InAppPurchaseService {
         return true;
       } else {
         debugPrint('❌ InAppPurchaseService: Failed to initiate purchase');
+        AnalyticsService().logPurchaseFailed(productId, 'not_initiated');
         _clearPurchasePending();
         onPurchaseError?.call('Failed to initiate purchase');
         return false;
       }
     } catch (e) {
       debugPrint('❌ InAppPurchaseService: Purchase error: $e');
+      AnalyticsService().logPurchaseFailed(productId, 'exception');
       _clearPurchasePending();
       onPurchaseError?.call('Purchase error: $e');
       return false;
@@ -242,6 +248,7 @@ class InAppPurchaseService {
   Future<void> restorePurchases() async {
     if (!_isAvailable) {
       debugPrint('❌ InAppPurchaseService: Store is not available for restore');
+      AnalyticsService().logRestorePurchases('unavailable');
       return;
     }
 
@@ -264,8 +271,10 @@ class InAppPurchaseService {
 
       await _inAppPurchase.restorePurchases();
       debugPrint('✅ InAppPurchaseService: Restore purchases initiated');
+      AnalyticsService().logRestorePurchases('started');
     } catch (e) {
       debugPrint('❌ InAppPurchaseService: Restore purchases error: $e');
+      AnalyticsService().logRestorePurchases('error');
       _isRestoringPurchases = false;
       _restoreSessionTimer?.cancel();
       _restoreSessionTimer = null;
@@ -430,15 +439,24 @@ class InAppPurchaseService {
     _validateReceipt(purchaseDetails).then((isValid) {
       if (isValid) {
         debugPrint('✅ InAppPurchaseService: Receipt validated successfully');
+        // GA4 `purchase` only for the purchase the user just made: renewals
+        // and restores come through here too and are not new revenue events.
+        if (isUserInitiated) _logPurchase(purchaseDetails);
         onPurchaseSuccess?.call(purchaseDetails.productID);
       } else {
         debugPrint('❌ InAppPurchaseService: Receipt validation failed');
+        if (isUserInitiated) {
+          AnalyticsService().logPurchaseFailed(purchaseDetails.productID, 'validation_failed');
+        }
         onPurchaseError?.call('Receipt validation failed');
       }
       _onValidationSettled();
     }).catchError((error) {
       // BUG FIX: Call error callback when validation throws an exception
       debugPrint('❌ InAppPurchaseService: Receipt validation error: $error');
+      if (isUserInitiated) {
+        AnalyticsService().logPurchaseFailed(purchaseDetails.productID, 'validation_error');
+      }
       onPurchaseError?.call('Receipt validation error: ${error.toString()}');
       _onValidationSettled();
     });
@@ -460,9 +478,23 @@ class InAppPurchaseService {
     _handleSuccessfulPurchase(next);
   }
 
+  void _logPurchase(PurchaseDetails purchaseDetails) {
+    final product = getProduct(purchaseDetails.productID);
+    AnalyticsService().logPurchase(
+      productId: purchaseDetails.productID,
+      value: product?.rawPrice,
+      currency: product?.currencyCode,
+      transactionId: purchaseDetails.purchaseID,
+    );
+  }
+
   /// Handle purchase error
   void _handlePurchaseError(PurchaseDetails purchaseDetails) {
     _clearPurchasePending();
+    AnalyticsService().logPurchaseFailed(
+      purchaseDetails.productID,
+      purchaseDetails.error?.code ?? 'unknown',
+    );
     final errorMessage = purchaseDetails.error?.message ?? 'Unknown purchase error';
     onPurchaseError?.call(errorMessage);
   }
@@ -470,6 +502,7 @@ class InAppPurchaseService {
   /// Handle purchase cancellation
   void _handlePurchaseCanceled(PurchaseDetails purchaseDetails) {
     _clearPurchasePending();
+    AnalyticsService().logPurchaseCancelled(purchaseDetails.productID);
     onPurchaseCanceled?.call(purchaseDetails.productID);
   }
 

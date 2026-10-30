@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/subscription_provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/analytics_service.dart';
 import '../services/in_app_purchase_service.dart';
 import '../localization/app_localizations.dart';
 import '../widgets/enhanced_subscription_card.dart';
@@ -20,6 +21,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     super.initState();
     // Run after the first frame so Provider.of is available
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // Callers pass where the paywall was opened from as the route argument.
+      final source = ModalRoute.of(context)?.settings.arguments;
+      AnalyticsService().logPaywallViewed(source is String ? source : 'unknown');
+      AnalyticsService().logScreenView('paywall');
       _setupPurchaseCallback();
     });
   }

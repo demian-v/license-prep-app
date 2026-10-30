@@ -7,6 +7,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 
+import 'analytics_service.dart';
+
 /// Where a tapped push goes (instructors plan v2 §12). The server puts it in
 /// `data.route`: `profile`, `chat/<id>` or `booking/<id>`. Anything else is
 /// ignored, so a malformed payload can't send the app somewhere odd.
@@ -92,6 +94,10 @@ class PushService {
 
   void _open(RemoteMessage message) {
     final route = PushRoute.parse(message.data['route']);
+    AnalyticsService().logNotificationOpened(
+      kind: '${message.data['kind'] ?? 'unknown'}',
+      route: route?.name ?? 'none',
+    );
     if (route != null) pendingRoute.value = route;
   }
 

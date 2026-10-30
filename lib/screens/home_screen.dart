@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/analytics_service.dart';
 import '../services/crash_reporter.dart';
 import 'package:provider/provider.dart';
 import '../screens/test_screen.dart';
@@ -78,6 +79,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeContent();
       _openPushRoute(); // a push tapped before Home existed (cold start)
+      AnalyticsService().logScreenView('tab_${_tabName(_currentIndex)}');
     });
     PushService.pendingRoute.addListener(_openPushRoute);
   }
@@ -117,6 +119,14 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
 
   /// The tab that carries the chat and its unread badge (plan v2 §14.1).
   int get _chatTab => _isInstructor ? 1 : 2;
+
+  /// The bottom-nav tab's name, for crash breadcrumbs and GA4 screen views.
+  String _tabName(int index) {
+    final tabs = _isInstructor
+        ? const ['calendar', 'chat', 'profile']
+        : const ['tests', 'theory', 'instructors', 'profile'];
+    return index < tabs.length ? tabs[index] : '$index';
+  }
 
   /// The badge's count, one listener per signed-in user.
   Stream<int>? _unread;
@@ -260,10 +270,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     
     // Breadcrumb: the bottom nav is the app's primary navigation and uses no
     // route at all, so CrashBreadcrumbObserver cannot see it.
-    final tabs = _isInstructor
-        ? const ['calendar', 'chat', 'profile']
-        : const ['tests', 'theory', 'instructors', 'profile'];
-    crashReporter.log('nav: tab ${index < tabs.length ? tabs[index] : index}');
+    crashReporter.log('nav: tab ${_tabName(index)}');
+    AnalyticsService().logScreenView('tab_${_tabName(index)}');
 
     print('🏠 HomeScreen: Tab changed to index $index, persisted for future rebuilds');
   }

@@ -34,6 +34,12 @@ class QuizResultScreen extends StatefulWidget {
 }
 
 class _QuizResultScreenState extends State<QuizResultScreen> {
+  @override
+  void initState() {
+    super.initState();
+    AnalyticsService().logScreenView('quiz_result');
+  }
+
   // Chosen once per result page, not on every rebuild.
   Future<String?>? _memeUrl;
 

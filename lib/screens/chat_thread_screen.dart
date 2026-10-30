@@ -76,6 +76,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
   @override
   void initState() {
     super.initState();
+    AnalyticsService().logScreenView('chat_thread');
     PushService.openConversation.value = widget.conversationId;
     _scroll.addListener(_onScroll);
     if (widget.partner == null) {

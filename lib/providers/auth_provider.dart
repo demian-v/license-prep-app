@@ -22,7 +22,6 @@ class AuthProvider extends ChangeNotifier {
   final firebase_auth.FirebaseAuth _firebaseAuth = firebase_auth.FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   LanguageProvider? _languageProvider;
-  SubscriptionProvider? _subscriptionProvider;
   StateProvider? _stateProvider;
 
   // Callback for session conflict navigation
@@ -33,11 +32,6 @@ class AuthProvider extends ChangeNotifier {
   // Set the language provider for synchronization
   void setLanguageProvider(LanguageProvider languageProvider) {
     _languageProvider = languageProvider;
-  }
-
-  // Set the subscription provider for analytics
-  void setSubscriptionProvider(SubscriptionProvider subscriptionProvider) {
-    _subscriptionProvider = subscriptionProvider;
   }
 
   // Set the state provider for synchronization
@@ -61,14 +55,6 @@ class AuthProvider extends ChangeNotifier {
       return 'network_error';
     }
     return 'unknown_error';
-  }
-
-  /// Get subscription status for analytics
-  String _getSubscriptionStatus() {
-    if (_subscriptionProvider?.subscription?.isActive == true) {
-      return _subscriptionProvider?.subscription?.planType ?? 'active';
-    }
-    return 'inactive';
   }
 
   Future<bool> login(String email, String password) async {
@@ -179,8 +165,8 @@ class AuthProvider extends ChangeNotifier {
             userId: user!.id,
             state: user!.state,
             language: user!.language ?? (_languageProvider?.language ?? 'en'),
-            subscriptionStatus: _getSubscriptionStatus(),
           );
+          await serviceLocator.analytics.setUserType(user!.userType);
           debugPrint('📊 AuthProvider: Login analytics tracked successfully');
         } catch (e) {
           debugPrint('⚠️ AuthProvider: Analytics login tracking error (non-critical): $e');
@@ -681,7 +667,9 @@ class AuthProvider extends ChangeNotifier {
         debugPrint('🗑️ AuthProvider: Deleting user account for ID: ${user!.id}');
         
         // Try to use the API to delete the account (now with backup mechanism)
+        final userType = user!.userType;
         await serviceLocator.auth.deleteAccount(user!.id);
+        await serviceLocator.analytics.logAccountDeleted(userType: userType);
         
         // Clear local data after successful API deletion
         user = null;

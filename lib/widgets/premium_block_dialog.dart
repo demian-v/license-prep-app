@@ -157,7 +157,7 @@ class PremiumBlockDialog extends StatelessWidget {
                       FilledButton(
                         onPressed: onUpgradePressed ?? () {
                           Navigator.of(context).pop();
-                          Navigator.pushNamed(context, '/subscription');
+                          Navigator.pushNamed(context, '/subscription', arguments: 'premium_dialog');
                         },
                         style: FilledButton.styleFrom(
                           backgroundColor: AppColors.ink,
