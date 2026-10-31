@@ -13,6 +13,7 @@ import '../screens/booking_detail_screen.dart';
 import '../screens/chat_thread_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/onboarding_screen.dart';
+import '../config/instructors_config.dart';
 import '../services/meta_events.dart';
 import '../theme/app_colors.dart';
 import '../widgets/super_enhanced_footer.dart';
@@ -52,7 +53,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   final List<Widget> _screens = [
     TestScreen(),
     TheoryScreen(),
-    const InstructorsScreen(),
+    if (instructorsOn) const InstructorsScreen(),
     ProfileScreen(),
   ];
 
@@ -127,7 +128,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   String _tabName(int index) {
     final tabs = _isInstructor
         ? const ['calendar', 'chat', 'profile']
-        : const ['tests', 'theory', 'instructors', 'profile'];
+        : ['tests', 'theory', if (instructorsOn) 'instructors', 'profile'];
     return index < tabs.length ? tabs[index] : '$index';
   }
 
@@ -340,7 +341,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
         stream: _unreadFor(Provider.of<AuthProvider>(context).user?.id),
         builder: (context, unread) {
           final badges = List.filled(screens.length, 0);
-          badges[isInstructor ? 1 : 2] = unread.data ?? 0;
+          if (isInstructor || instructorsOn) badges[isInstructor ? 1 : 2] = unread.data ?? 0;
           return SuperEnhancedFooter(
             currentIndex: index,
             onTap: _onTabTapped,

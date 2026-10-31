@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:license_prep_app/config/instructors_config.dart';
 import 'package:license_prep_app/localization/app_localizations.dart';
 import 'package:license_prep_app/screens/onboarding_screen.dart';
 import 'package:license_prep_app/services/analytics_service.dart';
@@ -60,15 +61,35 @@ void main() {
   // tutorial_complete or tutorial_skipped, once.
   final events = <(String, Map<String, dynamic>?)>[];
   setUp(() {
+    debugInstructorsOn = true;
     SharedPreferences.setMockInitialValues({});
     events.clear();
     AnalyticsService.debugEventSink = (name, params) {
       if (name.startsWith('tutorial_')) events.add((name, params));
     };
   });
-  tearDown(() => AnalyticsService.debugEventSink = null);
+  tearDown(() {
+    AnalyticsService.debugEventSink = null;
+    debugInstructorsOn = null;
+  });
 
   group('onboarding flow', () {
+    testWidgets('with instructors off the tour has no instructors step', (tester) async {
+      debugInstructorsOn = false;
+      await pumpOnboarding(tester, onDone: () {});
+      await tester.tap(find.text('Начнём'));
+      await settle(tester);
+      for (var i = 0; i < 5; i++) {
+        expect(find.textContaining('инструктора'), findsNothing);
+        await tester.tap(find.byTooltip('Далее').first);
+        await settle(tester);
+      }
+      expect(find.text('Меняйте язык и штат в любой момент.'), findsOneWidget);
+      await tester.tap(find.text('Начать'));
+      await settle(tester, 2000);
+      expect(events.last.$2, {'steps_seen': 7});
+    });
+
     testWidgets('greeting first, with no Back', (tester) async {
       await pumpOnboarding(tester, onDone: () {});
       expect(find.text('Добро пожаловать в DriveUSA'), findsOneWidget);

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../config/instructors_config.dart';
 import '../localization/app_localizations.dart';
 import '../services/analytics_service.dart';
 import '../theme/app_theme.dart';
@@ -129,7 +130,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    for (final screen in const ['tests', 'theory', 'instructors', 'profile']) {
+    for (final screen in ['tests', 'theory', if (instructorsOn) 'instructors', 'profile']) {
       precacheImage(AssetImage(_asset(screen)), context);
     }
   }
@@ -157,8 +158,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             screen: 'theory', element: 'module'),
         // Инструкторы (2026-10-05): its tab and the first instructor card,
         // captured as a paid student — a pointer to the tab, not a tour.
-        _Step(l.translate('onboarding_instructors_title'), l.translate('onboarding_instructors_body'),
-            screen: 'instructors', element: 'card'),
+        if (instructorsOn)
+          _Step(l.translate('onboarding_instructors_title'), l.translate('onboarding_instructors_body'),
+              screen: 'instructors', element: 'card'),
         _Step(l.translate('onboarding_profile_title'), l.translate('onboarding_profile_body'),
             screen: 'profile', element: 'settings'),
       ];

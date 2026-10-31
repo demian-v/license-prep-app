@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../config/instructors_config.dart';
 import '../providers/language_provider.dart';
 import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
@@ -56,7 +57,9 @@ class SuperEnhancedFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tabs = forInstructor ? _instructorTabs : _tabs;
+    final tabs = forInstructor
+        ? _instructorTabs
+        : [for (final tab in _tabs) if (instructorsOn || tab.key != 'instructors') tab];
     return Consumer<LanguageProvider>(
       builder: (context, languageProvider, _) {
         // The bar floats, so it clears the home indicator itself rather

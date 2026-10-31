@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:license_prep_app/config/instructors_config.dart';
 import 'package:license_prep_app/providers/language_provider.dart';
 import 'package:license_prep_app/widgets/super_enhanced_footer.dart';
 import 'package:provider/provider.dart';
@@ -21,6 +22,8 @@ void main() {
   });
 
   testWidgets('gaps between the Russian tab labels are equal', (tester) async {
+    debugInstructorsOn = true;
+    addTearDown(() => debugInstructorsOn = null);
     SharedPreferences.setMockInitialValues(
         {'language': 'ru', 'app_initialized': true});
     final language = LanguageProvider();
