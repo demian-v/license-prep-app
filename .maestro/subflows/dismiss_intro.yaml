@@ -1,0 +1,22 @@
+# After a student signs in on a cleared app: skip the tour, answer the
+# tracking question with no. Instructors get neither.
+appId: com.driveusa.app
+---
+- extendedWaitUntil:
+    visible: "Skip"
+    timeout: 20000
+    optional: true
+- runFlow:
+    when:
+      visible: "Skip"
+    commands:
+      - tapOn: "Skip"
+- extendedWaitUntil:
+    visible: "Allow ad measurement."
+    timeout: 5000
+    optional: true
+- runFlow:
+    when:
+      visible: "Allow ad measurement."
+    commands:
+      - tapOn: "Don't allow"

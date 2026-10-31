@@ -1,0 +1,28 @@
+# A paid student in Illinois finds a school and opens its profile.
+appId: com.driveusa.app
+---
+- runFlow:
+    file: ../subflows/login.yaml
+    env:
+      EMAIL: seed-student-paid@example.com
+- runFlow: ../subflows/dismiss_intro.yaml
+# Four tabs with instructors on.
+- assertVisible: "Tests"
+- assertVisible: "Theory"
+- assertVisible: "Profile"
+- tapOn: ".*Instructors.*"
+- extendedWaitUntil:
+    visible: "(?s).*Found: 6.*"
+    timeout: 20000
+- assertVisible: "(?s).*My lessons.*"
+- tapOn: "(?s)Lakeview Driving School.*"
+- extendedWaitUntil:
+    visible: "Driving school"
+    timeout: 15000
+- assertVisible: "Book"
+- assertVisible: "Message"
+- scrollUntilVisible:
+    element: "(?s).*Reviews.*"
+    direction: DOWN
+- back
+- assertVisible: "(?s).*Found: 6.*"

@@ -1,0 +1,19 @@
+# Student reports an instructor profile.
+appId: com.driveusa.app
+---
+- runFlow:
+    file: ../subflows/login.yaml
+    env:
+      EMAIL: seed-student-paid@example.com
+- runFlow: ../subflows/dismiss_intro.yaml
+- tapOn: ".*Instructors.*"
+- tapOn: "(?s)Marek Nowak.*"
+- tapOn: "Report this profile"
+- extendedWaitUntil:
+    visible: "(?s).*Fake profile.*"
+    timeout: 10000
+- tapOn: "(?s).*Spam or scam.*"
+- tapOn: "Submit"
+- extendedWaitUntil:
+    visible: "Thanks! We'll review this."
+    timeout: 15000

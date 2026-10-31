@@ -1,0 +1,59 @@
+# Student ↔ instructor chat before any booking: the student's phone number is
+# masked for both sides, the instructor sees it and replies, the student gets it.
+appId: com.driveusa.app
+---
+# Student writes to Olena (seed-instr-03; thread locked, 1 unread).
+- runFlow:
+    file: ../subflows/login.yaml
+    env:
+      EMAIL: seed-student-paid@example.com
+- runFlow: ../subflows/dismiss_intro.yaml
+- tapOn: ".*Instructors.*"
+- tapOn: "(?s)Messages.*"
+- tapOn: "(?s)Olena Kovalenko.*"
+- extendedWaitUntil:
+    visible: "Message"
+    timeout: 15000
+- tapOn: "Message"
+- inputText: "Call me on 3125550199 please"
+- tapOn: "Send"
+- extendedWaitUntil:
+    visible: "(?s).*Call me on ••• please.*"
+    timeout: 15000
+- assertNotVisible: "(?s).*3125550199.*"
+- assertVisible: "(?s).*Contacts unlock after the first booking.*"
+
+# Olena sees it, masked, and replies.
+- runFlow:
+    file: ../subflows/login.yaml
+    env:
+      EMAIL: seed-instr-03@example.com
+- extendedWaitUntil:
+    visible: ".*Chat.*"
+    timeout: 30000
+- tapOn: ".*Chat.*"
+- tapOn: "(?s).*Paid S[.].*Call me on.*"
+- extendedWaitUntil:
+    visible: "(?s).*Call me on ••• please.*"
+    timeout: 15000
+- assertNotVisible: "(?s).*3125550199.*"
+- tapOn: "Message"
+- inputText: "See you on Thursday at 14:00"
+- tapOn: "Send"
+- extendedWaitUntil:
+    visible: "(?s).*See you on Thursday at 14:00.*"
+    timeout: 15000
+
+# The student gets the reply.
+- runFlow:
+    file: ../subflows/login.yaml
+    env:
+      EMAIL: seed-student-paid@example.com
+- runFlow: ../subflows/dismiss_intro.yaml
+- tapOn: ".*Instructors.*"
+- tapOn: "(?s)Messages.*"
+- assertVisible: "(?s)Olena Kovalenko.*See you on Thursday at 14:00.*"
+- tapOn: "(?s)Olena Kovalenko.*"
+- extendedWaitUntil:
+    visible: "(?s).*See you on Thursday at 14:00.*"
+    timeout: 15000

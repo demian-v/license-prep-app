@@ -1,0 +1,16 @@
+# Fresh app state → signed in. Env: EMAIL, PASSWORD
+appId: com.driveusa.app
+---
+- clearState
+- launchApp
+- extendedWaitUntil:
+    visible: "Log In"
+    timeout: 30000
+- tapOn: "Email"
+- inputText: ${EMAIL}
+- tapOn: "Password"
+- inputText: ${PASSWORD}
+# "Log In" is both the card title and the button.
+- tapOn:
+    text: "Log In"
+    index: 1

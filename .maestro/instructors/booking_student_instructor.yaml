@@ -1,0 +1,66 @@
+# Student books a Lakeview lesson (emulator payment gateway, no Stripe), the
+# school sees it, the student cancels it free (>24 h ahead), the school sees that.
+appId: com.driveusa.app
+---
+- runFlow:
+    file: ../subflows/login.yaml
+    env:
+      EMAIL: seed-student-paid@example.com
+- runFlow: ../subflows/dismiss_intro.yaml
+- tapOn: ".*Instructors.*"
+- tapOn: "(?s)Lakeview Driving School.*"
+- tapOn: "Book"
+- extendedWaitUntil:
+    visible: "Book a lesson"
+    timeout: 20000
+# Dates move every day: take the third tile ("Tue\n3\nNov") and its first free time.
+- tapOn:
+    text: "(?s)[A-Z][a-z]{2}.[0-9]{1,2}.[A-Z][a-z]{2}"
+    index: 2
+- copyTextFrom:
+    text: "[0-9]{2}:[0-9]{2}"
+    index: 0
+- tapOn: "${maestro.copiedText}"
+- assertVisible: "(?s)Price.*Total.*"
+- tapOn: "Book"
+- extendedWaitUntil:
+    visible: "(?s).*Booked.*"
+    timeout: 30000
+- assertVisible: "(?s).*Lakeview Driving School.*"
+
+# The school sees it under upcoming lessons.
+- runFlow:
+    file: ../subflows/login.yaml
+    env:
+      EMAIL: seed-instr-01@example.com
+- extendedWaitUntil:
+    visible: ".*Calendar.*"
+    timeout: 30000
+- tapOn: ".*Calendar.*"
+- scrollUntilVisible:
+    element: "(?s).*Paid S.*${maestro.copiedText}.*"
+    direction: DOWN
+    timeout: 30000
+
+# The student cancels: more than 24 h ahead, so free.
+- runFlow:
+    file: ../subflows/login.yaml
+    env:
+      EMAIL: seed-student-paid@example.com
+- runFlow: ../subflows/dismiss_intro.yaml
+- tapOn: ".*Instructors.*"
+- tapOn: "(?s)My lessons.*"
+- scrollUntilVisible:
+    element: "(?s).*Lakeview.*${maestro.copiedText}.*"
+    direction: DOWN
+- tapOn: "(?s).*Lakeview.*${maestro.copiedText}.*"
+- tapOn: "Cancel lesson"
+- extendedWaitUntil:
+    visible: "Cancel the lesson."
+    timeout: 10000
+- assertVisible: "(?s).*more than 24 hours away.*"
+# The dialog's button; the page's own one is behind the barrier.
+- tapOn: "Cancel lesson"
+- extendedWaitUntil:
+    visible: "(?s).*Cancelled by the student.*"
+    timeout: 20000

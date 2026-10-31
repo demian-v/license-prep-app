@@ -1,0 +1,26 @@
+# Who can reach instructors: a trial student only gets a preview, a student in
+# a state that hasn't launched (Maryland) gets "coming soon".
+appId: com.driveusa.app
+---
+- runFlow:
+    file: ../subflows/login.yaml
+    env:
+      EMAIL: seed-student-trial@example.com
+- runFlow: ../subflows/dismiss_intro.yaml
+- tapOn: ".*Instructors.*"
+- extendedWaitUntil:
+    visible: "(?s).*Available with a subscription.*"
+    timeout: 20000
+- assertVisible: "(?s).*Profiles in your state: 6.*"
+- assertNotVisible: "(?s).*Found: 6.*"
+
+- runFlow:
+    file: ../subflows/login.yaml
+    env:
+      EMAIL: seed-student-md@example.com
+- runFlow: ../subflows/dismiss_intro.yaml
+- tapOn: ".*Instructors.*"
+- extendedWaitUntil:
+    visible: "(?s).*Coming to Maryland soon.*"
+    timeout: 20000
+- assertNotVisible: "(?s).*Lakeview Driving School.*"

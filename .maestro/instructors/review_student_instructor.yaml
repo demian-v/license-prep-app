@@ -1,0 +1,58 @@
+# Student rates a finished Lakeview lesson; the review shows on the profile
+# students see and in the school's own reviews.
+appId: com.driveusa.app
+---
+- runFlow:
+    file: ../subflows/login.yaml
+    env:
+      EMAIL: seed-student-paid@example.com
+- runFlow: ../subflows/dismiss_intro.yaml
+- tapOn: ".*Instructors.*"
+- tapOn: "(?s)My lessons.*"
+- scrollUntilVisible:
+    element: "(?s).*Lakeview.*Completed.*"
+    direction: DOWN
+- tapOn: "(?s).*Lakeview.*Completed.*"
+- extendedWaitUntil:
+    visible: "(?s).*Rate your lesson.*"
+    timeout: 15000
+- tapOn: "5 out of 5"
+- extendedWaitUntil:
+    visible: "(?s).*Comment.*"
+    timeout: 10000
+- tapOn: "(?s).*Comment.*"
+- inputText: "Patient and clear instructor"
+- tapOn: "Send"
+- extendedWaitUntil:
+    visible: "Thanks for your review!"
+    timeout: 15000
+- extendedWaitUntil:
+    visible: "(?s).*Your review.*"
+    timeout: 10000
+
+# Other students see it on the profile.
+- back
+- back
+- tapOn: "(?s)Lakeview Driving School.*"
+- scrollUntilVisible:
+    element: "(?s).*Patient and clear instructor.*"
+    direction: DOWN
+    timeout: 30000
+
+# The school sees it too.
+- runFlow:
+    file: ../subflows/login.yaml
+    env:
+      EMAIL: seed-instr-01@example.com
+- extendedWaitUntil:
+    visible: ".*Calendar.*"
+    timeout: 30000
+- tapOn: "Profile"
+- scrollUntilVisible:
+    element: "(?s).*My reviews.*"
+    direction: DOWN
+- tapOn: "(?s).*My reviews.*"
+- scrollUntilVisible:
+    element: "(?s).*Patient and clear instructor.*"
+    direction: DOWN
+    timeout: 30000
