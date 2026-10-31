@@ -1,7 +1,7 @@
 # Privacy Policy for DriveUSA
 
 **Effective Date:** November 17, 2025  
-**Last Updated:** October 30, 2026
+**Last Updated:** October 31, 2026
 
 ## 1. About This Privacy Policy
 
@@ -34,13 +34,20 @@ We automatically collect information about how you use our App:
 ### 2.3 Information We Do NOT Collect
 We do NOT collect:
 - Location data or GPS information
-- Camera or photo access
-- Microphone or audio recordings
 - Contact lists or phone numbers
 - SMS or call log data
-- Health or biometric information
+- Health information
+- Camera or photo access, microphone or audio recordings, or biometric information, unless you register as a driving instructor (see Section 2.4)
 - Payment card numbers, bank details, or billing addresses
 - Advertising identifiers (IDFA / AAID), and we do not track you across other apps or websites, unless you allow it (see Section 4.1)
+
+### 2.4 Driving Instructors
+This section applies only to people who register as driving instructors. Instructor registration is not open in the App yet. Students are never asked for camera or microphone access.
+
+- **Camera and microphone:** The identity check uses them so that you can photograph your ID and record a short selfie video. We use them for nothing else.
+- **Photos:** You can choose a profile photo, a licence photo or an ID document from your device.
+- **Biometric data:** Our partner Didit compares your selfie video with the photo on your ID, which creates a map of your face geometry. The App asks for your written consent on a separate screen first, and that screen says how long the data is kept. Didit processes this data in the European Union.
+- **What we receive:** Your name, date of birth, the result of the check and your ID’s expiry date. We do not receive the images or the face geometry, and we do not sell them.
 
 ## 3. How We Use Your Information
 
