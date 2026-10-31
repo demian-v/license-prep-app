@@ -1,0 +1,14 @@
+# Opens the paywall from the trial card and leaves without buying.
+appId: com.driveusa.app
+---
+- tapOn: "Tests"
+- tapOn: "Upgrade"
+- extendedWaitUntil:
+    visible: "Monthly Subscription"
+    timeout: 20000
+- assertVisible: "Subscription"
+- assertVisible: "Features Include"
+- assertVisible: "[$]9.99"
+- assertVisible: "Upgrade"
+- back
+- assertVisible: "Free Trial Active"

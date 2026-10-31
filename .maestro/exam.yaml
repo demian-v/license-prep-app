@@ -1,0 +1,24 @@
+# Takes Exam: answers question 1, skips the other 39, reaches the result.
+appId: com.driveusa.app
+---
+- tapOn: "Tests"
+- tapOn: "Take Exam.*"
+- extendedWaitUntil:
+    visible: "Question 1 of 40"
+    timeout: 30000
+# First option tile: the first element below the question text area.
+- tapOn:
+    below: "Question 1 of 40"
+    index: 1
+- tapOn: "Choose"
+- tapOn: "Next"
+- assertVisible: "Question 2 of 40"
+- repeat:
+    times: 39
+    commands:
+      - tapOn: "Skip"
+- extendedWaitUntil:
+    visible: "Exam (not )?passed"
+    timeout: 20000
+- assertVisible: "Correct"
+- tapOn: "Back to Tests"

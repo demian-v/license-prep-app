@@ -1,0 +1,24 @@
+# Profile > Ad measurement after a "Don't allow" sign-up: Off → Allow → On → Don't allow → Off.
+appId: com.driveusa.app
+---
+- tapOn: "Profile"
+- scrollUntilVisible:
+    element: "(?s).*Ad measurement.*"
+    direction: DOWN
+- assertVisible: "(?s).*Ad measurement.*Off.*"
+- tapOn: "(?s).*Ad measurement.*"
+- extendedWaitUntil:
+    visible: "Allow ad measurement."
+    timeout: 5000
+- tapOn: "Allow"
+- extendedWaitUntil:
+    visible: "(?s).*Ad measurement.*On.*"
+    timeout: 5000
+- tapOn: "(?s).*Ad measurement.*"
+- extendedWaitUntil:
+    visible: "Allow ad measurement."
+    timeout: 5000
+- tapOn: "Don't allow"
+- extendedWaitUntil:
+    visible: "(?s).*Ad measurement.*Off.*"
+    timeout: 5000

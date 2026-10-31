@@ -1,0 +1,8 @@
+# Signed-in student fresh from sign-up: the 3-day trial is active.
+appId: com.driveusa.app
+---
+- tapOn: "Tests"
+- extendedWaitUntil:
+    visible: "Free Trial Active"
+    timeout: 20000
+- assertVisible: "Days left: 3"

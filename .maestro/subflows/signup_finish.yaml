@@ -1,0 +1,40 @@
+# Code screen → language → state → 7-step tour → tracking question → Home.
+# Env: CODE (6 digits), TRACKING ("Allow" or "Don't allow")
+appId: com.driveusa.app
+---
+- inputText: ${CODE}
+- extendedWaitUntil:
+    visible: "Select your language"
+    timeout: 45000
+- tapOn: "English"
+- extendedWaitUntil:
+    visible: "Select your state"
+    timeout: 30000
+- tapOn: "(?s)California.*"
+- tapOn: "Continue"
+# Tour: 7 steps with instructors off. Step 1 "Let’s go", steps 2-6 an
+# arrow labelled "Next", step 7 "Start".
+- extendedWaitUntil:
+    visible: "Welcome to DriveUSA"
+    timeout: 45000
+- tapOn: "Let.s go"
+- repeat:
+    times: 5
+    commands:
+      - tapOn: "Next"
+      - waitForAnimationToEnd
+- assertVisible: "Start"
+- tapOn: "Start"
+# Tracking question: back must not dismiss it.
+- extendedWaitUntil:
+    visible: "Allow ad measurement."
+    timeout: 10000
+- back
+- assertVisible: "Allow ad measurement."
+- tapOn: ${TRACKING}
+- assertNotVisible: "Allow ad measurement."
+# Three tabs, no Instructors.
+- assertVisible: "Tests"
+- assertVisible: "Theory"
+- assertVisible: "Profile"
+- assertNotVisible: "Instructors"

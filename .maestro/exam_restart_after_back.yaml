@@ -1,0 +1,24 @@
+# Regression: finish an exam, leave the result with the system Back button,
+# start another. It must open on question 1, not on an empty result.
+appId: com.driveusa.app
+---
+- tapOn: "Tests"
+- tapOn: "Take Exam.*"
+- extendedWaitUntil:
+    visible: "Question 1 of 40"
+    timeout: 30000
+- repeat:
+    times: 40
+    commands:
+      - tapOn: "Skip"
+- extendedWaitUntil:
+    visible: "Exam (not )?passed"
+    timeout: 20000
+- back
+- tapOn: "Take Exam.*"
+- extendedWaitUntil:
+    visible: "Question 1 of 40"
+    timeout: 30000
+- assertNotVisible: "Exam (not )?passed"
+- back
+- tapOn: "Exit"

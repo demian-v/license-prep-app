@@ -1,0 +1,35 @@
+# Fresh install state → Sign Up form → submitted, waiting on the code screen.
+# Env: NAME, EMAIL, PASSWORD
+appId: com.driveusa.app
+---
+- clearState
+- launchApp
+- extendedWaitUntil:
+    visible: "Log In"
+    timeout: 30000
+- tapOn: "Don't have an account. Sign Up"
+- extendedWaitUntil:
+    visible: "Create Student Account"
+    timeout: 10000
+# Instructors are off: no instructor sign-up link.
+- assertNotVisible: ".*[Ii]nstructor.*"
+# Terms checkbox first, before the keyboard moves the layout. It is unlabelled
+# and its text is split around the "Terms of Use" link (which opens a
+# browser), so tap it by position.
+- tapOn:
+    point: "16%,60%"
+- tapOn: "Full Name"
+- inputText: ${NAME}
+- tapOn: "Email"
+- inputText: ${EMAIL}
+- tapOn: "Password"
+- inputText: ${PASSWORD}
+# No hideKeyboard: on Android it presses Back, which leaves the screen.
+- tapOn: "Create Student Account"
+- scrollUntilVisible:
+    element: "Sign Up"
+    direction: DOWN
+- tapOn: "Sign Up"
+- extendedWaitUntil:
+    visible: "Check your email"
+    timeout: 60000
