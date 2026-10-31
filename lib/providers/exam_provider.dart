@@ -19,6 +19,11 @@ class ExamProvider extends ChangeNotifier {
   ExamTimerProvider? _timerProvider;
   
   Exam? get currentExam => _currentExam;
+
+  /// Tests only.
+  @visibleForTesting
+  set debugCurrentExam(Exam? exam) => _currentExam = exam;
+
   bool get isExamInProgress => _currentExam != null && !_currentExam!.isCompleted;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
@@ -35,10 +40,18 @@ class ExamProvider extends ChangeNotifier {
     String licenseType = 'driver',
   }) async {
     try {
+      // Drop the previous exam before loading. Тесты pushes the question
+      // screen without awaiting this, and that screen sends a finished exam
+      // straight to its result: after a result page left with the system Back
+      // button (which never calls cancelExam), Take Exam opened an empty
+      // result instead of question 1 (2026-10-31, Android).
+      _stopTimer();
+      _currentExam = null;
+      _loadedQuestions = {};
       _isLoading = true;
       _errorMessage = null;
       notifyListeners();
-      
+
       // Get language from user's saved preferences (universal solution)
       String userLanguage = 'en'; // Default fallback
       try {
