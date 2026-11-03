@@ -3,7 +3,22 @@
 appId: com.driveusa.app
 ---
 - clearState
-- launchApp
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - launchApp
+# iOS: the sign-in lives in the Keychain, which survives a reinstall, and
+# launchApp grants every permission unless told not to, which would skip the
+# system tracking prompt.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - clearKeychain
+      - launchApp:
+          permissions:
+            usertracking: unset
 - extendedWaitUntil:
     visible: "Log In"
     timeout: 30000
@@ -26,6 +41,12 @@ appId: com.driveusa.app
 - inputText: ${PASSWORD}
 # No hideKeyboard: on Android it presses Back, which leaves the screen.
 - tapOn: "Create Student Account"
+# iOS keeps the keyboard up over the button.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn: "done"
 - scrollUntilVisible:
     element: "Sign Up"
     direction: DOWN

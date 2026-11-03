@@ -4,9 +4,11 @@ appId: com.driveusa.app
 ---
 - tapOn: "Tests"
 - tapOn: "Take Exam.*"
+# iOS on the emulators only: the first read after a quiet minute can take 90 s.
+# The emulator drops Firestore's 30 s keep-alive pings (too_many_pings).
 - extendedWaitUntil:
     visible: "Question 1 of 40"
-    timeout: 30000
+    timeout: 120000
 - repeat:
     times: 40
     commands:
@@ -14,11 +16,25 @@ appId: com.driveusa.app
 - extendedWaitUntil:
     visible: "Exam (not )?passed"
     timeout: 20000
-- back
+- runFlow: subflows/back.yaml
 - tapOn: "Take Exam.*"
+# iOS on the emulators only: the first read after a quiet minute can take 90 s.
+# The emulator drops Firestore's 30 s keep-alive pings (too_many_pings).
 - extendedWaitUntil:
     visible: "Question 1 of 40"
-    timeout: 30000
+    timeout: 120000
 - assertNotVisible: "Exam (not )?passed"
-- back
+# The exam asks before leaving, so the iOS edge swipe does nothing here: tap
+# the bar's close button, which has no label.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          point: "10%,10%"
 - tapOn: "Exit"

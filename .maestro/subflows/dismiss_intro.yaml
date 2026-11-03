@@ -20,3 +20,13 @@ appId: com.driveusa.app
       visible: "Allow ad measurement."
     commands:
       - tapOn: "Don't allow"
+# iOS asks in a system prompt, whatever launchApp's permissions say.
+- extendedWaitUntil:
+    visible: ".*to track your activity.*"
+    timeout: 5000
+    optional: true
+- runFlow:
+    when:
+      visible: ".*to track your activity.*"
+    commands:
+      - tapOn: "Ask App Not to Track"

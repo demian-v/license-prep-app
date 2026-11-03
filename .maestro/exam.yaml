@@ -3,9 +3,11 @@ appId: com.driveusa.app
 ---
 - tapOn: "Tests"
 - tapOn: "Take Exam.*"
+# iOS on the emulators only: the first read after a quiet minute can take 90 s.
+# The emulator drops Firestore's 30 s keep-alive pings (too_many_pings).
 - extendedWaitUntil:
     visible: "Question 1 of 40"
-    timeout: 30000
+    timeout: 120000
 # First option tile: the first element below the question text area.
 - tapOn:
     below: "Question 1 of 40"

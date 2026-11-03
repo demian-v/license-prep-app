@@ -31,8 +31,8 @@ appId: com.driveusa.app
     timeout: 10000
 
 # Other students see it on the profile.
-- back
-- back
+- runFlow: ../subflows/back_button.yaml
+- runFlow: ../subflows/back_button.yaml
 - tapOn: "(?s)Lakeview Driving School.*"
 - scrollUntilVisible:
     element: "(?s).*Patient and clear instructor.*"

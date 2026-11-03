@@ -10,5 +10,5 @@ appId: com.driveusa.app
 - assertVisible: "Features Include"
 - assertVisible: "[$]9.99"
 - assertVisible: "Upgrade"
-- back
+- runFlow: subflows/back.yaml
 - assertVisible: "Free Trial Active"

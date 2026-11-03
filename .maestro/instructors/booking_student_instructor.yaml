@@ -17,11 +17,35 @@ appId: com.driveusa.app
 - tapOn:
     text: "(?s)[A-Z][a-z]{2}.[0-9]{1,2}.[A-Z][a-z]{2}"
     index: 2
-- copyTextFrom:
-    text: "[0-9]{2}:[0-9]{2}"
-    index: 0
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - copyTextFrom:
+          text: "[0-9]{2}:[0-9]{2}"
+          index: 0
+# iOS: the status bar clock is the first match.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - copyTextFrom:
+          text: "[0-9]{2}:[0-9]{2}"
+          index: 1
 - tapOn: "${maestro.copiedText}"
-- assertVisible: "(?s)Price.*Total.*"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - assertVisible: "(?s)Price.*Total.*"
+# Below the fold on an iPhone.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - scrollUntilVisible:
+          element: "(?s)Price.*Total.*"
+          direction: DOWN
 - tapOn: "Book"
 - extendedWaitUntil:
     visible: "(?s).*Booked.*"

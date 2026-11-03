@@ -1,0 +1,16 @@
+# Back on a ForwardPageRoute screen: Android's Back button, the bar's arrow on
+# iOS, where this route has no edge swipe. The arrow has no label.
+appId: com.driveusa.app
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          point: "10%,11%"
+      - waitForAnimationToEnd

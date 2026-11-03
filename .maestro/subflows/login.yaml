@@ -2,7 +2,20 @@
 appId: com.driveusa.app
 ---
 - clearState
-- launchApp
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - launchApp
+# iOS: the sign-in lives in the Keychain, which survives a reinstall.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - clearKeychain
+      - launchApp:
+          permissions:
+            usertracking: deny
 - extendedWaitUntil:
     visible: "Log In"
     timeout: 30000

@@ -1,8 +1,25 @@
 # Code screen → language → state → 7-step tour → tracking question → Home.
-# Env: CODE (6 digits), TRACKING ("Allow" or "Don't allow")
+# Env: CODE (6 digits), TRACKING (the button: "Allow" or "Don't allow", on iOS
+# "Allow" or "Ask App Not to Track")
 appId: com.driveusa.app
 ---
-- inputText: ${CODE}
+# On iOS XCTest types faster than focus moves between the six boxes, so the
+# digits go one by one, as a person types them.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - inputText: ${CODE}
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - inputText: ${CODE.charAt(0)}
+      - inputText: ${CODE.charAt(1)}
+      - inputText: ${CODE.charAt(2)}
+      - inputText: ${CODE.charAt(3)}
+      - inputText: ${CODE.charAt(4)}
+      - inputText: ${CODE.charAt(5)}
 - extendedWaitUntil:
     visible: "Select your language"
     timeout: 45000
@@ -17,22 +34,36 @@ appId: com.driveusa.app
 - extendedWaitUntil:
     visible: "Welcome to DriveUSA"
     timeout: 45000
-- tapOn: "Let.s go"
+- tapOn: "(?s)Let.s go.*"
 - repeat:
     times: 5
     commands:
       - tapOn: "Next"
       - waitForAnimationToEnd
-- assertVisible: "Start"
-- tapOn: "Start"
-# Tracking question: back must not dismiss it.
-- extendedWaitUntil:
-    visible: "Allow ad measurement."
-    timeout: 10000
-- back
-- assertVisible: "Allow ad measurement."
-- tapOn: ${TRACKING}
-- assertNotVisible: "Allow ad measurement."
+- assertVisible: "(?s)Start.*"
+- tapOn: "(?s)Start.*"
+# Android asks in the app, and back must not dismiss it. iOS asks in a system
+# prompt, whose buttons differ: run-signup.sh passes the iOS one in TRACKING.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          visible: "Allow ad measurement."
+          timeout: 10000
+      - back
+      - assertVisible: "Allow ad measurement."
+      - tapOn: ${TRACKING}
+      - assertNotVisible: "Allow ad measurement."
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - extendedWaitUntil:
+          visible: ".*to track your activity.*"
+          timeout: 10000
+      - tapOn: ${TRACKING}
+      - assertNotVisible: ".*to track your activity.*"
 # Three tabs, no Instructors.
 - assertVisible: "Tests"
 - assertVisible: "Theory"

@@ -1,0 +1,18 @@
+# The system way back: Android's Back button, the edge swipe on iOS (Maestro's
+# `back` is Android and web only).
+appId: com.driveusa.app
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - swipe:
+          start: 1%, 50%
+          end: 85%, 50%
+          duration: 300
+      - waitForAnimationToEnd
