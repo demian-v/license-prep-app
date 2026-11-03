@@ -45,11 +45,9 @@ class _TestScreenState extends State<TestScreen> {
   Future<void> _preloadQuizData() async {
     try {
       // Get user's current state
-      final stateProvider = Provider.of<StateProvider>(context, listen: false);
       final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
       
-      // Ensure selectedState is cast to String properly
-      final userState = stateProvider.selectedState?.toString() ?? 'IL';
+      final userState = _questionState();
       final userLanguage = languageProvider.language;
       
       print('🔍 [TEST SCREEN] Pre-loading quiz data for state: $userState, language: $userLanguage');

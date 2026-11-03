@@ -85,5 +85,16 @@ void main() {
         reason: 'both the exam and the practice call sites',
       );
     });
+
+    test('the question preload sends a state id, not a printed StateInfo', () {
+      // `selectedState?.toString()` is "StateInfo(id: CA, name: CALIFORNIA)",
+      // so getPracticeQuestions found 0 questions and nothing was cached. The
+      // read of users/{uid} rescued it later, but not on a new account
+      // (iOS Simulator, 2026-11-02).
+      final source = File('lib/screens/test_screen.dart').readAsStringSync();
+
+      expect(source.contains('selectedState?.toString()'), isFalse);
+      expect(source.contains('final userState = _questionState();'), isTrue);
+    });
   });
 }
