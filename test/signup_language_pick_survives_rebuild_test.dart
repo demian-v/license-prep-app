@@ -98,5 +98,18 @@ void main() {
       expect(catchBlock.contains('ScaffoldMessenger.of(context)'), isFalse,
           reason: 'this context may be unmounted by then');
     });
+
+    test('a pick shows no overlay and waits for a frame, not a fixed time', () {
+      // The overlay said "This may take a few seconds" over a save that takes
+      // milliseconds, then 800 ms of waiting (owner, 2026-11-02). The wait did
+      // one job: letting the re-keyed app build. One frame does that.
+      final handler = pickHandler();
+      expect(source.contains('_buildLoadingOverlay'), isFalse);
+      expect(handler.contains('Future.delayed'), isFalse);
+      expect(handler.contains('endOfFrame'), isTrue);
+      expect(handler.indexOf('endOfFrame'),
+          lessThan(handler.indexOf('navigatorKey.currentState')),
+          reason: 'the live navigator is the rebuilt app\'s');
+    });
   });
 }

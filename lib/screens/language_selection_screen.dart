@@ -32,7 +32,7 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
   /// unmounted, skipped its navigation. Only English ever got through.
   ///
   /// So the pick lives here, outside any one State: a copy built while it is
-  /// set shows the overlay and leaves the defaults alone, and the pick
+  /// set waits for it and leaves the defaults alone, and the pick
   /// navigates through [navigatorKey], which reaches whichever navigator is
   /// live.
   static final ValueNotifier<String?> _pickInProgress = ValueNotifier(null);
@@ -41,7 +41,7 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
   DateTime? _selectionStartTime;
   String? _initialLanguage;
   
-  // Loading state variables
+  // A pick is being saved: the chosen card shows it and the cards stop taking taps
   bool _isLoading = false;
   String? _selectedLanguageName;
   
@@ -79,8 +79,8 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
     });
   }
   
-  /// A pick finished or failed: drop the overlay (on success the screen is
-  /// being replaced by state selection anyway).
+  /// A pick finished or failed: the cards answer again (on success the screen
+  /// is being replaced by state selection anyway).
   void _onPickInProgressChanged() {
     if (_pickInProgress.value == null && mounted && _isLoading) {
       setState(() => _isLoading = false);
@@ -158,58 +158,48 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
     debugPrint('🏳️‍🌈 [LANGUAGE SCREEN] Building language selection screen');
     return Scaffold(
       backgroundColor: AppColors.field,
-      // The overlay's dim covers the whole screen, status bar included, so
-      // the Stack sits outside the SafeArea — and expands, or it is only as
-      // tall as the list and the dim stops short of the bottom.
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.x4 + AppSpacing.x1,
-                AppSpacing.x8,
-                AppSpacing.x4 + AppSpacing.x1,
-                AppSpacing.x6,
-              ),
-              child: Consumer<LanguageProvider>(
-                builder: (context, languageProvider, _) {
-                  final blocks = <Widget>[
-                    bentoAuthBadge(SolarIcons.globalLinear),
-                    const SizedBox(height: AppSpacing.x4),
-                    _buildSectionHeader('Select your language'), // This remains hardcoded in English as specified
-                    _buildLanguageButton(context, 'English', 'en'),
-                    _buildLanguageButton(context, 'Spanish', 'es'),
-                    _buildLanguageButton(context, 'Ukrainian', 'uk'),
-                    _buildLanguageButton(context, 'Polish', 'pl'),
-                    _buildLanguageButton(context, 'Russian', 'ru'),
-                    const SizedBox(height: AppSpacing.x2),
-                    Center(
-                      child: BentoAuthLink(
-                        label: AppLocalizations.of(context).translate('logout'),
-                        onPressed: _isLoading ? null : _leaveSignup,
-                      ),
-                    ),
-                  ];
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      for (var i = 0; i < blocks.length; i++)
-                        StaggerIn(
-                          index: i,
-                          count: blocks.length,
-                          curve: BentoTokens.curve,
-                          child: blocks[i],
-                        ),
-                    ],
-                  );
-                },
-              ),
-            ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.x4 + AppSpacing.x1,
+            AppSpacing.x8,
+            AppSpacing.x4 + AppSpacing.x1,
+            AppSpacing.x6,
           ),
-          // Loading overlay
-          if (_isLoading) Positioned.fill(child: _buildLoadingOverlay()),
-        ],
+          child: Consumer<LanguageProvider>(
+            builder: (context, languageProvider, _) {
+              final blocks = <Widget>[
+                bentoAuthBadge(SolarIcons.globalLinear),
+                const SizedBox(height: AppSpacing.x4),
+                _buildSectionHeader('Select your language'), // This remains hardcoded in English as specified
+                _buildLanguageButton(context, 'English', 'en'),
+                _buildLanguageButton(context, 'Spanish', 'es'),
+                _buildLanguageButton(context, 'Ukrainian', 'uk'),
+                _buildLanguageButton(context, 'Polish', 'pl'),
+                _buildLanguageButton(context, 'Russian', 'ru'),
+                const SizedBox(height: AppSpacing.x2),
+                Center(
+                  child: BentoAuthLink(
+                    label: AppLocalizations.of(context).translate('logout'),
+                    onPressed: _isLoading ? null : _leaveSignup,
+                  ),
+                ),
+              ];
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < blocks.length; i++)
+                    StaggerIn(
+                      index: i,
+                      count: blocks.length,
+                      curve: BentoTokens.curve,
+                      child: blocks[i],
+                    ),
+                ],
+              );
+            },
+          ),
+        ),
       ),
     );
   }
@@ -244,54 +234,6 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildLoadingOverlay() {
-    return Container(
-      color: AppColors.ink.withValues(alpha: 0.4),
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.all(AppSpacing.x6),
-          margin: const EdgeInsets.symmetric(horizontal: 40),
-          decoration: BoxDecoration(
-            color: AppColors.paper,
-            borderRadius: BorderRadius.circular(BentoTokens.card),
-            boxShadow: AppColors.shadowRaised,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(
-                width: 36,
-                height: 36,
-                child: CircularProgressIndicator(
-                  color: AppColors.signal,
-                  strokeWidth: 3.5,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.x4 + AppSpacing.x1),
-              Text(
-                _selectedLanguageName != null
-                    ? 'Setting up $_selectedLanguageName...'
-                    : 'Please wait...',
-                style: AppTypography.body.copyWith(
-                  fontSize: 16,
-                  color: AppColors.ink,
-                  fontVariations: const [FontVariation('wght', 600)],
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: AppSpacing.x2),
-              Text(
-                'This may take a few seconds',
-                style: AppTypography.label.copyWith(color: AppColors.inkSecondary),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -377,9 +319,9 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
           );
           debugPrint('📊 Analytics: language_changed logged (signup: $previousLanguage → $code)');
           
-          // Wait longer to ensure the language is properly loaded
-          print('⏳ [LANGUAGE SCREEN] Waiting for language to propagate...');
-          await Future.delayed(Duration(milliseconds: 800));
+          // A changed language re-keys MaterialApp: let it build, so the
+          // navigator below is the new app's.
+          await WidgetsBinding.instance.endOfFrame;
           
           // The live navigator, not this screen's: if the language changed,
           // this screen's context belongs to the app that was thrown away.
@@ -423,8 +365,8 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
           debugPrint('📊 Analytics: language_change_failed logged (signup: $code)');
           
           print('🚨 [LANGUAGE SCREEN] Error updating language: $e');
-          // The overlay used to stay up for good after a failure. Clear it,
-          // here and — through the listener — on a copy built mid-pick.
+          // Clear the pick, here and — through the listener — on a copy built
+          // mid-pick, or the cards stay disabled after a failure.
           if (mounted) setState(() => _isLoading = false);
           // Show error snackbar, through the live app (see above)
           final messengerContext = navigatorKey.currentContext;
