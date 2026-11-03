@@ -691,5 +691,6 @@
   "tracking_setting": "Medición de anuncios",
   "tracking_setting_desc": "Compartir registros y compras con Meta",
   "tracking_on": "Sí",
-  "tracking_off": "No"
+  "tracking_off": "No",
+  "exam_timer_label": "{0} min {1} s"
 }

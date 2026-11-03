@@ -691,5 +691,6 @@
   "tracking_setting": "Ad measurement",
   "tracking_setting_desc": "Share sign-ups and purchases with Meta",
   "tracking_on": "On",
-  "tracking_off": "Off"
+  "tracking_off": "Off",
+  "exam_timer_label": "{0} min {1} sec"
 }

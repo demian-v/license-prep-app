@@ -691,5 +691,6 @@
   "tracking_setting": "Измерение рекламы",
   "tracking_setting_desc": "Передавать регистрации и покупки в Meta",
   "tracking_on": "Вкл.",
-  "tracking_off": "Выкл."
+  "tracking_off": "Выкл.",
+  "exam_timer_label": "{0} мин {1} сек"
 }

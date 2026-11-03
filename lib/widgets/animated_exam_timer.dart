@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../localization/app_localizations.dart';
 import '../providers/exam_timer_provider.dart';
 import '../theme/app_theme.dart';
 import '../theme/bento_tokens.dart';
@@ -51,7 +52,10 @@ class AnimatedExamTimer extends StatelessWidget {
 
         return Semantics(
           liveRegion: isLow,
-          label: '$minutes мин $seconds сек',
+          label: AppLocalizations.of(context)
+              .translate('exam_timer_label')
+              .replaceAll('{0}', '$minutes')
+              .replaceAll('{1}', '$seconds'),
           child: _buildFace(
             context,
             timeText,

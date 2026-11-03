@@ -691,5 +691,6 @@
   "tracking_setting": "Pomiar reklam",
   "tracking_setting_desc": "Udostępniaj rejestracje i zakupy firmie Meta",
   "tracking_on": "Wł.",
-  "tracking_off": "Wył."
+  "tracking_off": "Wył.",
+  "exam_timer_label": "{0} min {1} s"
 }

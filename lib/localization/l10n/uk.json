@@ -691,5 +691,6 @@
   "tracking_setting": "Вимірювання реклами",
   "tracking_setting_desc": "Передавати реєстрації та покупки в Meta",
   "tracking_on": "Увімк.",
-  "tracking_off": "Вимк."
+  "tracking_off": "Вимк.",
+  "exam_timer_label": "{0} хв {1} с"
 }
