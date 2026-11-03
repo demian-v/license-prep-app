@@ -133,7 +133,7 @@
   "support": "Support",
   "support_desc": "Answers to your questions",
   "language_desc": "Questions and app language",
-  "state_desc": "Rules and questions for your state",
+  "state_desc": "Rules and questions",
   "subscription_desc": "All tests and theory",
   "support_title": "Support",
   "support_message_placeholder": "Describe your question or issue (min 10 chars)...",

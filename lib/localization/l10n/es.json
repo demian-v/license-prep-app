@@ -133,7 +133,7 @@
   "support": "Soporte",
   "support_desc": "Respuestas a tus preguntas",
   "language_desc": "Idioma de preguntas y app",
-  "state_desc": "Reglas y preguntas de tu estado",
+  "state_desc": "Reglas y preguntas",
   "subscription_desc": "Todos los tests y la teoría",
   "support_title": "Soporte",
   "support_message_placeholder": "Describe tu pregunta o problema (mín 10 caracteres)...",
