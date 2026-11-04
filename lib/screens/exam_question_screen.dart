@@ -141,7 +141,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
         contextData: {
           'questionId': currentQuestion.id,
           'language': languageProvider.language,
-          'state': authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'IL',
+          'state': authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'unknown',
           'topicId': currentQuestion.topicId,
           'ruleReference': currentQuestion.ruleReference,
         },
@@ -1203,7 +1203,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
       final questionsCompleted = exam.answeredQuestionsCount;
       final correctAnswers = exam.correctAnswersCount;
       final timeSpentSeconds = exam.elapsedTime.inSeconds;
-      final state = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'IL';
+      final state = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'unknown';
       final language = languageProvider.language;
       final licenseType = 'driver'; // Default license type
 

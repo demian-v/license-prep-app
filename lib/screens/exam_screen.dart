@@ -25,7 +25,8 @@ class ExamScreen extends StatelessWidget {
     // Get exam parameters
     final language = languageProvider.language;
     final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
-    final state = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'IL';
+    // 'ALL' = no state selected; matches no state-specific questions (no IL fallback).
+    final state = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'ALL';
     
     // Start new exam with required parameters
     examProvider.startNewExam(

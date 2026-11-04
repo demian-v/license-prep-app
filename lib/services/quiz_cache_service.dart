@@ -205,6 +205,7 @@ class QuizCacheService {
         'ruleReference': q.ruleReference,
         'imagePath': q.imagePath,
         'type': q.type.toString().split('.').last,
+        'order': q.order,
       }).toList();
       
       await prefs.setString(cacheKey, jsonEncode(questionsData));
@@ -254,6 +255,7 @@ class QuizCacheService {
           ruleReference: data['ruleReference'],
           imagePath: data['imagePath'],
           type: _parseQuestionType(data['type'] ?? 'singleChoice'),
+          order: QuizQuestion.parseOrder(data['order']),
         );
       }).toList();
       
@@ -293,6 +295,7 @@ class QuizCacheService {
         'ruleReference': q.ruleReference,
         'imagePath': q.imagePath,
         'type': q.type.toString().split('.').last,
+        'order': q.order,
       }).toList();
       
       await prefs.setString(cacheKey, jsonEncode(questionsData));
@@ -341,6 +344,7 @@ class QuizCacheService {
           ruleReference: data['ruleReference'],
           imagePath: data['imagePath'],
           type: _parseQuestionType(data['type'] ?? 'singleChoice'),
+          order: QuizQuestion.parseOrder(data['order']),
         );
       }).toList();
       
@@ -377,6 +381,7 @@ class QuizCacheService {
         'ruleReference': q.ruleReference,
         'imagePath': q.imagePath,
         'type': q.type.toString().split('.').last,
+        'order': q.order,
       }).toList();
       
       await prefs.setString(cacheKey, jsonEncode(questionsData));
@@ -425,6 +430,7 @@ class QuizCacheService {
           ruleReference: data['ruleReference'],
           imagePath: data['imagePath'],
           type: _parseQuestionType(data['type'] ?? 'singleChoice'),
+          order: QuizQuestion.parseOrder(data['order']),
         );
       }).toList();
       
