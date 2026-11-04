@@ -58,7 +58,7 @@ class _PracticeResultScreenState extends State<PracticeResultScreen> {
       final incorrectAnswers = practice.incorrectAnswersCount;
       final practicePassed = practice.isPassed;
       final timeSpentSeconds = practice.elapsedTime.inSeconds;
-      final state = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'IL';
+      final state = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'unknown';
       final language = languageProvider.language;
       final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
       

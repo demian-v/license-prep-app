@@ -47,6 +47,18 @@ class ContentCachePolicy {
   ///
   /// [cached] is null on first run — nothing has been stored yet, so there is
   /// nothing to invalidate.
+  /// Version of the on-device content cache format. 2 = App fix C: cached
+  /// questions carry `order`. A device whose stored schema is older (or absent:
+  /// the store build never wrote one) drops its content caches once at startup,
+  /// so an upgrade cannot keep serving questions cached without `order` until
+  /// the TTL runs out. Bump when the cached shape changes again.
+  static const int cacheSchema = 2;
+
+  /// Whether a stored cache-schema number means the caches must be dropped.
+  /// Unlike [shouldInvalidate], absent counts as stale: the schema key is new,
+  /// so a device without it still holds caches written by an older build.
+  static bool shouldDropForSchema(int? stored) => (stored ?? 0) < cacheSchema;
+
   static bool shouldInvalidate({required int? cached, required int server}) {
     if (cached == null) return false;
     return cached != server;

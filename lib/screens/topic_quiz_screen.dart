@@ -218,7 +218,7 @@ class _TopicQuizScreenState extends State<TopicQuizScreen> {
       final progressProvider = Provider.of<ProgressProvider>(context, listen: false);
       final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
       
-      final stateId = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'IL';
+      final stateId = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'unknown';
       final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
       
       await analyticsService.trackQTopicStarted(

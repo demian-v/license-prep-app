@@ -543,7 +543,8 @@ export const getPracticeQuestions = functions.https.onCall(async (data, context)
           imagePath: data.imagePath || null,
           type: data.type || 'singleChoice',
           language: data.language,
-          state: data.state
+          state: data.state,
+          order: data.order || 0
         };
       })
       .filter(question => {

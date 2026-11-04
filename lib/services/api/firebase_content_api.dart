@@ -6,6 +6,7 @@ import '../../models/theory_module.dart';
 import '../../models/practice_test.dart';
 import '../../models/traffic_rule_topic.dart';
 import '../service_locator.dart';
+import '../question_order.dart';
 import 'firebase_functions_client.dart';
 import 'base/content_api_interface.dart';
 
@@ -193,24 +194,14 @@ class FirebaseContentApi implements ContentApiInterface {
     return 0;
   }
   
-  /// Helper method to sort questions by their numeric ID suffix (for Learn by Topics)
-  List<QuizQuestion> _sortQuestionsByNumericId(List<QuizQuestion> questions) {
-    questions.sort((a, b) {
-      final aNum = _extractNumericSuffixFromQuestionId(a.id);
-      final bNum = _extractNumericSuffixFromQuestionId(b.id);
-      return aNum.compareTo(bNum);
-    });
-    return questions;
-  }
-  
-  /// Helper method to extract numeric suffix from question ID
-  int _extractNumericSuffixFromQuestionId(String questionId) {
-    // Extract numeric part from IDs like "q_il_en_duties_01" -> 1
-    final regex = RegExp(r'_(\d+)$');
-    final match = regex.firstMatch(questionId);
-    return int.tryParse(match?.group(1) ?? '0') ?? 0;
-  }
-  
+  /// Sort questions for Learn by Topics, stably.
+  ///
+  /// Primary key is the authored `order` field (pipeline states). Questions
+  /// without one (IL/NY legacy docs, whose `order` is absent or 0) use the
+  /// numeric id suffix instead, as before. Ties keep their incoming position.
+  List<QuizQuestion> _sortQuestionsByNumericId(List<QuizQuestion> questions) =>
+      QuestionOrder.sortForTopic(questions);
+
   /// Get quiz topics based on language and state
   @override
   Future<List<QuizTopic>> getQuizTopics(String language, String state) async {
@@ -660,6 +651,7 @@ class FirebaseContentApi implements ContentApiInterface {
                 explanation: data['explanation']?.toString(),
                 ruleReference: data['ruleReference']?.toString(),
                 imagePath: data['imagePath']?.toString(),
+                order: QuizQuestion.parseOrder(data['order']),
                 type: data['type'] != null ? 
                   _parseQuestionType(data['type'].toString()) : 
                   QuestionType.singleChoice,
@@ -760,6 +752,7 @@ class FirebaseContentApi implements ContentApiInterface {
                   explanation: data['explanation']?.toString(),
                   ruleReference: data['ruleReference']?.toString(),
                   imagePath: data['imagePath']?.toString(),
+                  order: QuizQuestion.parseOrder(data['order']),
                   type: data['type'] != null ? 
                     _parseQuestionType(data['type'].toString()) : 
                     QuestionType.singleChoice,
@@ -868,6 +861,7 @@ class FirebaseContentApi implements ContentApiInterface {
           explanation: data['explanation']?.toString(),
           ruleReference: data['ruleReference']?.toString(),
           imagePath: data['imagePath']?.toString(),
+          order: QuizQuestion.parseOrder(data['order']),
           type: _parseQuestionType(data['type'] ?? 'singleChoice'),
         );
       }
@@ -1422,6 +1416,7 @@ class FirebaseContentApi implements ContentApiInterface {
                 explanation: data['explanation']?.toString(),
                 ruleReference: data['ruleReference']?.toString(),
                 imagePath: data['imagePath']?.toString(),
+                order: QuizQuestion.parseOrder(data['order']),
                 type: _parseQuestionType(data['type'] ?? 'singleChoice'),
               );
               
@@ -1487,6 +1482,7 @@ class FirebaseContentApi implements ContentApiInterface {
                 explanation: data['explanation']?.toString(),
                 ruleReference: data['ruleReference']?.toString(),
                 imagePath: data['imagePath']?.toString(),
+                order: QuizQuestion.parseOrder(data['order']),
                 type: _parseQuestionType(data['type'] ?? 'singleChoice'),
               );
               
@@ -1622,6 +1618,7 @@ class FirebaseContentApi implements ContentApiInterface {
               explanation: data['explanation']?.toString(),
               ruleReference: data['ruleReference']?.toString(),
               imagePath: data['imagePath']?.toString(),
+              order: QuizQuestion.parseOrder(data['order']),
               type: _parseQuestionType(data['type'] ?? 'singleChoice'),
             );
             

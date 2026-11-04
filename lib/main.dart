@@ -18,6 +18,7 @@ import 'firebase_options.dart';
 
 import 'services/meta_events.dart';
 import 'services/service_locator.dart';
+import 'services/content_version_service.dart';
 import 'services/service_locator_extensions.dart';
 import 'services/api/api_implementation.dart';
 import 'services/content_loading_manager.dart';
@@ -428,6 +429,10 @@ Future<void> _startApp() async {
   
   // Initialize service locator with Firebase implementation
   serviceLocator.initializeWithApiImplementation(ApiImplementation.firebase);
+
+  // App fix C: caches written by an older build (questions without `order`)
+  // are dropped once, before any screen reads them.
+  await ContentVersionService().dropCachesFromOlderSchema();
   
   // Initialize shared preferences
   final prefs = await SharedPreferences.getInstance();

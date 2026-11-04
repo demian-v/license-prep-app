@@ -14,6 +14,9 @@ class QuizQuestion {
   final String? ruleReference;
   final String? imagePath;
   final QuestionType type;
+  /// Authored position within the topic (pipeline states write a 1-based
+  /// integer). Null when the source doc has none (IL/NY legacy docs).
+  final int? order;
 
   QuizQuestion({
     required this.id,
@@ -25,7 +28,19 @@ class QuizQuestion {
     this.ruleReference,
     this.imagePath,
     required this.type,
+    this.order,
   });
+
+  /// Parse an `order` value from Firestore, a Function response or cache JSON.
+  /// Returns null for missing, non-numeric or non-positive values: the Cloud
+  /// Functions map a missing field to 0, and pipeline orders start at 1.
+  static int? parseOrder(dynamic value) {
+    if (value == null) return null;
+    final int? parsed = value is int
+        ? value
+        : (value is num ? value.toInt() : int.tryParse(value.toString()));
+    return (parsed != null && parsed > 0) ? parsed : null;
+  }
 
   /// Create a QuizQuestion from a map (e.g., from Firebase Functions)
   factory QuizQuestion.fromMap(Map<String, dynamic> map) {
@@ -64,6 +79,7 @@ class QuizQuestion {
       ruleReference: map['ruleReference'],
       imagePath: map['imagePath'],
       type: questionType,
+      order: parseOrder(map['order']),
     );
   }
 }

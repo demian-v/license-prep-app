@@ -74,7 +74,7 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> {
         contextData: {
           'questionId': currentQuestion.id,
           'language': languageProvider.language,
-          'state': authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'IL',
+          'state': authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'unknown',
           'topicId': currentQuestion.topicId,
           'ruleReference': currentQuestion.ruleReference,
         },
@@ -100,7 +100,7 @@ class _PracticeQuestionScreenState extends State<PracticeQuestionScreen> {
         final questionsCompleted = practice.answeredQuestionsCount;
         final correctAnswers = practice.correctAnswersCount;
         final timeSpentSeconds = practice.elapsedTime.inSeconds;
-        final state = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'IL';
+        final state = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'unknown';
         final language = languageProvider.language;
         final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
         

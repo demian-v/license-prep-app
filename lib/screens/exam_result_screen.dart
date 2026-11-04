@@ -56,7 +56,7 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
       final incorrectAnswers = exam.incorrectAnswersCount;
       final examPassed = exam.isPassed;
       final timeSpentSeconds = exam.elapsedTime.inSeconds;
-      final state = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'IL';
+      final state = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'unknown';
       final language = languageProvider.language;
       final licenseType = 'driver'; // Default license type
       

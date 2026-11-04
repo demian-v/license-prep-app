@@ -60,6 +60,14 @@ void main() {
           isFalse);
     });
 
+    test('cache schema: absent or older drops once, current keeps (fix C)', () {
+      // The store build never wrote the schema key, so absent must count as
+      // stale - otherwise an upgrading device keeps questions without `order`.
+      expect(ContentCachePolicy.shouldDropForSchema(null), isTrue);
+      expect(ContentCachePolicy.shouldDropForSchema(1), isTrue);
+      expect(ContentCachePolicy.shouldDropForSchema(ContentCachePolicy.cacheSchema), isFalse);
+    });
+
     test('version 0 on both sides is not an invalidation (positive control)', () {
       // A project with no contentMeta document reports 0 forever. That must be
       // a steady state, not a cache wipe on every launch.

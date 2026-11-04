@@ -49,7 +49,7 @@ class _TestScreenState extends State<TestScreen> {
       
       final userState = _questionState();
       final userLanguage = languageProvider.language;
-      
+
       print('🔍 [TEST SCREEN] Pre-loading quiz data for state: $userState, language: $userLanguage');
       
       // Call the new preload method in Firebase Content API
@@ -80,7 +80,8 @@ class _TestScreenState extends State<TestScreen> {
   String _questionState() {
     final stateProvider = Provider.of<StateProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    return authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'IL';
+    // No state known: 'ALL', the app's no-state value - never a silent Illinois (fix C).
+    return authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'ALL';
   }
 
   /// Analytics method for exam started event
@@ -94,7 +95,7 @@ class _TestScreenState extends State<TestScreen> {
       // Get analytics parameters
       final language = languageProvider.language;
       final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
-      final state = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'IL';
+      final state = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'unknown';
       
       // Generate unique exam ID for analytics
       final examId = 'exam_${DateTime.now().millisecondsSinceEpoch}';
@@ -127,7 +128,7 @@ class _TestScreenState extends State<TestScreen> {
       // Get analytics parameters
       final language = languageProvider.language;
       final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
-      final state = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'IL';
+      final state = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'unknown';
       
       // Generate unique practice ID for analytics
       final practiceId = 'practice_${DateTime.now().millisecondsSinceEpoch}';
@@ -179,7 +180,7 @@ class _TestScreenState extends State<TestScreen> {
       // Get analytics parameters
       final language = languageProvider.language;
       final licenseType = progressProvider.progress.selectedLicense ?? 'driver';
-      final state = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'IL';
+      final state = authProvider.user?.state ?? stateProvider.selectedState?.id ?? 'unknown';
       
       // Log Learn by Topics started analytics event
       await analyticsService.trackLearnByTopicsStarted(

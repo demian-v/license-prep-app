@@ -17,6 +17,26 @@ class ContentVersionService {
   static const String prefsKey = 'content_version';
   static const String functionName = 'getContentVersion';
 
+  static const String schemaKey = 'content_cache_schema';
+
+  /// App fix C: drop content caches written by an older cache format, once.
+  /// Runs at startup, offline too (no server call), before any screen reads a
+  /// cache. Silent on failure - the TTL is still the fallback.
+  Future<void> dropCachesFromOlderSchema() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final stored = prefs.getInt(schemaKey);
+      if (ContentCachePolicy.shouldDropForSchema(stored)) {
+        print('🔄 Content cache schema $stored → ${ContentCachePolicy.cacheSchema}, dropping cached content');
+        await serviceLocator.theoryCache.clearAllCaches();
+        await serviceLocator.quizCache.clearAllQuizCaches();
+        await prefs.setInt(schemaKey, ContentCachePolicy.cacheSchema);
+      }
+    } catch (e) {
+      print('⚠️ Content cache schema check failed, keeping cache: $e');
+    }
+  }
+
   /// Fetch the server version and clear content caches if it differs from the
   /// one stored on this device. Returns the version now stored, or null if the
   /// check could not be completed.

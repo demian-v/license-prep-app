@@ -47,10 +47,10 @@ void main() {
         // and in the comment that justified it ("to match Firebase data
         // structure") — which the topic query one line above disproved.
         //
-        // `?? 'IL'` is deliberately allowed: that is the last-resort fallback
-        // when neither the account nor the picker knows a state, and it has to
-        // be something.
-        final literals = RegExp(r"""state:\s*(['"])(IL|NY)\1""")
+        // `?? 'IL'` is no longer allowed (App fix C): with no known state the
+        // screens use the app's no-state value ('ALL', or 'unknown' for
+        // analytics) instead of silently serving Illinois.
+        final literals = RegExp(r"""(state:\s*|\?\?\s*)(['"])(IL|NY)\2""")
             .allMatches(source)
             .map((m) => m.group(0))
             .toList();
